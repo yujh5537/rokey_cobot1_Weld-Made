@@ -1,0 +1,90 @@
+services:
+
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: weld_made_mosquitto
+    restart: unless-stopped
+
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: weld_made_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # FastAPI Backend
+  fastapi:
+    build:
+      context: ../backend/app
+
+    container_name: weld_made_fastapi
+    restart: unless-stopped
+
+    ports:
+      - "${FASTAPI_PORT:-8000}:8000"
+
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      mosquitto:
+        condition: service_started
+
+  # Spring Boot Backend
+  spring:
+    build:
+      context: ../backend/spring
+
+    container_name: weld_made_spring
+    restart: unless-stopped
+
+    ports:
+      - "${SPRING_PORT:-8080}:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+volumes:
+  mosquitto_data:
+  postgres_data:
