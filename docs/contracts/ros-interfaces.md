@@ -1,7 +1,7 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의). 변경은 PR + `CHANGELOG.md`로만 한다.
-패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 T09에서 이 문서의 타입 전문을 그대로 옮겨 만든다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
+패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
 표기: **TBD** = 오늘 정하지 않은 것(9장). 수치는 전부 설계 출발값이며 계약이 아니다. 값은 `contact_scan_bringup/config/*.yaml`에만 둔다.
@@ -540,7 +540,15 @@ geometry_estimator 내부 오류 문자열은 scan_manager가 매핑한다: `GEO
 | `session_id` | string | FastAPI | 웹 세션 UUID |
 
 ### 6.3 QoS 프로파일
-발행 · 구독 양쪽이 **같은 프로파일 정의를 import**해서 쓴다(불일치하면 연결되지 않는다). 정의 위치는 T09에서 정한다.
+발행 · 구독 양쪽이 **같은 프로파일 정의를 import**해서 쓴다(불일치하면 연결되지 않는다).
+
+**정의 위치 [v0.1.1 확정 · T09]**: `contact_scan_interfaces` 패키지가 설치하는 Python 모듈 **`contact_scan_qos`**. `package.xml`에는 `contact_scan_interfaces` 의존만 선언하면 된다.
+```python
+from contact_scan_qos import QOS_SENSOR, QOS_STATE, QOS_EVENT, QOS_LOG, QOS_HEARTBEAT
+```
+- 모듈 이름이 패키지 이름과 다른 이유: rosidl Python 생성기가 이미 `contact_scan_interfaces`라는 Python 패키지를 설치하므로 같은 이름으로는 설치할 수 없다(CMake 타깃 중복으로 configure 실패, 2026-09-18 Jazzy 빌드로 확인).
+- 아래 표의 값은 계약이므로 ROS 파라미터로 빼지 않고 모듈에 고정한다. 값을 바꿀 때는 이 표와 모듈을 같이 바꾼다.
+- 표의 이름으로 찾을 때는 `contact_scan_qos.PROFILES['SENSOR']`.
 
 | 프로파일 | Reliability | Durability | History |
 |---|---|---|---|
@@ -627,5 +635,5 @@ T01 회의에서 **담당 · 기한 없이 TBD로 두기로** 했다. 정해지�
 - `RobotStatus.moving`의 근거, 두산 서비스 실제 이름
 - 홈 복귀 경로 · 순서, 중단 위치 재접근 절차, 이상 상태별 재시작 허용 조건
 - heartbeat 만료 시 조치(`warn`/`stop`) · 브라우저 단절 정책, 데이터 최신성 한계
-- QoS 프로파일 정의 위치(T09), 실측 발행 주기(T15)
+- 실측 발행 주기(T15)
 - result_store 파일 형식 · 스키마

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>contact_scan_interfaces</name>
+  <version>0.1.0</version>
+  <description>접촉 스캔 시스템의 msg/srv/action 과 QoS 프로파일. 기준은 docs/contracts/ros-interfaces.md (계약 v0.1).</description>
+  <maintainer email="ok778ts123@gmail.com">bhpark</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <!-- 두산(dsr_msgs2) 의존은 넣지 않는다. CI 에 없다. -->
+  <depend>builtin_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <depend>action_msgs</depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <!-- contact_scan_qos 모듈이 rclpy.qos 를 쓴다 -->
+  <exec_depend>rclpy</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
