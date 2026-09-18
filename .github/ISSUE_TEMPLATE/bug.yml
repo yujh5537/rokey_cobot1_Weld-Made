@@ -1,0 +1,26 @@
+name: 버그 / 통합 깨짐
+description: 통합 빌드·sim 종단·실기에서 발견한 문제
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: where
+    attributes:
+      label: 발견 위치
+      options: ["CI", "저녁 통합 빌드", "sim 종단 실행", "Virtual Mode", "실기", "웹"]
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 재현 방법과 실제 결과
+      description: 명령, 로그, 커밋 해시
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 결과 (계약·BRD 근거)
+  - type: input
+    id: owner
+    attributes:
+      label: 원인으로 보이는 패키지 / 담당자

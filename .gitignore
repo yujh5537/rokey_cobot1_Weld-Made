@@ -1,0 +1,43 @@
+# 레포 밖에서 관리하는 것 (강사 제공·서드파티)
+/ws_dsr/
+/DartPlatform/
+
+# ROS 2 / colcon
+ws_cobot1/build/
+ws_cobot1/install/
+ws_cobot1/log/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 실행 중 생성되는 측정 원본·로그 (result_store). 시험 결과는 docs/test-reports/에 요약만 올린다
+ws_cobot1/data/
+*.bag
+*.db3
+*.mcap
+
+# 웹
+node_modules/
+frontend/dist/
+backend/spring/build/
+backend/spring/.gradle/
+.venv/
+venv/
+
+# 비밀·개인 설정
+.env
+.env.*
+!.env.example
+CLAUDE.local.md
+.claude/settings.local.json
+
+# 공개 레포에 올리면 안 되는 자료 (강의안, 두산 매뉴얼)
+*.pdf
+
+# 에디터·OS
+.vscode/
+.idea/
+.DS_Store
+
+# 강의안 파생 자료 (공개 레포 제외, 로컬 보관)
+/docs/_local/

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(colcon build:*)",
+      "Bash(colcon test:*)",
+      "Bash(colcon test-result:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./**/.env)",
+      "Bash(sodreal:*)",
+      "Bash(* mode:=real*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)"
+    ]
+  }
+}

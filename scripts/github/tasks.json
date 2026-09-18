@@ -1,0 +1,1140 @@
+{
+ "milestones": [
+  {
+   "title": "M1 9/18 계약 동결·골격·환경",
+   "due_on": "2026-09-18T14:59:59Z"
+  },
+  {
+   "title": "M2 9/19 sim 종단 흐름",
+   "due_on": "2026-09-19T14:59:59Z"
+  },
+  {
+   "title": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "due_on": "2026-09-20T14:59:59Z"
+  },
+  {
+   "title": "M4 9/21 실기 종단·기능 동결",
+   "due_on": "2026-09-21T14:59:59Z"
+  },
+  {
+   "title": "M5 9/22 시험·시연",
+   "due_on": "2026-09-22T14:59:59Z"
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T01",
+   "title": "인터페이스 v0.1 동결 회의 (msg·srv·action 필드, MQTT 토픽·JSON 스키마, 단위, 명령 ID, 재시작 연결 방식)",
+   "owners": [
+    "학민",
+    "현지",
+    "병후",
+    "의석"
+   ],
+   "brd": "4.7절",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:contract",
+    "type:meeting"
+   ],
+   "scope": [
+    "docs/contracts/",
+    "ws_cobot1/src/contact_scan_interfaces/"
+   ],
+   "docs": [
+    "docs/contracts/README.md",
+    "docs/BRD.md 4.7절"
+   ],
+   "done": [
+    "docs/contracts/README.md의 체크리스트 항목이 확정 또는 TBD(담당·기한)로 정리됐다",
+    "ros-interfaces.md, mqtt-schema.md가 v0.1로 갱신되고 CHANGELOG에 기록됐다",
+    "재시작 연결 방식이 정해졌다"
+   ],
+   "note": "시간이 부족해도 오늘 끝낸다 (M1)."
+  },
+  {
+   "id": "T02",
+   "title": "sodreal 실기 연결, 툴 무게·무게중심·TCP 등록",
+   "owners": [
+    "학민"
+   ],
+   "brd": "4.1.5, 6장",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:env",
+    "hw:real-robot",
+    "type:impl"
+   ],
+   "scope": [
+    "docs/env/",
+    "docs/contracts/units-frames.md"
+   ],
+   "docs": [
+    "docs/contracts/units-frames.md",
+    "docs/env/setup-record-20260916.md"
+   ],
+   "done": [
+    "sodreal로 실기 연결 확인",
+    "RG2+탐침의 툴 무게·무게중심·TCP가 등록되고 값이 units-frames.md에 기록됐다",
+    "무접촉 정지 상태의 외력 크기를 기록했다 (4.1.5)"
+   ],
+   "note": "시간이 부족해도 오늘 끝낸다 (M1). Real 모드에서 dance 예제 실행 금지."
+  },
+  {
+   "id": "T03",
+   "title": "작업대 원점·z=0·홈 자세 확정",
+   "owners": [
+    "학민"
+   ],
+   "brd": "6장",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:env",
+    "hw:real-robot",
+    "type:impl"
+   ],
+   "scope": [
+    "docs/contracts/units-frames.md"
+   ],
+   "docs": [
+    "docs/contracts/units-frames.md",
+    "docs/BRD.md 6장"
+   ],
+   "done": [
+    "작업대 원점·축 방향·z=0 기준(작업대 표면/지그 지지면 구분)·홈 자세가 units-frames.md에 확정일·확인자와 함께 기록됐다"
+   ],
+   "note": "홈위치와 작업대 원점은 다른 것이다."
+  },
+  {
+   "id": "T04",
+   "title": "API 호출 확인 로그 (get_tool_force, move_stop, task_compliance_ctrl, set_desired_force, drl_script_run)",
+   "owners": [
+    "학민"
+   ],
+   "brd": "6장 제약, [E19]",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:env",
+    "hw:real-robot",
+    "type:impl"
+   ],
+   "scope": [
+    "docs/env/api-check-log.md"
+   ],
+   "docs": [
+    "docs/env/api-check-log.md"
+   ],
+   "done": [
+    "get_tool_force, move_stop, task_compliance_ctrl, set_desired_force, drl_script_run의 호출 경로와 Virtual/Real 성공 여부가 항목별로 기록됐다",
+    "ws_dsr 커밋 해시가 docs/env/versions.md에 기록됐다"
+   ],
+   "note": "호출 성공은 접촉 성능 검증이 아니다."
+  },
+  {
+   "id": "T05",
+   "title": "저장소 구조(ws_cobot1/src)와 브랜치 규칙 수립",
+   "owners": [
+    "현지"
+   ],
+   "brd": null,
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:infra",
+    "type:impl"
+   ],
+   "scope": [
+    ".github/",
+    ".claude/",
+    "CLAUDE.md",
+    "docs/conventions.md",
+    "ws_cobot1/src/contact_scan_bringup/",
+    "scripts/"
+   ],
+   "docs": [
+    "SETUP.md"
+   ],
+   "done": [
+    "레포 생성, 브랜치 보호, CODEOWNERS 아이디 치환, 이슈·마일스톤 생성 완료",
+    "팀원 4명이 클론해서 빈 워크스페이스 빌드 통과",
+    "contact_scan_bringup 패키지와 sim/real 파라미터 파일 골격"
+   ],
+   "note": null
+  },
+  {
+   "id": "T06",
+   "title": "일일 통합 빌드 주관 (저녁 main 병합, sim 종단 실행)",
+   "owners": [
+    "현지"
+   ],
+   "brd": null,
+   "milestone": "M5 9/22 시험·시연",
+   "labels": [
+    "area:infra",
+    "type:impl"
+   ],
+   "scope": [
+    "docs/test-reports/daily/"
+   ],
+   "docs": [
+    ".claude/skills/daily-integration/SKILL.md"
+   ],
+   "done": [
+    "- [ ] 9/18 통합 기록\n- [ ] 9/19 통합 기록\n- [ ] 9/20 통합 기록\n- [ ] 9/21 통합 기록 + 기능 동결 확인\n- [ ] 9/22 시연 전 최종 통합"
+   ],
+   "note": "매일 반복되는 작업이라 이슈 하나에 체크리스트로 관리한다. 통합이 깨지면 원인 패키지 담당자가 당일 고친다."
+  },
+  {
+   "id": "T07",
+   "title": "contact_detector 골격, sim 입력원(가상 직육면체)",
+   "owners": [
+    "현지"
+   ],
+   "brd": "4.1.6",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:detect",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/contact_detector/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md"
+   ],
+   "done": [
+    "빈 노드가 빌드되고 실행된다",
+    "sim 입력원: 가상 직육면체 치수와 TCP 위치로 접촉 상태를 만들어 공통 접촉 이벤트를 발행한다",
+    "입력원을 ROS 파라미터로 전환한다 (4.1.6)"
+   ],
+   "note": null
+  },
+  {
+   "id": "T08",
+   "title": "무접촉 외력 잡음·수집 주기 측정",
+   "owners": [
+    "현지",
+    "학민"
+   ],
+   "brd": "TR-01, 위험 1",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:detect",
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md 위험 1, TR-01"
+   ],
+   "done": [
+    "무접촉 정지 상태의 외력 잡음(평균·표준편차)과 샘플 실제 수신 주기를 측정해 docs/test-reports/에 기록했다"
+   ],
+   "note": "실기 약 30분. 설정상 50 Hz와 실측 주기를 구분한다."
+  },
+  {
+   "id": "T09",
+   "title": "contact_scan_interfaces 패키지 빌드",
+   "owners": [
+    "병후"
+   ],
+   "brd": "4.7절",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:contract",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/contact_scan_interfaces/",
+    "docs/contracts/ros-interfaces.md"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md"
+   ],
+   "done": [
+    "T01에서 동결한 msg/srv/action이 빌드된다",
+    "다른 패키지에서 import해서 빌드가 통과한다",
+    "ros-interfaces.md의 타입 정의와 .msg 파일이 일치한다"
+   ],
+   "note": "M1의 선행 조건. 다른 세 명이 이 패키지를 기다린다."
+  },
+  {
+   "id": "T10",
+   "title": "scan_manager 상태 기계 골격",
+   "owners": [
+    "병후"
+   ],
+   "brd": "4.6절",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:scan",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/scan_manager/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/architecture.md"
+   ],
+   "done": [
+    "상태(대기, 윗면 탐색, 모서리 탐색 n/4, 형상 생성, 완료, 오류, 중단)와 전이가 정의된 빈 상태 기계가 빌드된다",
+    "상태 전이 단위 테스트가 ROS 없이 돈다"
+   ],
+   "note": null
+  },
+  {
+   "id": "T11",
+   "title": "docker-compose: Mosquitto, PostgreSQL, FastAPI, Spring Boot 골격",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.7절",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "docker/",
+    "backend/"
+   ],
+   "docs": [
+    "docs/contracts/mqtt-schema.md"
+   ],
+   "done": [
+    "docker compose up으로 Mosquitto, PostgreSQL, FastAPI, Spring Boot 골격이 뜬다",
+    ".env.example만 커밋됐다 (.env 없음)",
+    "메인 PC에서 웹 PC 브로커에 접속된다"
+   ],
+   "note": "공개 레포다. 비밀번호를 커밋하지 않는다."
+  },
+  {
+   "id": "T12",
+   "title": "React·Three.js 프로젝트 골격, MQTT 목업 발행기",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.4절",
+   "milestone": "M1 9/18 계약 동결·골격·환경",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "frontend/",
+    "backend/mock_publisher/"
+   ],
+   "docs": [
+    "docs/contracts/mqtt-schema.md"
+   ],
+   "done": [
+    "React+Three.js 프로젝트가 빌드된다 (package-lock.json 커밋)",
+    "목업 발행기가 mqtt-schema.md v0.1 그대로 state/sample/event/result/log를 발행한다"
+   ],
+   "note": null
+  },
+  {
+   "id": "T13",
+   "title": "robot_manager: execute_motion Action (하강, 슬라이딩, 원점 복귀, 홈)",
+   "owners": [
+    "학민"
+   ],
+   "brd": "4.2.1~4.2.3, 4.2.6",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:robot",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/robot_manager/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/contracts/units-frames.md",
+    "docs/env/api-check-log.md"
+   ],
+   "done": [
+    "execute_motion Action으로 하강·슬라이딩·원점 복귀·홈이 Virtual Mode에서 동작한다",
+    "amovel 비동기 실행 중에도 정지 요청과 샘플 발행이 처리된다 (4.2.3)",
+    "Action 취소 접수와 실제 정지 완료가 구분된다",
+    "DSR 단위(mm, deg)↔계약 단위 변환이 robot_manager 안에만 있다"
+   ],
+   "note": null
+  },
+  {
+   "id": "T14",
+   "title": "/robot/stop (move_stop), 순응·힘 제어 finally 해제",
+   "owners": [
+    "학민"
+   ],
+   "brd": "4.5.1, 4.5.2",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:robot",
+    "safety",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/robot_manager/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/env/api-check-log.md"
+   ],
+   "done": [
+    "/robot/stop이 move_stop(DR_QSTOP)으로 이동을 정지시킨다",
+    "순응·힘 제어가 예외·취소·정지 등 모든 종료 경로에서 해제된다 (try/finally)",
+    "예외 주입 테스트가 있다 (4.5.2)"
+   ],
+   "note": null
+  },
+  {
+   "id": "T15",
+   "title": "RobotSample 발행, Virtual Mode 모션 검증, 발행 주기 실측",
+   "owners": [
+    "학민"
+   ],
+   "brd": "4.1.6, 위험 1",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:robot",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/robot_manager/",
+    "docs/contracts/ros-interfaces.md"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md"
+   ],
+   "done": [
+    "RobotSample이 TCP·힘의 취득 시각·프레임·유효성을 각각 담아 발행된다",
+    "Virtual Mode에서 모션 검증",
+    "실제 발행 주기를 실측해 ros-interfaces.md QoS 절에 기록했다"
+   ],
+   "note": null
+  },
+  {
+   "id": "T16",
+   "title": "contact_detector 완성 (tare·임계·z 급강하·디바운스 파라미터화)",
+   "owners": [
+    "현지"
+   ],
+   "brd": "4.1.1~4.1.6",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:detect",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/contact_detector/",
+    "ws_cobot1/src/contact_scan_bringup/config/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/BRD.md 4.1절"
+   ],
+   "done": [
+    "tare(/contact/tare): 무접촉 정지 1~2초 평균을 기준값으로 저장",
+    "접촉 발생: 기준값 대비 외력 임계, 접촉 소실: z 급강하(주)+외력 감소(보조)",
+    "연속 N회 디바운스",
+    "임계·디바운스·급강하·입력원이 모두 ROS 파라미터",
+    "이벤트에 판정 샘플의 좌표·시각과 motion_id가 들어간다",
+    "녹화된 샘플 열로 판정 로직 단위 테스트"
+   ],
+   "note": null
+  },
+  {
+   "id": "T17",
+   "title": "geometry_estimator와 단위 테스트 (꼭짓점, 엣지·경로 후보, 편향 보정, 비정상 검출)",
+   "owners": [
+    "현지"
+   ],
+   "brd": "4.3.1~4.3.3, 4.3.5, 4.2.4",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:detect",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/scan_manager/scan_manager/geometry_estimator/",
+    "ws_cobot1/src/scan_manager/test/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.3절, 1.4절 편향 보정"
+   ],
+   "done": [
+    "네 방향 좌표+윗면 높이 → 꼭짓점 4개, 외곽 엣지·경로 후보 4개(시작·끝·길이), 직육면체(꼭짓점 8, 모서리 12), 가로·세로·높이",
+    "편향 보정 √(2rδ−δ²)+속도×지연을 파라미터로 적용",
+    "비정상 형상(폭 0 이하, 높이 음수, 미측정값 포함) 오류 보고",
+    "rclpy import 없음, pytest가 ROS 없이 통과"
+   ],
+   "note": "scan_manager 패키지 안의 모듈이지만 소유자는 현지다. 병후와 모듈 입출력 형식을 먼저 맞춘다."
+  },
+  {
+   "id": "T18",
+   "title": "safety_monitor 최소판 (30 N, 하강 제한 5 mm에서 정지 요청)",
+   "owners": [
+    "현지"
+   ],
+   "brd": "4.5.3, 4.5.4",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:detect",
+    "safety",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/safety_monitor/",
+    "ws_cobot1/src/contact_scan_bringup/config/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/BRD.md 4.5.3, 4.5.4"
+   ],
+   "done": [
+    "과대 외력(출발값 30 N) 또는 하강 제한(출발값 5 mm) 초과 시 웹을 거치지 않고 /robot/stop을 요청한다",
+    "원인·위치·단계를 발행한다",
+    "한계값은 ROS 파라미터"
+   ],
+   "note": null
+  },
+  {
+   "id": "T19",
+   "title": "scan_manager 전체 시퀀스 sim 구동",
+   "owners": [
+    "병후"
+   ],
+   "brd": "4.6절, US-07",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:scan",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/scan_manager/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/architecture.md"
+   ],
+   "done": [
+    "sim 입력원으로 윗면 1점 → ±x, ±y 4점 → 형상 계산 → 완료까지 전체 시퀀스가 돈다",
+    "방향 사이에 팁을 들어 탐색 기준 원점으로 복귀한다 (4.2.6, 홈 안전복귀와 구분)",
+    "최대 이동 거리 안에 접촉/소실이 없으면 실패 처리하고 원인·단계·위치를 기록한다 (4.2.5)",
+    "이벤트를 motion_id와 대조한다"
+   ],
+   "note": "M2의 핵심."
+  },
+  {
+   "id": "T20",
+   "title": "result_store 로컬 기록",
+   "owners": [
+    "병후"
+   ],
+   "brd": "4.4.7",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:scan",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/scan_manager/scan_manager/result_store/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.4.7"
+   ],
+   "done": [
+    "job_id, 단계, 방향, 중단 위치, 좌표 기준, 확정 측정값, 적용 설정을 메인 PC 파일로 보존한다",
+    "실패·미측정값을 0으로 저장하지 않는다",
+    "프로세스를 재시작해도 기록을 다시 읽을 수 있다"
+   ],
+   "note": "저장 위치는 ws_cobot1/data/ (gitignore)."
+  },
+  {
+   "id": "T21",
+   "title": "mqtt_bridge: 명령 4종, 상태·샘플·이벤트·결과·로그 발행",
+   "owners": [
+    "병후"
+   ],
+   "brd": "4.4.2, 4.7절",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:bridge",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/mqtt_bridge/"
+   ],
+   "docs": [
+    "docs/contracts/mqtt-schema.md",
+    "docs/contracts/ros-interfaces.md"
+   ],
+   "done": [
+    "명령 4종(시작·중지·안전복귀·재시작)을 MQTT에서 받아 ROS Action/Service로 전달한다",
+    "command_id 중복 실행 방지, 접수(ack)와 완료(result)를 따로 발행한다",
+    "상태·샘플·이벤트·결과·로그를 mqtt-schema.md대로 발행한다 (단위 변환은 여기서만)",
+    "목업 JSON 예시로 직렬화 단위 테스트"
+   ],
+   "note": null
+  },
+  {
+   "id": "T22",
+   "title": "FastAPI: MQTT↔WebSocket, 명령 REST→MQTT, 접수/완료 구분",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.4.2, 4.7절",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "backend/app/"
+   ],
+   "docs": [
+    "docs/contracts/mqtt-schema.md"
+   ],
+   "done": [
+    "MQTT 구독 → WebSocket 중계",
+    "명령 REST → MQTT 발행, command_id 부여",
+    "접수/거절과 완료/실패를 구분해 프런트에 전달"
+   ],
+   "note": null
+  },
+  {
+   "id": "T23",
+   "title": "3D 뷰(작업대, 팁 위치·궤적, 접촉점), 4버튼, 단계 표시 (목업 데이터)",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.4.1, 4.4.2, 4.4.4",
+   "milestone": "M2 9/19 sim 종단 흐름",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "frontend/"
+   ],
+   "docs": [
+    "docs/contracts/mqtt-schema.md",
+    "docs/BRD.md 4.4절"
+   ],
+   "done": [
+    "목업 데이터로 작업대, 팁 현재 위치·궤적, 접촉점 3D 표시",
+    "서로 다른 명령을 보내는 4버튼",
+    "현재 단계 상시 표시 (대기/윗면/모서리 n/4/형상/완료/오류)"
+   ],
+   "note": "Must 항목(3D, 4버튼, 로그, 단계 표시)을 Day 3까지 먼저 끝낸다."
+  },
+  {
+   "id": "T24",
+   "title": "실기 TR-01: 수직 하강 접촉 임계값 튜닝",
+   "owners": [
+    "학민",
+    "현지"
+   ],
+   "brd": "TR-01, 4.2.1",
+   "milestone": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "labels": [
+    "area:robot",
+    "area:detect",
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "ws_cobot1/src/contact_scan_bringup/config/real.yaml",
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-01, 4.2.1",
+    "docs/contracts/units-frames.md"
+   ],
+   "done": [
+    "수직 하강 접촉의 임계값을 튜닝하고 real.yaml을 PR로 반영",
+    "검출 하중, 판정 지연, 같은 점 10회 접촉 좌표 산포를 TR-01 보고서에 기록",
+    "합격 기준: 접촉 검출 하중 5 N 이하"
+   ],
+   "note": "한 명은 티치펜던트 비상정지 앞에서 대기한다. 탐침·기준 블록이 없으면 실기 일정 전체가 하루씩 밀린다."
+  },
+  {
+   "id": "T25",
+   "title": "실기: 누름 슬라이딩, 모서리 z 급강하 검출 (+x 먼저, 이후 4방향)",
+   "owners": [
+    "학민",
+    "현지"
+   ],
+   "brd": "4.2.2, 4.5.4",
+   "milestone": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "labels": [
+    "area:robot",
+    "area:detect",
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "ws_cobot1/src/contact_scan_bringup/config/real.yaml",
+    "docs/test-reports/",
+    "ws_cobot1/src/robot_manager/",
+    "ws_cobot1/src/contact_detector/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.2.2, 4.5.4"
+   ],
+   "done": [
+    "누름 슬라이딩이 실기에서 동작한다",
+    "+x 모서리 z 급강하 검출 → 이후 4방향",
+    "모서리에서 하강량이 제한값(출발값 5 mm) 안에 머문다",
+    "M3: 윗면 1점 + 모서리 1방향 이상 검출"
+   ],
+   "note": "한 명은 비상정지 대기."
+  },
+  {
+   "id": "T26",
+   "title": "중지·안전복귀·재시작 로직 (진행 기록 보존, 중단 위치부터 계속)",
+   "owners": [
+    "병후"
+   ],
+   "brd": "4.4.8, 4.4.9, 4.5.1",
+   "milestone": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "labels": [
+    "area:scan",
+    "safety",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/scan_manager/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/BRD.md 4.4.8, 4.4.9, 4.5.1"
+   ],
+   "done": [
+    "중지: 이동 정지 + 순응·힘 제어 해제 + 중단 위치·진행 기록. 홈 복귀·재시작을 자동 실행하지 않는다",
+    "안전복귀: 홈위치로 복귀, 로그와 기존 측정값 보존",
+    "재시작: result_store에서 중단 단계·방향·기존 측정값을 읽어 중단 위치부터 계속. 새 작업 시작과 구분",
+    "sim에서 +x 중 중지 → 재시작 → z_top 유지 확인 테스트"
+   ],
+   "note": "홈 복귀 경로·재접근 절차는 미결정(BRD 6장). 팀 확인 없이 정하지 않는다."
+  },
+  {
+   "id": "T27",
+   "title": "mqtt_bridge↔FastAPI 실제 연결",
+   "owners": [
+    "병후",
+    "의석"
+   ],
+   "brd": "4.7절",
+   "milestone": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "labels": [
+    "area:bridge",
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/mqtt_bridge/",
+    "backend/app/",
+    "docs/contracts/mqtt-schema.md"
+   ],
+   "docs": [
+    "docs/contracts/mqtt-schema.md"
+   ],
+   "done": [
+    "웹 PC 브로커를 통해 실제 mqtt_bridge ↔ FastAPI 연결",
+    "웹 버튼으로 sim 스캔 시작·중지 동작 (M3)",
+    "목업과 실제 메시지의 스키마 차이가 있으면 mqtt-schema.md와 CHANGELOG를 고쳤다"
+   ],
+   "note": null
+  },
+  {
+   "id": "T28",
+   "title": "PostgreSQL 스키마, FastAPI 측정·이벤트 DB 쓰기",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.3.4",
+   "milestone": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "backend/app/",
+    "docker/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.3.4, 4.7절 저장 계약"
+   ],
+   "done": [
+    "PostgreSQL 스키마(작업, 측정, 이벤트, 설정)",
+    "FastAPI가 측정·이벤트를 DB에 쓴다",
+    "미측정·실패를 NULL로 저장하고 정상 0과 구분",
+    "MQTT 수신을 DB 커밋 완료로 취급하지 않는다"
+   ],
+   "note": null
+  },
+  {
+   "id": "T29",
+   "title": "시간순 로그 패널, 접수/거절·완료/실패 표시",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.4.3, 4.4.2",
+   "milestone": "M3 9/20 실기 첫 접촉·웹-ROS 연결",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "frontend/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.4.2, 4.4.3"
+   ],
+   "done": [
+    "단계·좌표·오류의 시간순 로그 패널",
+    "명령별 접수/거절, 완료/실패 표시"
+   ],
+   "note": null
+  },
+  {
+   "id": "T30",
+   "title": "실기 5점 전체 탐색, 편향 보정 상수 실측",
+   "owners": [
+    "학민",
+    "현지"
+   ],
+   "brd": "4.2.4, 위험 3",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "area:robot",
+    "area:detect",
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "ws_cobot1/src/contact_scan_bringup/config/real.yaml",
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.2.4, 위험 3"
+   ],
+   "done": [
+    "실기에서 5점 전체 탐색 완료",
+    "기준 블록으로 편향 보정 상수를 실측해 real.yaml에 반영 (PR)"
+   ],
+   "note": "M4 선행."
+  },
+  {
+   "id": "T31",
+   "title": "TR-02 (블록 2종, ±3 mm), 120초 이내 확인",
+   "owners": [
+    "학민",
+    "현지"
+   ],
+   "brd": "TR-02, 5장",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-02, 5장, 9장"
+   ],
+   "done": [
+    "기준 부재 2종의 가로·세로·높이·모서리 좌표 오차 ±3 mm 이내",
+    "전체 탐색 120초 이내",
+    "TR-02 보고서 작성"
+   ],
+   "note": "좌표계·TCP 기준 확정(T03) 후 실시."
+  },
+  {
+   "id": "T32",
+   "title": "실기 중지·안전복귀·재시작 검증 (TR-08), 홈 복귀 경로·재접근 절차 확정",
+   "owners": [
+    "병후",
+    "학민"
+   ],
+   "brd": "TR-08, 6장",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "area:scan",
+    "area:robot",
+    "type:test",
+    "hw:real-robot",
+    "safety"
+   ],
+   "scope": [
+    "ws_cobot1/src/scan_manager/",
+    "ws_cobot1/src/robot_manager/",
+    "docs/contracts/units-frames.md",
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-08, 6장 미결정 사항"
+   ],
+   "done": [
+    "실기에서 +x 탐색 중 중지 → 재시작으로 z_top 유지, 중단 위치부터 계속 (로그로 검증)",
+    "중지만으로 홈 복귀하지 않음",
+    "홈 복귀 경로와 재접근 절차를 팀이 확정해 units-frames.md와 ADR에 기록",
+    "TR-08 보고서"
+   ],
+   "note": null
+  },
+  {
+   "id": "T33",
+   "title": "safety_monitor 확장 (데이터 최신성, heartbeat)",
+   "owners": [
+    "현지"
+   ],
+   "brd": "4.6절, 위험 10",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "area:detect",
+    "safety",
+    "type:impl"
+   ],
+   "scope": [
+    "ws_cobot1/src/safety_monitor/"
+   ],
+   "docs": [
+    "docs/contracts/ros-interfaces.md",
+    "docs/BRD.md 위험 10"
+   ],
+   "done": [
+    "샘플 최신성(허용 시각 차이) 감시",
+    "웹 heartbeat 만료 감시. 브로커·백엔드·브라우저 단절을 구분",
+    "한계값·정책은 팀 확정값을 파라미터로"
+   ],
+   "note": "한계값은 TBD. 확정 전에는 파라미터 기본값을 비활성으로 둔다."
+  },
+  {
+   "id": "T34",
+   "title": "반복성 10회 측정",
+   "owners": [
+    "현지"
+   ],
+   "brd": "9장 KPI",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md 9장 반복성"
+   ],
+   "done": [
+    "같은 부재 10회 탐색 치수의 표준편차 기록 (목표 0.3 mm 이내)"
+   ],
+   "note": "일정이 밀리면 5회로 축소 (범위 조정 6순위)."
+  },
+  {
+   "id": "T35",
+   "title": "Spring Boot: 작업·공작물 관리, 측정 이력 조회",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.3.4, 4.6절",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "backend/spring/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.3.4, 4.6절"
+   ],
+   "done": [
+    "작업·공작물 CRUD",
+    "측정 이력 조회 (읽기 전용)",
+    "MQTT에 명령을 쓰지 않는다"
+   ],
+   "note": "Day 4 하루로 제한. 사용자 관리는 범위 조정 5순위."
+  },
+  {
+   "id": "T36",
+   "title": "엣지·경로 후보 강조와 좌표 표, 홈 복귀·재시작 진행 상태 표시",
+   "owners": [
+    "의석"
+   ],
+   "brd": "4.4.5, 4.4.4",
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "area:web",
+    "type:impl"
+   ],
+   "scope": [
+    "frontend/"
+   ],
+   "docs": [
+    "docs/BRD.md 4.4.4, 4.4.5"
+   ],
+   "done": [
+    "외곽 엣지·경로 후보를 다른 모서리와 구분되는 색으로 강조",
+    "각 선의 좌표·길이 표",
+    "홈 복귀·재시작 진행 상태 표시"
+   ],
+   "note": "엣지 좌표 표는 Should (범위 조정 4순위). 진행 상태 표시는 Must."
+  },
+  {
+   "id": "T37",
+   "title": "기능 동결 (월요일 저녁)",
+   "owners": [
+    "학민",
+    "현지",
+    "병후",
+    "의석"
+   ],
+   "brd": null,
+   "milestone": "M4 9/21 실기 종단·기능 동결",
+   "labels": [
+    "type:meeting"
+   ],
+   "scope": [],
+   "docs": [],
+   "done": [
+    "M4 종단 통과 확인",
+    "이후 bug 라벨 이슈의 PR만 머지한다고 전원 확인",
+    "열린 기능 PR 정리 (머지 또는 닫기)"
+   ],
+   "note": null
+  },
+  {
+   "id": "T38",
+   "title": "블록 교체 후 무수정 재실행, TR-03, 20회 연속 오검출 시험",
+   "owners": [
+    "현지"
+   ],
+   "brd": "TR-02, TR-03, 5장",
+   "milestone": "M5 9/22 시험·시연",
+   "labels": [
+    "type:test",
+    "hw:real-robot"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-02, TR-03, 5장"
+   ],
+   "done": [
+    "블록 교체 후 코드·좌표 수정 없이 재실행해 ±3 mm 만족",
+    "TR-03: 중심 ±10 mm, 회전 ±2°에서 오차 변화 기록",
+    "20회 연속 탐색에서 거짓 접촉·거짓 소실 합 1회 이하"
+   ],
+   "note": "TR-03은 범위 조정 3순위."
+  },
+  {
+   "id": "T39",
+   "title": "TR-04 직접교시 시간 비교, TR-07 안전 시험",
+   "owners": [
+    "학민"
+   ],
+   "brd": "TR-04, TR-07",
+   "milestone": "M5 9/22 시험·시연",
+   "labels": [
+    "type:test",
+    "hw:real-robot",
+    "safety"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-04, TR-07"
+   ],
+   "done": [
+    "TR-04: 같은 부재 직접교시 시간 대비 셋업 3분 이내, 50% 이상 단축",
+    "TR-07: 중지·과대 외력·미접촉·예외 주입 시 이동 중지, 순응·힘 제어 해제, 기록 보존. 안전복귀 별도 실행 확인"
+   ],
+   "note": null
+  },
+  {
+   "id": "T40",
+   "title": "TR-09 데이터·명령 연동, 로그 검증",
+   "owners": [
+    "병후"
+   ],
+   "brd": "TR-09",
+   "milestone": "M5 9/22 시험·시연",
+   "labels": [
+    "type:test",
+    "area:bridge"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-09"
+   ],
+   "done": [
+    "sim 데이터로 취득 시각·프레임·유효성 보존 확인",
+    "이벤트와 motion_id 대응",
+    "중복 명령 미실행, 접수와 완료 구분 표시"
+   ],
+   "note": null
+  },
+  {
+   "id": "T41",
+   "title": "TR-05 (반영 지연 200 ms, 중지 1초), TR-10 저장·조회 연동",
+   "owners": [
+    "의석"
+   ],
+   "brd": "TR-05, TR-10",
+   "milestone": "M5 9/22 시험·시연",
+   "labels": [
+    "type:test",
+    "area:web"
+   ],
+   "scope": [
+    "docs/test-reports/"
+   ],
+   "docs": [
+    "docs/BRD.md TR-05, TR-10"
+   ],
+   "done": [
+    "TR-05: 반영 지연 200 ms 이내, 중지 1초 이내, 로그 누락 없음, 4버튼 독립 명령",
+    "TR-10: 메인 PC 원본·FastAPI 쓰기·PostgreSQL·Spring Boot 조회의 식별자·설정 일치, 미측정값이 0으로 저장되지 않음"
+   ],
+   "note": "웹 PC와 메인 PC의 시계 동기화가 지연 측정의 선행 조건. 손이 비는 사람이 같이 측정한다."
+  },
+  {
+   "id": "T42",
+   "title": "버그 수정, 시연 리허설 2회, 백업 영상 녹화, 결과 정리",
+   "owners": [
+    "학민",
+    "현지",
+    "병후",
+    "의석"
+   ],
+   "brd": "9장",
+   "milestone": "M5 9/22 시험·시연",
+   "labels": [
+    "type:meeting"
+   ],
+   "scope": [],
+   "docs": [
+    "docs/BRD.md 9장 수락 기준"
+   ],
+   "done": [
+    "BRD 9장 수락 기준 체크리스트 통과",
+    "시연 리허설 2회",
+    "백업 영상 녹화",
+    "결과 정리 (test-reports 최종)"
+   ],
+   "note": "오후에는 버그 수정만 한다."
+  }
+ ]
+}

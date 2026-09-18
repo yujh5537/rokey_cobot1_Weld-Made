@@ -1,0 +1,79 @@
+name: CI
+
+# 경로 필터를 걸지 않는다. 필수 체크(ros, web)가 실행되지 않으면 머지가 막히기 때문이다.
+# 대신 각 단계가 "파일이 있을 때만" 돌도록 해서 Day 1의 빈 골격에서도 통과한다.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ros:
+    runs-on: ubuntu-24.04
+    container: ros:jazzy-ros-base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: 의존성 설치
+        run: |
+          apt-get update
+          apt-get install -y python3-pytest
+          rosdep update
+          # 두산·RG2 드라이버(dsr_msgs2 등)는 CI에 없다. -r 로 못 찾는 키는 건너뛴다.
+          rosdep install --from-paths ws_cobot1/src --ignore-src -y -r || true
+      - name: colcon build
+        working-directory: ws_cobot1
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --event-handlers console_cohesion+
+      - name: colcon test
+        working-directory: ws_cobot1
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          if [ -f install/setup.bash ]; then source install/setup.bash; fi
+          # 실기·DSR이 필요한 테스트는 pytest 마커 hw 로 표시하고 CI에서 제외한다
+          colcon test --pytest-args -m "not hw" --event-handlers console_cohesion+
+          if [ -d build ]; then colcon test-result --verbose; fi
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: frontend 빌드
+        run: |
+          if [ -f frontend/package.json ]; then
+            cd frontend && npm ci && npm run build
+          else echo "frontend 없음, 건너뜀"; fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: FastAPI 테스트
+        run: |
+          if [ -f backend/app/requirements.txt ]; then
+            cd backend/app && pip install -r requirements.txt pytest
+            if [ -d tests ]; then python -m pytest -q; fi
+          else echo "backend/app 없음, 건너뜀"; fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Spring Boot 빌드
+        run: |
+          if [ -f backend/spring/gradlew ]; then
+            cd backend/spring && chmod +x gradlew && ./gradlew build --no-daemon
+          else echo "backend/spring 없음, 건너뜀"; fi
+      - name: compose 문법 확인
+        run: |
+          if [ -f docker/docker-compose.yml ]; then
+            [ -f docker/.env ] || cp docker/.env.example docker/.env 2>/dev/null || true
+            docker compose -f docker/docker-compose.yml config -q
+          else echo "compose 없음, 건너뜀"; fi

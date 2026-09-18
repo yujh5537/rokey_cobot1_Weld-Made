@@ -1,0 +1,21 @@
+# 필수 리뷰는 "통합 지점"에만 건다. 여기에 없는 경로는 CI 통과 후 작성자가 직접 머지한다.
+# @아이디는 scripts/github/team.json과 같은 값으로 바꾼다.
+# 작성자 본인은 승인할 수 없으므로 경로마다 2명 이상을 둔다.
+
+# ROS 인터페이스 계약 (소유: 병후, 통합: 현지)
+/ws_cobot1/src/contact_scan_interfaces/   @yujh5537 @ok778ts123
+/docs/contracts/                          @yujh5537 @ok778ts123
+
+# ROS↔웹 접점: 병후·의석 양쪽이 같이 본다 (더 구체적인 규칙이 아래에 와야 우선한다)
+/docs/contracts/mqtt-schema.md            @ok778ts123 @EuiseokJeongNZ
+
+# 좌표·TCP·홈 기준: 학민이 확정, 현지가 확인
+/docs/contracts/units-frames.md           @rokeyhak @yujh5537
+
+# scan_manager(병후) 안에 있지만 소유자가 현지인 모듈
+/ws_cobot1/src/scan_manager/scan_manager/geometry_estimator/   @yujh5537 @ok778ts123
+
+# 팀 전원의 Claude 행동을 바꾸는 파일
+/CLAUDE.md          @yujh5537 @ok778ts123
+/.claude/           @yujh5537 @ok778ts123
+/.github/           @yujh5537 @ok778ts123
