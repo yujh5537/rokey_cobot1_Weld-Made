@@ -1,0 +1,11 @@
+string request_id
+bool use_override
+ScanConfig config_override
+---
+string scan_id
+bool success                # 명령 전체(마무리 홈 복귀 포함)의 성공 여부
+uint16 reason_code
+string detail
+ScanResult result           # /scan/result 와 같은 내용. result.success 는 측정의 성공 여부
+---
+ScanState state

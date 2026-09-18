@@ -1,0 +1,7 @@
+string request_id
+ScanConfig config           # *_set = true 인 항목만 적용
+---
+bool success
+uint16 reason_code          # BUSY / INVALID_VALUE / PARAM_SET_FAILED
+string detail
+ScanConfig applied          # 적용 후 전체 값 (모든 *_set = true)

@@ -1,0 +1,9 @@
+# StopRobot.srv  (/robot/stop)
+string request_id
+string requester            # 요청한 노드 이름 ('scan_manager' | 'safety_monitor')
+uint16 reason               # ReasonCode
+string detail
+---
+bool accepted               # 접수 ≠ 정지 완료
+uint16 reason_code
+string detail

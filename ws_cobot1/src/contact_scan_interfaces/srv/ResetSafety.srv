@@ -1,0 +1,6 @@
+string request_id
+string detail               # 관제자 메모 (선택)
+---
+bool success
+uint16 reason_code          # CONDITION_ACTIVE / INVALID_REQUEST
+string detail

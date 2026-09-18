@@ -1,0 +1,47 @@
+uint8 OP_NONE=0             # goal 에는 쓰지 않는다 (RobotSample · RobotStatus 표시용)
+uint8 OP_MOVE_TO=1          # 지정 좌표로 이동. 접촉 판정 없음
+uint8 OP_DESCEND=2          # -z 저속 하강. CONTACT 로 정상 종료
+uint8 OP_SLIDE=3            # 윗면을 누른 채 수평 이동. EDGE 로 정상 종료
+uint8 OP_HOME=4             # 홈위치(파라미터 home_pose)로 이동
+uint8 DIR_NONE=0            # ScanState.DIR_* 와 같은 값
+uint8 DIR_POS_X=1
+uint8 DIR_NEG_X=2
+uint8 DIR_POS_Y=3
+uint8 DIR_NEG_Y=4
+
+string scan_id
+uint32 motion_id            # scan_manager 발급, scan 안에서 1부터 증가
+uint8 operation
+geometry_msgs/Pose target   # MOVE_TO 만 사용
+string frame_id             # target 의 프레임
+uint8 direction             # SLIDE 만 사용. Base 축 기준
+float64 speed               # m/s
+float64 max_distance        # m (DESCEND · SLIDE)
+builtin_interfaces/Duration timeout
+---
+uint8 REASON_TARGET_REACHED=0
+uint8 REASON_CONTACT=1
+uint8 REASON_EDGE=2
+uint8 REASON_MAX_DISTANCE=3
+uint8 REASON_TIMEOUT=4
+uint8 REASON_STOP_REQUESTED=5
+uint8 REASON_CANCELED=6
+uint8 REASON_OVER_FORCE=7
+uint8 REASON_ROBOT_ERROR=8
+uint8 REASON_REJECTED=9
+
+geometry_msgs/Pose pose         # 정지 시점 pose = 중단 위치의 출처
+string frame_id
+builtin_interfaces/Time pose_stamp
+uint8 reason
+uint16 reason_code              # ReasonCode
+string detail
+uint64 event_id                 # 종료 원인이 된 ContactEvent. 없으면 0
+float64 distance_travelled
+bool compliance_released        # 순응·힘 제어 해제 확인. 항상 true 여야 한다
+---
+geometry_msgs/Pose pose
+string frame_id
+builtin_interfaces/Time pose_stamp
+float64 distance_travelled
+builtin_interfaces/Duration elapsed
