@@ -587,7 +587,9 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 | 대상 | 1차 | 2차 |
 |---|---|---|
 | 과대 외력 `over_force_n` | contact_detector `TYPE_OVER_FORCE` → robot_manager 즉시 정지 | safety_monitor 독립 감시 → `/robot/stop` + 래치 |
-| 하강 제한 `drop_limit_m` **[v0.1 변경]** | robot_manager가 SLIDE 안에서 즉시 정지 · 순응 해제. `REASON_ROBOT_ERROR` + `DROP_LIMIT(205)` | safety_monitor가 `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**를 기준으로 하강량을 감시 → `/robot/stop` + 래치 |
+| 하강 제한 `drop_limit_m` **[v0.1 변경]** | robot_manager가 SLIDE 안에서 즉시 정지 · 순응 해제. 기준은 2차와 같다: `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**. `REASON_ROBOT_ERROR` + `DROP_LIMIT(205)` | safety_monitor가 `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**를 기준으로 하강량을 감시 → `/robot/stop` + 래치 |
+
+두 감시의 기준(값과 기준 z)이 다르면 1차보다 2차가 먼저 걸려 래치부터 걸린다. 그래서 값도 기준도 같게 둔다.
 
 ### 7.3 방향 전환 절차 **[v0.1 변경]**
 한 방향의 밀기가 끝나면 scan_manager는 **`OP_MOVE_TO` goal을 연달아 보내** 다음 방향을 준비한다. 재하강(`OP_DESCEND`)은 하지 않는다.
@@ -633,6 +635,8 @@ T01 회의에서 **담당 · 기한 없이 TBD로 두기로** 했다. 정해지�
 - 하강 속도 · 누름 목표 힘 · 내림 속도 · `recontact_margin_m`의 값
 - tare 허용치(`tare_max_force_n` · 불안정 판정) · 외력 감소 보조 신호
 - `RobotStatus.moving`의 근거, 두산 서비스 실제 이름
+- 순응 · 힘 제어 **해제 호출이 실패했을 때** 무엇을 보고하는가(`ExecuteMotion.Result.compliance_released` · `reason_code` · `RobotStatus`의 두 플래그). 5.4절의 "항상 true 여야 한다"는 목표이며 실패 경로는 정해지지 않았다
+- 정지 시 `move_stop` → 순응 · 힘 제어 해제의 순서(4.1절). 순응이 켜진 채 급정지할 때의 반동을 실기에서 확인한 뒤 확정한다
 - 홈 복귀 경로 · 순서, 중단 위치 재접근 절차, 이상 상태별 재시작 허용 조건
 - heartbeat 만료 시 조치(`warn`/`stop`) · 브라우저 단절 정책, 데이터 최신성 한계
 - 실측 발행 주기(T15)

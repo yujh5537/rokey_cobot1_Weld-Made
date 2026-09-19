@@ -15,7 +15,7 @@
 | 각도 | v0.1 MQTT에는 **각도 값을 싣지 않는다.** 자세는 quaternion 그대로. 화면에 deg가 필요하면 웹이 시각화 단계에서 변환한다 |
 | 시각 | **epoch ms 정수(UTC)**. ROS stamp는 `*_stamp_ms` · `*_at_ms`로 각각 보존한다. mqtt_bridge가 발행 시각 `published_at_ms`를 붙인다. 웹이 보내는 메시지의 발신 시각은 `timestamp_ms` |
 | enum | **문자열 이름**(접두사 제외): `"EDGE_SEARCH"` · `"POS_X"` · `"EDGE"` · `"STOP"` · `"SLIDE"` |
-| 사유 코드 | `reason_code`(숫자)와 `reason`(이름)을 함께 싣는다. 다른 코드 필드도 같다(`error_code`+`error`, `code`+`code_name`) |
+| 사유 코드 | `reason_code`(숫자)와 `reason`(이름)을 함께 싣는다. 다른 코드 필드도 같다(`error_code`+`error_name`, `code`+`code_name`). `robot/status`의 `error`는 이름이 아니라 ROS `RobotStatus.error`(bool)와 1:1이다 |
 | 미측정값 | 값은 **`null`**, 짝이 되는 **`*_valid` 키는 항상 유지**한다(키 생략 금지). 0을 쓰지 않는다. mqtt_bridge는 ROS의 `*_valid=false`(값 NaN)를 `null`로 바꾼다 |
 | 식별자 | 명령은 `request_id`(UUID v4, FastAPI 발급), 작업은 `scan_id`. `command_id` · `job_id`라는 이름은 쓰지 않는다 |
 | 와일드카드 | 발행에 와일드카드를 쓰지 않는다 |
@@ -54,9 +54,9 @@
 | ROS → 웹 | `hb/ros` | 0 | false | — | 메인 PC 생존 신호. 1 Hz |
 | ROS → 웹 | `conn/ros` | 1 | **true** | — | mqtt_bridge 연결 상태(LWT) |
 
-- **명령은 전부 retain=false.** retain=true는 상태 4종과 `conn/*`뿐이다. 웹은 retain으로 받은 상태의 `stamp_ms`를 보고 오래된 값을 배제한다.
+- **명령은 전부 retain=false.** retain=true는 상태 3종(`robot/status` · `scan/state` · `safety/status`)과 `conn/*`뿐이다. 웹은 retain으로 받은 상태의 `stamp_ms`를 보고 오래된 값을 배제한다.
 - 구독 필터: FastAPI = `robot/#` · `scan/#` · `contact/#` · `safety/#` · `cmd/ack` · `hb/ros` · `conn/ros`. mqtt_bridge = `cmd/scan/+` · `cmd/safety/reset` · `hb/web` · `conn/web`.
-- mqtt_bridge 파라미터 `topic_prefix`(기본 `""`)로 전체 토픽 앞에 접두사를 붙일 수 있다.
+- mqtt_bridge 파라미터 `topic_prefix`(기본 `""`)로 전체 토픽 앞에 접두사를 붙일 수 있다. **웹(FastAPI · 목업 발행기)은 기본값, 즉 접두사 없는 토픽을 전제로 한다.** 접두사를 쓰려면 웹 쪽 설정도 같이 바꾼다.
 - 검토안(MVP 밖): `cmd/scan/calibrate` · `scan/calibration/result`.
 
 ## 3. 명령 처리 규칙
@@ -64,7 +64,15 @@
 1. 웹이 명령을 발행한다. `request_id`는 FastAPI가 발급한다.
 2. mqtt_bridge가 검사한다.
    - 같은 `request_id`를 다시 받으면 → `cmd/ack` `accepted=false`, `DUPLICATE_REQUEST(106)`. 최근 N개를 기억한다(파라미터 `dedup_cache_size`, 출발값 100).
-   - `timestamp_ms`가 `cmd_expiry_s`(출발값 5)보다 오래됐거나 필수 필드가 없으면 → `INVALID_REQUEST(101)`.
+   - 필수 필드가 없으면 → `INVALID_REQUEST(101)`. 필수 필드는 아래 표.
+   - `timestamp_ms`가 `cmd_expiry_s`(출발값 5)보다 오래됐으면 → `INVALID_REQUEST(101)`. **`cmd/scan/stop`은 만료 검사에서 제외한다**(중복 검사와 필수 필드 검사는 한다). 중지는 멱등이라 늦게 도착해도 결과가 정지뿐이고, 두 PC의 시계가 `cmd_expiry_s` 이상 어긋나 있어도(chrony 적용 전 포함) 중지가 거절되면 안 된다. `cmd/scan/home`(로봇을 움직임)과 `cmd/safety/reset`(래치를 풂)을 포함한 나머지 명령은 만료 검사를 한다.
+
+   | 메시지 | 필수 | 선택 |
+   |---|---|---|
+   | 명령 6종(`cmd/scan/*` · `cmd/safety/reset`) | `schema_version` · `request_id` · `timestamp_ms` · `payload`(빈 객체 가능) | `session_id`(로그 · 추적용. 없어도 거절하지 않는다) · `cmd/scan/resume`의 `scan_id`(없으면 `""`과 같다) |
+   | `hb/web` | `schema_version` · `session_id` · `seq` · `timestamp_ms` | — |
+   | `conn/web` | `schema_version` · `connected` · `timestamp_ms` | — |
+
 3. 통과하면 ROS Action goal / Service를 호출하고, 수락/거절을 `cmd/ack`로 돌려준다. **접수는 완료가 아니다.**
 4. 완료/실패는 `scan/command_result`로 한 번 보낸다(`request_id`로 짝을 맞춘다).
    - start: 마무리 홈 복귀까지 끝난 시점(`RunScan` Result). 형상 데이터는 그보다 먼저 `scan/result`로 간다.

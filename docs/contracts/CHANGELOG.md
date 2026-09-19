@@ -2,14 +2,14 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
-## v0.1.1 (2026-09-18, T09)
+## v0.1.1 (2026-09-18, T09, PR #49)
 타입 변경 없음(msg/srv/action은 v0.1 그대로). `ros-interfaces.md` 6.3절의 TBD였던 **QoS 프로파일 정의 위치**를 확정했다. 영향: Topic을 발행 · 구독하는 자체 노드 5개.
 - 위치: `contact_scan_interfaces` 패키지가 설치하는 Python 모듈 `contact_scan_qos`. 사용: `from contact_scan_qos import QOS_SENSOR`(`QOS_STATE` · `QOS_EVENT` · `QOS_LOG` · `QOS_HEARTBEAT`). 의존 선언은 `contact_scan_interfaces` 하나로 충분하다
 - 이유: rosidl 생성기가 `contact_scan_interfaces`라는 Python 패키지를 이미 설치해 같은 이름으로는 설치할 수 없다(빌드로 확인). 별도 패키지는 의존 선언이 늘고 새 이슈가 필요해 택하지 않았다
 - 값은 6.3절 표 그대로이며 모듈에 고정한다(yaml 파라미터 아님)
 - 9장 TBD에서 "QoS 프로파일 정의 위치(T09)"를 지웠다
 
-## v0.1 (2026-09-18, 동결 회의 T01)
+## v0.1 (2026-09-18, 동결 회의 T01, PR #47)
 최초 동결. 팀 합의 문서인 인터페이스 정의서 통합본 v1.1(BRD v3.1.0 기준)을 계약으로 채택하고, T01 1차(병후·의석) · 2차(전원) 회의 결정을 덧붙였다. 영향: 전 모듈.
 
 **v0.0 초안에서 바뀐 이름**
@@ -36,6 +36,12 @@
 **MQTT (1차 회의)**: ROS와 1:1 구조 · 단위 접미사 키 · enum 문자열 · `reason_code`+`reason` · `schema_version` / 시각 epoch ms · `published_at_ms` / 각도 값 없음(quaternion) / QoS · retain 표 / 미측정 `null` + `*_valid` 유지 / 명령 완료는 `scan/command_result`(start는 위 4번에 따라 마무리 복귀까지 끝난 시점)
 
 **TBD**: 담당 · 기한을 정하지 않고 TBD로 둔다(회의 결정). 목록은 각 문서 끝.
+
+**리뷰 반영 (2026-09-19, PR #47 머지 전)** — 타입 변경 없음
+- `mqtt-schema.md` 3장: `cmd/scan/stop`을 만료 검사에서 제외(중복 · 필수 필드 검사는 유지). 시계가 어긋나도 중지는 거절되면 안 된다. `home` · `safety/reset`은 만료 검사 유지. 영향: mqtt_bridge
+- `mqtt-schema.md` 3장: 필수 필드 표 추가. `session_id`는 명령에서 선택, `hb/web`에서만 필수. 영향: FastAPI 발행부 · 목업 발행기 · mqtt_bridge
+- `mqtt-schema.md` 1장: 코드 필드 표기를 `error_code`+`error_name`으로 정정(4.2절 예시가 맞았다). 2장: retain 상태 "4종" → 3종 정정, `topic_prefix` 기본값이 웹 쪽 전제임을 명시
+- `ros-interfaces.md` 7.2절: 하강 제한 1차(robot_manager)의 기준 z를 2차와 같게 명시. 9장 TBD에 "순응 · 힘 제어 해제 실패 시 보고"와 "`move_stop` → 해제 순서의 실기 확인" 추가
 
 ## v0.0 (2026-09-18)
 - BRD v3.0.0 4.7절의 초안 표를 옮겨 적음. 확정 아님.
