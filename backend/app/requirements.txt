@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 paho-mqtt
 psycopg[binary]
+
+# TestClient transport used by the existing CI test step.
+httpx
