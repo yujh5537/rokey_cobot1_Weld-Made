@@ -1,0 +1,10 @@
+mqtt_bridge:
+  ros__parameters:
+    broker_host: "127.0.0.1"
+    broker_port: 1883
+    topic_prefix: ""
+    dedup_cache_size: 100
+    cmd_expiry_s: 5.0
+    sample_publish_hz: 10.0
+    heartbeat_hz: 1.0
+    keepalive_s: 60
