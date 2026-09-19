@@ -557,7 +557,7 @@
    "id": "T21",
    "title": "mqtt_bridge: 명령 4종, 상태·샘플·이벤트·결과·로그 발행",
    "owners": [
-    "병후"
+    "의석"
    ],
    "brd": "4.4.2, 4.7절",
    "milestone": "M2 9/19 sim 종단 흐름",
@@ -725,7 +725,6 @@
    "id": "T27",
    "title": "mqtt_bridge↔FastAPI 실제 연결",
    "owners": [
-    "병후",
     "의석"
    ],
    "brd": "4.7절",

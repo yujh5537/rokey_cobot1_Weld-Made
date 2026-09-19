@@ -7,7 +7,7 @@
 | `contact_detector` | ament_python | 현지 | T07, T16 |
 | `safety_monitor` | ament_python | 현지 | T18, T33 |
 | `scan_manager` (+ `geometry_estimator/`, `result_store/`) | ament_python | 병후 (geometry_estimator는 현지) | T10, T17, T19, T20, T26 |
-| `mqtt_bridge` | ament_python | 병후 | T21, T27 |
+| `mqtt_bridge` | ament_python | 의석 | T21, T27 |
 | `contact_scan_bringup` | ament_python (launch, config) | 현지 | T05 |
 
 ## 골격 만들기 (Day 1, 각 담당자)
