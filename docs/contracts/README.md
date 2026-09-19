@@ -9,15 +9,18 @@
 | `units-frames.md` | 단위, 좌표계, TCP, 홈, 작업대 원점, z=0 | 학민 |
 | `CHANGELOG.md` | 계약 변경 이력 | 바꾼 사람 |
 
-## T01 동결 회의(9/18)에서 정할 것
-BRD 4.7절이 "계약에서 확정할 사항"으로 남긴 항목이다. 회의에서 못 정한 것은 `TBD`로 남기고 담당과 기한을 적는다.
+## T01 동결 회의(9/18) 결과 — v0.1
+정의서 통합본 v1.1(팀 합의)을 계약 v0.1로 채택하고, 1차(병후·의석) · 2차(전원) 회의 결정을 덧붙였다. 정의서와 달라진 곳은 `CHANGELOG.md`에 있다.
 
-- [ ] msg/srv/action 필드와 타입 (`RobotSample`, `ContactEvent`, `ScanState`, `ScanResult`, `ExecuteMotion`, `RunScan`)
-- [ ] 재시작 연결 방식 (BRD에서 이름·방식 TBD): 별도 Action인가, `/scan/run`의 모드인가
-- [ ] 동작 식별자(motion_id)와 작업 식별자(job_id) 형식
-- [ ] 명령 ID(command_id) 형식, 중복 처리, 접수 응답과 완료 응답의 구분 방법
-- [ ] MQTT 토픽 트리, QoS, retain(명령은 retain=false 방향), JSON 필드
-- [ ] 단위: ROS 내부 m·rad·N, 웹 mm (BRD 제안을 채택할지)
-- [ ] 시각 표기: 취득 시각과 발행 시각, 시계 기준(메인 PC와 웹 PC 동기화)
-- [ ] 미측정·실패 값 표기 (0 금지)
-- [ ] 오류 코드 목록 초안
+- [x] msg/srv/action 필드와 타입 → **확정** (`ros-interfaces.md` 3~5장: msg 8 + 하위 msg 3 · srv 5 · action 4)
+- [x] 재시작 연결 방식 → **확정**: 별도 Action `/scan/resume`. 홈 복귀 후 재접근은 절차 확정 전까지 `NOT_SUPPORTED`
+- [x] 동작 식별자와 작업 식별자 형식 → **확정**: `motion_id` uint32(0 = 없음), 작업 식별자는 `job_id`가 아니라 `scan_id`(`YYYYMMDD-HHMMSS-xxxx`)
+- [x] 명령 ID 형식, 중복 처리, 접수/완료 구분 → **확정**: `command_id`가 아니라 `request_id`(UUID v4). 중복 · 만료는 mqtt_bridge가 거절. 접수 = `cmd/ack`, 완료 = `scan/command_result`
+- [x] MQTT 토픽 트리, QoS, retain, JSON 필드 → **확정** (`mqtt-schema.md`). 명령은 retain=false
+- [x] 단위 → **확정**: ROS 내부 m·rad·N, 웹 mm. 웹에는 각도 값을 싣지 않는다
+- [x] 시각 표기 → **확정**: ROS는 메인 PC 시계 · 취득 시각 각각 보존, MQTT는 epoch ms + `published_at_ms`. 시계 동기는 chrony(의석, 별도 PR)
+- [x] 미측정·실패 값 표기 → **확정**: ROS `NaN` + `*_valid=false`, MQTT `null` + `*_valid` 유지, Python `None`
+- [x] 오류 코드 목록 → **확정**: `ReasonCode` 33개. 번호는 추가만 하고 바꾸지 않는다
+
+### TBD로 남긴 것
+회의에서 **담당 · 기한은 정하지 않고 TBD로 두기로** 했다. 목록은 각 문서 끝에 있다(`ros-interfaces.md` 9장, `mqtt-schema.md` 5장, `units-frames.md`의 좌표 값 · 미결정).
