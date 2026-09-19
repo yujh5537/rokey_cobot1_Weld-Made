@@ -1,9 +1,9 @@
 # 노드 구성도 v1.1 — 접촉 스캔 시스템 (ROS 2)
 
 > **문서 상태: 초안 · 실기 검증 전 · 수치는 설계 출발값**
-> **v1.1 (2026-09-18)**: T01 계약 동결 회의 결정을 반영했다. 구속력 있는 계약은 레포의 `docs/contracts/` v0.1이며, 이 문서와 다르면 계약이 우선한다. v1.0 대비 변경은 7장. **짝 그림 `contact-scan-node-diagram-v1.0.drawio`에는 v1.1 변경(P03 등)이 아직 반영되지 않았다.**
-> 기준 문서: BRD v3.2.0(`docs/BRD.md`) (2026-09-18) · `contact-scan-system-architecture-v1.5.drawio` (BRD v3.0.0 반영 · 인터페이스 필드 정합)
-> 작성일: 2026-09-18 · 짝 문서: `contact-scan-node-diagram-v1.0.drawio`(같은 그림) · `contact-scan-interface-spec-integrated-v1.2.md`(통합 인터페이스 정의서, 이하 "정의서" · Part 1 절 번호 기준)
+> **v1.1 (2026-09-18)**: T01 계약 동결 회의 결정을 반영했다. 구속력 있는 계약은 레포의 `docs/contracts/` v0.1이며, 이 문서와 다르면 계약이 우선한다. v1.0 대비 변경은 7장. 짝 그림 `contact-scan-node-diagram-v1.1.drawio`도 같은 내용으로 갱신했다(2026-09-19).
+> 기준 문서: BRD v3.2.0(`docs/BRD.md`) (2026-09-18) · `contact-scan-system-architecture-v1.6.drawio` (계약 v0.1 반영)
+> 작성일: 2026-09-18 · 짝 문서: `contact-scan-node-diagram-v1.1.drawio`(같은 그림) · `contact-scan-node-overview-v1.2.drawio`(간략판) · `contact-scan-interface-spec-integrated-v1.2.md`(통합 인터페이스 정의서, 이하 "정의서" · Part 1 절 번호 기준)
 > 표기: **확정**(BRD) · **초안**(아키텍처 4.7) · **제안(TBD)**(이 문서에서 채움). 통신은 이름·종류·의미만 적고 필드·타입·QoS는 정의서에 둔다.
 
 ---
@@ -208,7 +208,7 @@ flowchart TB
 | C01 | `/scan/calibrate` | A (점선) | mqtt_bridge | scan_manager | 기준면 자동 캘리브레이션 — 환경 세팅 후 범위 검토(6장) | 9장 |
 | C02 | `/calibration/result` | T (점선) | scan_manager | mqtt_bridge | 캘리브레이션 결과 | 9장 |
 
-합계: 자체 27 + 표준 ROS 3 + 외부 8 + 검토안 2 = **40선** (drawio v1.0은 P03이 없는 39선).
+합계: 자체 27 + 표준 ROS 3 + 외부 8 + 검토안 2 = **40선** (drawio v1.1과 동일).
 
 ---
 
@@ -260,7 +260,7 @@ flowchart TB
 | — | 제공 드라이버 실제 이름 · Python 노출 | X04 · X05 · X06 라벨 | [E18]/[E19] 확인 표기 |
 | — | BRD 6장 미결정(홈 복귀 경로 · 재접근 절차 · 재시작 허용 조건 · HB 만료 · 브라우저 단절 · 좌표계·TCP·홈 좌표) | 선 변화 없음. 파라미터 값·절차 | 값 TBD |
 
-결정 #18(하위 msg 신설)은 선 변화 없음. drawio v1.5로 되돌릴 수정 제안(R1~R7)은 정의서 10장 끝에 있다.
+결정 #18(하위 msg 신설)은 선 변화 없음. 아키텍처 그림으로 되돌릴 수정 제안(R1~R7, 정의서 10장 끝)은 아키텍처 v1.6에 반영했다.
 
 ---
 

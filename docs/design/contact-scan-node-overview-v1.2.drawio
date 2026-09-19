@@ -4,11 +4,11 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;fontSize=26;fontStyle=1;fontColor=#1B5CA6;align=left;verticalAlign=middle;" value="접촉 스캔 시스템 — 노드 구조도 (간략)" vertex="1">
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=26;fontStyle=1;fontColor=#1B5CA6;align=left;verticalAlign=middle;" value="접촉 스캔 시스템 — 노드 구조도 (간략) v1.2" vertex="1">
           <mxGeometry height="40" width="800" x="40" y="30" as="geometry" />
         </mxCell>
-        <mxCell id="sub" parent="1" style="text;html=1;fontSize=14;fontColor=#6B8199;align=left;verticalAlign=middle;" value="실선 상자 = 자체 ROS 2 노드 5개 · 점선 상자 = 외부(제공 드라이버 · 웹) · 화살표 = 데이터·명령 방향 · 상세는 인터페이스 정의서 v1.1" vertex="1">
-          <mxGeometry height="30" width="1000" x="40" y="72" as="geometry" />
+        <mxCell id="sub" parent="1" style="text;html=1;fontSize=14;fontColor=#6B8199;align=left;verticalAlign=middle;" value="실선 상자 = 자체 ROS 2 노드 5개 · 점선 상자 = 외부(제공 드라이버 · 웹) · 화살표 = 데이터·명령 방향 · 상세는 docs/contracts v0.1 · 인터페이스 정의서 v1.2 · 노드 구성도 v1.1 (2026-09-19)" vertex="1">
+          <mxGeometry height="30" width="1400" x="40" y="72" as="geometry" />
         </mxCell>
         <mxCell id="WEB" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#F4F8FC;strokeColor=#B9C9D8;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;dashed=1;dashPattern=8 6;" value="&lt;b style=&quot;font-size:20px&quot;&gt;웹 관제&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;React · FastAPI · MQTT Broker&lt;/span&gt;" vertex="1">
           <mxGeometry height="90" width="400" x="860" y="100" as="geometry" />
@@ -19,10 +19,10 @@
         <mxCell id="SM" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;" value="&lt;b style=&quot;font-size:20px&quot;&gt;scan_manager&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;상태 머신 · 작업 제어 · 형상 계산 · 원본 보관&lt;/span&gt;" vertex="1">
           <mxGeometry height="100" width="340" x="890" y="490" as="geometry" />
         </mxCell>
-        <mxCell id="SAF" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;" value="&lt;b style=&quot;font-size:20px&quot;&gt;safety_monitor&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;이상 감시와 로컬 정지&lt;/span&gt;" vertex="1">
+        <mxCell id="SAF" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;" value="&lt;b style=&quot;font-size:20px&quot;&gt;safety_monitor&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;이상 감시 · 로컬 정지 · 래치&lt;/span&gt;" vertex="1">
           <mxGeometry height="100" width="400" x="1560" y="490" as="geometry" />
         </mxCell>
-        <mxCell id="RM" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;" value="&lt;b style=&quot;font-size:20px&quot;&gt;robot_manager&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;M0609 명령과 상태 수집&lt;/span&gt;" vertex="1">
+        <mxCell id="RM" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;" value="&lt;b style=&quot;font-size:20px&quot;&gt;robot_manager&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;M0609 명령 · 상태와 실행 중 동작 보고&lt;/span&gt;" vertex="1">
           <mxGeometry height="100" width="340" x="380" y="490" as="geometry" />
         </mxCell>
         <mxCell id="CD" parent="1" style="rounded=1;arcSize=30;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;" value="&lt;b style=&quot;font-size:20px&quot;&gt;contact_detector&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:15px&quot;&gt;접촉과 엣지 판정&lt;/span&gt;" vertex="1">
@@ -71,8 +71,8 @@
         <mxCell id="e5" edge="1" parent="1" source="SM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.000;exitY=0.250;exitDx=0;exitDy=0;entryX=1.000;entryY=0.250;entryDx=0;entryDy=0;" target="RM">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="l5" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="탐색 동작 요청 · 정지" vertex="1">
-          <mxGeometry height="36" width="124" x="746" y="497" as="geometry" />
+        <mxCell id="l5" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="동작 요청 · 정지 · 설정 전파" vertex="1">
+          <mxGeometry height="36" width="166" x="722" y="497" as="geometry" />
         </mxCell>
         <mxCell id="e6" edge="1" parent="1" source="RM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=1.000;exitY=0.750;exitDx=0;exitDy=0;entryX=0.000;entryY=0.750;entryDx=0;entryDy=0;" target="SM">
           <mxGeometry relative="1" as="geometry" />
@@ -83,8 +83,8 @@
         <mxCell id="e7" edge="1" parent="1" source="SM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=1.000;exitY=0.250;exitDx=0;exitDy=0;entryX=0.000;entryY=0.250;entryDx=0;entryDy=0;" target="SAF">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="l7" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="단계" vertex="1">
-          <mxGeometry height="36" width="90" x="1385" y="497" as="geometry" />
+        <mxCell id="l7" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="단계 · 설정 전파" vertex="1">
+          <mxGeometry height="36" width="140" x="1360" y="497" as="geometry" />
         </mxCell>
         <mxCell id="e8" edge="1" parent="1" source="SAF" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.000;exitY=0.750;exitDx=0;exitDy=0;entryX=1.000;entryY=0.750;entryDx=0;entryDy=0;" target="SM">
           <mxGeometry relative="1" as="geometry" />
@@ -95,8 +95,8 @@
         <mxCell id="e9" edge="1" parent="1" source="SM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.375;exitY=1.000;exitDx=0;exitDy=0;entryX=0.350;entryY=0.000;entryDx=0;entryDy=0;" target="CD">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="l9" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="단계 · 힘 기준값 tare" vertex="1">
-          <mxGeometry height="36" width="203" x="898" y="632" as="geometry" />
+        <mxCell id="l9" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="작업 ID · 힘 기준값 tare · 설정 전파" vertex="1">
+          <mxGeometry height="36" width="256" x="872" y="632" as="geometry" />
         </mxCell>
         <mxCell id="e10" edge="1" parent="1" source="CD" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.650;exitY=0.000;exitDx=0;exitDy=0;entryX=0.625;entryY=1.000;entryDx=0;entryDy=0;" target="SM">
           <mxGeometry relative="1" as="geometry" />
@@ -111,8 +111,8 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="l11" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="TCP 위치 외력" vertex="1">
-          <mxGeometry height="36" width="136" x="702" y="782" as="geometry" />
+        <mxCell id="l11" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="TCP · 외력 · 실행 중 동작" vertex="1">
+          <mxGeometry height="36" width="174" x="684" y="782" as="geometry" />
         </mxCell>
         <mxCell id="e12" edge="1" parent="1" source="CD" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.000;exitY=0.700;exitDx=0;exitDy=0;entryX=0.706;entryY=1.000;entryDx=0;entryDy=0;" target="RM">
           <mxGeometry relative="1" as="geometry">
@@ -121,8 +121,8 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="l12" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="접촉 이벤트 → 즉시 정지" vertex="1">
-          <mxGeometry height="36" width="192" x="644" y="822" as="geometry" />
+        <mxCell id="l12" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="접촉 · 엣지 · 과대 외력 → 정지" vertex="1">
+          <mxGeometry height="36" width="224" x="628" y="822" as="geometry" />
         </mxCell>
         <mxCell id="e13" edge="1" parent="1" source="RM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.176;exitY=1.000;exitDx=0;exitDy=0;entryX=0.250;entryY=1.000;entryDx=0;entryDy=0;" target="SAF">
           <mxGeometry relative="1" as="geometry">
@@ -132,8 +132,8 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="l13" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="TCP 위치 외력 · 로봇 상태" vertex="1">
-          <mxGeometry height="36" width="226" x="937" y="952" as="geometry" />
+        <mxCell id="l13" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="TCP · 외력 · 실행 중 동작 · 로봇 상태" vertex="1">
+          <mxGeometry height="36" width="290" x="905" y="952" as="geometry" />
         </mxCell>
         <mxCell id="e14" edge="1" parent="1" source="SAF" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.500;exitY=1.000;exitDx=0;exitDy=0;entryX=0.412;entryY=1.000;entryDx=0;entryDy=0;" target="RM">
           <mxGeometry relative="1" as="geometry">

@@ -2,9 +2,9 @@
 
 > **문서 상태: 초안 · 실기 검증 전 · 수치는 설계 출발값**
 > **v1.2 (2026-09-18)**: T01 계약 동결 회의(1차 병후·의석 / 2차 전원) 결정을 반영했다. **구속력 있는 계약은 레포의 `docs/contracts/` v0.1이며, 이 문서와 다르면 계약이 우선한다.** 이 문서는 시나리오 · 설계 배경 · 파라미터 목록 · 근거를 담는 참고 문서다. v1.1 대비 변경 목록은 16장.
-> 기준 문서: BRD v3.2.0(`docs/BRD.md`) · `contact-scan-system-architecture-v1.5.drawio` (BRD v3.0.0 반영 · 카드 간 인터페이스 필드 정합)
+> 기준 문서: BRD v3.2.0(`docs/BRD.md`) · `contact-scan-system-architecture-v1.6.drawio` (계약 v0.1 반영. 본문의 "아키텍처 v1.5"는 v1.1 작성 당시의 출처 표시다)
 > 통합 출처: `contact-scan-ros2-interface-spec-v1.0.md`(ROS 2 정의서, Part 1) + `Interface_Draft_v0.11.md`(팀원 초안 · 웹 연동, Part 2). 이 통합본이 두 문서를 대체한다.
-> 작성일: 2026-09-18 · 짝 문서: `contact-scan-node-diagram-v1.1.md`(노드 구성도) · `contact-scan-node-diagram-v1.0.drawio`(같은 그림, v1.1 변경 미반영)
+> 작성일: 2026-09-18 · 짝 문서: `contact-scan-node-diagram-v1.1.md`(노드 구성도) · `contact-scan-node-diagram-v1.1.drawio`(같은 그림) · `contact-scan-node-overview-v1.2.drawio`(간략판)
 
 **읽는 순서**
 - **Part 1 (0~10장) — ROS 2 계약**: `contact_scan_interfaces` 패키지와 자체 노드 5개 사이의 Topic · Service · Action · 파라미터 · 공통 정의. 구현 팀(ROS)이 그대로 쓰는 부분.
@@ -1376,6 +1376,8 @@ uint16 INSUFFICIENT_POINTS=501
 BRD 6장의 미결정 사항 중 이 문서가 건드리지 않은 것(홈 복귀 경로·순서 · 중단 위치 재접근 절차 · 이상 상태별 재시작 허용 조건 · 허용 시각 차이 · 브라우저 단절 정책 · 재전송·저장 확인 절차 · 좌표계·z=0·Base 변환·TCP·홈 좌표)은 환경 세팅 후 팀 확인으로 확정한다.
 
 ### BRD / 아키텍처에 되돌려 반영할 변경 제안
+
+> **처리 결과(2026-09-19)**: R1 · R2 · R6 · R7은 BRD v3.1.0~v3.2.0에, R3~R7은 아키텍처 **v1.6** 그림에 반영했다. R3은 포트를 합치지 않고 화살표 c370의 끝점만 입력 포트(c145)로 고쳤다. v1.6에는 T01 회의 변경(16장)도 같이 들어갔다.
 
 | # | 대상 | 내용 |
 |---|---|---|
