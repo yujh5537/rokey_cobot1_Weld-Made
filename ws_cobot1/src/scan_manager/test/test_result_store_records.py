@@ -231,12 +231,17 @@ def test_final_homing_flag_needs_homing_phase():
 def test_home_return_roundtrip():
     empty = HomeReturn()
     assert roundtrip(empty) == empty and empty.completed is None
-    done = HomeReturn(True, 1, Stamp(9), Phase.STOPPED, True, Stamp(12), pose())
+    done = HomeReturn(
+        requested=True, request_count=1, requested_at=Stamp(9), interruptions_at_request=1,
+        origin_phase=Phase.STOPPED, completed=True, completed_at=Stamp(12), final_pose=pose())
     assert roundtrip(done) == done
-    unfinished = HomeReturn(True, 1, Stamp(9), Phase.STOPPED)
+    unfinished = HomeReturn(
+        requested=True, request_count=1, requested_at=Stamp(9), origin_phase=Phase.STOPPED)
     assert roundtrip(unfinished).completed is None  # None 이 False 로 바뀌지 않는다
     with pytest.raises(ValueError):
         HomeReturn(completed=True)
+    with pytest.raises(ValueError):
+        HomeReturn(interruptions_at_request=1)
 
 
 def test_failure_from_state_machine_failure():
@@ -307,6 +312,13 @@ def test_shape_rejects_filler_values():
         ShapeResult(**{**base, 'success': True})   # 성공인데 reason_code != 0
     with pytest.raises(ValueError, match='0 금지'):
         SegmentRecord((0, 0, 0), (0, 0, 0), 0.0, False)
+
+
+def test_success_needs_every_value():
+    data = box_shape().to_dict()
+    data['y_neg'], data['y_neg_valid'] = None, False
+    with pytest.raises(ValueError, match='success=true'):
+        ShapeResult.from_dict(data)
 
 
 def test_tampered_file_with_zero_for_missing_is_rejected_on_read():

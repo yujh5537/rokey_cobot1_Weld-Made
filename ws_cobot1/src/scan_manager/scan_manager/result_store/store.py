@@ -218,7 +218,11 @@ class ResultStore:
         return self._mutate(scan_id, apply)
 
     def record_stop(self, scan_id: str, interruption: Interruption) -> ScanRecord:
-        """작업 중지 1건을 기록한다. 마무리 HOMING 중이었는지는 호출 측이 밝힌다(추론하지 않는다)."""
+        """작업 중지 1건을 기록한다. 마무리 HOMING 중이었는지는 호출 측이 밝힌다(추론하지 않는다).
+
+        정지 완료를 확인하고 중단 위치를 얻은 뒤, notify(STOP_CONFIRMED) 를 보내기 **전에** 부른다.
+        STOPPED 가 된 뒤에야 안전복귀가 접수되므로, 그래야 "중지 → 안전복귀"의 순서가 기록에서도 같다.
+        """
         def apply(record, now):
             record.interruptions.append(replace(interruption, stopped_at=now, resumed_at=None))
         return self._mutate(scan_id, apply)
@@ -240,6 +244,7 @@ class ResultStore:
                 requested=True,
                 request_count=record.home_return.request_count + 1,
                 requested_at=now,
+                interruptions_at_request=len(record.interruptions),
                 origin_phase=origin_phase,
                 completed=None,
                 completed_at=None,

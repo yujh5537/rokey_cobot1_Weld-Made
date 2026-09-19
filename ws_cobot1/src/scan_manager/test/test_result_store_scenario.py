@@ -7,6 +7,7 @@ result_store/README.md 의 "사용 주의"에 적은 연결 방식(쓰기 전용
 
 from concurrent.futures import ThreadPoolExecutor
 import itertools
+import random
 import threading
 
 import pytest
@@ -220,16 +221,22 @@ class SimScanManager:
         """작업 중지: 접수 → 정지 완료 확인 → 중단 위치 기록. 홈 복귀 · 재시작은 부르지 않는다."""
         before = self.sm.snapshot()
         assert self.sm.request(Command.STOP).accepted
-        self.sm.notify(Signal.STOP_CONFIRMED)
+        # 중단 위치를 기록한 뒤에 STOPPED 로 보낸다. 그래야 뒤따르는 안전복귀가 기록에서도 중지 뒤에 온다
         self._write(self.store.record_stop, self.scan_id, Interruption(
             before.phase, before.direction, before.progress, pose=self._pose(),
             during_final_homing=during_final_homing))
+        self.sm.notify(Signal.STOP_CONFIRMED)
 
-    def home(self):
+    def begin_home(self):
+        """안전복귀를 접수만 한다(복귀 도중의 중지 시나리오용)."""
         origin = self.sm.phase
         outcome = self.sm.request(Command.HOME, conditions=READY)
         assert outcome.accepted
         self._write(self.store.record_home_requested, self.scan_id, origin_phase=origin)
+        self.tcp = [0.2, 0.0, 0.2]  # 홈으로 가는 길
+
+    def home(self):
+        self.begin_home()
         self.tcp = [0.0, 0.0, 0.4]
         self.sm.notify(Signal.HOMING_DONE)
         self._write(self.store.record_home_finished, self.scan_id, True, final_pose=self._pose())
@@ -249,7 +256,7 @@ class SimScanManager:
         self.scan_id = self._begun = record.scan_id
         self._motion_ids = itertools.count(record.last_motion_id + 1)  # motion_id 를 이어서 발급
         self.sm.request(Command.START, conditions=READY, scan_id=record.scan_id)
-        last = record.last_interruption
+        last = record.resume_point
         if last.phase >= Phase.TOP_SEARCH:
             self.sm.notify(Signal.PREPARE_DONE)
         if record.top.valid and last.phase is not Phase.TOP_SEARCH:
@@ -260,7 +267,7 @@ class SimScanManager:
             self.sm.notify(Signal.GEOMETRY_DONE)
         self.sm.request(Command.STOP)
         self.sm.notify(Signal.STOP_CONFIRMED)
-        if record.home_return_since_last_stop:
+        if record.home_return_since_resume_point:
             self.sm.request(Command.HOME, conditions=READY)
             self.sm.notify(Signal.HOMING_DONE)
         self._recording = True
@@ -382,7 +389,7 @@ def test_stop_then_process_restart_then_resume_from_the_record(result_dir, clock
     assert record.last_interruption.direction is Direction.NEG_X
     assert record.confirmed_edges == (Direction.POS_X,)
     assert record.edges[Direction.NEG_X].status == STATUS_NOT_ATTEMPTED
-    assert not record.home_return_since_last_stop and not record.stopped_during_final_homing
+    assert not record.home_return_since_resume_point and not record.stopped_during_final_homing
     assert record.state.motion_id == 0 and record.last_motion_id == 3
 
     second.restore(record)
@@ -415,13 +422,35 @@ def test_home_after_stop_is_visible_after_restart_and_resume_is_refused(result_d
 
     second = SimScanManager(result_dir, FakeClock(start_sec=1_790_300_000))
     record = second.store.find_resume_candidate().record
-    assert record.home_return_since_last_stop and record.home_return.completed is True
+    assert record.home_return_since_resume_point and record.home_return.completed is True
     assert record.home_return.origin_phase is Phase.STOPPED
     assert record.top.valid and record.state.phase is Phase.STOPPED  # 측정값 · 로그는 보존된다
     second.restore(record)
     assert second.resume().reason is Reason.NOT_SUPPORTED  # 메모리의 판정과 기록의 사실이 같다
     second.kill()
     assert fresh_store(result_dir).load(SCAN_A).last_interruption.resumed_at is None
+
+
+def test_stop_during_safety_homing_still_refuses_resume_after_restart(result_dir, clock):
+    first = SimScanManager(result_dir, clock)
+    first.start(SCAN_A)
+    first.find_top()
+    first.find_edge()
+    assert first.start_slide() is Direction.NEG_X
+    first.stop()
+    first.begin_home()
+    first.stop()  # 복귀 도중에 다시 중지. 로봇은 중단 위치도 홈도 아닌 곳에 있다
+    assert first.resume().reason is Reason.NOT_SUPPORTED
+    first.kill()
+
+    second = SimScanManager(result_dir, FakeClock(start_sec=1_790_300_000))
+    record = second.store.find_resume_candidate().record
+    assert record.last_interruption.phase is Phase.HOMING
+    assert record.resume_point.direction is Direction.NEG_X and record.resume_point.progress == 1
+    assert record.home_return_since_resume_point and record.home_return.completed is None
+    second.restore(record)
+    assert second.resume().reason is Reason.NOT_SUPPORTED
+    second.kill()
 
 
 # ---- 4. 마무리 HOMING 중 중지 ----
@@ -539,3 +568,67 @@ def test_slow_disk_does_not_block_stop(result_dir, clock):
     sim.flush()
     assert sim.store.load(SCAN_A).state.phase is Phase.STOPPED  # 밀린 기록이 순서대로 들어갔다
     sim.kill()
+
+
+# ---- 9. 무작위 명령열: 기록의 사실만으로 상태 기계의 RESUME 판정을 맞힐 수 있는가 ----
+
+def verdict_from_facts(record):
+    """T26 이 기록만 보고 내릴 판정. 여기서 쓰는 것은 store 가 돌려주는 사실뿐이다."""
+    if record.failure is not None or record.resume_point is None:
+        return Reason.NO_RESUMABLE_SCAN
+    if record.result_saved or record.stopped_during_final_homing:
+        return Reason.NO_RESUMABLE_SCAN  # 측정이 이미 끝난 작업이다(7.4절)
+    if record.home_return_since_resume_point:
+        return Reason.NOT_SUPPORTED
+    return Reason.OK
+
+
+ACTIONS = {
+    Phase.PREPARING: ('top', 'stop'),
+    Phase.EDGE_SEARCH: ('edge', 'edge', 'stop', 'fail'),
+    Phase.GEOMETRY: ('geometry', 'stop'),
+    Phase.HOMING: ('homed', 'stop_final'),
+    Phase.STOPPED: ('resume', 'resume', 'home', 'home_then_stop'),
+    Phase.ERROR: ('home', 'home_then_stop', 'end'),
+    Phase.DONE: ('home', 'home_then_stop', 'end'),
+}
+
+
+@pytest.mark.parametrize('seed', range(40))
+def test_recorded_facts_predict_the_resume_verdict(result_dir, seed):
+    rng = random.Random(seed)
+    sim = SimScanManager(result_dir, FakeClock())
+    sim.start(SCAN_A)
+
+    for _ in range(30):
+        action = rng.choice(ACTIONS[sim.sm.phase])
+        if action == 'top':
+            sim.find_top()
+        elif action == 'edge':
+            sim.find_edge()
+        elif action == 'geometry':
+            sim.geometry()
+        elif action == 'homed':
+            sim.finish_homing()
+        elif action == 'stop':
+            sim.stop()
+        elif action == 'stop_final':
+            sim.stop(during_final_homing=True)
+        elif action == 'fail':
+            sim.sm.notify(Signal.FAILED, reason_code=Reason.NO_EDGE, detail='fuzz')
+            sim._write(sim.store.record_failure, sim.scan_id, sim.sm.failure)
+        elif action == 'home':
+            sim.home()
+        elif action == 'home_then_stop':
+            sim.begin_home()
+            sim.stop()
+        elif action == 'resume':
+            sim.flush()
+            # 프로세스를 재시작한 것과 같은 조건: 새 인스턴스가 파일에서 읽은 사실만 쓴다
+            expected = verdict_from_facts(fresh_store(result_dir).load(SCAN_A))
+            assert sim.resume().reason is expected
+        else:
+            break
+    sim.kill()
+    record = fresh_store(result_dir).load(SCAN_A)
+    assert record.state.phase is not Phase.STOPPING and record.revision > 1

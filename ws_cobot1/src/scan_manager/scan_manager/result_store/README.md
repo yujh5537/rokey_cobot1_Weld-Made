@@ -45,7 +45,7 @@
 | `node_params` | scan_manager 자체 파라미터의 자유 형식 스냅샷(`search_origin_pose` · `base_to_fixture` · `tip_radius_m` 등). 무엇을 넣을지는 T19가 정한다 |
 | `measurements.top` · `measurements.edges.{POS_X,NEG_X,POS_Y,NEG_Y}` | 아래 "측정값 한 칸" |
 | `interruptions[]` | 작업 중지 목록. 중지를 접수한 시점의 `phase` · `direction` · `progress`, 중단 위치 `pose`(+`pose_valid`), `during_final_homing`, `stopped_at`, `resumed_at`(`null` = 아직 재시작하지 않음) |
-| `home_return` | 홈 안전복귀의 사실. `requested` · `request_count` · `requested_at` · `origin_phase` · `completed`(`null` = 끝을 모름) · `completed_at` · `final_pose` |
+| `home_return` | 홈 안전복귀의 사실. `requested` · `request_count` · `requested_at` · `interruptions_at_request`(접수 때까지 기록돼 있던 중지의 수. "어느 중지 뒤의 복귀인가"를 시계에 기대지 않고 남긴다) · `origin_phase` · `completed`(`null` = 끝을 모름) · `completed_at` · `final_pose` |
 | `failure` | `reason_code` · `detail` · `phase`(실패가 난 phase) · `recorded_at`. 없으면 `null` |
 | `result_saved` · `result_success` | `result.json`을 썼는지, 그 형상이 성공인지(`null` = 아직 없음) |
 
@@ -68,6 +68,7 @@
 | `saved_at` | store가 기록한 시각 |
 
 형상 계산이 실패한 결과(`success=false`, 예: `INVALID_SHAPE`)도 원본으로 저장한다. 얻은 값만 있고 나머지는 `null`이다.
+`success=true`이면 모든 값이 유효해야 한다(`*_valid` · `dims_valid` · `box_valid`). 하나라도 무효면 `ValueError`다.
 
 ## 값 규칙 (CLAUDE.md 규칙 4)
 - `valid=false`인데 숫자가 오면 `ValueError`다. **0을 끼워 넣을 수 없다.** NaN만 `None`으로 바꾼다(ROS msg가 미측정을 NaN으로 싣기 때문이다).
@@ -113,7 +114,7 @@ store = ResultStore(result_dir, now_fn=lambda: Stamp(*node.get_clock().now().sec
 | `record_edge(scan_id, direction, Measurement)` | 모서리 확정. **그 뒤에** `notify(EDGE_FOUND)` | `EDGE` |
 | `record_attempt_failed(scan_id, target, reason_code, detail='', stop_pose=None)` | 한 점의 탐색 실패(`NO_CONTACT` · `NO_EDGE` …) | `target`은 `TOP` 또는 `Direction` |
 | `record_failure(scan_id, failure)` | `notify(FAILED)` 뒤 | T10의 `sm.failure`를 그대로 넣는다(`reason_code` · `detail` · `phase`) |
-| `record_stop(scan_id, Interruption(phase, direction, progress, pose, during_final_homing))` | 정지 완료를 확인하고 중단 위치를 얻은 뒤 | `phase` 등은 STOP 접수 **직전**의 Snapshot 값. 마무리 HOMING 중이었는지는 호출 측이 밝힌다(store는 추론하지 않는다) |
+| `record_stop(scan_id, Interruption(phase, direction, progress, pose, during_final_homing))` | 정지 완료를 확인하고 중단 위치를 얻은 뒤, **`notify(STOP_CONFIRMED)` 전에**. STOPPED가 된 뒤에야 안전복귀가 접수되므로 그래야 "중지 → 안전복귀"의 순서가 기록에서도 같다 | `phase` 등은 STOP 접수 **직전**의 Snapshot 값. 마무리 HOMING 중이었는지는 호출 측이 밝힌다(store는 추론하지 않는다) |
 | `record_resume(scan_id)` | RESUME이 접수된 뒤 | 가장 최근 중지에 `resumed_at`을 채운다 |
 | `record_home_requested(scan_id, origin_phase=None)` | 안전복귀(HOME)가 접수된 뒤 | 마무리 복귀(7.4절)에는 쓰지 않는다 |
 | `record_home_finished(scan_id, completed, final_pose=None)` | 안전복귀가 끝났다(성공 · 실패) | |
@@ -132,12 +133,14 @@ record = candidate.record                                # 없으면 None → NO
 - "가장 최근"은 `scan_id`의 사전순이다. **`scan_id`는 벽시계로 발급해야 한다.** sim time(1970년부터)으로 발급하면 순서가 깨진다.
 
 돌려주는 것은 사실뿐이다. 판단(계약 5.3절의 거절 사유)은 호출 측이 한다.
+이 사실들만으로 T10 상태 기계의 RESUME 판정(`OK` · `NOT_SUPPORTED` · `NO_RESUMABLE_SCAN`)을 맞힐 수 있다는 것을 `test_recorded_facts_predict_the_resume_verdict`가 무작위 명령열로 확인한다(그 테스트의 `verdict_from_facts`가 판정 예시다).
 | 사실 | 쓰임 |
 |---|---|
-| `record.state` · `record.last_interruption`(`phase` · `direction` · `progress` · `pose` · `resumed_at`) | 어느 단계 · 방향에서 멈췄는가. `None`이면 중지 기록 없이 프로세스가 죽은 것이다(중단 위치를 모른다) |
+| `record.resume_point`(`phase` · `direction` · `progress` · `pose` · `resumed_at`) | **재개 지점**: 측정 단계 또는 마무리 HOMING에서의 가장 최근 중지. 어느 단계 · 방향에서 멈췄는가. RESUMING · 안전복귀 HOMING 중의 중지는 재개 지점을 바꾸지 않는다(T10 상태 기계와 같은 규칙). `None`이면 측정 중에 중지된 적이 없다(중지 기록 없이 프로세스가 죽었다면 중단 위치를 모른다) |
+| `record.last_interruption` · `record.state` | 가장 최근 중지(복귀 도중의 중지일 수 있다)와 마지막으로 기록된 상태. **재개 방향을 여기서 읽지 않는다** |
 | `record.top` · `record.edges` · `record.confirmed_edges` | 유지할 기존 측정값 |
-| `record.home_return_since_last_stop` | 가장 최근 중지 뒤에 안전복귀를 접수했다 → `NOT_SUPPORTED`(5.3절). `record.home_return_requested`는 "이 작업에서 한 번이라도" |
-| `record.stopped_during_final_homing` · `record.result_saved` · `candidate.result_file_exists` | 측정이 이미 끝난 작업이다 → `NO_RESUMABLE_SCAN`(7.4절) |
+| `record.home_return_since_resume_point` | 재개 지점 뒤에 안전복귀를 접수했다 → `NOT_SUPPORTED`(5.3절). 끝까지 갔는지와 무관하고, **복귀 도중에 다시 중지된 경우에도 참**이다. 순서는 시각이 아니라 `interruptions_at_request`로 본다. `record.home_return_requested`는 "이 작업에서 한 번이라도" |
+| `record.stopped_during_final_homing` · `record.result_saved` · `candidate.result_file_exists` | 측정이 이미 끝난 작업이다 → `NO_RESUMABLE_SCAN`(7.4절). 예외: 재개 지점이 GEOMETRY이고 `result_saved`가 참이면(결과를 쓴 직후 · `GEOMETRY_DONE` 전에 중지) 상태 기계는 재시작을 받는다. 그때는 다시 계산하지 말고 `load_result()`로 읽어 재발행한다 |
 | `record.failure` | 실패로 끝난 작업(재시작 허용 조건은 TBD, #26) |
 | `record.last_motion_id` | 재시작 뒤에 `motion_id`를 이어서 발급한다 |
 | `candidate.is_latest` · `candidate.newer_scan_ids` | 더 나중에 시작된 작업이 있는가 |

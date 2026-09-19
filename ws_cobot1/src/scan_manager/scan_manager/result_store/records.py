@@ -581,6 +581,8 @@ class HomeReturn:
     requested: bool = False
     request_count: int = 0
     requested_at: Optional[Stamp] = None   # 가장 최근 접수 시각
+    # 가장 최근 접수 때까지 기록돼 있던 중지의 수. "어느 중지 뒤의 복귀인가"를 시계에 기대지 않고 남긴다
+    interruptions_at_request: int = 0
     origin_phase: Optional[Phase] = None   # 가장 최근 접수 때의 출발 phase
     completed: Optional[bool] = None       # 가장 최근 접수의 결과
     completed_at: Optional[Stamp] = None
@@ -589,6 +591,9 @@ class HomeReturn:
     def __post_init__(self):
         _bool(self.requested, 'requested')
         _uint(self.request_count, 'request_count')
+        _uint(self.interruptions_at_request, 'interruptions_at_request')
+        if not self.requested and self.interruptions_at_request:
+            raise ValueError('접수 기록 없이 interruptions_at_request 를 둘 수 없다')
         if self.requested != (self.request_count > 0) or self.requested != (
                 self.requested_at is not None):
             raise ValueError('requested · request_count · requested_at 이 서로 어긋난다')
@@ -604,6 +609,7 @@ class HomeReturn:
             'requested': self.requested,
             'request_count': self.request_count,
             'requested_at': _dump(self.requested_at),
+            'interruptions_at_request': self.interruptions_at_request,
             'origin_phase': None if self.origin_phase is None else self.origin_phase.name,
             'completed': self.completed,
             'completed_at': _dump(self.completed_at),
@@ -617,6 +623,7 @@ class HomeReturn:
             requested=data['requested'],
             request_count=data['request_count'],
             requested_at=_load(Stamp, data['requested_at']),
+            interruptions_at_request=data['interruptions_at_request'],
             origin_phase=data['origin_phase'],
             completed=data['completed'],
             completed_at=_load(Stamp, data['completed_at']),
@@ -698,6 +705,8 @@ class ScanRecord:
             raise ValueError('edges 는 네 방향을 모두 담아야 한다')
         if any(item.stopped_at is None for item in self.interruptions):
             raise ValueError('기록된 중지에는 stopped_at 이 있어야 한다')
+        if self.home_return.interruptions_at_request > len(self.interruptions):
+            raise ValueError('home_return.interruptions_at_request 가 중지 기록 수보다 크다')
         _bool(self.result_saved, 'result_saved')
         if self.result_success is not None:
             _bool(self.result_success, 'result_success')
@@ -714,10 +723,28 @@ class ScanRecord:
         return self.interruptions[-1] if self.interruptions else None
 
     @property
+    def resume_point(self) -> Optional[Interruption]:
+        """재개 지점이 되는 중지: 측정 단계 또는 마무리 HOMING 에서의 가장 최근 중지.
+
+        RESUMING · 안전복귀 HOMING 중의 중지는 재개 지점을 바꾸지 않는다(T10 상태 기계와 같은 규칙).
+        그래서 last_interruption 과 다를 수 있다. 없으면 None.
+        """
+        index = self._resume_point_index()
+        return None if index is None else self.interruptions[index]
+
+    def _resume_point_index(self) -> Optional[int]:
+        for index in range(len(self.interruptions) - 1, -1, -1):
+            item = self.interruptions[index]
+            safety_homing = item.phase is Phase.HOMING and not item.during_final_homing
+            if item.phase is not Phase.RESUMING and not safety_homing:
+                return index
+        return None
+
+    @property
     def stopped_during_final_homing(self) -> bool:
-        """가장 최근 중지가 스캔 마무리 HOMING 중이었는가 (계약 7.4절 → NO_RESUMABLE_SCAN)."""
-        last = self.last_interruption
-        return last is not None and last.during_final_homing
+        """재개 지점이 스캔 마무리 HOMING 중의 중지인가 (계약 7.4절 → NO_RESUMABLE_SCAN)."""
+        point = self.resume_point
+        return point is not None and point.during_final_homing
 
     @property
     def home_return_requested(self) -> bool:
@@ -725,12 +752,16 @@ class ScanRecord:
         return self.home_return.requested
 
     @property
-    def home_return_since_last_stop(self) -> bool:
-        """가장 최근 중지 뒤에 홈 안전복귀를 접수했는가 (계약 5.3절 → NOT_SUPPORTED)."""
-        last = self.last_interruption
-        if last is None or not self.home_return.requested:
+    def home_return_since_resume_point(self) -> bool:
+        """재개 지점(resume_point) 뒤에 홈 안전복귀를 접수했는가 (계약 5.3절 → NOT_SUPPORTED).
+
+        끝까지 갔는지와 무관하다. 안전복귀 도중에 다시 중지된 경우에도 참이다.
+        재개 지점이 없으면 접수 여부 그대로다. 순서는 시각이 아니라 기록된 중지의 수로 본다.
+        """
+        if not self.home_return.requested:
             return False
-        return self.home_return.requested_at.ns >= last.stopped_at.ns
+        index = self._resume_point_index()
+        return index is None or self.home_return.interruptions_at_request > index
 
     @property
     def confirmed_edges(self) -> Tuple[Direction, ...]:
@@ -899,6 +930,10 @@ class ShapeResult:
         _set(
             self, vertices=vertices,
             edges=tuple(self.edges), path_candidates=tuple(self.path_candidates))
+        if self.success:
+            scalars_valid = all(getattr(self, name).valid for name in _SHAPE_SCALARS)
+            if not (scalars_valid and self.dims_valid and self.box_valid):
+                raise ValueError('success=true 인데 무효인 값이 있다. 5점 미확보 · 비정상 형상은 실패다')
 
     def to_dict(self):
         data = {

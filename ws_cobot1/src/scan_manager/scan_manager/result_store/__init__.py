@@ -4,6 +4,7 @@
 """
 
 from .records import BiasCorrection
+from .records import check_scan_id
 from .records import ConfigSnapshot
 from .records import Detection
 from .records import EDGE_DIRECTIONS
@@ -43,7 +44,8 @@ from .store import ScanAlreadyExists
 from .store import UnsupportedSchemaError
 
 __all__ = [
-    'BiasCorrection', 'ConfigSnapshot', 'CorruptRecordError', 'Detection', 'EDGE_DIRECTIONS',
+    'BiasCorrection', 'check_scan_id', 'ConfigSnapshot', 'CorruptRecordError', 'Detection',
+    'EDGE_DIRECTIONS',
     'EVENT_CONTACT', 'EVENT_EDGE', 'FailureRecord', 'Frames', 'HomeReturn', 'Interruption',
     'Measured', 'Measurement', 'MeasurementAlreadyConfirmed', 'MeasurementSlot', 'PoseRecord',
     'PROGRESS_FILE', 'RecordNotFound', 'RecordStateError', 'RESULT_FILE', 'ResultAlreadySaved',

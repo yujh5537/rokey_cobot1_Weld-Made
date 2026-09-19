@@ -2,7 +2,13 @@
 
 import json
 import os
+from pathlib import Path
+import random
+import signal
+import subprocess
+import sys
 import threading
+import time
 
 import pytest
 from result_store_helpers import begin
@@ -240,13 +246,13 @@ def test_resume_without_stop_is_rejected(store):
 def test_home_return_facts(store):
     begin(store)
     stop_in_edge_search(store)
-    assert not store.load(SCAN_A).home_return_since_last_stop
+    assert not store.load(SCAN_A).home_return_since_resume_point
     with pytest.raises(RecordStateError):
         store.record_home_finished(SCAN_A, True)
 
     store.record_home_requested(SCAN_A, origin_phase=Phase.STOPPED)
     requested = reopen(store).load(SCAN_A)
-    assert requested.home_return_requested and requested.home_return_since_last_stop
+    assert requested.home_return_requested and requested.home_return_since_resume_point
     assert requested.home_return.completed is None  # 끝났는지 모른다. False 가 아니다
     assert requested.home_return.origin_phase is Phase.STOPPED
 
@@ -257,14 +263,58 @@ def test_home_return_facts(store):
     assert finished.home_return_requested
 
 
+def test_stop_during_safety_homing_does_not_move_the_resume_point(store):
+    begin(store)
+    stop_in_edge_search(store, progress=1, direction=Direction.NEG_X)
+    store.record_home_requested(SCAN_A, origin_phase=Phase.STOPPED)
+    store.record_stop(
+        SCAN_A, Interruption(Phase.HOMING, Direction.NONE, 1, pose=pose(0.2, 0, 0.2)))
+    record = reopen(store).load(SCAN_A)
+    assert record.last_interruption.phase is Phase.HOMING     # 가장 최근 중지는 복귀 도중이다
+    assert record.resume_point.phase is Phase.EDGE_SEARCH     # 재개 지점은 그대로 -x 다
+    assert record.resume_point.direction is Direction.NEG_X
+    assert record.home_return_since_resume_point              # 로봇은 이미 중단 위치를 떠났다
+    assert record.home_return.completed is None
+    assert not record.stopped_during_final_homing
+
+
+def test_stop_during_resuming_does_not_move_the_resume_point(store):
+    begin(store)
+    stop_in_edge_search(store, progress=2, direction=Direction.POS_Y)
+    store.record_resume(SCAN_A)
+    store.record_stop(SCAN_A, Interruption(Phase.RESUMING, Direction.NONE, 2))
+    record = reopen(store).load(SCAN_A)
+    assert record.resume_point.direction is Direction.POS_Y and record.resume_point.progress == 2
+    assert record.last_interruption.phase is Phase.RESUMING
+    assert not record.home_return_since_resume_point
+
+
+def test_resume_point_is_none_without_a_measuring_stop(store):
+    begin(store)
+    assert store.load(SCAN_A).resume_point is None
+    store.record_home_requested(SCAN_A, origin_phase=Phase.ERROR)
+    store.record_stop(SCAN_A, Interruption(Phase.HOMING, Direction.NONE, 0))
+    record = store.load(SCAN_A)
+    assert record.resume_point is None and record.home_return_since_resume_point
+
+
+def test_home_order_does_not_depend_on_the_clock(tmp_path):
+    ticks = iter([Stamp(500), Stamp(400), Stamp(300), Stamp(200), Stamp(100), Stamp(50)])
+    backwards = ResultStore(tmp_path / 'data', now_fn=lambda: next(ticks))  # 시계가 거꾸로 간다
+    begin(backwards)
+    backwards.record_stop(SCAN_A, Interruption(Phase.EDGE_SEARCH, Direction.POS_X, 0))
+    backwards.record_home_requested(SCAN_A, origin_phase=Phase.STOPPED)
+    assert backwards.load(SCAN_A).home_return_since_resume_point
+
+
 def test_home_before_the_last_stop_is_told_apart(store):
     begin(store)
     stop_in_edge_search(store, progress=0, direction=Direction.POS_X)
     store.record_home_requested(SCAN_A, origin_phase=Phase.STOPPED)
     store.record_stop(SCAN_A, Interruption(Phase.EDGE_SEARCH, Direction.NEG_X, 1))
     record = store.load(SCAN_A)
-    assert record.home_return_requested          # 접수한 적은 있다
-    assert not record.home_return_since_last_stop  # 하지만 가장 최근 중지보다 앞이다
+    assert record.home_return_requested               # 접수한 적은 있다
+    assert not record.home_return_since_resume_point  # 하지만 재개 지점(두 번째 중지)보다 앞이다
 
 
 # ---- 최종 결과 ----
@@ -400,6 +450,62 @@ def test_concurrent_writers_do_not_lose_updates(store):
     assert reopen(store).load(SCAN_A).confirmed_edges == ORDER
 
 
+def test_reader_never_sees_a_half_written_file(store):
+    begin(store)
+    stop = threading.Event()
+    problems = []
+
+    def read_loop():
+        reader = reopen(store)
+        while not stop.is_set():
+            try:
+                reader.load(SCAN_A)
+            except Exception as error:  # noqa: B902
+                problems.append(error)
+
+    thread = threading.Thread(target=read_loop, daemon=True)
+    thread.start()
+    try:
+        for motion_id in range(1, 120):
+            store.record_state(snapshot(phase=Phase.TOP_SEARCH, motion_id=motion_id))
+    finally:
+        stop.set()  # 쓰기가 실패해도 읽기 스레드를 남기지 않는다(남으면 pytest 가 끝나지 않는다)
+        thread.join(timeout=10.0)
+    assert problems == [] and not thread.is_alive()
+
+
+def test_sigkill_in_the_middle_of_writes_leaves_a_readable_record(store):
+    begin(store)
+    code = (
+        'import sys, itertools\n'
+        'from scan_manager.result_store import ResultStore\n'
+        'from scan_manager.state_machine import Snapshot\n'
+        'from scan_manager.contract_enums import Phase, Direction\n'
+        'store = ResultStore(sys.argv[1])\n'
+        "print('ready', flush=True)\n"
+        'for n in itertools.count(1):\n'
+        '    state = Snapshot(sys.argv[2], Phase.TOP_SEARCH, Direction.NONE, 0, 4, n)\n'
+        '    store.record_state(state)\n'
+    )
+    package_root = str(Path(__file__).resolve().parents[1])
+    revision = store.load(SCAN_A).revision
+    for _ in range(3):
+        child = subprocess.Popen(
+            [sys.executable, '-c', code, str(store.result_dir), SCAN_A],
+            cwd=package_root, stdout=subprocess.PIPE)
+        assert child.stdout.readline().strip() == b'ready'
+        time.sleep(0.15)
+        child.send_signal(signal.SIGKILL)  # 쓰는 도중에 죽인다
+        child.wait()
+        child.stdout.close()
+        record = reopen(store).load(SCAN_A)  # 깨지지 않았다
+        assert 0 < record.state.motion_id <= record.last_motion_id  # 자식은 매번 1부터 다시 센다
+        assert record.revision > revision
+        revision = record.revision
+    reopen(store).record_state(snapshot(phase=Phase.EDGE_SEARCH, direction=Direction.POS_X))
+    assert reopen(store).load(SCAN_A).state.phase is Phase.EDGE_SEARCH  # 이어서 쓸 수 있다
+
+
 # ---- 깨진 파일 · 모르는 스키마 ----
 
 def corrupt(store, scan_id, text):
@@ -423,12 +529,72 @@ def test_broken_file_raises_corrupt(store, text):
         store.record_state(snapshot(phase=Phase.TOP_SEARCH))  # 깨진 기록 위에 덮어쓰지 않는다
 
 
+def test_random_damage_only_raises_store_errors(store):
+    """파일의 아무 곳이나 망가뜨려도 CorruptRecordError · UnsupportedSchemaError 말고는 새지 않는다."""
+    begin(store)
+    store.record_top(SCAN_A, top_measurement())
+    store.record_edge(SCAN_A, Direction.POS_X, edge_measurement(Direction.POS_X))
+    store.record_attempt_failed(SCAN_A, Direction.NEG_X, 301, 'x', stop_pose=pose())
+    stop_in_edge_search(store)
+    store.record_home_requested(SCAN_A, origin_phase=Phase.STOPPED)
+    store.save_result(SCAN_A, box_shape(), bias_corrections())
+    rng = random.Random(20)
+    junk = [None, True, False, 0, -1, 1.5, '', 'x', [], {}, [1, 2], {'a': 1}, 2 ** 70, 'NaN']
+
+    def damage(node):
+        """무작위로 고른 한 곳을 지우거나 다른 자료형으로 바꾼다."""
+        paths = []
+
+        def walk(value, path):
+            if isinstance(value, dict):
+                for key in value:
+                    paths.append(path + [key])
+                    walk(value[key], path + [key])
+            elif isinstance(value, list):
+                for index in range(len(value)):
+                    paths.append(path + [index])
+                    walk(value[index], path + [index])
+        walk(node, [])
+        target = rng.choice(paths)
+        parent = node
+        for key in target[:-1]:
+            parent = parent[key]
+        if rng.random() < 0.3:
+            del parent[target[-1]]
+        else:
+            parent[target[-1]] = rng.choice(junk)
+
+    for name, load in ((PROGRESS_FILE, store.load), (RESULT_FILE, store.load_result)):
+        path = store.result_dir / SCAN_A / name
+        original = path.read_text(encoding='utf-8')
+        rejected = 0
+        for _ in range(400):
+            data = json.loads(original)
+            damage(data)
+            path.write_text(json.dumps(data), encoding='utf-8')
+            try:
+                load(SCAN_A)
+            except (CorruptRecordError, UnsupportedSchemaError):
+                rejected += 1
+        path.write_text(original, encoding='utf-8')
+        assert load(SCAN_A) is not None
+        assert rejected > 300  # 대부분의 훼손은 거절된다(자유 형식인 node_params · detail 등은 예외)
+
+
 def test_nan_literal_in_file_is_corrupt(store):
     begin(store)
     store.record_top(SCAN_A, top_measurement())
     text = progress_path(store).read_text(encoding='utf-8')
     corrupt(store, SCAN_A, text.replace('"force_delta_n": 3.4', '"force_delta_n": NaN'))
     with pytest.raises(CorruptRecordError):
+        store.load(SCAN_A)
+
+
+def test_nan_in_a_key_the_schema_does_not_read_is_still_corrupt(store):
+    begin(store)
+    text = progress_path(store).read_text(encoding='utf-8')
+    corrupt(store, SCAN_A, text.replace('"schema_version": 1,', '"schema_version": 1, "x": NaN,'))
+    with pytest.raises(CorruptRecordError, match='NaN'):
         store.load(SCAN_A)
 
 
@@ -549,7 +715,7 @@ def test_home_return_and_final_homing_flags_are_preserved(store):
     stop_in_edge_search(store, SCAN_A)
     store.record_home_requested(SCAN_A, origin_phase=Phase.STOPPED)
     homed = reopen(store).find_resume_candidate(SCAN_A)
-    assert homed.record.home_return_requested and homed.record.home_return_since_last_stop
+    assert homed.record.home_return_requested and homed.record.home_return_since_resume_point
     assert not homed.record.stopped_during_final_homing
 
     begin(store, SCAN_B)
