@@ -1,6 +1,6 @@
 # 접촉 탐색 기반 외곽 엣지·경로 후보 생성 시스템 (MVP 9/18~9/22)
 
-M0609 + RG2(무센서 탐침)로 직육면체를 만져 윗면 1점·모서리 4점을 얻고, 외곽 엣지·경로 후보와 직육면체를 계산해 웹에 3D로 보여준다. 기준 문서는 `docs/BRD.md`(v3.0.0)이다.
+M0609 + RG2(무센서 탐침)로 직육면체를 만져 윗면 1점·모서리 4점을 얻고, 외곽 엣지·경로 후보와 직육면체를 계산해 웹에 3D로 보여준다. 기준 문서는 `docs/BRD.md`(v3.2.0)이다.
 
 ## 레포 구조
 - `ws_cobot1/src/` ROS 2 Jazzy 자체 패키지 (메인 PC). 패키지·담당은 `ws_cobot1/src/README.md`
@@ -41,6 +41,7 @@ cd frontend && npm ci && npm run dev
 | MQTT 토픽, JSON, 명령 ID | `docs/contracts/mqtt-schema.md` |
 | 좌표계, TCP, 홈, 단위 | `docs/contracts/units-frames.md` |
 | 노드 책임, 데이터 흐름 | `docs/architecture.md` |
+| 시나리오별 흐름, 설계 배경, 노드별 파라미터 목록 | `docs/design/` (참고 자료. 계약과 다르면 계약이 우선) |
 | 요구사항 번호(4.x.x), TR, KPI | `docs/BRD.md` 해당 절만 |
 | 두산 API 실제 동작 여부 | `docs/env/api-check-log.md` |
 | 왜 이렇게 결정했나 | `docs/decisions/` |
