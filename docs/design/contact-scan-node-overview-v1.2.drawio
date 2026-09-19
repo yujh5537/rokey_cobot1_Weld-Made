@@ -71,8 +71,8 @@
         <mxCell id="e5" edge="1" parent="1" source="SM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=0.000;exitY=0.250;exitDx=0;exitDy=0;entryX=1.000;entryY=0.250;entryDx=0;entryDy=0;" target="RM">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="l5" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="동작 요청 · 정지 · 설정 전파" vertex="1">
-          <mxGeometry height="36" width="166" x="722" y="497" as="geometry" />
+        <mxCell id="l5" parent="1" style="rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#B9CCDD;strokeWidth=1.5;fontSize=13;fontColor=#2C5F9C;align=center;verticalAlign=middle;" value="동작 · 정지 · 설정 전파" vertex="1">
+          <mxGeometry height="36" width="136" x="737" y="497" as="geometry" />
         </mxCell>
         <mxCell id="e6" edge="1" parent="1" source="RM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;arcSize=10;html=1;strokeColor=#B9CCDD;strokeWidth=2.5;endArrow=open;endFill=0;endSize=8;exitX=1.000;exitY=0.750;exitDx=0;exitDy=0;entryX=0.000;entryY=0.750;entryDx=0;entryDy=0;" target="SM">
           <mxGeometry relative="1" as="geometry" />
