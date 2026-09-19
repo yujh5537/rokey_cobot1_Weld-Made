@@ -62,7 +62,7 @@ scan_manager는 `/robot/sample`을 구독하지 않는다(중단 위치는 `Exec
 | scan_manager | 상면→±X/±Y→형상 계산→홈 복귀(마무리, 정상 완료일 때만) 순서, 방향 전환 이동, 중지·안전복귀·재시작 조정, 설정을 3개 노드로 전파, Base→작업대 좌표 변환(결과만) | 병후 |
 | └ geometry_estimator (모듈) | 꼭짓점, 외곽 엣지·경로 후보, 편향 보정, 비정상 검출 | 현지 |
 | └ result_store (모듈) | 메인 PC의 측정 원본·진행 기록·설정 보관. 재시작의 원본 | 병후 |
-| mqtt_bridge | ROS ↔ MQTT, 명령 ID 중복·만료 검사(중지는 만료 검사 제외)·접수/완료·연결 상태 추적, 단위 변환(m→mm), NaN→null | 병후 |
+| mqtt_bridge | ROS ↔ MQTT, 명령 ID 중복·만료 검사(중지는 만료 검사 제외)·접수/완료·연결 상태 추적, 단위 변환(m→mm), NaN→null | 의석 (T27은 병후와 공동) |
 | contact_scan_interfaces | msg/srv/action 정의 패키지 + QoS 프로파일 모듈 `contact_scan_qos` | 병후 |
 | FastAPI / Spring Boot / PostgreSQL / Mosquitto / React | 화면·명령·저장·이력 | 의석 |
 
