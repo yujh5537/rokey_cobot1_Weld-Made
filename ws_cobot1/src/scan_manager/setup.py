@@ -14,7 +14,7 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='bhpark',
-    maintainer_email='ok778ts123@gmail.com',
+    maintainer_email='284185005+ok778ts123@users.noreply.github.com',
     description='스캔 순서와 중지 · 안전복귀 · 재시작을 조정하는 노드. 상태 기계는 rclpy 없이 도는 순수 Python 모듈이다.',
     license='Apache-2.0',
     extras_require={
