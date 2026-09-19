@@ -135,7 +135,11 @@ class Snapshot:
 
 @dataclass(frozen=True)
 class Failure:
-    """ERROR 로 간 사유."""
+    """가장 최근에 ERROR 로 간 사유.
+
+    다음 START 가 접수될 때까지 남는다. ERROR 에서 안전복귀하다가 중지해 STOPPED 가 된 경우처럼
+    phase 가 ERROR 가 아니어도 값이 있을 수 있으므로, 현재 상태는 phase 로 판단한다.
+    """
 
     reason_code: int
     detail: str
@@ -154,7 +158,12 @@ class Outcome:
 
 
 class ScanStateMachine:
-    """phase · 방향 · 진행도 n/4 를 들고 Command 와 Signal 로만 바뀐다."""
+    """phase · 방향 · 진행도 n/4 를 들고 Command 와 Signal 로만 바뀐다.
+
+    on_change 는 상태가 바뀔 때마다 락을 쥔 채로 불린다. 그래서 상태가 바뀐 순서와 발행 순서가 같다.
+    대신 콜백 안에서 오래 걸리는 일 · 다른 노드의 응답 대기를 하면 다른 콜백의 request · notify 가 막힌다.
+    발행처럼 바로 끝나는 일만 한다.
+    """
 
     def __init__(
         self,
