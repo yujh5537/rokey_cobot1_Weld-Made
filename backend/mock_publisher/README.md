@@ -40,7 +40,7 @@ python3 mock_publisher.py
 다른 Broker를 사용할 경우:
 
 ```bash
-MQTT_HOST=172.24.0.51 \
+MQTT_HOST=<메인 PC 주소> \
 MQTT_PORT=1883 \
 python3 mock_publisher.py
 ```
