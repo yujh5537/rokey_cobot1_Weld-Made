@@ -1096,7 +1096,7 @@ builtin_interfaces/Duration elapsed
 | 파라미터 | 자료형 | 단위 | 출발값 | 설명 | 출처 |
 |---|---|---|---|---|---|
 | `over_force_n` ★ | double | N | 30 | 과대 외력(contact_detector와 같은 값 유지 · 2차 감시) | 4.5.3 · 결정 #17 |
-| `drop_limit_m` ★ | double | m | 0.005 | **(v1.2)** 모서리 하강량 제한 2차 감시. 기준 = `operation`이 SLIDE로 바뀐 첫 샘플의 z. robot_manager와 같은 값 | 4.5.4 · T01 |
+| `drop_limit_m` ★ | double | m | 0.005 | **(v1.2)** 모서리 하강량 제한 2차 감시. 기준 = `operation`이 SLIDE로 바뀐 첫 샘플의 z. robot_manager(1차)와 **값도 기준 z도 같다**. 같은 샘플에서 동시에 걸릴 때의 동작은 이슈 #53 | 4.5.4 · T01 |
 | `max_speed_mps` | double | m/s | TBD | TCP 속도 한계(샘플 차분) | 4.6 |
 | `workspace_min_m` · `workspace_max_m` | double[3] | m | TBD | 작업영역 상자(base_link) | 6장 제약(900 mm) |
 | `max_descend_m` | double | m | TBD | 하강 한계(z 하한) | 4.6 |
@@ -1266,7 +1266,7 @@ uint16 INSUFFICIENT_POINTS=501
 
 정지 경로 ③이 래치를 걸면 `/safety/reset`(4.5)이 성공할 때까지 시작·재시작이 거절된다(결정 #6). 작업 중지는 홈 복귀·재시작을 자동 실행하지 않는다(4.5.1). 순응·힘 제어 해제는 모든 경로에서 finally 보장(4.5.2), `RobotStatus.compliance_active=false` · `force_ctrl_active=false`(v1.2) · `ExecuteMotion.Result.compliance_released=true`로 확인. **(v1.2)** 모서리 하강량 제한도 과대 외력과 같은 이중 감시다: 1차 robot_manager(`DROP_LIMIT`), 2차 safety_monitor(래치).
 
-### 7.6 QoS 프로파일 — 제안(TBD) #9
+### 7.6 QoS 프로파일 — 제안(TBD) #9 · **(v1.2) 정의 위치는 `contact_scan_interfaces`가 설치하는 Python 모듈 `contact_scan_qos`(계약 v0.1.1)**
 
 | 프로파일 | Reliability | Durability | History | 적용 |
 |---|---|---|---|---|
@@ -1474,11 +1474,13 @@ mqtt_bridge (메인 PC · ROS 2)
 |---|---|---|
 | `request_id` | 명령 1건 식별 (UUID, FastAPI 발급) | `request_id` (Goal/Request에 그대로 전달) |
 | `scan_id` | 대상 작업 (resume에서 필수, 그 외 선택) | `Resume.Goal.scan_id` |
-| `session_id` | 웹 세션 식별 | `WebHeartbeat.session_id` |
+| `session_id` | 웹 세션 식별. **(v1.2)** 명령에서는 선택(없어도 거절하지 않음), `hb/web`에서만 필수 | `WebHeartbeat.session_id` |
 | `timestamp` | 발신 시각 (웹 PC 시계 · 시간 기준 맞춤은 6장 선행조건) | — (mqtt_bridge가 만료 검사에 사용, `cmd_expiry_s`) |
 | `payload` | 명령별 본문 (`set_config`는 `ScanConfig` 필드와 같은 키, 단위는 #24) | `SetConfig.Request.config` · `RunScan.Goal.config_override` |
 
 규칙 — `cmd/ack`는 접수/거절이며 동작 완료가 아니다. 완료는 `scan/result` 또는 `scan/command_result`. 중복(`request_id` 재사용)·만료(`timestamp` + `cmd_expiry_s`) 명령은 mqtt_bridge가 거절하고 `cmd/ack`에 `DUPLICATE_REQUEST`/`INVALID_REQUEST`(7.2)를 실어 응답한다. 응답 대기 timeout은 FastAPI가 "미확정"으로 표시한다(아키텍처 c78).
+
+**(v1.2 · PR #47 리뷰 반영)** `cmd/scan/stop`은 만료 검사에서 제외한다(중복 · 필수 필드 검사는 한다). 중지는 멱등이고, 두 PC의 시계가 어긋나 있어도 중지가 거절되면 안 된다. `cmd/scan/home` · `cmd/safety/reset`을 포함한 나머지 명령은 만료 검사를 한다. 명령의 필수 필드는 `schema_version` · `request_id` · `timestamp_ms` · `payload`, `hb/web`은 `schema_version` · `session_id` · `seq` · `timestamp_ms`, `conn/web`은 `schema_version` · `connected` · `timestamp_ms`다. 발신 시각 키는 `timestamp_ms`다(위 표의 `timestamp`는 v1.1 표기).
 
 ### 12.3 데이터 변환 규칙 (mqtt_bridge)
 
@@ -1486,11 +1488,11 @@ mqtt_bridge (메인 PC · ROS 2)
 - `robot/sample`은 표시용 10 Hz 다운샘플(설계 목표), ROS 측정 루프(50 Hz)에 영향을 주지 않는다.
 - **(v1.2 · T01 1차 회의 확정)** 상세와 토픽별 JSON 예시는 `docs/contracts/mqtt-schema.md` v0.1.
   - 구조: ROS 메시지와 같은 이름 · 같은 구조로 1:1. 길이 · 힘 키에는 단위 접미사(`x_mm` · `fz_n` · `z_drop_mm`). `unit` 필드는 두지 않는다. 변환은 mqtt_bridge에서만(#24 종결).
-  - enum은 문자열 이름, 사유는 `reason_code` + `reason` 병기, 모든 메시지에 `schema_version: "0.1"`.
+  - enum은 문자열 이름, 사유는 `reason_code` + `reason` 병기(다른 코드 필드는 `error_code` + `error_name`, `code` + `code_name`), 모든 메시지에 `schema_version: "0.1"`.
   - 시각: epoch ms 정수(UTC). `*_stamp_ms` 각각 보존 + mqtt_bridge의 `published_at_ms`. 명령 발신 시각은 `timestamp_ms`.
   - 각도 값은 싣지 않는다. 자세는 quaternion. deg 변환은 웹이 시각화할 때 한다.
   - 미측정값: `null` + `*_valid` 키 항상 유지.
-  - QoS(#22 종결): 명령 · `cmd/ack` · `scan/command_result` · `contact/event` · `scan/result` · `scan/log` = 1, `robot/sample` · `hb/*` = 0. retain=true는 `scan/state` · `robot/status` · `safety/status` · `conn/*`만, 명령은 전부 false. 중복 기억 개수 · `cmd_expiry_s`는 mqtt_bridge 파라미터(출발값 100개 · 5 s).
+  - QoS(#22 종결): 명령 · `cmd/ack` · `scan/command_result` · `contact/event` · `scan/result` · `scan/log` = 1, `robot/sample` · `hb/*` = 0. retain=true는 상태 3종(`scan/state` · `robot/status` · `safety/status`)과 `conn/*`만, 명령은 전부 false. `topic_prefix` 기본값 `""`은 웹 쪽의 전제다. 중복 기억 개수 · `cmd_expiry_s`는 mqtt_bridge 파라미터(출발값 100개 · 5 s).
   - 웹 PC ↔ 메인 PC 시계 동기는 chrony(의석 담당).
 
 ## 13. Web API 경계 (범위 밖 · 이름과 책임만)
@@ -1585,6 +1587,10 @@ v0.11에서 그대로 가져온 것: 11.1 연결 구조(조정 #13 제외) · 11
 | 11 | 프레임 · TCP | 프레임 배정은 제안, TCP · 힘 기준 없음 | 샘플은 계속 Base, 결과만 scan_manager가 변환(가이드 평행 설치 조건). TCP = 팁 최하단점, 자세 수직 고정, 힘 `DR_BASE` | T02 · T03 전에 기준 확정 | 7.4 |
 | 12 | 패키지 | 단일 `contact_scan` 제안 | 레포의 노드별 패키지 | 레포가 이미 그렇게 구성됨 | 0.3 |
 | 13 | MQTT · 웹 경계 | #22 · #24 · JSON 스키마 TBD | 1차 회의로 확정(12.3). 시작 명령의 완료도 `scan/command_result` | — | 12.1 · 12.3 |
+
+| 14 | PR #47 리뷰 반영 | — | `cmd/scan/stop` 만료 검사 제외 · 필수 필드(`session_id`는 명령에서 선택) · `error_code`+`error_name` · retain 상태 3종 · 하강 제한 1차 기준 z = 2차와 같음 · QoS 정의 위치 `contact_scan_qos` | 리뷰(현지 · 학민 · 의석) | 6.3 · 7.6 · 12.2 · 12.3 |
+
+계약에 TBD로 추가된 것: 순응 · 힘 제어 해제 실패 시 보고, `move_stop` → 해제 순서의 실기 확인. 후속 이슈: #51~#55.
 
 재시작: 홈 안전복귀를 거친 뒤의 재접근 절차는 여전히 TBD이며, 확정 전까지 그 경우는 `NOT_SUPPORTED`로 거절한다(5.3, v1.1 제안을 채택).
 

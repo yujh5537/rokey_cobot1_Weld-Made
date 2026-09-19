@@ -227,7 +227,7 @@ flowchart TB
 | 과대 외력 (정지 경로 ②) | **contact_detector** `/contact/event` OVER_FORCE(모든 operation에서 원시 외력으로 판정) → **robot_manager**(대조 없이 우선 정지 · Result OVER_FORCE) · **scan_manager**(실패 · 원인·위치·단계 기록) · **mqtt_bridge**. safety_monitor도 같은 조건을 독립 감시해 래치(이중 경로 유지 · 결정 #17) | 4.5.3 · 위험 4 |
 | 설정 등록 | 웹 `cmd/scan/set_config` → **mqtt_bridge** → `/scan/set_config`(S) → **scan_manager**(동작 중이면 거절 BUSY · 수락 시 자체 값 갱신 → `rcl_interfaces/srv/SetParameters`(결정 #16) → **robot_manager** · **contact_detector** · **safety_monitor**(v1.1 · P03)) → 응답 `applied` → **mqtt_bridge** `cmd/ack` | US-05 · 4.1.6 |
 
-모서리 하강량 제한(BRD 4.5.4)도 과대 외력과 같은 이중 감시다(v1.1): 1차 robot_manager(SLIDE 안에서 즉시 정지 · `DROP_LIMIT`), 2차 safety_monitor(래치).
+모서리 하강량 제한(BRD 4.5.4)도 과대 외력과 같은 이중 감시다(v1.1): 1차 robot_manager(SLIDE 안에서 즉시 정지 · `DROP_LIMIT`), 2차 safety_monitor(래치). 1차와 2차는 값과 기준 z(SLIDE 첫 샘플의 z)가 같다.
 
 세 정지 경로 모두 정지 **완료**는 `/robot/status`로 확인하며, `accepted`는 접수일 뿐이다(BRD 4.5.1 · 4.2.3).
 
