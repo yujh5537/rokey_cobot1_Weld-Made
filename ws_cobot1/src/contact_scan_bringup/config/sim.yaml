@@ -22,7 +22,8 @@ contact_detector:
     sim_box_origin_m: [0.40, 0.00, 0.00]   # 밑면 중심(지지면 위)의 x, y, z
     sim_box_size_m: [0.10, 0.06, 0.04]     # 가로(x) · 세로(y) · 높이(z). 윗면 z = origin z + 높이
     sim_stiffness_n_per_m: 20000.0         # 가상 외력 = 강성 x 윗면 침투 깊이. 3 N 에서 침투 0.15 mm, 30 N 에서 1.5 mm
-    sim_tip_radius_m: 0.00045              # 가상 팁 반지름. PR #57 실측 r = 0.45 mm 와 같게 둔다(실기와 같은 보정 경로를 sim 에서 본다)
+    sim_tip_radius_m: 0.000225             # 가상 팁 반지름. PR #57 실측 r = 0.225 mm (지름 0.45 mm) 와 같게 둔다
+                                           #   units-frames.md v0.1.2. edge_drop_m(0.5 mm) > r 이라 실기와 같은 보정 경로(δ >= r)를 sim 에서 본다
                                            #   scan_manager 의 tip_radius_m 과 같은 값이어야 sim 치수가 복원된다
     # sim 엣지 모델(모서리를 지난 뒤의 가상 하강)의 나머지 파라미터는 T07 에서 확정한다
 
