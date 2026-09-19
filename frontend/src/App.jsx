@@ -1,264 +1,94 @@
-import { useEffect, useRef, useState } from 'react'
-import * as THREE from 'three'
+import { useEffect, useReducer, useState } from 'react'
+import Scene from './Scene'
 import './App.css'
 
-
-function App() {
-  // Three.js canvas
-  const canvasRef = useRef(null)
-
-  // 화면에 표시할 현재 상태
-  const [phase, setPhase] = useState('IDLE')
-  const [direction, setDirection] = useState('-')
-  const [progress, setProgress] = useState(0)
-
-  // 시간순 로그
-  const [logs, setLogs] = useState([])
-
-
-  // =========================
-  // 로그 추가 함수
-  // =========================
-  function addLog(message) {
-    const now = new Date().toLocaleTimeString()
-
-    setLogs((prevLogs) => [
-      ...prevLogs,
-      `${now} - ${message}`,
-    ])
+const labels = { IDLE: '대기', TARE: '기준값 측정', TOP_SEARCH: '윗면 탐색', EDGE_SEARCH: '모서리 탐색', GEOMETRY: '형상 생성', COMPLETED: '완료', DONE: '완료', ERROR: '오류', STOPPING: '중지 진행', STOPPED: '중단', HOMING: '안전복귀 진행', RESUMING: '재시작 진행' }
+const commandLabels = { pending: '접수 대기', accepted: '접수됨 · 실행 완료 대기', rejected: '거절', completed: '완료', failed: '실패', unknown: '미확정 · 상태 확인 필요' }
+const initial = { online: false, mqtt: false, state: null, sample: null, points: [], trail: [], logs: [], commands: {}, lastReceived: null }
+function reduce(state, event) {
+  const p = event.payload
+  if (event.topic === 'web/snapshot') {
+    let next = { ...state, online: true, mqtt: p.mqtt_connected }
+    for (const entry of p.latest) next = reduce(next, entry)
+    for (const command of p.commands) next = reduce(next, { topic: 'web/command', payload: command })
+    return next
   }
-
-
-  // =========================
-  // 버튼 함수
-  // =========================
-
-  function handleStart() {
-    setPhase('EDGE_SEARCH')
-    setDirection('POS_X')
-    setProgress(1)
-
-    addLog('스캔 시작')
+  if (event.topic === 'web/offline') return { ...state, online: false, mqtt: false }
+  if (event.topic === 'web/connection') return { ...state, mqtt: p.mqtt_connected }
+  if (event.topic === 'web/command') {
+    // A late HTTP 202 response must not overwrite a faster MQTT ACK/result.
+    if (p.status === 'pending' && state.commands[p.request_id]) return state
+    return { ...state, commands: { ...state.commands, [p.request_id]: p } }
   }
-
-
-  function handleStop() {
-    setPhase('STOPPED')
-
-    addLog('스캔 중지')
+  if (event.topic === 'scan/state') {
+    const changed = state.state?.scan_id && state.state.scan_id !== p.scan_id
+    return { ...state, state: p, lastReceived: event.received_at_ms,
+      points: changed ? [] : state.points, trail: changed ? [] : state.trail }
   }
-
-
-  function handleHome() {
-    setPhase('HOMING')
-    setDirection('-')
-
-    addLog('안전복귀 시작')
+  if (event.topic === 'robot/sample') {
+    const trail = p.valid ? [...state.trail.filter(v => v.frame_id === p.frame_id), { ...p.pose, frame_id: p.frame_id }].slice(-1000) : state.trail
+    return { ...state, sample: p, trail }
   }
-
-
-  function handleResume() {
-    setPhase('EDGE_SEARCH')
-    setDirection('POS_X')
-
-    addLog('스캔 재시작')
+  if (event.topic === 'contact/event') {
+    if (state.points.some(v => v.scan_id === p.scan_id && v.event_id === p.event_id)) return state
+    return { ...state, points: [...state.points, p].slice(-200) }
   }
-
-
-  // =========================
-  // Three.js 화면
-  // =========================
-
-  useEffect(() => {
-    // 1. 3D 공간
-    const scene = new THREE.Scene()
-
-    // 2. 카메라
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      900 / 500,
-      0.1,
-      1000
-    )
-
-    camera.position.set(4, 3, 5)
-    camera.lookAt(0, 0, 0)
-
-
-    // 3. Renderer
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvasRef.current,
-      antialias: true,
-    })
-
-    renderer.setSize(900, 500)
-
-
-    // 4. 조명
-    const ambientLight = new THREE.AmbientLight(
-      0xffffff,
-      1
-    )
-
-    scene.add(ambientLight)
-
-
-    const directionalLight =
-      new THREE.DirectionalLight(
-        0xffffff,
-        2
-      )
-
-    directionalLight.position.set(3, 5, 4)
-
-    scene.add(directionalLight)
-
-
-    // 5. 작업대
-    const tableGeometry =
-      new THREE.BoxGeometry(
-        4,
-        0.2,
-        3
-      )
-
-    const tableMaterial =
-      new THREE.MeshStandardMaterial()
-
-    const table = new THREE.Mesh(
-      tableGeometry,
-      tableMaterial
-    )
-
-    table.position.y = -0.1
-
-    scene.add(table)
-
-
-    // 6. 직육면체 부재
-    const workpieceGeometry =
-      new THREE.BoxGeometry(
-        2,
-        1,
-        1.2
-      )
-
-    const workpieceMaterial =
-      new THREE.MeshStandardMaterial()
-
-    const workpiece = new THREE.Mesh(
-      workpieceGeometry,
-      workpieceMaterial
-    )
-
-    workpiece.position.y = 0.5
-
-    scene.add(workpiece)
-
-
-    // 7. XYZ 좌표축
-    const axesHelper =
-      new THREE.AxesHelper(2)
-
-    scene.add(axesHelper)
-
-
-    // 8. 화면 그리기
-    renderer.render(
-      scene,
-      camera
-    )
-
-
-    // React 화면 종료 시 정리
-    return () => {
-      renderer.dispose()
-    }
-  }, [])
-
-
-  return (
-    <main>
-
-      <h1>접촉 탐색 시스템</h1>
-
-      <p>
-        외곽 엣지·경로 후보 생성 시스템
-      </p>
-
-
-      {/* 제어 버튼 */}
-      <section className="control-panel">
-
-        <button onClick={handleStart}>
-          시작
-        </button>
-
-        <button onClick={handleStop}>
-          중지
-        </button>
-
-        <button onClick={handleHome}>
-          안전복귀
-        </button>
-
-        <button onClick={handleResume}>
-          재시작
-        </button>
-
-      </section>
-
-
-      {/* 현재 상태 */}
-      <section className="status-panel">
-
-        <h2>현재 상태</h2>
-
-        <p>
-          현재 단계: {phase}
-        </p>
-
-        <p>
-          진행 방향: {direction}
-        </p>
-
-        <p>
-          진행도: {progress} / 4
-        </p>
-
-      </section>
-
-
-      {/* Three.js */}
-      <section>
-
-        <h2>3D 화면</h2>
-
-        <canvas ref={canvasRef} />
-
-      </section>
-
-
-      {/* 로그 */}
-      <section className="log-panel">
-
-        <h2>시간순 로그</h2>
-
-        {logs.length === 0 && (
-          <p>아직 로그가 없습니다.</p>
-        )}
-
-        {logs.map((log, index) => (
-          <p key={index}>
-            {log}
-          </p>
-        ))}
-
-      </section>
-
-    </main>
-  )
+  if (event.topic === 'scan/log') return { ...state, logs: [...state.logs, p].sort((a,b) => a.stamp_ms-b.stamp_ms).slice(-200) }
+  return state
 }
 
+export default function App() {
+  const [data, dispatch] = useReducer(reduce, initial)
+  const [error, setError] = useState('')
+  const [sending, setSending] = useState({})
+  const [clock, setClock] = useState(Date.now)
+  useEffect(() => {
+    let socket, retry, stopped = false
+    function connect() {
+      socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/live`)
+      socket.onmessage = e => { try { dispatch(JSON.parse(e.data)) } catch { setError('수신 메시지를 해석할 수 없습니다.') } }
+      socket.onclose = () => { dispatch({ topic: 'web/offline' }); if (!stopped) retry = setTimeout(connect, 1500) }
+      socket.onerror = () => socket.close()
+    }
+    connect()
+    const timer = setInterval(() => setClock(Date.now()), 1000)
+    return () => { stopped = true; clearTimeout(retry); clearInterval(timer); socket?.close() }
+  }, [])
 
-export default App
+  async function send(action) {
+    setError(''); setSending(v => ({ ...v, [action]: true }))
+    try {
+      const response = await fetch(`/api/scan/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scan_id: action === 'resume' ? data.state?.scan_id ?? '' : '' }) })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(JSON.stringify(payload.detail))
+      dispatch({ topic: 'web/command', payload })
+    } catch (e) { setError(`명령 전송 결과 확인 필요: ${e.message}. 자동 재전송하지 않습니다.`) }
+    finally { setSending(v => ({ ...v, [action]: false })) }
+  }
+  const state = data.state
+  const sample = data.sample
+  const pose = sample?.valid ? sample.pose : null
+  return <main>
+    <header><p>WELD-MADE / CONTACT SCAN</p><h1>접촉 탐색 관제</h1><p>외곽 엣지·경로 후보 생성 시스템</p></header>
+    <section className="status-panel" aria-live="polite">
+      <strong>{state ? labels[state.phase] ?? state.phase : '상태 수신 대기'}</strong>
+      <span>{state?.direction ?? '—'} · {state?.progress ?? '—'} / {state?.progress_total ?? 4}</span>
+      <span>화면 {data.online ? '연결' : '단절'} / MQTT {data.mqtt ? '연결' : '단절'}</span>
+      <small>상태 취득 후 {state ? `${Math.max(0, (clock-state.stamp_ms)/1000).toFixed(0)}초` : '—'} · 연결 전 수신값은 현재 상태를 보장하지 않습니다.</small>
+    </section>
+    <section className="control-panel">
+      {[['start','작업 시작'],['stop','작업 중지'],['home','안전복귀'],['resume','재시작']].map(([action,label]) => <button key={action} className={action} disabled={!data.online || !data.mqtt || sending[action]} onClick={() => send(action)}>{label}</button>)}
+    </section>
+    {error && <p role="alert" className="error">{error}</p>}
+    <div className="workspace"><section className="scene-panel"><h2>팁 위치 · 궤적 · 접촉점</h2>
+      <Scene sample={sample} trail={data.trail} points={data.points} />
+      <p>좌표계: {sample?.frame_id ?? '미수신'} / mm · 파랑: 궤적 · 주황: 접촉점</p>
+      <small>작업대는 표시용 기준 평면입니다. 실제 작업대 위치는 T03 좌표 확정 후 반영합니다.</small>
+    </section><aside><h2>현재 TCP</h2>{['x','y','z'].map(axis => <p key={axis}>{axis.toUpperCase()} <strong>{Number.isFinite(pose?.[`${axis}_mm`]) ? pose[`${axis}_mm`].toFixed(2) : '—'}</strong> mm</p>)}
+      <p>샘플 시각: {sample ? new Date(sample.pose_stamp_ms).toLocaleTimeString() : '—'}</p>
+      <h2>명령 처리</h2><p>접수와 실행 완료를 별도로 표시합니다.</p>
+      {Object.values(data.commands).slice(-12).reverse().map(c => <article key={c.request_id}><strong>{c.action} · {commandLabels[c.status]}</strong><small>{c.request_id}</small>{(c.result?.reason || c.ack?.reason) && <p>{c.result?.reason ?? c.ack?.reason}</p>}</article>)}
+    </aside></div>
+    <section className="log-panel"><h2>시간순 로그</h2>{!data.logs.length && <p>로그 수신 대기</p>}{data.logs.map((l,i) => <p key={`${l.stamp_ms}-${i}`}><time>{new Date(l.stamp_ms).toLocaleTimeString()}</time> [{l.level}] {l.phase} · {l.message}</p>)}</section>
+  </main>
+}
