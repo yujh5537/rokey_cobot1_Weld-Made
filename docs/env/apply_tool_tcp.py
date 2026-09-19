@@ -29,7 +29,7 @@ TOOL_NAME = 'rg2_probe'
 TOOL_WEIGHT_KG = 1.3
 TOOL_COG_MM = [0.0, 31.08, 29.84]
 TCP_NAME = 'rg2_probe_tip'
-TCP_POS = [-1.30, 3.71, 250.21, 0.0, 0.0, 0.0]  # 최하단점: 구 중심 z 249.76 + 팁 반지름 0.45
+TCP_POS = [-1.30, 3.71, 249.99, 0.0, 0.0, 0.0]  # 최하단점: 구 중심 z 249.76 + 팁 반지름 0.225 (지름 0.45)
 MANUAL, AUTONOMOUS = 0, 1
 
 
