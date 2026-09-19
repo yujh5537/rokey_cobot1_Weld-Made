@@ -2,6 +2,14 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.1.2 (2026-09-19, T02, PR #TBD)
+타입 변경 없음. `units-frames.md`의 좌표 값 중 **툴 무게 · 무게중심**, **탐침 TCP 오프셋(최하단점)**, **팁 반지름**을 실측해 적었다. 근거는 `docs/env/tool-tcp-register.md`. 영향: robot_manager(T13) · contact_detector(T07, T16) · 모서리 편향 보정(r 사용) · 임계값 튜닝(T24).
+- 툴: 1.3 kg, 무게중심 (0, 31.08, 29.84) mm. 펜던트에 있던 값이다
+- TCP(최하단점): [-1.30, 3.71, 250.21] mm. 피벗 보정 14자세로 구 중심 [-1.30, 3.71, 249.76]을 구하고 r을 더했다. 불확도는 약 ±1 mm다
+- 팁 반지름 r: 0.45 mm. 탐침이 인공눈물 용기로 바뀌어 설계 출발값 3 mm를 대체한다
+- 새로 적은 사실: ROS로 등록한 툴 · TCP는 `sodreal`을 다시 켜면 지워진다. 툴이 없을 때 무접촉 외력은 11~12.5 N, 등록 뒤에는 2.1~2.9 N(최대 3.7 N)이었다. robot_manager가 시작할 때와 탐색 전에 현재 툴 · TCP를 확인해야 한다
+- 실측값은 코드 상수가 아니라 `real.yaml` 파라미터로 둔다고 상태 줄에 적었다
+
 ## v0.1.1 (2026-09-18, T09, PR #49)
 타입 변경 없음(msg/srv/action은 v0.1 그대로). `ros-interfaces.md` 6.3절의 TBD였던 **QoS 프로파일 정의 위치**를 확정했다. 영향: Topic을 발행 · 구독하는 자체 노드 5개.
 - 위치: `contact_scan_interfaces` 패키지가 설치하는 Python 모듈 `contact_scan_qos`. 사용: `from contact_scan_qos import QOS_SENSOR`(`QOS_STATE` · `QOS_EVENT` · `QOS_LOG` · `QOS_HEARTBEAT`). 의존 선언은 `contact_scan_interfaces` 하나로 충분하다
