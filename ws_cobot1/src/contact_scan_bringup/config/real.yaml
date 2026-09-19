@@ -1,0 +1,33 @@
+# source:=robot_force 파라미터 (실기, 로봇 내장 힘 감지)
+#
+# - 단위: m · N · s (docs/contracts/units-frames.md). 좌표는 Base(base_link 가칭) 기준이다.
+# - 아래 수치는 BRD 의 "설계 출발값"이다. 실측값이 아니다. 실기 튜닝 값은 이 파일을 PR 로 고친다
+#   (브랜치 tune-MMDD-*, 커밋 'tune:'). 값을 바꾸면 옆에 날짜 · 조건 · 시험 기록(docs/test-reports/)을 적는다.
+#   실기 PC 에만 남은 값은 없는 값이다(docs/conventions.md).
+# - "계약 이름" 표시가 있는 파라미터는 SetConfig 가 이름으로 전파한다(ros-interfaces.md 6.4). 이름을 바꾸지 않는다.
+# - over_force_n, drop_limit_m 은 여러 노드가 같은 값을 써야 한다(7.2). test/test_config.py 가 검사한다.
+# - 최상위 키는 노드 이름이다. 다른 노드의 파라미터는 각 담당자가 자기 절에 추가한다.
+
+contact_detector:
+  ros__parameters:
+    source: robot_force              # 'sim' | 'robot_force' (BRD 4.1.6)
+    contact_threshold_n: 3.0         # 계약 이름. 접촉 임계 |F - F0|. 출발값 3~5 N 의 하한. TR-01(T24)에서 확정
+    edge_drop_m: 0.0005              # 계약 이름. 접촉 소실로 보는 z 급강하. 출발값 0.5 mm. T25 에서 확정
+    debounce_n: 3                    # 계약 이름. 연속 N 회 유지되면 확정. 출발값 3
+    over_force_n: 30.0               # 계약 이름. 과대 외력(원시 |F|). 출발값 30 N
+
+safety_monitor:
+  ros__parameters:
+    over_force_n: 30.0               # 계약 이름. contact_detector 와 같은 값
+    drop_limit_m: 0.005              # 계약 이름. SLIDE 첫 샘플 z 기준 하강 제한. 출발값 5 mm
+
+robot_manager:
+  ros__parameters:
+    drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
+    # slide_target_force_n:          # 계약 이름. 값 TBD (학민)
+
+# scan_manager:                      # 계약 이름: descend_speed_mps · slide_speed_mps · max_descend_m ·
+#   ros__parameters:                 #   max_slide_m · motion_timeout_s · lift_height_m (병후)
+
+# mqtt_bridge:                       # (병후)
+#   ros__parameters:
