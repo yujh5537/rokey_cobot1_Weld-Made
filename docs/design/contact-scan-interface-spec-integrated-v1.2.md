@@ -1369,9 +1369,9 @@ uint16 INSUFFICIENT_POINTS=501
 | 19 | HOME 목표 출처(신규) | robot_manager 파라미터 `home_pose`(goal.target 무시) | goal.target에 scan_manager가 실음 | 4.4.9 · 6장 | 5.4 · 6.1 |
 | 20 | RunScan Goal/Result(신규) | Goal `{request_id, use_override, config_override}` · Result `{scan_id, success, reason_code, detail, result}` · Feedback `{state}` | Goal 비움 | 아키텍처 c38 · 4.4.2 | 5.1 |
 | 21 | 작업 중지 시 goal cancel(신규) | `/robot/stop` 호출 + 진행 중 ExecuteMotion cancel 동시 | `/robot/stop`만 | 4.2.3 | 1.4 · 4.3 |
-| 22 | MQTT QoS · timeout · 만료 · 재전송 정책 (v0.11) | 명령·ACK·이벤트 QoS 1 · retain=false · `cmd_expiry_s` 만료 · 상태는 시각 검증 | QoS 0 표시 토픽 / 브로커 persistent session | 아키텍처 c101 · 위험 10 | 12.3 |
+| 22 | MQTT QoS · timeout · 만료 · 재전송 정책 (v0.11) | **12.3절로 대체(T01 1차 회의 확정 · 계약 `mqtt-schema.md` 2~3장).** 토픽별 QoS · retain 표, `cmd/scan/stop` 만료 검사 제외. v1.1 제안: 명령·ACK·이벤트 QoS 1 · retain=false · `cmd_expiry_s` 만료 · 상태는 시각 검증 | QoS 0 표시 토픽 / 브로커 persistent session | 아키텍처 c101 · 위험 10 | 12.3 |
 | 23 | PostgreSQL ERD/DDL (v0.11) | `scan_result` · `scan_event` · `calibration_result`(FastAPI) / `job` · `workpiece` · `user`(Spring) — 컬럼은 `ScanResult` · `ContactEvent` 필드와 1:1, `*_valid` 컬럼 유지 | JSONB 한 컬럼 | 4.3.4 · TR-10 | 11.2 |
-| 24 | 웹 표시 단위 변환 위치 (v0.11) | mqtt_bridge가 JSON 직렬화 시 mm로 변환 + `unit` 필드 | FastAPI에서 변환 | 4.7 데이터 계약 | 12.3 |
+| 24 | 웹 표시 단위 변환 위치 (v0.11) | **12.3절로 대체(T01 1차 회의 확정).** mqtt_bridge가 mm로 변환하고 **`unit` 필드는 두지 않는다. 단위는 키 이름 접미사**(`x_mm` · `fz_n`). v1.1 제안: mm로 변환 + `unit` 필드 | FastAPI에서 변환 | 4.7 데이터 계약 | 12.3 |
 
 BRD 6장의 미결정 사항 중 이 문서가 건드리지 않은 것(홈 복귀 경로·순서 · 중단 위치 재접근 절차 · 이상 상태별 재시작 허용 조건 · 허용 시각 차이 · 브라우저 단절 정책 · 재전송·저장 확인 절차 · 좌표계·z=0·Base 변환·TCP·홈 좌표)은 환경 세팅 후 팀 확인으로 확정한다.
 

@@ -34,7 +34,8 @@ flowchart LR
   SM -- "state · result · log" --> BR
   BR -- "safety/reset · heartbeat" --> SF
   SM -- "execute_motion · stop" --> RM
-  SM -- "tare" --> CD
+  SM -- "tare · scan state" --> CD
+  SM -- "scan state" --> SF
   SM -. "SetParameters (P01~P03)" .-> RM
   SM -. "SetParameters" .-> CD
   SM -. "SetParameters" .-> SF
