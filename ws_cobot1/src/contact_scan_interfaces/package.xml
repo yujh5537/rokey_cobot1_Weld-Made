@@ -4,7 +4,7 @@
   <name>contact_scan_interfaces</name>
   <version>0.1.0</version>
   <description>접촉 스캔 시스템의 msg/srv/action 과 QoS 프로파일. 기준은 docs/contracts/ros-interfaces.md (계약 v0.1).</description>
-  <maintainer email="ok778ts123@gmail.com">bhpark</maintainer>
+  <maintainer email="284185005+ok778ts123@users.noreply.github.com">bhpark</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
