@@ -725,6 +725,7 @@
    "id": "T27",
    "title": "mqtt_bridge↔FastAPI 실제 연결",
    "owners": [
+    "병후",
     "의석"
    ],
    "brd": "4.7절",
