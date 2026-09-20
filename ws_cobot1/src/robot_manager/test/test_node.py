@@ -151,3 +151,36 @@ def test_moving_is_true_again_when_positions_go_stale(ros):
         assert node.moving_from_positions() is True
     finally:
         node.destroy_node()
+
+
+def test_status_timer_refreshes_moving(ros):
+    """상태 발행 전에 moving 을 다시 본다 (병후 리뷰, PR #72).
+
+    조회가 밀려 state 갈래가 안 돌면 낡은 moving 이 그대로 나간다. 계약상 정지 완료의
+    유일한 근거가 connected && !moving 이라, 그 사이 "정지"로 보고하면 안 된다.
+    """
+    node = RobotManager(parameter_overrides=PARAMS)
+    listener = rclpy.create_node('status_refresh_listener')
+    received = []
+    listener.create_subscription(RobotStatus, '/robot/status', received.append, QOS_STATE)
+    try:
+        now = node.now_s()
+        node.connected = True
+        node.moving = False                      # 낡은 값
+        node.positions.clear()
+        for i in range(3):                       # 창(0.3 s)보다 오래된 위치만 남았다
+            node.positions.append((now - 5.0 + i * 0.05, (0.4, 0.0, 0.2)))
+
+        node.on_status_timer()
+
+        assert node.moving is True, '낡은 위치만 있으면 이동 중으로 되돌아와야 한다'
+        executor = SingleThreadedExecutor()
+        executor.add_node(listener)
+        for _ in range(20):
+            executor.spin_once(timeout_sec=0.05)
+            if received:
+                break
+        assert received and received[-1].moving is True
+    finally:
+        listener.destroy_node()
+        node.destroy_node()

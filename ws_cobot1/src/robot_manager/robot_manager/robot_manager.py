@@ -216,7 +216,15 @@ class RobotManager(Node):
 
     # ---- 상태 -------------------------------------------------------------
     def on_status_timer(self):
-        """상태는 주기적으로 **발행만** 한다. 조회는 샘플 줄(on_response)에서 같이 한다."""
+        """발행 전에 moving 을 다시 본다. 조회는 샘플 줄(on_response)에서 같이 한다.
+
+        조회가 밀려 state 갈래가 안 돌면 낡은 moving 이 그대로 나간다(최대
+        `ABANDON_AFTER_S`). 계약상 정지 완료의 유일한 근거가 `connected && !moving`
+        이므로 그 사이 "정지"로 보고하면 안 된다. 창이 비면 점이 2개 미만이 되어
+        "이동 중"으로 떨어진다. 두산 호출이 아니라 위치 버퍼 위의 계산이라 비용이 없다.
+        (병후 리뷰, PR #72)
+        """
+        self.set_state(self.connected, self.moving_from_positions(), self.detail)
         self.publish_status()
 
     def set_state(self, connected, moving, detail):
