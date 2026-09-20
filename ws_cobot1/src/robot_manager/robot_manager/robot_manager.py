@@ -30,6 +30,7 @@ from robot_manager import dsr_client, motion_state
 from robot_manager.conversions import posx_to_pose_fields, tool_force_to_wrench_fields
 
 NAN = float('nan')
+ABANDON_AFTER_S = 5.0   # 이만큼 응답이 없으면 그 요청을 포기하고 다시 보낸다
 
 
 class Attempt:
@@ -79,6 +80,8 @@ class RobotManager(Node):
         self.sample_id = 0
         self.cycle = 0
         self.attempt = None
+        self.pending_calls = 0      # 응답을 기다리는 두산 호출 수. 동시 호출을 막는다
+        self.last_call_s = 0.0
         # 두산 호출을 한 줄로 묶었으므로, 상태 조회는 샘플 몇 번마다 한 번 끼워 넣는다
         self.state_every = max(1, round(sample_hz / status_hz))
         self.moving_eps_m = float(self.get_parameter('moving_eps_m').value)
@@ -109,6 +112,14 @@ class RobotManager(Node):
             if self.now_s() - self.attempt.started_s < self.service_timeout_s:
                 return  # 아직 응답을 기다리는 중. 요청을 쌓지 않는다
             self.finish(self.attempt)  # 시간 초과. 못 받은 값은 NaN으로 발행한다
+        if self.pending_calls:
+            # 보낸 요청의 응답이 아직 안 왔다. 새로 보내면 같은 서비스로 여러 건이 동시에 뜬다
+            # (병후 리뷰, PR #72). 드라이버가 느려지는 것은 멈추기 직전 증상이라 그때 밀면 안 된다
+            if self.now_s() - self.last_call_s < ABANDON_AFTER_S:
+                return
+            self.get_logger().warn(
+                f'{ABANDON_AFTER_S:.0f} s 동안 응답이 없어 {self.pending_calls}건을 포기하고 다시 보낸다')
+            self.pending_calls = 0
         self.cycle += 1
         attempt = self.attempt = Attempt(self.now_s(), want_state=self.cycle % self.state_every == 0)
         self.call(self.srv_clients['posx'], dsr_client.posx_request(), attempt, 'posx')
@@ -123,12 +134,15 @@ class RobotManager(Node):
         if not client.service_is_ready():
             self.on_response(attempt, kind, None)
             return
+        self.pending_calls += 1
+        self.last_call_s = self.now_s()
         client.call_async(request).add_done_callback(partial(self.on_response, attempt, kind))
 
     def on_response(self, attempt, kind, future):
         stamp = self.get_clock().now().to_msg()  # 응답을 받은 시각 (발행 시각이 아니다)
         response = None
         if future is not None:
+            self.pending_calls = max(0, self.pending_calls - 1)
             try:
                 response = future.result()
             except Exception as exc:  # 드라이버가 죽는 등
@@ -157,6 +171,9 @@ class RobotManager(Node):
         motion_state.trim(self.positions, stamp_s, self.moving_window_s)
 
     def moving_from_positions(self):
+        # 판정 직전에도 창을 정리한다. posx 응답이 끊기면 옛 위치만 남아 "정지"로 굳는다
+        # (병후 리뷰, PR #72). 창이 비면 점이 2개 미만이 되어 "이동 중"으로 돌아간다
+        motion_state.trim(self.positions, self.now_s(), self.moving_window_s)
         return motion_state.is_moving(self.positions, self.moving_eps_m)
 
     def finish(self, attempt):

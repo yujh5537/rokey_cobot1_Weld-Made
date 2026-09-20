@@ -111,3 +111,43 @@ def test_sample_id_increases(ros):
     finally:
         listener.destroy_node()
         node.destroy_node()
+
+
+def test_does_not_send_while_a_call_is_outstanding(ros):
+    """앞 요청의 응답이 안 왔으면 새로 보내지 않는다 (병후 리뷰, PR #72).
+
+    같은 서비스로 여러 건이 동시에 뜨면 드라이버가 응답을 멈춘다.
+    """
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        node.pending_calls = 1
+        node.last_call_s = node.now_s()
+        node.attempt = None
+        before = node.cycle
+        node.on_sample_timer()
+        assert node.cycle == before, '응답을 기다리는 중에는 새 조회를 시작하지 않는다'
+        assert node.attempt is None
+
+        # 너무 오래 기다리면 포기하고 다시 보낸다 (영구 정지를 막는다)
+        node.last_call_s = node.now_s() - 10.0
+        node.on_sample_timer()
+        assert node.cycle == before + 1
+        assert node.pending_calls == 0
+    finally:
+        node.destroy_node()
+
+
+def test_moving_is_true_again_when_positions_go_stale(ros):
+    """정지 상태로 창을 채운 뒤 posx 가 끊기면 moving 이 다시 True 가 된다."""
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        now = node.now_s()
+        for i in range(3):
+            node.positions.append((now - 0.2 + i * 0.05, (0.4, 0.0, 0.2)))
+        assert node.moving_from_positions() is False
+        node.positions.clear()
+        for i in range(3):        # 창(0.3 s)보다 오래된 위치만 남은 상태
+            node.positions.append((now - 5.0 + i * 0.05, (0.4, 0.0, 0.2)))
+        assert node.moving_from_positions() is True
+    finally:
+        node.destroy_node()

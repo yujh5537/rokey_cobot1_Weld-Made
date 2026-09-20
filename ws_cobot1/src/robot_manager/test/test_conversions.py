@@ -111,3 +111,12 @@ def test_trim_drops_old_points():
     points = window((0.0, (0, 0, 0)), (0.5, (0, 0, 0)), (0.9, (0, 0, 0)))
     trim(points, now_s=1.0, window_s=0.3)
     assert [t for t, _ in points] == [0.9]
+
+
+def test_stale_points_are_dropped_then_unknown_means_moving():
+    """posx 응답이 끊기면 창이 비고, 그때는 "이동 중"으로 본다 (병후 리뷰, PR #72)."""
+    points = window((0.0, (0.4, 0.0, 0.2)), (0.1, (0.4, 0.0, 0.2)), (0.2, (0.4, 0.0, 0.2)))
+    assert is_moving(points, 0.0002) is False          # 정지 상태로 창이 차 있다
+    trim(points, now_s=5.0, window_s=0.3)              # 5초간 새 위치가 없었다
+    assert len(points) == 0
+    assert is_moving(points, 0.0002) is True           # 모르면 이동 중
