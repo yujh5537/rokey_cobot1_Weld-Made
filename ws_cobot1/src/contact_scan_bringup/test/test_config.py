@@ -56,3 +56,9 @@ def test_no_zero_or_nan_placeholder(file_name):
         for name in names:
             value = _params(file_name)[node][name]
             assert value > 0 and math.isfinite(value), f'{file_name}: {node}.{name} = {value}'
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_state_publish_period_positive(file_name):
+    """0 이하면 scan_manager 가 기동하지 않는다 (PR #50)."""
+    assert _params(file_name)['scan_manager']['state_publish_period_s'] > 0
