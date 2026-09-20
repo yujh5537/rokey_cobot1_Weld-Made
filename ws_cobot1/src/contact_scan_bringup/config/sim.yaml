@@ -55,7 +55,40 @@ scan_manager:
   ros__parameters:
     state_publish_period_s: 1.0      # /scan/state 주기 발행 간격(s). 상태가 바뀌면 이 값과 무관하게 바로 발행한다
                                      #   0 이하면 노드가 기동하지 않는다. 설계 출발값이며 실측값이 아니다 (병후, PR #50)
-    # 계약 이름(T19에서 추가): descend_speed_mps · slide_speed_mps · max_descend_m · max_slide_m · motion_timeout_s · lift_height_m
+    # --- T19a (병후). 아래는 전부 sim 전용 가상값이거나 설계 출발값이다. 실측값이 아니다 ---
+    # 필수 항목이 비어 있으면 노드는 기동하되 START 를 INVALID_VALUE 로 거절하고 빠진 이름을 알려 준다(코드 예비값 없음).
+    descend_speed_mps: 0.005         # 계약 이름. OP_DESCEND 속도
+    slide_speed_mps: 0.010           # 계약 이름. OP_SLIDE 속도
+    max_descend_m: 0.08              # 계약 이름. 미접촉 실패 한계. 기준점 z 0.10 - sim 박스 윗면 0.04 = 0.06 을 덮는다
+    max_slide_m: 0.15                # 계약 이름. 미소실 실패 한계. sim 박스 중심에서 모서리까지 0.05 · 0.03 을 덮는다
+    motion_timeout_s: 30.0           # 계약 이름. 단위 모션 제한 시간
+    lift_height_m: 0.05              # 계약 이름. 방향 전환 · 마무리 때 팁 상승량. 출발값 50 mm (BRD 4.2.6)
+    move_speed_mps: 0.05             # OP_MOVE_TO 속도: 기준점 이동 · 방향 전환의 올림과 수평 이동 · 마무리 들어 올림
+                                     #   robot_manager 는 OP_HOME 이 아닌 goal 의 speed <= 0 을 거절한다(PR #73)
+    recontact_margin_m: 0.001        # 방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값. 출발값 1 mm (계약 7.3)
+                                     #   drop_limit_m(0.005) 보다 충분히 작아야 한다: 틈을 메우는 하강도 하강 제한에 들어간다
+    recontact_speed_mps: 0.005       # 방향 전환 뒤 내림 속도(저속)
+    search_origin_pose: [0.40, 0.00, 0.10, 0.0, 1.0, 0.0, 0.0]
+                                     # 탐색 기준점 상공. Base, x y z qx qy qz qw. sim 박스 중심의 위 0.10 m
+                                     #   자세는 팁이 아래를 보는 수직(두산 ZYZ (0, 180, 0) deg 에 해당). 오일러로 두지 않는다(ZYZ 규약 혼동)
+                                     #   Virtual Mode 에서 이 pose 에 도달하는지는 미확인이다(T19b)
+    base_to_fixture: [0.40, 0.00, 0.00]   # 작업대 원점의 Base 좌표 x y z. 평행 이동만. sim 박스의 밑면 중심과 같게 둔 가상값
+    support_z_m: 0.0                 # 지지면 높이(작업대 좌표). z=0 이 작업대 표면이다. 0 이 정당한 값이다
+    tip_radius_m: 0.000225           # 편향 보정 r. **반지름**이다(지름 0.45 mm). units-frames.md 실측(2026-09-19 학민, PR #57)
+                                     #   contact_detector 의 sim_tip_radius_m 과 같아야 sim 치수가 복원된다. 정의서 기본값 0.003 을 쓰지 않는다
+    # detect_latency_s:              # 편향 보정 지연 t. **TBD (현지)**: sim 입력원(T16)의 판정 지연에 맞춰야 한다
+                                     #   '판정 샘플'의 정의(이슈 #69)에 따라 뜻이 달라진다. 0 을 임시로 넣지 않는다
+                                     #   이 값이 없으면 sim 에서도 START 가 거절된다
+    edge_round_radius_m: 0.0         # 부재 모서리 둥글림 R. sim 박스는 예리하다. 0 이 정당한 값이다
+    edge_bias_offset_m: 0.0          # 실측 나머지 편향. 스칼라 하나, 방향당 값, 진행 방향 + (geometry_estimator README, PR #75)
+    result_dir: data                 # result_store 경로. 상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이다
+                                     #   ws_cobot1 에서 launch 하면 ws_cobot1/data (gitignore)
+    result_frame_id: workpiece_fixture    # ScanResult 의 프레임(가칭)
+    motion_frame_id: base_link            # ExecuteMotion goal 의 프레임(가칭)
+    direction_order: [POS_X, NEG_X, POS_Y, NEG_Y]   # 모서리 탐색 순서. 기동할 때만 읽는다
+    event_wait_timeout_s: 1.0        # Result 가 가리킨 ContactEvent 를 기다리는 한도. 넘으면 실패(TIMEOUT)
+    stop_confirm_timeout_s: 5.0      # 정지 완료(connected && !moving)를 기다리는 한도. 넘으면 실패(ROBOT_STATUS_LOST)
+    server_wait_timeout_s: 2.0       # 상대 서버(/robot/execute_motion · /contact/tare)의 미기동 판단
 
 # mqtt_bridge:                       # (병후)
 #   ros__parameters:

@@ -13,9 +13,10 @@
 | `scan_manager/geometry_adapter.py` | Base → 작업대 좌표 평행 이동, `geometry_estimator` 호출, `BoxEstimate` → `ShapeResult` · `BiasCorrection`, `GEOM_*` → ReasonCode. `geometry_estimator`를 import하는 유일한 곳 | 쓰지 않음 |
 | `scan_manager/result_store/` | 진행 기록 · 결과 원본의 파일 보존(T20). [README](scan_manager/result_store/README.md) | 쓰지 않음 |
 | `scan_manager/geometry_estimator/` | 5점 → 편향 보정 · 직육면체(T17, 현지). [README](scan_manager/geometry_estimator/README.md) | 쓰지 않음 |
-| `scan_manager/scan_manager.py` | 노드. 상태 기계를 들고 `/scan/state`를 발행한다 | 씀 |
+| `scan_manager/conversions.py` | msg ↔ 순수 자료형: `ContactEvent` → `Detection`, `MotionRequest` → goal, `ShapeResult` → `ScanResult`(None → NaN + `*_valid=false`), `ScanConfig` ↔ 값 | msg 타입만 |
+| `scan_manager/scan_manager.py` | 노드. 서버 5개 · 구독 · 클라이언트 · `Ports` 구현 · 쓰기 스레드 · 종료 처리 | 씀 |
 
-T10은 골격까지다. T19a는 두 PR로 얹는다: ① 위의 순수 모듈 4개(이 표), ② 노드 배선(Action · Service 서버, `Ports` 구현, yaml). 실제 상대 노드와의 sim 종단 구동과 SetConfig 전파는 T19b, 중지 뒤의 재시작 처리는 T26이다.
+T19a까지 들어 있다: 시퀀스 · 서버 · geometry 연결. **검증은 테스트 안에서 띄운 가짜 상대 노드(`test/fake_peers.py`)로만 했다.** 실제 contact_detector · robot_manager와의 sim 종단 구동과 SetConfig 전파(P01~P03)는 T19b, 재시작 로직은 T26이다.
 
 ## 시퀀스 (`sequence.py`)
 기준은 계약 5.4 · 7.1 · 7.3 · 7.4절과 BRD 4.2.5 · 4.2.6이다.
@@ -56,15 +57,74 @@ python3 -m pytest src/scan_manager/test -q     # ROS를 source하지 않은 셸.
 source /opt/ros/jazzy/setup.bash               # ws_dsr 없이 빌드된다
 colcon build --symlink-install --packages-up-to scan_manager && source install/setup.bash
 colcon test --packages-select scan_manager && colcon test-result --verbose
-ros2 run scan_manager scan_manager             # 로봇 · 드라이버 연결 없이 단독 실행
+ros2 run scan_manager scan_manager             # 로봇 · 드라이버 연결 없이 단독 실행. 파라미터가 없어 START 는 거절된다
+ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽는다. 자체 노드만 뜬다
 ```
+노드 테스트(`test_node_scan.py`)는 `ROS_DOMAIN_ID`를 따로 잡고 가짜 `/robot/execute_motion` · `/contact/tare` · `/robot/stop` 서버와 가짜 `/contact/event` · `/robot/status` · `/safety/status` 발행기를 같은 프로세스에 띄운다. 로봇 · 드라이버 · Virtual Mode를 쓰지 않는다.
 
 ## 파라미터
-값은 `contact_scan_bringup/config/*.yaml`에 둔다. 아래 값은 설계 출발값이며 실측값이 아니다.
+값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s`만 본다(측정 파라미터가 비었다고 홈 복귀를 막지 않는다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
 
-| 이름 | 출발값 | 뜻 |
-|---|---|---|
-| `state_publish_period_s` | 1.0 | `/scan/state` 주기 발행 간격(s). 상태가 바뀌면 이 주기와 상관없이 바로 발행한다. 0 이하면 노드가 기동하지 않는다 |
+| 이름 | 형 | 필수 | 범위 | 뜻 |
+|---|---|---|---|---|
+| `state_publish_period_s` | double | — (출발값 1.0) | > 0 | `/scan/state` 주기 발행 간격. 상태가 바뀌면 이 주기와 상관없이 바로 발행한다. 0 이하면 노드가 기동하지 않는다 |
+| `descend_speed_mps` · `slide_speed_mps` | double | ● | > 0 | 계약 이름. `OP_DESCEND` · `OP_SLIDE` 속도 |
+| `max_descend_m` · `max_slide_m` | double | ● | > 0 | 계약 이름. 미접촉 · 미소실 실패 한계 |
+| `motion_timeout_s` | double | ● | > 0 | 계약 이름. 단위 모션 제한 시간. tare 응답을 기다리는 한도로도 쓴다 |
+| `lift_height_m` | double | ● | > 0 | 계약 이름. 방향 전환 · 마무리 때 팁 상승량 |
+| `move_speed_mps` | double | ● | > 0 | `OP_MOVE_TO` 속도(기준점 이동, 방향 전환의 올림 · 수평 이동, 마무리 들어 올림). robot_manager는 `OP_HOME`이 아닌 goal의 `speed <= 0`을 거절한다 |
+| `recontact_margin_m` | double | ● | > 0, `lift_height_m` 미만 | 방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값. `drop_limit_m`보다 충분히 작아야 한다(계약 7.3절) |
+| `recontact_speed_mps` | double | ● | > 0 | 방향 전환 뒤 내림 속도(저속) |
+| `search_origin_pose` | double[7] | ● | 단위 quaternion | 탐색 기준점 상공. Base, `x y z qx qy qz qw`. 오일러로 두지 않는다(두산 ZYZ 규약과 헷갈린다) |
+| `base_to_fixture` | double[3] | ● | 유한 | 작업대 원점의 Base 좌표. 평행 이동만(`units-frames.md`) |
+| `support_z_m` | double | ● | 유한 | 지지면 높이(작업대 좌표). **0이 정당한 값이다** |
+| `tip_radius_m` | double | ● | > 0 | 편향 보정 r. 반지름이다. sim에서는 `contact_detector.sim_tip_radius_m`과 같아야 한다 |
+| `detect_latency_s` | double | ● | ≥ 0 | 편향 보정 지연 t. 뜻은 이슈 #69의 결정에 달려 있다 |
+| `edge_round_radius_m` | double | ● | ≥ 0 | 부재 모서리 둥글림 R. 예리하면 0 |
+| `edge_bias_offset_m` | double | ● | 유한(음수 가능) | 실측 나머지 편향. 스칼라 하나, 방향당 값, 진행 방향 + |
+| `result_dir` | string | ● | 빈 문자열 아님 | result_store 경로. **상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준**이다(`ws_cobot1`에서 launch하면 `ws_cobot1/data`, gitignore). `~`를 쓸 수 있다 |
+| `event_wait_timeout_s` | double | ● | > 0 | Result가 가리킨 `ContactEvent`를 기다리는 한도 |
+| `stop_confirm_timeout_s` | double | ● | > 0 | 정지 완료(`connected && !moving`)를 기다리는 한도. Result가 끝내 오지 않을 때의 대비(`motion_timeout_s` + 이 값)에도 쓴다 |
+| `server_wait_timeout_s` | double | ● | > 0 | 상대 서버의 미기동 판단 |
+| `result_frame_id` · `motion_frame_id` | string | — (`workpiece_fixture` · `base_link`) | | 프레임 이름(가칭) |
+| `direction_order` | string[] | — (`POS_X, NEG_X, POS_Y, NEG_Y`) | 네 방향을 한 번씩 | 모서리 탐색 순서. **기동할 때만 읽는다**(상태 기계가 순서를 들고 있다). 나머지는 START 때마다 읽는다 |
+
+실행에 쓰는 값 = yaml 파라미터 ← `/scan/set_config`로 받은 값 ← `RunScan.config_override`(`use_override=true`일 때, 그 작업에만). scan_manager가 직접 쓰는 것은 계약의 모션 6개뿐이고, 나머지 6개(`contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` · `target_force_n` · `drop_limit_m`)는 받은 것만 보관한다. **다른 노드의 현재 값은 모른다**(전파 P01~P03은 T19b). 그래서 `SetConfig.applied` · `ScanResult.config`에서 모르는 항목은 `NaN` + `*_set=false`다. 0을 채우지 않는다. `debounce_n`은 uint8이라 NaN을 실을 수 없으므로 `debounce_set`으로만 판단한다.
+
+## 서버
+노드가 뜨자마자 5개가 준비된다. 상대 노드가 없어도 된다(mqtt_bridge가 `server_is_ready()`로 본다).
+
+| 이름 | 처리 |
+|---|---|
+| `/scan/run` | 시작 조건(BUSY → 파라미터 → 래치 → 연결)을 확인하고 시퀀스를 돈다. Result는 DONE · ERROR · STOPPED에서 돌려준다. `success`는 명령 전체(마무리 복귀 포함), `result.success`는 측정의 성공 여부다 |
+| `/scan/home` | 휴지 phase에서만. `OP_HOME` 하나를 보낸다(경로 · 순서는 TBD). 안전 래치는 막지 않는다. 작업 기록이 있으면 `record_home_requested` · `record_home_finished`를 남긴다 |
+| `/scan/resume` | **T26 전까지 `NOT_SUPPORTED(107)`.** 상태 기계에 묻지 않으므로 phase가 바뀌지 않는다 |
+| `/scan/stop` | `/robot/stop` 호출과 진행 중 goal cancel을 **함께** 보내고 접수를 바로 돌려준다. 정지 완료 확인 · 중단 위치 기록 · `STOP_CONFIRMED`는 시퀀스 스레드가 한다. **홈 복귀 · 재시작을 부르지 않는다.** 멈출 작업이 없어도 `/robot/stop`은 보낸다(멱등) |
+| `/scan/set_config` | 동작 중이면 `BUSY`, 범위 밖이면 `INVALID_VALUE`(같이 온 정상값도 적용하지 않는다). `*_set`인 항목만 적용. 전파는 T19b |
+
+**goal 거절 방식.** ROS 2의 goal reject에는 사유 필드가 없고, main의 mqtt_bridge는 reject를 `BUSY`로 고정해 낸다. 그래서 **goal은 항상 accept하고, 거절할 요청은 phase를 바꾸지 않은 채 바로 Result(`success=false`, `reason_code`=1xx, `scan_id=""`)로 끝낸다(abort).** 실제 사유(`SAFETY_LATCHED` · `INVALID_VALUE` …)가 `scan/command_result`로 웹에 간다. 계약 5.1~5.3절의 "거절" 문구와 다르므로 계약 문서 PR에서 문구를 맞춘다. 거절 처리는 `ScanManager._reject` 한 곳에 있다.
+Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하나로 한다(정지 확인과 중단 위치 기록이 거기에 묶여 있다). Feedback은 보내지 않는다(같은 내용이 `/scan/state`에 있다).
+
+## 발행
+| 토픽 | 시점 |
+|---|---|
+| `/scan/state` | 상태가 바뀔 때 + 주기. 주기 발행이 방금 나간 변경을 옛 상태로 덮어쓰지 않게 순번으로 거른다 |
+| `/scan/result` | 작업 종료 시 1회. 정상이면 GEOMETRY 끝(복귀를 기다리지 않는다, `finished_at`도 그 시각). 실패 · 중단이면 확보한 값만 유효하고 나머지는 `NaN` + `*_valid=false`(좌표는 작업대 프레임). `stamp`는 발행할 때마다 새로 찍는다(mqtt_bridge의 중복 제거 키). 마무리 복귀가 실패해도 다시 발행하지 않는다 |
+| `/scan/log` | 시작 · 측정 확정 · 무시한 이벤트 · 거절 · 실패(원인 · 단계 · 위치) · 중지. 좌표가 판정 좌표인지 정지 좌표인지 message에 적는다 |
+
+`result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작(T26)이 끝까지 간 뒤에 쓸 자리를 남겨 둔다.
+
+## executor · 스레드
+`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 넷이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버, 클라이언트(Reentrant). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
+
+시퀀스는 `/scan/run`의 execute 콜백 안에서 돌며 executor 스레드 하나를 차지한다. 교착이 없는 이유:
+- 시퀀스 스레드는 **락을 쥔 채 기다리지 않는다.** 상대 노드의 응답은 `add_done_callback`이 세우는 `threading.Event`로 기다리고, 콜백 안에서 spin하지 않는다. 그 완료 콜백 · 구독 · `/scan/stop`은 다른 그룹이라 남은 스레드에서 돈다.
+- 상태 기계의 `on_change`(락 안)는 발행과 쓰기 큐 투입만 한다. 디스크 쓰기 · 서비스 호출 · 대기가 없어서 `/scan/stop`의 `request(STOP)`이 디스크를 기다리지 않는다.
+- 락의 순서는 한 방향이다: (명령 접수 락 →) 작업 락 → 상태 기계 락 → 발행 락. 주기 발행은 상태 기계 락을 놓은 뒤에 발행 락을 잡는다.
+- `/scan/stop` 콜백은 아무것도 기다리지 않는다(`call_async` · `cancel_goal_async`).
+- 모든 기다림에는 파라미터로 준 한도가 있고, 종료 요청이 오면 바로 빠져나온다.
+
+종료: SIGINT가 두 번 와도(launch의 Ctrl-C) 트레이스백 없이 코드 0으로 끝난다. 큐에 남은 기록을 디스크에 쓴 뒤 닫는다. **모션 도중에 노드가 죽으면 robot_manager는 그 모션을 끝까지(`max_distance` · `timeout`) 실행한다.** 종료할 때 `/robot/stop`을 보내지 않는다(context가 이미 내려가 있다) → T19b에서 다룬다.
 
 ## 상태 기계
 
