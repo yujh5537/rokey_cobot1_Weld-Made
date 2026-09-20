@@ -1,0 +1,52 @@
+# source:=sim 파라미터 (Virtual Mode + 가상 직육면체)
+#
+# - 단위: m · N · s (docs/contracts/units-frames.md). 좌표는 Base(base_link 가칭) 기준이다.
+# - 아래 수치는 BRD 의 "설계 출발값"이거나 sim 전용 가상값이다. 실측값이 아니다.
+# - "계약 이름" 표시가 있는 파라미터는 SetConfig 가 이름으로 전파한다(ros-interfaces.md 6.4). 이름을 바꾸지 않는다.
+# - over_force_n, drop_limit_m 은 여러 노드가 같은 값을 써야 한다(7.2). test/test_config.py 가 검사한다.
+# - 최상위 키는 노드 이름이다. 다른 노드의 파라미터는 각 담당자가 자기 절에 추가한다.
+
+contact_detector:
+  ros__parameters:
+    source: sim                      # 'sim' | 'robot_force' (BRD 4.1.6)
+    contact_threshold_n: 3.0         # 계약 이름. 접촉 임계 |F - F0|. 출발값 3~5 N 중 하한 (정의서 6.2 의 출발값은 4.0)
+                                     #   하한을 고른 이유: KPI '검출 하중 5 N 이하'(BRD 9장)의 여유
+                                     #   근거: PR #57 툴 등록 후 무접촉 외력 크기의 표준편차 최대 0.50 N (학민, 2026-09-19, 3자세 x 50샘플)
+                                     #   하강 중 관성력은 미측정(T08 미실시). TR-01(T24)에서 확정한다
+    edge_drop_m: 0.0005              # 계약 이름. 접촉 소실로 보는 z 급강하. 출발값 0.5 mm
+                                     #   0.5 mm 는 BRD 1.4 의 r = 3 mm 예시와 함께 나온 값이다. 실측 r = 0.225 mm 에서는
+                                     #   팁이 모서리에 얹혀 내려가는 구간(하강량 <= r)을 넘는다. T25 에서 재검토한다
+    debounce_n: 3                    # 계약 이름. 연속 N 회 유지되면 확정. 출발값 3
+    over_force_n: 30.0               # 계약 이름. 과대 외력(원시 |F|). 출발값 30 N
+
+    # --- sim 입력원 전용: 가상 직육면체 (T07). 실제 부재와 무관한 가상값. 이름은 정의서 6.2 ---
+    sim_box_frame_id: base_link            # 아래 좌표의 프레임. RobotSample.frame_id 와 다르면 sim 은 판정하지 않는다
+    sim_box_origin_m: [0.40, 0.00, 0.00]   # 밑면 중심(지지면 위)의 x, y, z
+    sim_box_size_m: [0.10, 0.06, 0.04]     # 가로(x) · 세로(y) · 높이(z). 윗면 z = origin z + 높이
+    sim_stiffness_n_per_m: 20000.0         # 가상 외력 = 강성 x 윗면 침투 깊이. 3 N 에서 침투 0.15 mm, 30 N 에서 1.5 mm
+    sim_tip_radius_m: 0.000225             # 가상 팁 반지름. PR #57 실측 r = 0.225 mm (지름 0.45 mm) 와 같게 둔다
+                                           #   units-frames.md v0.1.2. edge_drop_m(0.5 mm) > r 이라 실기와 같은 보정 경로(δ >= r)를 sim 에서 본다
+                                           #   scan_manager 의 tip_radius_m 과 같은 값이어야 sim 치수가 복원된다
+    # sim 엣지 모델(모서리를 지난 뒤의 가상 하강)의 나머지 파라미터는 T07 에서 확정한다
+    # 주의: sim 박스는 모서리가 예리하다. 실제 블록의 모서리 라운드 · 모따기는 재현되지 않는다.
+    #   'sim 에서 치수가 복원된다'는 편향 보정 코드가 맞다는 뜻일 뿐, 실기 치수 정확도의 근거가 아니다.
+    #   실기 정확도는 TR-02(T31)에서만 판정한다.
+
+safety_monitor:
+  ros__parameters:
+    over_force_n: 30.0               # 계약 이름. contact_detector 와 같은 값
+    drop_limit_m: 0.005              # 계약 이름. SLIDE 첫 샘플 z 기준 하강 제한. 출발값 5 mm
+
+robot_manager:
+  ros__parameters:
+    drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
+    # slide_target_force_n:          # 계약 이름. 값 TBD (학민)
+
+scan_manager:
+  ros__parameters:
+    state_publish_period_s: 1.0      # /scan/state 주기 발행 간격(s). 상태가 바뀌면 이 값과 무관하게 바로 발행한다
+                                     #   0 이하면 노드가 기동하지 않는다. 설계 출발값이며 실측값이 아니다 (병후, PR #50)
+    # 계약 이름(T19에서 추가): descend_speed_mps · slide_speed_mps · max_descend_m · max_slide_m · motion_timeout_s · lift_height_m
+
+# mqtt_bridge:                       # (병후)
+#   ros__parameters:
