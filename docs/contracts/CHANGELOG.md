@@ -2,12 +2,13 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
-## v0.1.7 (2026-09-20, T19a, PR #82)
+## v0.1.6 (2026-09-20, T19a, PR #82)
 타입 변경 없음. `units-frames.md`의 **탐색 기준점** 행에서 "별도 파라미터를 두지 않는다"를 "scan_manager 파라미터 `search_origin_pose`(Base, x y z + quaternion)로 둔다"로 바꿨다. PR #77(T19a 2/2) 리뷰에서 현지가 계약과 코드의 불일치를 지적했다. 영향: scan_manager(T19a · T19b), `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절.
 - 이유: scan_manager는 홈 자세의 TCP를 모른다(홈은 robot_manager의 관절각이고 scan_manager는 `/robot/sample`을 구독하지 않는다). `OP_MOVE_TO`의 목표에는 자세가 필요한데 자세(수직 고정)는 홈과 `base_to_fixture`만으로 나오지 않는다
 - 값을 정하는 규칙은 그대로다: x · y = 작업대 원점, z = 첫 하강을 시작할 높이(초안: 홈 팁 높이), 자세 = 탐침 수직. 자세는 quaternion으로 적는다(두산 ZYZ 오일러와 혼동하지 않게)
 - `max_descend_m` 조건(하한 · 상한)은 바꾸지 않았다. 값은 여전히 TBD다
-- 번호: v0.1.4(PR #72) · v0.1.5(PR #79) · v0.1.5~6(PR #80)이 열려 있다. 머지 순서에 따라 번호를 맞춘다. PR #80도 같은 행(홈 팁 높이 수치)을 고치므로 나중에 머지되는 쪽이 rebase한다
+- 번호: main은 v0.1.4(PR #72)다. 열린 계약 PR에 준비된 순서로 배정했다 — **v0.1.5 = PR #79**(#69 판정 샘플), **v0.1.6 = 이 PR**, **v0.1.7 · v0.1.8 = PR #80**(T03 후속, 두 항목), **v0.1.9 = 후속 PR**(#51 · #54). PR #80도 같은 행(홈 팁 높이 수치)을 고치므로 나중에 머지되는 쪽이 rebase한다
+
 ## v0.1.4 (2026-09-20, T15, PR #72)
 타입 변경 없음. `ros-interfaces.md`의 **실측 발행 주기**와 **`RobotStatus.moving`의 근거**를 채웠다. 영향: scan_manager(정지 완료 판단) · contact_detector · safety_monitor(샘플 주기 가정).
 - 실측(Virtual): `/robot/sample` 37.6 Hz, `/robot/status` 9.3~9.8 Hz. 설정값 50 · 10 Hz에 못 미친다. 두산 서비스를 직렬로 불러야 해서다(동시 호출 시 드라이버가 응답을 멈췄다)
