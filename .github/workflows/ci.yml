@@ -46,7 +46,9 @@ jobs:
       - name: dsr_msgs2 빌드 (캐시가 없을 때만)
         if: steps.dsr-cache.outputs.cache-hit != 'true'
         run: |
-          set -eux
+          # -u 는 쓰지 않는다. /opt/ros/jazzy/setup.bash 가 AMENT_TRACE_SETUP_FILES 를
+          # 미설정 상태로 참조해서 nounset 이면 source 에서 죽는다
+          set -ex
           mkdir -p "$DSR_WS/src" /tmp/dsr_src
           cd /tmp/dsr_src
           git init -q .
