@@ -19,7 +19,9 @@ from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.parameter import Parameter  # noqa: E402
 from scan_manager.scan_manager import ScanManager  # noqa: E402
 from scan_manager.state_machine import Command  # noqa: E402
-from sequence_helpers import isolated_domain_id  # noqa: E402
+from sequence_helpers import isolated_ros_env  # noqa: E402
+
+os.environ.update(isolated_ros_env())  # 이 파일만 돌려도 조 공용 도메인(30)에 뜨지 않는다
 
 
 @pytest.fixture
@@ -76,7 +78,7 @@ def test_rejects_non_positive_period(ros):
 @pytest.mark.parametrize('gap_s', [0.0, 0.05, 0.5])
 def test_two_sigints_exit_quietly(gap_s):
     """launch 의 Ctrl-C 는 SIGINT 를 두 번 보낼 수 있다. 트레이스백 · 0 이 아닌 종료 코드 없이 끝나야 한다."""
-    env = {**os.environ, 'ROS_DOMAIN_ID': isolated_domain_id()}
+    env = {**os.environ, **isolated_ros_env()}
     process = subprocess.Popen(
         [sys.executable, '-c', 'from scan_manager.scan_manager import main; main()'],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)

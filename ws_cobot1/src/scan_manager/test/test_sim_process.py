@@ -27,9 +27,9 @@ SIM_YAML = Path(__file__).resolve().parents[2] / 'contact_scan_bringup' / 'confi
 if not SIM_YAML.exists():
     pytest.skip('contact_scan_bringup/config/sim.yaml 이 없다', allow_module_level=True)
 
-from sequence_helpers import isolated_domain_id  # noqa: E402
+from sequence_helpers import isolated_ros_env  # noqa: E402
 
-os.environ['ROS_DOMAIN_ID'] = isolated_domain_id()
+os.environ.update(isolated_ros_env())  # 조 범위의 도메인 + LOCALHOST. rclpy.init 전에 건다
 
 from contact_scan_interfaces.action import RunScan  # noqa: E402
 from contact_scan_interfaces.msg import ScanResult  # noqa: E402

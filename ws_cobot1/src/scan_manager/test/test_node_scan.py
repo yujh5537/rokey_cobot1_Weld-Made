@@ -17,9 +17,9 @@ rclpy = pytest.importorskip('rclpy')
 pytest.importorskip('contact_scan_interfaces')
 
 # 다른 패키지의 테스트 · 실행 중인 노드와 섞이지 않게 한다
-from sequence_helpers import isolated_domain_id  # noqa: E402
+from sequence_helpers import isolated_ros_env  # noqa: E402
 
-os.environ['ROS_DOMAIN_ID'] = isolated_domain_id()
+os.environ.update(isolated_ros_env())  # 조 범위의 도메인 + LOCALHOST. rclpy.init 전에 건다
 
 from contact_scan_interfaces.action import Resume  # noqa: E402
 from contact_scan_interfaces.action import ReturnHome  # noqa: E402
