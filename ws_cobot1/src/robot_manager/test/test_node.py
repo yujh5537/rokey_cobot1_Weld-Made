@@ -33,6 +33,11 @@ PARAMS = [
     Parameter('service_timeout_s', Parameter.Type.DOUBLE, 0.05),
     # 브링업이 없는 환경이므로 실제 서비스와 겹치지 않는 이름을 쓴다
     Parameter('dsr_namespace', Parameter.Type.STRING, 'test_no_driver'),
+    # 아래 셋은 기본값이 없다. yaml(또는 여기)에 없으면 기동하지 않는다 (현지 리뷰, PR #73)
+    Parameter('drop_limit_m', Parameter.Type.DOUBLE, 0.005),
+    Parameter('slide_target_force_n', Parameter.Type.DOUBLE, 3.0),
+    Parameter('compliance_stiffness', Parameter.Type.DOUBLE_ARRAY,
+              [3000.0, 3000.0, 3000.0, 200.0, 200.0, 200.0]),
 ]
 
 
@@ -165,5 +170,32 @@ def test_moving_is_true_again_when_positions_go_stale(ros):
         for i in range(3):        # 창(0.3 s)보다 오래된 위치만 남은 상태
             node.positions.append((now - 5.0 + i * 0.05, (0.4, 0.0, 0.2)))
         assert node.moving_from_positions() is True
+    finally:
+        node.destroy_node()
+
+
+@pytest.mark.parametrize('missing', ['drop_limit_m', 'slide_target_force_n', 'compliance_stiffness'])
+def test_refuses_to_start_without_required_params(ros, missing):
+    """값이 없으면 기본값으로 조용히 도는 대신 기동을 거부한다.
+
+    drop_limit_m 은 계약 7.2 가 safety_monitor 와 같은 값을 요구하는데, 그 일치는
+    contact_scan_bringup 의 yaml 만 보고 검사된다. 코드에 기본값이 있으면 yaml 에서
+    줄이 사라져도 검사는 통과하면서 1차 · 2차 감시의 기준만 어긋난다 (현지 리뷰, PR #73).
+    """
+    params = [p for p in PARAMS if p.name != missing]
+    with pytest.raises(ValueError, match=missing):
+        RobotManager(parameter_overrides=params)
+
+
+def test_slide_is_rejected_when_start_z_is_unknown(ros):
+    """기준 z 를 모르면 1차 하강 제한이 감시 없이 도는 것과 같다. 거절한다."""
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        assert node.last_pose is None      # 드라이버가 없어 유효 샘플이 없다
+        goal = ExecuteMotion.Goal(scan_id='t', motion_id=1, operation=RobotSample.OP_SLIDE,
+                                  direction=1, speed=0.01, max_distance=0.02)
+        assert 'start_z' in node.reject_reason(goal) or '위치' in node.reject_reason(goal)
     finally:
         node.destroy_node()

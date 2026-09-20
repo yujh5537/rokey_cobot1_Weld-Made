@@ -82,7 +82,16 @@ safety_monitor:
 robot_manager:
   ros__parameters:
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
-    # slide_target_force_n:          # 계약 이름. 값 TBD (학민)
+    slide_target_force_n: 3.0        # 계약 이름. **tare 대비 증분** [N] (set_desired_force 는
+                                     #   DR_FC_MOD_REL). 출발값이고 잠정이다.
+                                     #   하한 두 개: contact_detector 의 edge_arm_force_n(1.5 N)
+                                     #   보다 충분히 커야 EDGE 판정이 무장되고, contact_threshold_n
+                                     #   (3 N, 증분 기준)보다 커야 슬라이드 내내 접촉으로 잡힌다.
+                                     #   9/20 실기 편향 2.25 mm 는 증분 2~4 N 에서 잰 값이다.
+                                     #   확정 순서: 이동 중 잡음 → 임계 → 누름 힘 → 편향 (병후)
+    compliance_stiffness: [3000.0, 3000.0, 3000.0, 200.0, 200.0, 200.0]
+                                     # task_compliance_ctrl 강성 [N/m ×3, N·m/rad ×3].
+                                     #   두산 기본값. 실기에서 조정한다
     frame_id: base_link              # units-frames.md 가칭. 계약에서 확정되면 같이 바꾼다
     dsr_namespace: dsr01
     sample_rate_hz: 50.0             # 설정값. 실측은 Virtual 37.6 Hz, 실기 42.8 Hz

@@ -25,6 +25,7 @@ from contact_scan_interfaces.msg import ContactEvent, ReasonCode, RobotSample, R
 from contact_scan_qos import QOS_EVENT, QOS_SENSOR, QOS_STATE
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.exceptions import ParameterUninitializedException
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -81,13 +82,18 @@ class RobotManager(Node):
         self.declare_parameter('moving_eps_m', 0.0002)
         self.declare_parameter('moving_window_s', 0.3)
         # 계약 이름 (ros-interfaces.md 6.4). 값은 contact_scan_bringup/config/*.yaml 에 둔다
-        self.declare_parameter('slide_target_force_n', 0.0)      # 0 이면 SLIDE 를 거절한다
-        self.declare_parameter('drop_limit_m', 0.005)
+        # 아래 셋은 기본값을 두지 않는다. yaml 에 없으면 기동하지 않는다 (CLAUDE.md 규칙 7,
+        # 현지 리뷰 PR #73). 특히 drop_limit_m 은 계약 7.2 가 safety_monitor 와 같은 값을
+        # 요구하고 그 일치는 contact_scan_bringup/test/test_config.py 가 yaml 만 보고 검사한다.
+        # 코드에 기본값이 있으면 yaml 에서 줄이 사라져도 검사는 통과하면서 1차 · 2차 감시의
+        # 기준만 조용히 어긋난다.
+        self.declare_parameter('slide_target_force_n', Parameter.Type.DOUBLE)
+        self.declare_parameter('drop_limit_m', Parameter.Type.DOUBLE)
         # 계약 이름이 아닌 것
         # 빈 리스트를 기본값으로 주면 rclpy 가 BYTE_ARRAY 로 추론한다. 타입만 선언한다
         self.declare_parameter('home_joint_deg', Parameter.Type.DOUBLE_ARRAY)  # 없으면 OP_HOME 거절
         self.declare_parameter('home_speed_deg_s', 20.0)
-        self.declare_parameter('compliance_stiffness', [3000.0, 3000.0, 3000.0, 200.0, 200.0, 200.0])
+        self.declare_parameter('compliance_stiffness', Parameter.Type.DOUBLE_ARRAY)
         self.declare_parameter('motion_timeout_s', 60.0)         # goal.timeout 이 0 일 때 쓴다
         self.declare_parameter('stop_settle_s', 1.5)             # 정지 명령 후 멈춤을 기다리는 시간
         self.declare_parameter('feedback_period_s', 0.1)
@@ -100,6 +106,7 @@ class RobotManager(Node):
         status_hz = float(self.get_parameter('status_rate_hz').value)
         if sample_hz <= 0.0 or status_hz <= 0.0:
             raise ValueError('sample_rate_hz와 status_rate_hz는 0보다 커야 한다')
+        self.require_params('drop_limit_m', 'slide_target_force_n', 'compliance_stiffness')
 
         group = ReentrantCallbackGroup()
         self.srv_clients = dsr_client.make_clients(self, self.get_parameter('dsr_namespace').value)
@@ -146,6 +153,25 @@ class RobotManager(Node):
     # ---- 공통 -------------------------------------------------------------
     def now_s(self):
         return self.get_clock().now().nanoseconds / 1e9
+
+    def require_params(self, *names):
+        """yaml 에 없으면 기동하지 않는다. 기본값으로 조용히 도는 것보다 낫다.
+
+        `declare_parameter(name, Type)` 만으로는 **읽을 때** 예외가 난다. 그러면 첫 SLIDE
+        goal 이 올 때까지 잘못된 설정이 드러나지 않는다. 여기서 한 번 읽어 기동 시점에
+        끝낸다 (현지 리뷰, PR #73).
+        """
+        missing = []
+        for name in names:
+            try:
+                self.get_parameter(name)
+            except ParameterUninitializedException:
+                missing.append(name)
+        if missing:
+            raise ValueError(
+                f'파라미터 {missing} 가 설정되지 않았다. '
+                'contact_scan_bringup/config/*.yaml 의 robot_manager 절에 넣는다. '
+                '기본값을 코드에 두지 않는다 (CLAUDE.md 규칙 7, 계약 7.2)')
 
     def param(self, name):
         return self.get_parameter(name).value
@@ -334,6 +360,10 @@ class RobotManager(Node):
                 return 'INVALID_VALUE: SLIDE direction'
             if float(self.param('slide_target_force_n')) <= 0.0:
                 return 'INVALID_VALUE: slide_target_force_n 이 설정되지 않았다'
+            # 기준 z 를 모르면 1차 하강 제한(계약 7.2)이 감시 없이 도는 것과 같다. 조회가
+            # 실패 중인 상황이 바로 감시가 필요한 상황이라 거절한다 (현지 리뷰, PR #73)
+            if self.last_pose is None:
+                return 'INVALID_VALUE: 마지막 위치를 모른다. 하강 제한 기준 z 를 잡을 수 없다'
         if op in (RobotSample.OP_DESCEND, RobotSample.OP_SLIDE) and goal.max_distance <= 0.0:
             return 'INVALID_VALUE: max_distance'
         if op == RobotSample.OP_HOME and not self.home_joint_deg():
@@ -378,6 +408,14 @@ class RobotManager(Node):
     def run_motion(self, goal_handle, motion):
         """명령을 보내고 끝날 때까지 지켜본다. (reason, reason_code, detail)."""
         goal = motion.goal
+        if goal.operation == RobotSample.OP_SLIDE and motion.start_z is None:
+            # 기준 z 를 모르면 1차 하강 제한(계약 7.2)이 감시 없이 도는 것과 같다. reject_reason
+            # 에서 한 번 걸리지만 수락과 실행 사이에 샘플이 끊길 수 있어 여기서도 막는다.
+            # 조용히 감시 없이 도는 것보다 소리내어 끝낸다 (현지 리뷰, PR #73)
+            self.get_logger().error(
+                'SLIDE 기준 z 를 잡지 못했다(마지막 위치 없음). 1차 하강 제한을 걸 수 없어 거절한다')
+            return (ExecuteMotion.Result.REASON_REJECTED, ReasonCode.INVALID_VALUE,
+                    'start_z 없음. 하강 제한 감시 불가')
         if goal.operation == RobotSample.OP_SLIDE and not self.start_slide_force(motion):
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                     '순응 · 힘 제어를 켜지 못했다')
