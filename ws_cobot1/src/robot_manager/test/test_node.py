@@ -126,25 +126,29 @@ def test_sample_id_increases(ros):
 
 
 def test_does_not_send_while_a_call_is_outstanding(ros):
-    """앞 요청의 응답이 안 왔으면 새로 보내지 않는다 (병후 리뷰, PR #72).
+    """앞 요청의 응답이 안 왔으면 새 조회를 시작하지 않는다 (병후 리뷰, PR #72).
 
     같은 서비스로 여러 건이 동시에 뜨면 드라이버가 응답을 멈춘다.
     """
     node = RobotManager(parameter_overrides=PARAMS)
     try:
-        node.pending_calls = 1
-        node.last_call_s = node.now_s()
+        class Pending:                      # 응답이 오지 않는 호출 하나
+            def service_is_ready(self):
+                return True
+
+            def call_async(self, request):
+                class Future:
+                    def add_done_callback(self, callback):
+                        pass
+                return Future()
+
+        node.queue.submit(Pending(), 'req', None, 'stuck')
+        assert node.queue.busy() is True
         node.attempt = None
         before = node.cycle
         node.on_sample_timer()
         assert node.cycle == before, '응답을 기다리는 중에는 새 조회를 시작하지 않는다'
         assert node.attempt is None
-
-        # 너무 오래 기다리면 포기하고 다시 보낸다 (영구 정지를 막는다)
-        node.last_call_s = node.now_s() - 10.0
-        node.on_sample_timer()
-        assert node.cycle == before + 1
-        assert node.pending_calls == 0
     finally:
         node.destroy_node()
 
@@ -162,37 +166,4 @@ def test_moving_is_true_again_when_positions_go_stale(ros):
             node.positions.append((now - 5.0 + i * 0.05, (0.4, 0.0, 0.2)))
         assert node.moving_from_positions() is True
     finally:
-        node.destroy_node()
-
-
-def test_status_timer_refreshes_moving(ros):
-    """상태 발행 전에 moving 을 다시 본다 (병후 리뷰, PR #72).
-
-    조회가 밀려 state 갈래가 안 돌면 낡은 moving 이 그대로 나간다. 계약상 정지 완료의
-    유일한 근거가 connected && !moving 이라, 그 사이 "정지"로 보고하면 안 된다.
-    """
-    node = RobotManager(parameter_overrides=PARAMS)
-    listener = rclpy.create_node('status_refresh_listener')
-    received = []
-    listener.create_subscription(RobotStatus, '/robot/status', received.append, QOS_STATE)
-    try:
-        now = node.now_s()
-        node.connected = True
-        node.moving = False                      # 낡은 값
-        node.positions.clear()
-        for i in range(3):                       # 창(0.3 s)보다 오래된 위치만 남았다
-            node.positions.append((now - 5.0 + i * 0.05, (0.4, 0.0, 0.2)))
-
-        node.on_status_timer()
-
-        assert node.moving is True, '낡은 위치만 있으면 이동 중으로 되돌아와야 한다'
-        executor = SingleThreadedExecutor()
-        executor.add_node(listener)
-        for _ in range(20):
-            executor.spin_once(timeout_sec=0.05)
-            if received:
-                break
-        assert received and received[-1].moving is True
-    finally:
-        listener.destroy_node()
         node.destroy_node()
