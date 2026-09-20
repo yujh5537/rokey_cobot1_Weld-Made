@@ -178,6 +178,11 @@ class FakePeers(Node):
         if behavior == HOLD:
             while not self._halt.wait(0.005):
                 pass
+            # 실제 robot_manager 는 먼저 온 것으로 정지한다. 여기서는 scan_manager 가 /robot/stop 과 cancel 을
+            # **둘 다** 보냈는지 보려고, 나머지 하나가 도착할 때까지 잠깐 기다린다(끝난 goal 의 cancel 은 콜백이 불리지 않는다).
+            deadline = time.monotonic() + 2.0
+            while not (self.stop_requests and self.cancel_count) and time.monotonic() < deadline:
+                time.sleep(0.005)
             return self._result(R.REASON_STOP_REQUESTED, 200)
         if goal.operation == Operation.MOVE_TO:
             t = goal.target.position
