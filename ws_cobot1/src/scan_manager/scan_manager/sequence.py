@@ -24,12 +24,11 @@ from .contract_enums import MotionReason
 from .contract_enums import Operation
 from .contract_enums import Reason
 from .params import ScanParams
+from .result_store import TOP  # noqa: F401  측정 대상 '윗면'(record_attempt_failed 의 target). 모서리는 Direction
 from .state_machine import Signal
 
 Position = Tuple[float, float, float]
 Orientation = Tuple[float, float, float, float]
-
-TOP = 'TOP'  # 측정 대상. result_store.TOP 과 같은 값
 
 
 # ---- 모션 요청 ----
