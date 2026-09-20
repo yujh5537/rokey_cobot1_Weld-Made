@@ -70,8 +70,14 @@ safety_monitor:
 robot_manager:
   ros__parameters:
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
-    slide_target_force_n: 3.0        # 계약 이름. **tare 대비 증분** [N] (set_desired_force 는
-                                     #   DR_FC_MOD_REL). 출발값이고 잠정이다.
+    slide_target_force_n: 3.0        # 계약 이름 [N]. 출발값이고 잠정이다.
+                                     #   ⚠️ set_desired_force 를 DR_FC_MOD_REL 로 부른다. 드라이버
+                                     #   정의가 "relative to initial state (the instance when this
+                                     #   function is called)" 이므로, 이 값은 tare 대비가 아니라
+                                     #   **호출 시점에 이미 실려 있는 힘에 더해지는 값**이다.
+                                     #   SLIDE 는 DESCEND 가 접촉으로 끝난 직후에 오므로 기준선이
+                                     #   접촉력(증분 3~5 N 추정)이고, 실제 누름은 그만큼 더 커진다.
+                                     #   실기에서 SLIDE 시작 로그의 기준선 Fz 를 보고 정한다 (#73).
                                      #   하한 두 개: contact_detector 의 edge_arm_force_n(1.5 N)
                                      #   보다 충분히 커야 EDGE 판정이 무장되고, contact_threshold_n
                                      #   (3 N, 증분 기준)보다 커야 슬라이드 내내 접촉으로 잡힌다.

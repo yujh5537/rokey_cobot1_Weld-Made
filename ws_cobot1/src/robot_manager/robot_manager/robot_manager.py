@@ -15,6 +15,7 @@
 실패한 값은 0으로 채우지 않는다. NaN으로 두고 `valid=false`로 발행한다(CLAUDE.md 규칙 4).
 순응 · 힘 제어를 켜면 반드시 `finally`에서 해제한다(규칙 2).
 """
+import math
 import threading
 import time
 from collections import deque
@@ -125,6 +126,7 @@ class RobotManager(Node):
         self.state_every = max(1, round(sample_hz / status_hz))
         self.positions = deque()
         self.last_pose = None          # 마지막 유효 샘플의 (Pose, stamp, (x, y, z))
+        self.last_force = None         # 마지막 유효 샘플의 (Fx, Fy, Fz) [N]. REL 기준선 확인용
         self.connected = False
         self.moving = False
         self.compliance_active = False
@@ -264,6 +266,7 @@ class RobotManager(Node):
             (fx, fy, fz), (tx, ty, tz) = tool_force_to_wrench_fields(attempt.force or [])
             msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z = fx, fy, fz
             msg.wrench.torque.x, msg.wrench.torque.y, msg.wrench.torque.z = tx, ty, tz
+            self.last_force = (fx, fy, fz)
             force_ok = True
         except ValueError:
             msg.wrench.force.x = msg.wrench.force.y = msg.wrench.force.z = NAN
@@ -444,7 +447,25 @@ class RobotManager(Node):
         return self.call_sync(self.srv_clients['move_line'], request, 'move_line')
 
     def start_slide_force(self, motion):
-        """SLIDE: 순응 제어 → −z 목표 힘. 켠 것은 release_all 이 finally 에서 해제한다."""
+        """SLIDE: 순응 제어 → −z 목표 힘. 켠 것은 release_all 이 finally 에서 해제한다.
+
+        **`slide_target_force_n` 은 `DR_FC_MOD_REL` 이라 "더 누르는 힘"이다.** 드라이버 정의는
+        "relative value to initial state (the instance when this function is called)" 이므로,
+        기준선은 이 호출 시점에 이미 실려 있는 힘이다. SLIDE 는 보통 DESCEND 가 접촉으로 끝난
+        직후에 오므로 그 접촉력이 기준선이 되고, **실제 누름 = 접촉력 + slide_target_force_n**
+        이 된다. 기준선을 로그로 남겨 실기에서 한 번에 확인할 수 있게 한다
+        (병후 · 현지 지적, PR #73).
+        """
+        baseline = self.last_force
+        if baseline is None:
+            self.get_logger().warning(
+                'SLIDE 시작: 직전 힘을 모른다. DR_FC_MOD_REL 기준선을 확인할 수 없다')
+        else:
+            fz = baseline[2]
+            self.get_logger().info(
+                f'SLIDE 시작: DR_FC_MOD_REL 기준선 Fz={fz:.2f} N '
+                f'(|F|={math.dist(baseline, (0.0, 0.0, 0.0)):.2f} N). '
+                f'목표 {float(self.param("slide_target_force_n")):.2f} N 은 여기에 더해진다')
         if not self.call_sync(
                 self.srv_clients['compliance_on'],
                 dsr_client.compliance_on_request(list(self.param('compliance_stiffness'))),
