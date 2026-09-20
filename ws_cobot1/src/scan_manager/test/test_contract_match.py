@@ -5,6 +5,8 @@ ROS 를 source 하지 않은 셸에서는 skip 되고, colcon test · CI 에서�
 
 import pytest
 from scan_manager.contract_enums import Direction
+from scan_manager.contract_enums import MotionReason
+from scan_manager.contract_enums import Operation
 from scan_manager.contract_enums import Phase
 from scan_manager.contract_enums import Reason
 
@@ -36,6 +38,14 @@ def test_phase_matches_scan_state():
 def test_direction_matches_scan_state_and_execute_motion():
     assert _members(Direction) == _constants(ScanState, 'DIR_')
     assert _members(Direction) == _constants(ExecuteMotion.Goal, 'DIR_')
+
+
+def test_operation_matches_execute_motion():
+    assert _members(Operation) == _constants(ExecuteMotion.Goal, 'OP_')
+
+
+def test_motion_reason_matches_execute_motion_result():
+    assert _members(MotionReason) == _constants(ExecuteMotion.Result, 'REASON_')
 
 
 def test_reason_matches_reason_code():

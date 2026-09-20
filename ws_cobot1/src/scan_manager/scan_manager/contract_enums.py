@@ -1,4 +1,4 @@
-"""계약 상수의 순수 Python 사본 (docs/contracts/ros-interfaces.md 3.4절 · 6.1절).
+"""계약 상수의 순수 Python 사본 (docs/contracts/ros-interfaces.md 3.4절 · 5.4절 · 6.1절).
 
 rclpy · contact_scan_interfaces 를 import 하지 않는다. ROS 를 source 하지 않은 셸에서도
 상태 기계와 그 테스트가 돌아야 하기 때문이다. 값이 msg 상수와 같은지는
@@ -34,6 +34,31 @@ class Direction(IntEnum):
     NEG_X = 2
     POS_Y = 3
     NEG_Y = 4
+
+
+class Operation(IntEnum):
+    """ExecuteMotion.OP_* (5.4절). RobotSample · RobotStatus 의 OP_* 와 같은 값."""
+
+    NONE = 0
+    MOVE_TO = 1
+    DESCEND = 2
+    SLIDE = 3
+    HOME = 4
+
+
+class MotionReason(IntEnum):
+    """ExecuteMotion.Result.REASON_* (5.4절). 모션이 끝난 이유이며 ReasonCode 와 다른 값이다."""
+
+    TARGET_REACHED = 0
+    CONTACT = 1
+    EDGE = 2
+    MAX_DISTANCE = 3
+    TIMEOUT = 4
+    STOP_REQUESTED = 5
+    CANCELED = 6
+    OVER_FORCE = 7
+    ROBOT_ERROR = 8
+    REJECTED = 9
 
 
 class Reason(IntEnum):
