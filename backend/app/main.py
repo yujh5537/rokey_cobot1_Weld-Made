@@ -11,6 +11,8 @@ import psycopg
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
+from db import save_contact_event, save_scan_result
+
 
 # =========================================================
 # FastAPI
@@ -227,7 +229,42 @@ def on_message(client, userdata, message):
         payload,
     )
 
-    # 2. 명령 접수/거절 처리
+    # 2. DB 저장이 필요한 MQTT 메시지 처리
+    if message.topic == "scan/result":
+        try:
+            scan_id = save_scan_result(payload)
+
+            print(
+                f"[DB] scan/result committed "
+                f"scan_id={scan_id}"
+            )
+
+        except Exception as exc:
+            print(
+                f"[DB] scan/result save failed "
+                f"scan_id={payload.get('scan_id')} "
+                f"error={exc}"
+            )
+
+    elif message.topic == "contact/event":
+        try:
+            event_id = save_contact_event(payload)
+
+            print(
+                f"[DB] contact/event committed "
+                f"scan_id={payload.get('scan_id')} "
+                f"event_id={event_id}"
+            )
+
+        except Exception as exc:
+            print(
+                f"[DB] contact/event save failed "
+                f"scan_id={payload.get('scan_id')} "
+                f"event_id={payload.get('event_id')} "
+                f"error={exc}"
+            )
+
+    # 3. 명령 접수/거절 처리
     if message.topic == "cmd/ack":
         command_state = update_command_from_ack(payload)
 
@@ -242,7 +279,7 @@ def on_message(client, userdata, message):
                 command_state,
             )
 
-    # 3. 명령 완료/실패 처리
+    # 4. 명령 완료/실패 처리
     elif message.topic == "scan/command_result":
         command_state = update_command_from_result(payload)
 

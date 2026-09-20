@@ -30,6 +30,7 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
 
     healthcheck:
       test:
@@ -53,6 +54,8 @@ services:
       - "${FASTAPI_PORT:-8000}:8000"
 
     environment:
+      PYTHONUNBUFFERED: "1"
+
       MQTT_HOST: mosquitto
       MQTT_PORT: 1883
 
