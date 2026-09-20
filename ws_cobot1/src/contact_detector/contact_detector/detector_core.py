@@ -64,8 +64,12 @@ class DetectorConfig:
 class Detection:
     """확정된 판정 1건.
 
-    sample 은 판정을 확정한 샘플(연속 N 번째)이고 ContactEvent 에 싣는 좌표 · 시각의 출처다.
-    first_sample 은 같은 연속 구간의 첫 샘플이다. 둘의 시각 · z 차이가 디바운스로 생긴 판정 지연과 편향이다.
+    first_sample 은 조건이 처음 성립한 샘플(연속 구간의 첫 샘플)이다. 측정 좌표의 출처로 쓴다:
+    ContactEvent 의 pose · pose_stamp · wrench · force_stamp · sample_id 에 싣는다.
+    sample 은 판정을 확정한 샘플(연속 N 번째)이다. detect_stamp 와 force_delta_n(검출 하중, BRD 9장
+    '접촉으로 확정된 순간의 외력')의 출처다.
+    확정 샘플의 좌표를 쓰면 디바운스 동안 더 움직인 만큼(50 Hz · 5 mm/s · N=3 이면 0.2 mm) 측정값이 밀린다.
+    이 배정은 계약 3.3 의 '판정 샘플' 정의가 확정될 때까지 초안이다.
     """
 
     type: int
@@ -152,6 +156,10 @@ class ContactDetector:
             return None
         delta = self.force_delta(sample)
         count = self._contact_run.update(delta > self.config.contact_threshold_n, sample)
+        if count == 0 and self._motion_id == 0:
+            # motion_id 0 = 없음. 동작의 경계를 알 수 없으므로 외력이 임계 아래로 내려오면 다시 판정한다.
+            # 이렇게 하지 않으면 motion_id 가 0 으로만 오는 동안 첫 접촉 뒤로 이벤트가 영영 나가지 않는다
+            self._contact_latched = False
         if self._contact_latched or count < self.config.debounce_n:
             return None
         self._contact_latched = True

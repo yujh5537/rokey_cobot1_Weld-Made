@@ -85,6 +85,18 @@ def test_contact_once_per_motion_then_again_for_next_motion(config):
     assert len(run(detector, make_samples([10] * 10, motion_id=2, start_id=100))) == 1
 
 
+def test_same_motion_does_not_fire_again_when_force_bounces(config):
+    # 접촉 뒤 정지하면서 외력이 임계 근처에서 출렁여도 같은 motion_id 에서는 1 회만 낸다
+    assert len(run(tared(config), make_samples([10] * 5 + [0] * 3 + [10] * 5, motion_id=1))) == 1
+
+
+def test_motion_id_zero_rearms_when_force_drops(config):
+    # robot_manager 가 motion_id 를 채우지 않아 0 으로만 오는 경우: 래치가 영영 걸리지 않게 한다
+    detections = run(tared(config), make_samples([10] * 5 + [0] * 3 + [10] * 5, motion_id=0))
+    assert [d.type for d in detections] == [TYPE_CONTACT, TYPE_CONTACT]
+    assert all(d.sample.motion_id == 0 for d in detections)
+
+
 def test_run_does_not_carry_over_between_motions(config):
     detector = tared(config)
     assert run(detector, make_samples([10, 10], motion_id=1)) == []
