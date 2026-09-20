@@ -44,6 +44,22 @@ def test_invalid_rows_are_kept_but_not_used(tmp_path):
     assert offline.tare_stats(head).baseline == pytest.approx((0.1, 2.0, -1.5))
 
 
+def test_blank_invalid_rows_from_recorder(tmp_path):
+    # docs/env/measure_idle_force.py --csv 는 실패한 조회의 숫자 칸을 비우고 valid=0 으로 남긴다
+    path = write_descend_csv(tmp_path / 'a.csv')
+    lines = path.read_text().splitlines(keepends=True)
+    lines[5] = '0.080,,,,,,,,0\n'          # 위치는 받았고 힘을 못 받은 줄
+    lines[6] = ',,,,,,,,0\n'               # 둘 다 못 받은 줄
+    path.write_text(''.join(lines))
+    samples = offline.load_csv(path)
+    assert [s.valid for s in samples[4:7]] == [False, False, True]
+    assert offline.period_stats(samples).invalid == 2
+    head, tail = offline.split_tare(samples, tare_seconds=1.5)
+    assert offline.tare_stats(head).baseline == pytest.approx((0.1, 2.0, -1.5))
+    rows = offline.sweep(tail, offline.tare_stats(head).baseline, [3.0], [3], over_force_n=30.0)
+    assert rows[0].contact_count == 1
+
+
 def test_sweep_detect_force_delay_and_z_bias(tmp_path):
     samples = offline.load_csv(write_descend_csv(tmp_path / 'a.csv'))
     head, tail = offline.split_tare(samples, tare_seconds=1.5)
