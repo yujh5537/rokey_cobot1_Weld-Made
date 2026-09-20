@@ -69,8 +69,13 @@ scan_manager:
     support_z_m: 0.0                 # 지지면 높이(작업대 좌표). z=0 이 작업대 표면이다(units-frames.md). 0 이 정당한 값이다
     tip_radius_m: 0.000225           # 편향 보정 r. **반지름**이다(지름 0.45 mm). 실측: 2026-09-19 학민, 인공눈물 용기 끝(units-frames.md, PR #57)
     # detect_latency_s:              # 편향 보정 지연 t. TBD (T24 · T30 실측). '판정 샘플'의 정의(이슈 #69)에 따라 뜻이 달라진다
-    # edge_round_radius_m:           # 부재 모서리 둥글림 R. TBD (블록 실측). 기준 큐브에 라운드가 있을 가능성이 있다(units-frames.md, 미확인 가설)
-    edge_bias_offset_m: 0.0          # 실측 나머지 편향. T30 실측 전이라 0. 스칼라 하나, 방향당 값, 진행 방향 + (PR #75)
+    edge_round_radius_m: 0.0         # 부재 모서리 둥글림 R. 기준 큐브(80 x 80 x 80 mm)는 모서리가 예리하다: 라운드 없음
+                                     #   실측: 2026-09-20 학민, 캘리퍼 · 손끝(PR #80, docs/test-reports/T03-follow-up_20260920.md).
+                                     #   2026-09-19 의 라운드 가설은 폐기됐다. 다른 부재를 쓰면 다시 잰다. 0 이 정당한 값이다
+    edge_bias_offset_m: 0.0          # 실측 나머지 편향. **아직 재지 않아 0 이다.** T25 에서 누름 힘별로 재서 채운다(PR #80 4절:
+                                     #   접촉 소실 검출이 진짜 변보다 바깥에서 걸린다. 값은 그 PR 에서 확정 중)
+                                     #   스칼라 하나, 방향당 값((추정 폭 - 캘리퍼 폭) / 2). 검출점이 진행 방향으로 더 나간 거리가 + 이고,
+                                     #   geometry_estimator 가 그만큼 진행 방향 반대로 뺀다(README, PR #75)
     result_dir: data                 # result_store 경로. 상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이다
                                      #   ws_cobot1 에서 launch 하면 ws_cobot1/data (gitignore). 실기 PC 에만 남은 기록은 없는 기록이다
     result_frame_id: workpiece_fixture    # ScanResult 의 프레임(가칭)
