@@ -1,6 +1,6 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
@@ -119,17 +119,17 @@ uint8 TYPE_OVER_FORCE=2     # 과대 외력
 uint64 event_id             # contact_detector 발급, 발행마다 +1
 string scan_id              # /scan/state 에서 받은 현재 scan_id. 없으면 ""
 uint32 motion_id            # 판정에 쓴 RobotSample.motion_id 를 그대로 복사
-uint64 sample_id            # 판정에 쓴 RobotSample.sample_id
+uint64 sample_id            # 판정 샘플(= 조건이 처음 성립한 샘플)의 RobotSample.sample_id
 uint8 type
 string source               # 'robot_force' | 'sim'
 string frame_id             # RobotSample 과 동일
-geometry_msgs/Pose pose     # 판정 샘플의 TCP pose (≠ 정지 완료 좌표)
+geometry_msgs/Pose pose     # 판정 샘플의 TCP pose (≠ 확정 샘플, ≠ 정지 완료 좌표)
 geometry_msgs/Wrench wrench # 판정 샘플의 외력
-builtin_interfaces/Time pose_stamp
-builtin_interfaces/Time force_stamp
-builtin_interfaces/Time detect_stamp   # 판정을 확정한 시각
-float64 force_delta_n       # |F − F0|. OVER_FORCE 는 원시 |F|
-float64 z_drop_m            # EDGE 의 실제 z 하강량. 그 외 type 은 NaN
+builtin_interfaces/Time pose_stamp     # 판정 샘플의 값
+builtin_interfaces/Time force_stamp    # 판정 샘플의 값
+builtin_interfaces/Time detect_stamp   # 판정을 확정한 시각 (확정 샘플. 연속 N 번째)
+float64 force_delta_n       # 확정 샘플의 |F − F0|. OVER_FORCE 는 원시 |F|
+float64 z_drop_m            # EDGE 판정 샘플의 실제 z 하강량. 그 외 type 은 NaN
 bool z_drop_valid
 uint8 debounce_count        # 판정을 확정한 연속 횟수
 ```
@@ -137,6 +137,19 @@ uint8 debounce_count        # 판정을 확정한 연속 횟수
 - `/scan/state`는 `scan_id` 태깅에만 쓴다.
 - 판정 좌표(이 메시지)와 정지 완료 좌표(`ExecuteMotion.Result.pose`)를 혼용하지 않는다. 측정값의 출처는 판정 좌표다.
 - `z_drop_m`은 편향 보정의 δ로 쓴다(임계값이 아니라 실제 하강량).
+
+**판정 샘플의 정의 [v0.1.5 확정 · #69]** — 디바운스(연속 N 회)가 있으므로 "판정 샘플"은 **조건이 처음 성립한 샘플**(연속 구간의 첫 샘플)이다. 확정 샘플(연속 N 번째)이 아니다.
+
+| 필드 | 어느 샘플의 값인가 |
+|---|---|
+| `pose` · `pose_stamp` · `wrench` · `force_stamp` · `sample_id` | **첫 샘플** (조건이 처음 성립한 샘플) |
+| `z_drop_m` · `z_drop_valid` (EDGE) | **첫 샘플**의 하강량 (좌표와 같은 순간) |
+| `force_delta_n` · `detect_stamp` | **확정 샘플** (연속 N 번째). BRD 9장 KPI "접촉 검출 하중 = 접촉으로 확정된 순간의 외력 크기"와 맞춘다 |
+| `debounce_count` | 그대로: 판정을 확정한 연속 횟수 |
+
+- `detect_stamp − force_stamp`가 디바운스 지연이다. 이벤트가 자기 지연을 들고 다니므로 TR-01의 "판정 지연"을 이벤트만으로 구할 수 있다.
+- **측정 좌표는 `debounce_n`을 바꿔도 움직이지 않는다.** 확정 샘플의 좌표를 쓰면 디바운스 동안 더 움직인 만큼 측정값이 밀린다(50 Hz · 5 mm/s · N=3 이면 0.2 mm, N=5 면 0.4 mm. **계산값이고 실측이 아니다**). 그렇게 두면 `debounce_n` 하나가 오검출 억제와 측정 편향을 같이 바꾸어, 디바운스를 튜닝할 때마다 편향 보정 상수를 다시 재야 한다.
+- CONTACT · EDGE · OVER_FORCE에 같은 정의를 쓴다.
 
 ### 3.4 ScanState.msg
 ```

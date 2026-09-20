@@ -2,6 +2,15 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.1.5 (2026-09-20, #69, PR #79)
+타입 변경 없음. `ros-interfaces.md` 3.3절의 **"판정 샘플"** 을 **조건이 처음 성립한 샘플**(연속 구간의 첫 샘플)로 확정하고, `ContactEvent` 필드별로 어느 샘플의 값인지 적었다. 주석만 바뀌었고 필드 이름 · 타입 · 순서 · 상수값은 그대로다. 영향: contact_detector(T16 배선에서 고르는 필드) · scan_manager/geometry_estimator(`detect_latency_s`의 뜻에서 디바운스 몫이 빠진다) · mqtt_bridge · 웹(`pose`의 뜻만 달라진다). robot_manager는 이벤트를 정지 트리거로만 쓰므로 영향 없음.
+- 첫 샘플: `pose` · `pose_stamp` · `wrench` · `force_stamp` · `sample_id` · `z_drop_m`(EDGE). 확정 샘플: `force_delta_n` · `detect_stamp`. `debounce_count`는 그대로
+- 왜: 확정 샘플의 좌표를 쓰면 `debounce_n` 하나가 오검출 억제와 측정 편향을 같이 바꾼다. 실기에서 디바운스를 튜닝할 때마다 편향 보정 상수(T30)를 다시 재야 한다. 첫 샘플로 두면 측정 좌표가 디바운스 설정과 무관해진다
+- 편향 크기는 50 Hz · 5 mm/s에서 N=3이면 0.2 mm, N=5면 0.4 mm다. **계산값이고 실측이 아니다**
+- `detect_stamp − force_stamp`가 디바운스 지연이 되어 TR-01의 "판정 지연"을 이벤트만으로 구할 수 있다
+- CONTACT · EDGE · OVER_FORCE에 같은 정의를 쓴다. main의 `detector_core.Detection`은 두 샘플을 모두 들고 있어 CONTACT · OVER_FORCE가 이미 이 배정과 같다. EDGE는 아직 구현 전이다
+- 번호: v0.1.4(PR #72)가 머지된 main 위로 rebase했다. 같은 시기에 열린 계약 PR(#80 T03 후속 · #82 units-frames)과는 머지 순서로 번호를 맞춘다
+
 ## v0.1.4 (2026-09-20, T15, PR #72)
 타입 변경 없음. `ros-interfaces.md`의 **실측 발행 주기**와 **`RobotStatus.moving`의 근거**를 채웠다. 영향: scan_manager(정지 완료 판단) · contact_detector · safety_monitor(샘플 주기 가정).
 - 실측(Virtual): `/robot/sample` 37.6 Hz, `/robot/status` 9.3~9.8 Hz. 설정값 50 · 10 Hz에 못 미친다. 두산 서비스를 직렬로 불러야 해서다(동시 호출 시 드라이버가 응답을 멈췄다)
