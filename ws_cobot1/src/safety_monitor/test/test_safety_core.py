@@ -261,6 +261,20 @@ def test_freshness_stops_only_while_moving():
     assert st.level() is Level.STOP
 
 
+def test_lost_status_stops_even_when_last_known_moving_was_false():
+    """상태가 끊기면 moving 은 모르는 값이다. 마지막 False 를 믿고 WARN 에 머물면 안 된다."""
+    st = state()
+    st.moving = False
+    found = st.watch.check_freshness(10.0, last_sample_s=10.0, last_status_s=9.0)
+    assert [c.code for c in found] == [ROBOT_STATUS_LOST]
+    assert st.level() is Level.STOP
+    assert [c.code for c in st.stopping_conditions()] == [ROBOT_STATUS_LOST]
+    # 상태가 다시 들어오면 moving 을 알 수 있으므로 WARN 으로 내려간다
+    st.watch.check_freshness(10.0, last_sample_s=9.0, last_status_s=10.0)
+    assert list(st.watch.active) == [SAMPLE_STALE]
+    assert st.level() is Level.WARN and st.stopping_conditions() == []
+
+
 def test_over_force_always_stops_even_when_not_moving():
     st = state()
     st.moving = False

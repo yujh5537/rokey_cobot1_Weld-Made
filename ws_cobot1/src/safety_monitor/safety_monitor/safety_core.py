@@ -252,8 +252,14 @@ class SafetyState:
         self.connected = False
 
     def stopping_conditions(self) -> List[Condition]:
-        """지금 정지가 필요한 조건. 최신성 조건은 움직이는 중일 때만 포함한다."""
-        return [c for c in self.watch.active.values() if c.stops or self.moving]
+        """지금 정지가 필요한 조건.
+
+        최신성 조건은 움직이는 중일 때만 포함한다. 단 /robot/status 가 끊겨 있으면 moving 은
+        **모르는 값이지 False 가 아니다.** 마지막으로 알려진 False 를 믿으면, 상태가 끊긴 뒤
+        로봇이 움직이기 시작한 경우를 "서 있다"로 읽는다. 모를 때는 STOP 쪽으로 본다.
+        """
+        unknown_moving = ROBOT_STATUS_LOST in self.watch.active
+        return [c for c in self.watch.active.values() if c.stops or self.moving or unknown_moving]
 
     def level(self) -> Level:
         if self.latched or self.stopping_conditions():
