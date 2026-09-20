@@ -2,15 +2,90 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import './App.css'
 
+function getPhaseLabel(
+  phase,
+  progress,
+  progressTotal
+) {
+  switch (phase) {
+    case 'IDLE':
+      return '대기'
+
+    case 'PREPARING':
+      return '시작 준비'
+
+    case 'TOP_SEARCH':
+      return '윗면 탐색'
+
+    case 'EDGE_SEARCH':
+      return `모서리 탐색 ${progress}/${progressTotal}`
+
+    case 'GEOMETRY':
+      return '형상 생성'
+
+    case 'DONE':
+      return '완료'
+
+    case 'ERROR':
+      return '오류'
+
+    case 'STOPPING':
+      return '중지 진행'
+
+    case 'STOPPED':
+      return '중단됨'
+
+    case 'HOMING':
+      return '홈 복귀 진행'
+
+    case 'RESUMING':
+      return '재시작 진행'
+
+    default:
+      return phase
+  }
+}
 
 function App() {
   // Three.js canvas
   const canvasRef = useRef(null)
 
+  // Three.js에서 현재 TCP 팁 Mesh를 참조한다.
+  const tipMeshRef = useRef(null)
+
+  // Three.js에서 TCP 이동 궤적 Line을 참조한다.
+  const trajectoryLineRef = useRef(null)
+
+  // Three.js 접촉점들을 담는 Group
+  const contactGroupRef = useRef(null)
+
   // 화면에 표시할 현재 상태
   const [phase, setPhase] = useState('IDLE')
   const [direction, setDirection] = useState('-')
   const [progress, setProgress] = useState(0)
+  const [progressTotal, setProgressTotal] = useState(4)
+
+  // 현재 진행 중인 scan ID
+  const [scanId, setScanId] = useState(null)
+
+  const [commandStatus, setCommandStatus] =
+    useState('-')
+
+  const [lastRequestId, setLastRequestId] =
+    useState(null)
+
+  // FastAPI WebSocket 연결 상태
+  const [wsConnected, setWsConnected] = useState(false)
+
+  // 현재 로봇 TCP 팁 위치
+  // robot/sample의 pose는 base_link 기준, 단위는 mm
+  const [tipPose, setTipPose] = useState(null)
+
+  // robot/sample로 받은 TCP 이동 기록
+  const [tipTrajectory, setTipTrajectory] = useState([])
+
+  // contact/event로 받은 접촉점 목록
+  const [contactPoints, setContactPoints] = useState([])
 
   // 시간순 로그
   const [logs, setLogs] = useState([])
@@ -33,36 +108,253 @@ function App() {
   // 버튼 함수
   // =========================
 
-  function handleStart() {
-    setPhase('EDGE_SEARCH')
-    setDirection('POS_X')
-    setProgress(1)
+  async function sendScanCommand(action) {
+    const requestBody = {
+      payload: {},
+    }
 
-    addLog('스캔 시작')
+    // resume 명령은 기존 scan_id를 같이 보낸다.
+    if (action === 'resume') {
+      requestBody.scan_id = scanId ?? ''
+    }
+
+    try {
+      const response = await fetch(
+        `/commands/scan/${action}`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json',
+          },
+
+          body: JSON.stringify(
+            requestBody
+          ),
+        }
+      )
+
+      const result =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}`
+        )
+      }
+
+      console.log(
+        '[COMMAND]',
+        action,
+        result
+      )
+
+      addLog(
+        `${action} 명령 전송: ${result.status}`
+      )
+
+    } catch (error) {
+      console.error(
+        '[COMMAND] error:',
+        error
+      )
+
+      addLog(
+        `${action} 명령 전송 실패`
+      )
+    }
+  }
+
+
+  function handleStart() {
+    sendScanCommand('start')
   }
 
 
   function handleStop() {
-    setPhase('STOPPED')
-
-    addLog('스캔 중지')
+    sendScanCommand('stop')
   }
 
 
   function handleHome() {
-    setPhase('HOMING')
-    setDirection('-')
-
-    addLog('안전복귀 시작')
+    sendScanCommand('home')
   }
 
 
   function handleResume() {
-    setPhase('EDGE_SEARCH')
-    setDirection('POS_X')
-
-    addLog('스캔 재시작')
+    sendScanCommand('resume')
   }
+
+
+  // =========================
+  // FastAPI WebSocket
+  // =========================
+
+  useEffect(() => {
+    const wsProtocol =
+      window.location.protocol === 'https:'
+        ? 'wss'
+        : 'ws'
+
+    const wsUrl =
+      `${wsProtocol}://${window.location.host}/ws`
+
+    const websocket = new WebSocket(wsUrl)
+
+
+    // WebSocket 연결 성공
+    websocket.onopen = () => {
+      console.log('[WS] connected')
+
+      setWsConnected(true)
+      addLog('FastAPI WebSocket 연결')
+    }
+
+
+    // FastAPI에서 메시지 수신
+    websocket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+
+        console.log('[WS] message:', message)
+
+        const { topic, payload } = message
+
+
+        // scan/state
+        if (topic === 'scan/state') {
+          setPhase(
+            payload.phase ?? 'UNKNOWN'
+          )
+
+          setDirection(
+            payload.direction ?? '-'
+          )
+
+          setProgress(
+            payload.progress ?? 0
+          )
+
+          setProgressTotal(
+            payload.progress_total ?? 4
+          )
+
+          setScanId(
+            payload.scan_id ?? null
+          )
+        }
+
+        // robot/sample
+        if (
+          topic === 'robot/sample' &&
+          payload.valid === true &&
+          payload.pose
+        ) {
+          const newTipPose = {
+            frameId: payload.frame_id,
+            x: payload.pose.x_mm,
+            y: payload.pose.y_mm,
+            z: payload.pose.z_mm,
+          }
+
+          // 현재 TCP 위치
+          setTipPose(newTipPose)
+
+          // TCP 이동 궤적
+          setTipTrajectory((prevTrajectory) => {
+            const nextTrajectory = [
+              ...prevTrajectory,
+              newTipPose,
+            ]
+
+            // 너무 오래 실행해도 브라우저 메모리가
+            // 계속 늘어나지 않도록 최근 1000점만 유지한다.
+            return nextTrajectory.slice(-1000)
+          })
+        }
+
+        // contact/event
+        if (
+          topic === 'contact/event' &&
+          payload.pose
+        ) {
+          const newContactPoint = {
+            eventId: payload.event_id,
+            frameId: payload.frame_id,
+            x: payload.pose.x_mm,
+            y: payload.pose.y_mm,
+            z: payload.pose.z_mm,
+          }
+
+          setContactPoints((prevPoints) => {
+            // 같은 event_id가 다시 들어오면 중복 저장하지 않는다.
+            const alreadyExists =
+              prevPoints.some(
+                (point) =>
+                  point.eventId === newContactPoint.eventId
+              )
+
+            if (alreadyExists) {
+              return prevPoints
+            }
+
+            return [
+              ...prevPoints,
+              newContactPoint,
+            ]
+          })
+        }
+
+        // scan/log
+        if (topic === 'scan/log') {
+          addLog(
+            payload.message ?? 'scan log'
+          )
+        }
+
+        // command/status
+        if (topic === 'command/status') {
+          setCommandStatus(
+            payload.status ?? 'UNKNOWN'
+          )
+
+          setLastRequestId(
+            payload.request_id ?? null
+          )
+        }
+
+      } catch (error) {
+        console.error(
+          '[WS] invalid message:',
+          error
+        )
+      }
+    }
+
+
+    // WebSocket 연결 종료
+    websocket.onclose = () => {
+      console.log('[WS] disconnected')
+
+      setWsConnected(false)
+      addLog('FastAPI WebSocket 연결 종료')
+    }
+
+
+    // WebSocket 오류
+    websocket.onerror = (error) => {
+      console.error(
+        '[WS] error:',
+        error
+      )
+    }
+
+
+    // React 컴포넌트 종료 시 연결 정리
+    return () => {
+      websocket.close()
+    }
+  }, [])
 
 
   // =========================
@@ -162,19 +454,196 @@ function App() {
 
     scene.add(axesHelper)
 
+    // 8. 현재 TCP 팁 표시
+    const tipGeometry =
+      new THREE.SphereGeometry(
+        0.12,
+        24,
+        24
+      )
 
-    // 8. 화면 그리기
-    renderer.render(
-      scene,
-      camera
-    )
+    const tipMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0xff3333,
+      })
+
+    const tipMesh =
+      new THREE.Mesh(
+        tipGeometry,
+        tipMaterial
+      )
+
+    // 아직 robot/sample을 받기 전이므로 숨긴다.
+    tipMesh.visible = false
+
+    scene.add(tipMesh)
+
+    // 다른 useEffect에서도 이 Mesh를 조작할 수 있도록 보관한다.
+    tipMeshRef.current = tipMesh
+
+
+    // 9. TCP 이동 궤적
+    const trajectoryGeometry =
+      new THREE.BufferGeometry()
+
+    const trajectoryMaterial =
+      new THREE.LineBasicMaterial({
+        color: 0x33aaff,
+      })
+
+    const trajectoryLine =
+      new THREE.Line(
+        trajectoryGeometry,
+        trajectoryMaterial
+      )
+
+    scene.add(trajectoryLine)
+
+    trajectoryLineRef.current = trajectoryLine
+
+    // 10. 접촉점들을 담을 Group
+    const contactGroup = new THREE.Group()
+
+    scene.add(contactGroup)
+
+    contactGroupRef.current = contactGroup
+
+    // 11. 실시간 렌더링
+    let animationFrameId
+
+    function animate() {
+      animationFrameId =
+        requestAnimationFrame(animate)
+
+      renderer.render(
+        scene,
+        camera
+      )
+    }
+
+    animate()
 
 
     // React 화면 종료 시 정리
     return () => {
+      cancelAnimationFrame(animationFrameId)
+
+      tipMeshRef.current = null
+      trajectoryLineRef.current = null
+      contactGroupRef.current = null
+
       renderer.dispose()
     }
   }, [])
+
+  // =========================
+  // TCP 팁 3D 위치 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!tipPose) {
+      return
+    }
+
+    if (!tipMeshRef.current) {
+      return
+    }
+
+    // MQTT/Web 좌표 단위는 mm.
+    // 화면 표시를 위해 100 mm = Three.js 1 unit로 축소한다.
+    const DISPLAY_SCALE = 0.01
+
+    // 기존 Three.js 장면은 Y축을 위쪽으로 사용하고 있기 때문
+    tipMeshRef.current.position.set(
+      tipPose.x * DISPLAY_SCALE,
+      tipPose.z * DISPLAY_SCALE,
+      tipPose.y * DISPLAY_SCALE
+    )
+
+    tipMeshRef.current.visible = true
+  }, [tipPose])
+
+  // =========================
+  // TCP 이동 궤적 3D 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!trajectoryLineRef.current) {
+      return
+    }
+
+    if (tipTrajectory.length < 2) {
+      return
+    }
+
+    const DISPLAY_SCALE = 0.01
+
+    // tipTrajectory를 Three.js Vector3 배열로 변환
+    const points = tipTrajectory.map((pose) =>
+      new THREE.Vector3(
+        pose.x * DISPLAY_SCALE,
+        pose.z * DISPLAY_SCALE,
+        pose.y * DISPLAY_SCALE
+      )
+    )
+
+    const newGeometry =
+      new THREE.BufferGeometry()
+        .setFromPoints(points)
+
+    trajectoryLineRef.current.geometry.dispose()
+
+    trajectoryLineRef.current.geometry =
+      newGeometry
+
+  }, [tipTrajectory])
+
+  // =========================
+  // 접촉점 3D 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!contactGroupRef.current) {
+      return
+    }
+
+    const group =
+      contactGroupRef.current
+
+    // 기존 접촉점 Mesh 제거
+    group.clear()
+
+    const DISPLAY_SCALE = 0.01
+
+    contactPoints.forEach((point) => {
+      const geometry =
+        new THREE.SphereGeometry(
+          0.08,
+          20,
+          20
+        )
+
+      const material =
+        new THREE.MeshStandardMaterial({
+          color: 0xffcc00,
+        })
+
+      const marker =
+        new THREE.Mesh(
+          geometry,
+          material
+        )
+
+      marker.position.set(
+        point.x * DISPLAY_SCALE,
+        point.z * DISPLAY_SCALE,
+        point.y * DISPLAY_SCALE
+      )
+
+      group.add(marker)
+    })
+
+  }, [contactPoints])
 
 
   return (
@@ -215,7 +684,21 @@ function App() {
         <h2>현재 상태</h2>
 
         <p>
-          현재 단계: {phase}
+          FastAPI WebSocket:{' '}
+          {wsConnected ? '연결됨' : '연결 안 됨'}
+        </p>
+
+        <p>
+          현재 단계:{' '}
+          {getPhaseLabel(
+            phase,
+            progress,
+            progressTotal
+          )}
+        </p>
+
+        <p>
+          Phase 코드: {phase}
         </p>
 
         <p>
@@ -223,8 +706,42 @@ function App() {
         </p>
 
         <p>
-          진행도: {progress} / 4
+          진행도: {progress} / {progressTotal}
         </p>
+
+        <p>
+          Scan ID: {scanId ?? '-'}
+        </p>
+
+        <p>
+          최근 명령 상태: {commandStatus}
+        </p>
+
+        <p>
+          Request ID: {lastRequestId ?? '-'}
+        </p>
+
+        {tipPose ? (
+          <>
+            <p>
+              팁 기준 프레임: {tipPose.frameId}
+            </p>
+
+            <p>
+              팁 위치:
+              {' '}
+              X {tipPose.x.toFixed(2)} mm /
+              {' '}
+              Y {tipPose.y.toFixed(2)} mm /
+              {' '}
+              Z {tipPose.z.toFixed(2)} mm
+            </p>
+          </>
+        ) : (
+          <p>
+            팁 위치: 아직 수신되지 않음
+          </p>
+        )}
 
       </section>
 
