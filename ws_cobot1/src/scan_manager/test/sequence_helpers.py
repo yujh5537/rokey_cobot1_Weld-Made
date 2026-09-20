@@ -97,6 +97,7 @@ class FakePorts(Ports):
         self.stop_during = None       # 이 label 의 모션 도중에 /scan/stop 이 온다
         self.stop_after_event = None  # 이 label 의 측정값을 받은 직후에 /scan/stop 이 온다
         self.stop_before_notify = None  # 이 Signal 을 알리기 직전에 /scan/stop 이 온다
+        self.latch_after = None       # 이 label 의 모션이 끝난 직후에 안전 래치가 걸린다(모션 사이의 래치)
         self.still = True
         self.tare_outcome = StepOutcome(True)
         self.safety_code = 0
@@ -132,6 +133,8 @@ class FakePorts(Ports):
             return self._simulate(request)
         finally:
             self.sm.set_motion_id(0)
+            if self.latch_after == request.label:
+                self.safety_code = 400
 
     def _simulate(self, request):
         p = self.params

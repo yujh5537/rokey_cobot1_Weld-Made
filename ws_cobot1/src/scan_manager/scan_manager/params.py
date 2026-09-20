@@ -9,7 +9,6 @@
 """
 
 from dataclasses import dataclass
-from dataclasses import replace
 import math
 from typing import Callable, Dict, Mapping, Optional, Tuple
 
@@ -132,7 +131,6 @@ _FOREIGN_CONFIG_CHECKS = {
     'target_force_n': positive,
     'drop_limit_m': positive,
 }
-FOREIGN_CONFIG_NAMES = tuple(_FOREIGN_CONFIG_CHECKS)
 
 
 @dataclass(frozen=True)
@@ -250,11 +248,3 @@ def check(values: Mapping[str, object]) -> ParamCheck:
             merged[spec.name] = tuple(float(v) for v in merged[spec.name])
     merged['direction_order'] = tuple(Direction[name] for name in merged['direction_order'])
     return ParamCheck(ScanParams(**merged), (), ())
-
-
-def with_motion_config(params: ScanParams, overrides: Mapping[str, float]) -> ScanParams:
-    """계약 6개 중 주어진 것만 바꾼 사본. 범위 검사는 호출 전에 check_values 로 한다."""
-    unknown = set(overrides) - set(MOTION_CONFIG_NAMES)
-    if unknown:
-        raise ValueError(f'모션 설정이 아닌 이름: {sorted(unknown)}')
-    return replace(params, **{name: float(value) for name, value in overrides.items()})

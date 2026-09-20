@@ -103,16 +103,6 @@ def test_check_values_covers_other_nodes_config():
     assert P.check_values({'debounce_n': 2.5}) != ()
 
 
-def test_with_motion_config_changes_only_what_is_given():
-    params = make_params()
-    changed = P.with_motion_config(params, {'slide_speed_mps': 0.02})
-    assert changed.slide_speed_mps == 0.02
-    assert changed.descend_speed_mps == params.descend_speed_mps
-    assert params.slide_speed_mps == VALUES['slide_speed_mps']  # 원본은 그대로다
-    with pytest.raises(ValueError):
-        P.with_motion_config(params, {'tip_radius_m': 0.001})
-
-
 def test_node_params_snapshot_is_plain_and_excludes_contract_config():
     snapshot = make_params().node_params()
     assert not set(P.MOTION_CONFIG_NAMES) & set(snapshot)

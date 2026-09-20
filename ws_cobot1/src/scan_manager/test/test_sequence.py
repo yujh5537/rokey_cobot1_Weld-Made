@@ -240,12 +240,33 @@ def test_compliance_not_released_stops_the_sequence(ports, params):
 @pytest.mark.parametrize('safety_code, expected', [
     (0, Reason.ROBOT_ERROR), (int(Reason.OVER_FORCE), Reason.OVER_FORCE)])
 def test_stop_that_nobody_requested_is_a_failure(ports, params, safety_code, expected):
-    ports.safety_code = safety_code
-    ports.override['slide_NEG_X'] = MotionResult(reason=MotionReason.STOP_REQUESTED, reason_code=200)
+    def stopped_by_someone_else(_request):
+        ports.safety_code = safety_code  # 모션 도중에 safety_monitor 가 래치를 걸고 로봇을 세웠다
+        return MotionResult(reason=MotionReason.STOP_REQUESTED, reason_code=200)
+    ports.override['slide_NEG_X'] = stopped_by_someone_else
     outcome = run(ports, params)
     assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == expected
     assert ports.sm.phase is Phase.ERROR
     assert no_return_motion(ports)
+
+
+@pytest.mark.parametrize('latch_after, last_sent, failed_phase', [
+    ('to_origin', 'to_origin', Phase.TOP_SEARCH),       # tare 중에 걸렸다 → 하강을 보내지 않는다
+    ('descend', 'descend', Phase.EDGE_SEARCH),          # 윗면 기록 중 → 첫 밀기를 보내지 않는다
+    ('slide_NEG_Y', 'slide_NEG_Y', Phase.HOMING),       # 형상 계산 중 → 마무리 복귀도 보내지 않는다
+])
+def test_latch_between_motions_blocks_the_next_motion(ports, params, latch_after, last_sent, failed_phase):
+    ports.latch_after = latch_after
+    outcome = run(ports, params)
+    assert outcome.reason_code == Reason.OVER_FORCE and '안전 래치' in outcome.detail
+    assert ports.labels()[-1] == last_sent
+    assert ports.sm.phase is Phase.ERROR and ports.sm.failure.phase is failed_phase
+    assert no_return_motion(ports)
+    if failed_phase is Phase.HOMING:
+        assert outcome.kind is OutcomeKind.HOMING_FAILED and ports.geometry.shape.success
+    else:
+        assert outcome.kind is OutcomeKind.FAILED
+    assert ports.attempt_failures == []  # 탐색을 시도하지 않았으므로 '탐색 실패'로 적지 않는다
 
 
 # ---- 작업 중지: 홈 복귀 · 재시작을 부르지 않는다 ----
@@ -352,6 +373,13 @@ def test_run_home_failure_and_stop(params):
     assert stopping.sm.phase is Phase.STOPPED
 
 
+def test_latch_does_not_block_the_operator_home(params):
+    ports = home_ports(params)
+    ports.safety_code = int(Reason.OVER_FORCE)  # 래치 중이다
+    outcome = run_home(MotionPlanner(params), ports)
+    assert outcome.kind is OutcomeKind.DONE and ports.labels() == ['home']
+
+
 # ---- classify · planner ----
 
 DESCEND = MotionRequest(Operation.DESCEND, 'descend', speed=0.004, max_distance=0.09)
@@ -377,11 +405,37 @@ def test_classify(request_, result, kind, code):
 
 
 @pytest.mark.parametrize('reason', [
-    MotionReason.STOP_REQUESTED, MotionReason.CANCELED, MotionReason.EDGE,
-    MotionReason.TARGET_REACHED])
-def test_classify_stop_wins_over_whatever_the_motion_ended_with(reason):
+    MotionReason.STOP_REQUESTED, MotionReason.CANCELED, MotionReason.EDGE])
+def test_classify_stop_wins_over_a_motion_that_ended_well(reason):
     verdict = classify(SLIDE, MotionResult(reason=reason, event_id=9), stop_requested=True)
     assert verdict.kind is VerdictKind.STOPPED
+    reached = classify(MOVE, MotionResult(reason=MotionReason.TARGET_REACHED), stop_requested=True)
+    assert reached.kind is VerdictKind.STOPPED
+
+
+@pytest.mark.parametrize('result, code', [
+    (MotionResult(reason=MotionReason.OVER_FORCE), Reason.OVER_FORCE),
+    (MotionResult(reason=MotionReason.ROBOT_ERROR, reason_code=205), Reason.DROP_LIMIT),
+    (MotionResult(reason=MotionReason.REJECTED), Reason.ROBOT_ERROR),
+    (MotionResult(reason=MotionReason.MAX_DISTANCE), Reason.NO_EDGE),
+    (MotionResult(reason=MotionReason.TIMEOUT), Reason.TIMEOUT),
+    (MotionResult(reason=MotionReason.STOP_REQUESTED, compliance_released=False), Reason.ROBOT_ERROR),
+    (MotionResult(accepted=False), Reason.ROBOT_ERROR),
+])
+def test_classify_a_failure_is_not_hidden_by_a_stop_request(result, code):
+    verdict = classify(SLIDE, result, stop_requested=True)
+    assert (verdict.kind, verdict.reason_code) == (VerdictKind.FAILED, code)
+
+
+def test_failure_during_stop_ends_in_error_not_stopped(ports, params):
+    def over_force_while_stopping(_request):
+        ports.request_stop()
+        return MotionResult(reason=MotionReason.OVER_FORCE, reason_code=400, position=(0.41, 0.0, 0.04))
+    ports.override['slide_POS_X'] = over_force_while_stopping
+    outcome = run(ports, params)
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.OVER_FORCE
+    assert ports.sm.phase is Phase.ERROR and ports.stop_record is None
+    assert no_return_motion(ports)
 
 
 def test_planner_uses_parameters_only(params):

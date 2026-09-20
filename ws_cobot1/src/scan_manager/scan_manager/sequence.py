@@ -11,6 +11,8 @@
 - 측정값의 출처는 판정 좌표(ContactEvent)다. 정지 좌표(ExecuteMotion.Result.pose)는 따로 기록한다.
 - 실패 · 중단 · 형상 계산 실패에서는 **자동으로 홈 복귀하지 않는다**(7.4절, CLAUDE.md 규칙 3).
 - 중지는 STOPPED 로만 간다. 이 파일에는 중지 뒤에 모션을 보내는 경로가 없다.
+  다만 중지를 접수했어도 모션이 실패 사유로 끝났으면 실패(ERROR)다. 사실을 가리지 않는다.
+- 스캔의 모든 모션(마무리 복귀 포함)은 보내기 전에 안전 래치를 본다. 관제자의 안전복귀는 막지 않는다.
 - 측정값은 기록(디스크)을 확인한 뒤에 상태 기계에 알린다(result_store/README.md).
 """
 
@@ -137,7 +139,6 @@ def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bo
     stop_requested: 이 노드가 /scan/stop 을 접수했는가.
     safety_reason_code: /safety/status 가 래치 중이면 그 reason_code, 아니면 0.
     """
-    op = request.operation
     if not result.available:
         return _failed(Reason.ROBOT_DISCONNECTED, '/robot/execute_motion 서버가 없다')
     if not result.accepted:
@@ -159,12 +160,21 @@ def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bo
             safety_reason_code or Reason.ROBOT_ERROR,
             f'{request.label}: 요청하지 않은 정지 {reason.name} '
             f'(reason_code={result.reason_code}, {result.detail})')
-    if stop_requested:
-        # 중지와 동시에 끝난 모션. 도달 · 측정이어도 중지가 우선이다(늦게 온 측정값 방침은 T26)
+
+    verdict = _classify_ended(request, result)
+    if stop_requested and verdict.kind is not VerdictKind.FAILED:
+        # 중지와 동시에 도달 · 측정으로 끝난 모션. 중지가 우선이다(늦게 온 측정값 방침은 T26).
+        # 실패 사유(OVER_FORCE · ROBOT_ERROR · MAX_DISTANCE · TIMEOUT …)로 끝났으면 중지를 접수했어도
+        # 실패다. STOPPED 로 보내면 그 사실이 가려지고 재시작 대상이 된다(병후 결정 2026-09-20).
         return MotionVerdict(
             VerdictKind.STOPPED, int(Reason.STOP_REQUESTED),
-            f'{request.label}: 중지 접수 뒤에 {getattr(reason, "name", reason)} 로 끝났다')
+            f'{request.label}: 중지 접수 뒤에 {reason.name} 로 끝났다')
+    return verdict
 
+
+def _classify_ended(request: MotionRequest, result: MotionResult) -> MotionVerdict:
+    """정지 요청이 아닌 사유로 끝난 모션."""
+    op, reason = request.operation, result.reason
     if reason is MotionReason.TARGET_REACHED and op in (Operation.MOVE_TO, Operation.HOME):
         return MotionVerdict(VerdictKind.REACHED)
     measured = (
@@ -222,7 +232,7 @@ class Ports:
         raise NotImplementedError
 
     def safety_reason_code(self) -> int:
-        """/safety/status 가 래치 중이면 그 reason_code, 아니면 0."""
+        """/safety/status 가 래치 중이면 **0 이 아닌** ReasonCode(그 reason_code), 아니면 0."""
         raise NotImplementedError
 
     def execute(self, motion_id: int, request: MotionRequest) -> MotionResult:
@@ -301,11 +311,13 @@ class _Fail(Exception):
 
 class _Runner:
 
-    def __init__(self, planner: MotionPlanner, ports: Ports, first_motion_id: int = 1):
+    def __init__(self, planner: MotionPlanner, ports: Ports, first_motion_id: int = 1,
+                 block_on_latch: bool = True):
         if first_motion_id < 1:
             raise ValueError('motion_id 는 1 부터다(0 = 없음)')
         self._plan = planner
         self._ports = ports
+        self._block_on_latch = block_on_latch
         self._motion_ids = itertools.count(first_motion_id)
         self.last_motion_id = first_motion_id - 1
         self._last_result: Optional[MotionResult] = None
@@ -322,6 +334,11 @@ class _Runner:
     def _execute(self, request: MotionRequest, target=None) -> MotionResult:
         """모션 하나. 중지는 _Stop, 실패는 _Fail 로 빠진다. target 은 측정 대상(TOP · Direction)."""
         self._check_stop()
+        if self._block_on_latch:
+            # 모션 사이(tare · 기록 · 형상 계산 중)에 걸린 안전 래치. 모션 중의 래치는 로봇 정지의 Result 로 잡힌다.
+            latched = self._ports.safety_reason_code()
+            if latched:
+                raise _Fail(latched, f'{request.label}: 안전 래치 중이라 모션을 보내지 않았다')
         self.last_motion_id = next(self._motion_ids)
         result = self._ports.execute(self.last_motion_id, request)
         self._last_result = result
@@ -455,7 +472,8 @@ def run_home(planner: MotionPlanner, ports: Ports, first_motion_id: int = 1) -> 
 
     홈 복귀 경로 · 순서는 TBD(계약 7.4절)라 OP_HOME 하나만 보낸다.
     """
-    runner = _Runner(planner, ports, first_motion_id)
+    # 안전 래치는 안전복귀를 막지 않는다(T10 결정, scan_manager/README.md)
+    runner = _Runner(planner, ports, first_motion_id, block_on_latch=False)
     try:
         runner._execute(planner.home())
         runner._notify(Signal.HOMING_DONE)
