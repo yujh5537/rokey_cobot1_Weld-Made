@@ -60,14 +60,20 @@ HOME_POSITION = (0.42, -0.18, 0.29)
 SIGN = {Direction.POS_X: 1.0, Direction.NEG_X: -1.0, Direction.POS_Y: 1.0, Direction.NEG_Y: -1.0}
 
 
-def isolated_domain_id() -> str:
-    """노드 테스트용 ROS_DOMAIN_ID. 다른 테스트 · 떠 있는 노드 · 조 공용 도메인과 섞이지 않게 한다.
+# 이 조에 배정된 ROS_DOMAIN_ID 는 30~39 다. 30 은 조 공용(실기 · 팀원의 Virtual)이라 쓰지 않는다.
+# 범위 밖 번호는 같은 망의 다른 조와 섞인다.
+TEST_DOMAIN_IDS = range(31, 40)
 
-    1~101 안에서 고른다. Linux 에서 102 이상은 DDS 포트(7400 + 250 x 도메인)가 임시 포트 범위
-    (32768~)에 들어가 드물게 충돌한다. 30 은 이 조의 공용 도메인(실기 · Virtual)이라 피한다.
+
+def isolated_ros_env() -> dict:
+    """노드 테스트가 쓸 ROS 환경 변수. 다른 테스트 · 떠 있는 노드 · 실기와 섞이지 않게 한다.
+
+    - ROS_DOMAIN_ID: 31~39 중 하나(PID 로 고른다. 같은 PC 의 다른 테스트 프로세스와 겹칠 확률을 줄인다).
+    - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST: 이 PC 밖으로 나가지 않는다. 가짜 상대 노드에 보내는 goal 이
+      같은 망의 robot_manager(Virtual · 실기)로 갈 길을 막는 것은 이 설정이다(CLAUDE.md 규칙 1).
     """
-    domain = 1 + os.getpid() % 100
-    return str(101 if domain == 30 else domain)
+    domain = TEST_DOMAIN_IDS[os.getpid() % len(TEST_DOMAIN_IDS)]
+    return {'ROS_DOMAIN_ID': str(domain), 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'LOCALHOST'}
 
 
 def make_params(**overrides):
