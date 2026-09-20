@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='yujh5537',
     maintainer_email='yujh5537@users.noreply.github.com',
-    description='접촉 · 과대 외력 판정 노드',
+    description='접촉 · 과대 외력 판정 노드와 오프라인 분석기',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'contact_detector = contact_detector.contact_detector:main',
+            'analyze_samples = contact_detector.offline:main',
         ],
     },
 )
