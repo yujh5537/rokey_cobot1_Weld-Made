@@ -16,13 +16,15 @@
     python3 docs/env/measure_idle_force.py --pose origin_above --duration 30 --interval 0.02 \
         --csv descend_01.csv
 
-**실기에서 `--interval 0` 은 쓰지 않는다.** `--csv` 를 주면 샘플마다 posx + force 라 조회가 두 배이고,
-간격 0 이면 Virtual 기준 초당 400회를 넘는다. dsr_controller2 가 호출 과부하로 모든 응답을 멈춘 적이
-있는데(2026-09-20) 그것이 동시 호출 때문인지 호출량 때문인지 아직 모른다. 하강 중에 그 일이 나면
-모션은 이미 걸려 있고 정지 명령도 먹지 않는다. `docs/env/api-check-log.md` 의 실기 확인이 끝난 뒤에 쓴다
-(현지 리뷰, PR #71).
+**실기에서는 `--interval` 을 0.01 미만으로 둘 수 없다.** 실기로 판정되면 `--csv` 유무와 무관하게
+거부하고, `--allow-fast-on-real` 로만 넘긴다. dsr_controller2 가 호출 과부하로 모든 응답을 멈춘 적이
+있는데(2026-09-20) 그것이 동시 호출 때문인지 호출량 때문인지 아직 모른다. 원인을 모르는 동안은
+`--csv` 없는 force 단독 폴링(초당 200회 근처)도 같은 위험으로 본다. 하강 중에 그 일이 나면 모션은
+이미 걸려 있고 정지 명령도 먹지 않는다. `docs/env/api-check-log.md` 의 실기 확인이 끝난 뒤에 푼다
+(현지 리뷰, PR #71). 로봇 종류를 조회하지 못하면 실기로 간주해 닫는다.
 
-`--csv` 형식은 `contact_detector`의 오프라인 분석기(`analyze_samples`)가 읽는 형식이다.
+`--csv` 형식은 `contact_detector` 의 오프라인 분석기(`ros2 run contact_detector analyze_samples`,
+`contact_detector/offline.py` 의 `load_csv`)가 읽는 형식이다. 머리줄이 그 README 와 같다.
 
     t_pose_s,t_force_s,x_mm,y_mm,z_mm,fx_n,fy_n,fz_n,valid
 
@@ -48,7 +50,7 @@ from dsr_msgs2.srv import (GetCurrentPosx, GetCurrentTcp, GetCurrentTool, GetRob
                            GetToolForce)
 
 PREFIX = '/dsr01/dsr_controller2/'
-MIN_REAL_INTERVAL_S = 0.01   # 실기에서 --csv 와 함께 쓸 때의 최소 간격 (현지 리뷰, PR #71)
+MIN_REAL_INTERVAL_S = 0.01   # 실기 최소 간격. --csv 유무와 무관하다 (현지 리뷰, PR #71)
 AXES = ('Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz')
 REF = {'base': 0, 'tool': 1}
 
@@ -99,7 +101,7 @@ def read_posx(res):
 
 
 class Recorder:
-    """분석기(`contact_detector`의 analyze_samples)가 읽는 CSV로 남긴다."""
+    """분석기(`ros2 run contact_detector analyze_samples`)가 읽는 CSV로 남긴다."""
 
     HEADER = 't_pose_s,t_force_s,x_mm,y_mm,z_mm,fx_n,fy_n,fz_n,valid\n'
     FLUSH_EVERY = 50
@@ -144,19 +146,25 @@ def measure(args, node):
     c_system = caller.client(GetRobotSystem, 'system/get_robot_system')
 
     deadline = time.monotonic() + 10.0
-    missing = [c.srv_name for c in (c_tool, c_tcp, c_posx, c_force)
+    missing = [c.srv_name for c in (c_tool, c_tcp, c_posx, c_force, c_system)
                if not c.wait_for_service(timeout_sec=max(0.1, deadline - time.monotonic()))]
     if missing:
         print(f'서비스 연결 안 됨: {missing}. sodreal이 떠 있는지 확인')
         return None
     time.sleep(0.5)  # 응답 경로까지 연결될 시간을 준다
 
+    # 모르면 닫는 쪽으로 판정한다. 조회가 실패하는 상황이 바로 막아야 할 상황이다 (현지 리뷰, PR #71)
     system = caller.call(c_system, GetRobotSystem.Request())
-    is_real = bool(system and system.success and system.robot_system == 0)   # 0 = REAL
-    if is_real and args.csv and args.interval < MIN_REAL_INTERVAL_S and not args.allow_fast_on_real:
+    if system is None or not system.success:
+        is_real = True
+        print('robot_system 조회 실패. 로봇 종류를 확인하지 못했으므로 실기로 간주한다')
+    else:
+        is_real = system.robot_system == 0   # 0 = REAL
+    if is_real and args.interval < MIN_REAL_INTERVAL_S and not args.allow_fast_on_real:
         print(f'실기에서는 --interval 을 {MIN_REAL_INTERVAL_S} 이상으로 둔다 (지금 {args.interval}).')
-        print('  --csv 는 샘플마다 posx + force 라 조회가 두 배다. 호출 과부하로 드라이버가 응답을')
-        print('  멈춘 적이 있고(2026-09-20), 하강 중에 그러면 정지 명령도 먹지 않는다.')
+        print('  호출 과부하로 드라이버가 응답을 멈춘 적이 있고(2026-09-20), 하강 중에 그러면')
+        print('  정지 명령도 먹지 않는다. --csv 면 posx + force 라 조회가 두 배지만, 과부하의')
+        print('  원인을 아직 모르므로 force 단독 폴링도 같이 막는다.')
         print('  docs/env/api-check-log.md 의 실기 확인이 끝났으면 --allow-fast-on-real 로 넘긴다.')
         return None
 
