@@ -40,6 +40,30 @@ BRD는 "매뉴얼 설명 / 소스 확인 / 실제 PC 호출 확인 / 실기 성�
 
 소스(`dsr_controller2/src/dsr_controller2.cpp`의 `check_position_condition_cb`)는 `Drfl->check_position_condition_abs()`의 반환값을 `success`에 그대로 넣는다[E18].
 
+## 두산 서비스 동시 호출 (2026-09-20 Virtual, T15에서 발견)
+
+**동시에 부르면 안 된다.** robot_manager(T15)가 `aux_control/get_current_posx`와 `aux_control/get_tool_force`를
+여러 스레드에서 동시에 부르자, `dsr_controller2`가 **모든 서비스 응답을 멈췄다.** 그 뒤로는
+`ros2 service call`로 부른 조회도 응답하지 않았고, 노드를 종료해도 회복되지 않아 브링업을 다시 띄워야 했다.
+컨트롤러 노드 자체는 살아 있었고(`controller_manager` 로그가 계속 나옴) `get_robot_state`만 44회 처리된 뒤 멈췄다.
+
+- 어제(T04) 확인이 모두 성공한 것은 호출을 **하나씩 차례로** 했기 때문이다.
+- robot_manager는 `posx → force → get_robot_state`를 응답을 받은 뒤 다음 것을 부르는 방식으로 잇는다.
+  그 상태에서 Virtual 37.6 Hz로 10초간 유효 376/376이었다.
+- 이동(`move_joint` ASYNC) 중에 조회를 이어가는 것은 문제가 없었다(모션 1건 + 조회 1건은 동시에 떠 있다).
+- 실기에서도 재현되는지는 미확인이다. 재현되면 T13의 모션 호출도 같은 줄에 넣어야 한다.
+
+## get_robot_state는 이동 중에도 STANDBY다 (2026-09-20 Virtual)
+
+`system/get_robot_state`(`GetRobotState`, 0 INITIALIZING · 1 STANDBY · 2 MOVING · 3 SAFE_OFF)는
+**이동 중에도 1(STANDBY)** 을 돌려줬다. 5 deg/s로 `move_joint`(ASYNC)를 걸어 팁 z가 540.6 → 527.6 mm로
+움직이는 동안 0.2초 간격 30회 모두 1이었다.
+
+- 그래서 `RobotStatus.moving`은 이 값으로 판정할 수 없다. robot_manager는 TCP 위치 변화로 본다
+  (`docs/contracts/ros-interfaces.md` 9장, T15).
+- 서비스 응답 자체는 정상이므로 **연결 확인(`connected`)** 용으로는 쓴다.
+- **실기에서 다시 확인할 것:** 실기 컨트롤러가 이동 중 2(MOVING)를 돌려주면 그쪽이 더 정확하다.
+
 ## Real 확인 절차 (사람이 실행, 미실시)
 
 T02처럼 툴 · TCP 등록이 휘발성이니 먼저 `apply_tool_tcp.py`로 등록 상태를 맞춘다. 탐침 팁이 아무것도 닿지 않은 상태에서 한다.
@@ -57,6 +81,8 @@ python3 docs/env/check_api_calls.py --real-ok --move-home --steps amovel_stop,co
 - [ ] `--move-home`: 홈 관절각으로 movej 한다. 경로에 물체가 없는지 먼저 본다
 - [ ] `amovel_stop`: +z(위쪽) 20 mm를 20 mm/s로 가다가 0.4 s 뒤 `move_stop`. 도중에 멈추는지
 - [ ] `compliance_force`: 목표 힘 0 N이라 로봇이 스스로 움직이지 않아야 한다. 움직이면 비상정지
+- [ ] `get_robot_state`가 이동 중 2(MOVING)를 돌려주는지 (Virtual은 1 STANDBY)
+- [ ] 동시 호출이 실기에서도 드라이버를 멈추는지 (Virtual에서 멈췄다)
 - [ ] `drl`: `set_external_force_reset()` 전후 `get_tool_force`가 0 근처로 바뀌는지. Real은 `robot_system=0`으로 부른다(스크립트가 조회해서 넣는다)
 - [ ] `/onrobot/sendCommand`: 스크립트는 실기에서 거부한다(탐침 파지 중 열면 떨어진다). 탐침을 뺀 상태에서 따로 확인한다
 - [ ] 결과표(스크립트 마지막 출력)를 이 문서 Real 칸에 옮긴다
