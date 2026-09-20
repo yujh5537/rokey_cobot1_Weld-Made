@@ -3,7 +3,7 @@
 <package format="3">
   <name>contact_detector</name>
   <version>0.1.0</version>
-  <description>접촉 · 과대 외력 판정 노드(입력원 robot_force / sim). 소유: 현지 (T07, T16)</description>
+  <description>접촉 · 과대 외력 판정 노드(입력원 robot_force / sim)와 오프라인 분석기. 소유: 현지 (T07, T16)</description>
   <maintainer email="yujh5537@users.noreply.github.com">yujh5537</maintainer>
   <license>Apache-2.0</license>
 
