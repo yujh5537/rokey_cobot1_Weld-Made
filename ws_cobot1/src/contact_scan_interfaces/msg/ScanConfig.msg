@@ -22,7 +22,7 @@ bool    motion_timeout_set
 float64 lift_height_m
 bool    lift_height_set
 # 힘/순응 → robot_manager (drop_limit_m 은 safety_monitor 에도)
-float64 target_force_n
+float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 같은 값, 이름만 다르다
 bool    target_force_set
 float64 drop_limit_m
 bool    drop_limit_set

@@ -1,7 +1,7 @@
 # MQTT 토픽·JSON 스키마 계약
 
 상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석). 변경은 PR + `CHANGELOG.md`로만 한다.
-이 문서 한 장이 ROS 쪽(병후, mqtt_bridge)과 웹 쪽(의석, FastAPI)의 유일한 접점이다. 의석의 목업 발행기(`backend/mock_publisher`)와 mqtt_bridge 테스트는 **아래 예시를 그대로** 쓴다.
+이 문서 한 장이 ROS 쪽(의석, mqtt_bridge. scan_manager 쪽 접점은 병후)과 웹 쪽(의석, FastAPI)의 유일한 접점이다. 의석의 목업 발행기(`backend/mock_publisher`)와 mqtt_bridge 테스트는 **아래 예시를 그대로** 쓴다.
 
 브로커: 웹 PC의 Mosquitto 1개. 주소·포트는 `docker/.env`.
 
@@ -28,7 +28,7 @@
 | `geometry_msgs/Point` | `{"x_mm","y_mm","z_mm"}` |
 | `geometry_msgs/Wrench` | `{"fx_n","fy_n","fz_n","tx_nm","ty_nm","tz_nm"}` |
 | `builtin_interfaces/Time` 필드 `foo_stamp` / `foo_at` / `stamp` | `foo_stamp_ms` / `foo_at_ms` / `stamp_ms` |
-| `ScanConfig`의 `*_set` | 웹 → ROS: 보낸 키만 `*_set=true`로 적용. ROS → 웹: 전체 값을 싣고 `*_set`은 생략 |
+| `ScanConfig`의 `*_set` | 웹 → ROS: 보낸 키만 `*_set=true`로 적용. ROS → 웹: 전체 값을 싣고 `*_set`은 생략. **scan_manager가 아직 모르는 값(`*_set=false`)은 `null`** — scan_manager가 NaN으로 두고 mqtt_bridge가 `null`로 바꾼다(0을 넣지 않는다. `ros-interfaces.md` 1장 무효 값) |
 
 ## 2. 토픽 · QoS · retain
 
@@ -309,6 +309,7 @@ LWT는 같은 구조에 `"connected": false`.
 }
 ```
 `type`이 `CONTACT` · `OVER_FORCE`이면 `"z_drop_mm": null, "z_drop_valid": false`.
+`pose` · `wrench` · `pose_stamp_ms` · `force_stamp_ms` · `sample_id` · `z_drop_mm`는 **판정 샘플**(조건이 처음 성립한 샘플, 연속 구간의 첫 샘플)의 값이고, `force_delta_n` · `detect_stamp_ms`는 **확정 샘플**(연속 N번째)의 값이다. `detect_stamp_ms − force_stamp_ms`가 디바운스 지연이다(`ros-interfaces.md` 3.3절).
 
 #### scan/result (성공)
 꼭짓점 · 엣지 순서는 `ros-interfaces.md` 3.5절 규약을 따른다.
@@ -477,3 +478,5 @@ LWT는 같은 구조에 `"connected": false`(브로커가 대신 발행하므로
 - 예시의 설정값(속도 · 힘 · 거리)은 전부 자리 표시다. 실제 값은 yaml 파라미터와 실측으로 정한다.
 - FastAPI의 `cmd/ack` 대기 제한 시간, WebSocket 메시지 형식, PostgreSQL ERD/DDL(웹 쪽 문서에서 정한다).
 - heartbeat 만료 시 조치 · 브라우저 단절 정책(BRD 6장).
+- `hb/ros` · `conn/ros`의 **만료 판정 기준 필드**. 두 메시지에는 `stamp_ms`가 없고 `published_at_ms`만 있다. 발신 측 `published_at_ms`로 볼지 수신 측이 받은 시각으로 볼지 정해야 한다. `conn/ros`의 LWT는 브로커가 대신 발행해 `published_at_ms`가 *접속 시각*이므로 만료 판정에 그대로 쓸 수 없다. `hb/web`은 mqtt_bridge 수신 시각 기준으로 이미 정해져 있다(3장).
+- retain으로 받은 상태(`robot/status` · `scan/state` · `safety/status`)를 "오래된 값"으로 보는 **기준 시간**(2장). 웹 TBD와 같이 정한다.
