@@ -263,7 +263,14 @@ class ScanManager(Node):
 
     def _write(self, method, *args, **kwargs):
         """다음 단계로 가기 전에 디스크에 있어야 하는 기록. 쓰기 스레드에 맡기고 끝을 기다린다."""
-        return self._writer.submit(method, *args, **kwargs).result()
+        if self._closing.is_set():
+            raise _Closing()  # 종료 중의 기록 실패를 작업의 실패로 남기지 않는다
+        try:
+            return self._writer.submit(method, *args, **kwargs).result()
+        except RuntimeError as exc:
+            if self._closing.is_set():
+                raise _Closing() from exc
+            raise
 
     def log(self, level, code, message, pose=None, frame_id=''):
         """/scan/log + 노드 로그. 상태 기계의 락 안(on_change)에서 부르지 않는다.
@@ -356,6 +363,9 @@ class ScanManager(Node):
         요청 전의 오래된 moving=false 로 통과시키지 않는다.
         """
         asked_at = self.get_clock().now().nanoseconds
+        if asked_at <= 0:
+            self.get_logger().error('ROS 시계가 0 이다(use_sim_time 인데 /clock 없음?). 정지를 확인할 수 없다')
+            return False
 
         def still():
             status = self._robot_status
@@ -386,8 +396,12 @@ class ScanManager(Node):
         config = {name: None for name, _flag in CONFIG_FIELDS}
         for name in scan_params.MOTION_CONFIG_NAMES:
             config[name] = self.get_parameter_or(name).value
-        config.update({k: v for k, v in self._config.items() if v is not None})
-        config.update(override or {})
+        for source in (self._config, override or {}):
+            # 다른 노드 몫 6개는 받아서 보관만 한다(self._config). 그 노드에 전파하기 전에는 실제로 적용된 값이
+            # 아니므로 applied · ScanResult.config · 기록에 싣지 않는다(웹이 안전 임계값이 바뀐 것으로 읽는다).
+            config.update({
+                k: v for k, v in source.items()
+                if v is not None and k in scan_params.MOTION_CONFIG_NAMES})
         return config
 
     def _store_for(self, result_dir) -> ResultStore:
@@ -408,6 +422,10 @@ class ScanManager(Node):
         result.success = False
         result.reason_code = int(reason_code)
         result.detail = detail
+        if hasattr(result, 'result'):
+            result.result = conversions.blank_result_msg()   # 재지 않은 값에 0 을 남기지 않는다
+        if hasattr(result, 'final_pose'):
+            result.final_pose = conversions.nan_pose()
         self.log(ScanLog.LEVEL_WARN, reason_code, f'명령 거절: {detail}')
         goal_handle.abort()
         return result
@@ -421,13 +439,12 @@ class ScanManager(Node):
         if isinstance(rejection, tuple):
             return self._reject(goal_handle, result, *rejection)
         job = rejection
+        ports = _NodePorts(self, job)
         try:
             # 기록을 만들지 못하면(디스크 오류 등) 로봇을 움직이기 전에 끝낸다
             self._begin_future.result()
-            ports = _NodePorts(self, job)
             outcome = ScanRunner(
                 MotionPlanner(job.params), ports, job.params.direction_order).run()
-            self._last_motion_id[job.scan_id] = ports.last_motion_id
             if job.result_msg is None:
                 # 측정이 끝나기 전에 끝난 작업(중단). 실패는 fail() 이 이미 발행했다
                 self._publish_partial_result(job, outcome.reason_code, outcome.detail)
@@ -436,11 +453,12 @@ class ScanManager(Node):
         except Exception as exc:  # 기록 실패 등. 모션은 동기로 기다리므로 이 시점에 진행 중인 모션은 없다
             outcome = self._internal_failure(job, exc)
         finally:
+            # 예외로 끝나도 남긴다. 같은 작업의 안전복귀가 motion_id 를 이어서 발급한다(계약 6.2절)
+            self._last_motion_id[job.scan_id] = ports.last_motion_id
             self._end_job(job)
 
         result.scan_id = job.scan_id
-        if job.result_msg is not None:
-            result.result = job.result_msg
+        result.result = job.result_msg if job.result_msg is not None else conversions.blank_result_msg()
         # success 는 명령 전체(마무리 복귀 포함)의 성공 여부다. result.result.success 는 측정의 성공 여부다
         return self._finish_goal(goal_handle, result, outcome)
 
@@ -505,7 +523,6 @@ class ScanManager(Node):
         return job
 
     def _end_job(self, job):
-        self._matcher.end()
         # 마지막 상태(DONE · STOPPED · ERROR)는 on_change 가 큐에 넣기만 했다. 명령의 Result 를 돌려주기 전에
         # 디스크에 쓰인 것을 확인한다. 그래야 Result 를 받은 쪽이 기록을 읽어도 옛 상태를 보지 않는다.
         try:
@@ -515,6 +532,7 @@ class ScanManager(Node):
             pass  # 종료 중이라 쓰기 스레드가 이미 닫혔다
         with self._job_lock:
             if self._job is job:
+                self._matcher.end()  # 그 사이에 새 작업이 접수됐으면 그 작업의 matcher 를 지우지 않는다
                 self._job = None
 
     def _internal_failure(self, job, exc, recorded=True):
@@ -522,8 +540,15 @@ class ScanManager(Node):
         self.get_logger().error(detail)
         try:
             _NodePorts(self, job, recorded=recorded).fail(int(Reason.ROBOT_ERROR), detail, None)
-        except Exception as nested:  # 기록 자체가 안 되는 경우. 상태만은 ERROR 로 보낸다
-            self.get_logger().error(f'실패 기록도 실패: {nested!r}')
+        except Exception as nested:
+            self.get_logger().error(f'실패 처리도 실패: {nested!r}')
+        if self.state_machine.is_busy:
+            # 로그 · 기록이 먼저 터져 FAILED 를 알리지 못한 경우. 동작 중 phase 에 남으면 계속 BUSY 다
+            try:
+                self.state_machine.notify(
+                    Signal.FAILED, reason_code=int(Reason.ROBOT_ERROR), detail=detail)
+            except InvalidTransition:
+                pass
         return RunOutcome(OutcomeKind.FAILED, int(Reason.ROBOT_ERROR), detail)
 
     def _publish_result(self, job, shape):
@@ -562,33 +587,51 @@ class ScanManager(Node):
                 self._job = None
                 return self._reject(goal_handle, result, outcome.reason, outcome.detail)
         recorded = bool(job.scan_id) and self._store is not None and self._begun == job.scan_id
+        ports = _NodePorts(self, job, recorded=recorded)
         try:
             if recorded:
-                self._write(self._store.record_home_requested, job.scan_id, before.phase)
+                # 기록 실패(디스크 오류 · 기록 파일 없음)는 안전복귀를 막지 않는다(래치 · 측정 파라미터와 같은 방침).
+                recorded = ports.recorded = self._record_home(
+                    self._store.record_home_requested, job.scan_id, before.phase)
             self.log(
                 ScanLog.LEVEL_INFO, Reason.OK,
                 f'안전복귀 시작 request_id={goal_handle.request.request_id}')
-            ports = _NodePorts(self, job, recorded=recorded)
             first = self._last_motion_id.get(job.scan_id, 0) + 1
             outcome = run_home(MotionPlanner(job.params), ports, first_motion_id=first)
-            self._last_motion_id[job.scan_id] = first
-            done = outcome.kind is OutcomeKind.DONE
             final = ports.last_result.raw if ports.last_result is not None else None
             if recorded and outcome.kind is not OutcomeKind.STOPPED:
-                self._write(
-                    self._store.record_home_finished, job.scan_id, done,
-                    final_pose=conversions.stop_pose_record(final) if final is not None else None)
+                self._record_home(
+                    self._store.record_home_finished, job.scan_id,
+                    outcome.kind is OutcomeKind.DONE,
+                    final_pose=conversions.stop_pose_record(final))
         except _Closing:
-            outcome, done, final = None, False, None
+            outcome, final = None, None
         except Exception as exc:
-            outcome, done, final = self._internal_failure(job, exc, recorded), False, None
+            outcome, final = self._internal_failure(job, exc, recorded), None
         finally:
+            if ports.last_motion_id:
+                self._last_motion_id[job.scan_id] = ports.last_motion_id
             self._end_job(job)
 
-        if final is not None:
+        if final is not None and conversions.has_stop_pose(final):
             result.final_pose = final.pose
             result.frame_id = final.frame_id
+        else:
+            result.final_pose = conversions.nan_pose()
         return self._finish_goal(goal_handle, result, outcome)
+
+    def _record_home(self, method, *args, **kwargs) -> bool:
+        """안전복귀의 사실을 기록한다. 실패하면 ERROR 로그만 남기고 False (복귀는 계속한다)."""
+        try:
+            self._write(method, *args, **kwargs)
+        except _Closing:
+            raise
+        except Exception as exc:
+            self.log(
+                ScanLog.LEVEL_ERROR, Reason.ROBOT_ERROR,
+                f'안전복귀 기록 실패({method.__name__}): {exc!r}. 기록 없이 복귀를 계속한다')
+            return False
+        return True
 
     # ---- /scan/resume ----
 
@@ -606,28 +649,26 @@ class ScanManager(Node):
 
         홈 복귀 · 재시작을 부르지 않는다(CLAUDE.md 규칙 3). 다른 노드의 완료를 여기서 기다리지 않는다.
         """
-        job = self._job
         handle = None
-        if job is not None:
-            with job.lock:
-                before = self.state_machine.snapshot()
+        # 락 순서: 명령 접수 락 → 작업 락 → 상태 기계 락. START · HOME 의 접수와 겹치지 않게 한다.
+        # (겹치면 STOP 이 STOPPING 으로 바꿔 놓고도 그 작업의 stop_event 를 세우지 못해 첫 모션이 나간다)
+        with self._job_lock:
+            job = self._job
+            if job is not None:
+                with job.lock:
+                    before = self.state_machine.snapshot()
+                    outcome = self.state_machine.request(Command.STOP)
+                    if outcome.changed:
+                        job.stop_snapshot = before
+                        job.stop_event.set()
+                        handle = job.motion_handle
+            else:
                 outcome = self.state_machine.request(Command.STOP)
-                if outcome.changed:
-                    job.stop_snapshot = before
-                    job.stop_event.set()
-                    handle = job.motion_handle
-        else:
-            outcome = self.state_machine.request(Command.STOP)
 
         # 멈출 작업이 없어도 로봇 정지는 요청한다(멱등, 계약 4.1절). 응답은 기다리지 않는다.
-        if self._robot_stop_client.service_is_ready():
-            self._robot_stop_client.call_async(StopRobot.Request(
-                request_id=request.request_id, requester=self.get_name(),
-                reason=request.reason or int(Reason.STOP_REQUESTED), detail=request.detail)
-            ).add_done_callback(self._on_robot_stop_response)
-            robot_stop = '/robot/stop 요청함'
-        else:
-            robot_stop = '/robot/stop 서버가 없다'
+        sent = self.request_robot_stop(
+            request.request_id, request.reason or int(Reason.STOP_REQUESTED), request.detail)
+        robot_stop = '/robot/stop 요청함' if sent else '/robot/stop 서버가 없다'
         if handle is not None:
             handle.cancel_goal_async()
 
@@ -637,9 +678,18 @@ class ScanManager(Node):
         response.detail = (
             f'phase={phase}. {robot_stop}' if outcome.changed
             else f'멈출 작업이 없다(phase={phase}). {robot_stop}')
-        level = ScanLog.LEVEL_INFO if self._robot_stop_client.service_is_ready() else ScanLog.LEVEL_WARN
+        level = ScanLog.LEVEL_INFO if sent else ScanLog.LEVEL_WARN
         self.log(level, Reason.STOP_REQUESTED, f'작업 중지 접수: {response.detail}')
         return response
+
+    def request_robot_stop(self, request_id, reason, detail) -> bool:
+        """/robot/stop 을 요청한다(멱등). 응답은 기다리지 않는다. 서버가 없으면 False."""
+        if not self._robot_stop_client.service_is_ready():
+            return False
+        self._robot_stop_client.call_async(StopRobot.Request(
+            request_id=request_id, requester=self.get_name(), reason=int(reason), detail=detail)
+        ).add_done_callback(self._on_robot_stop_response)
+        return True
 
     def _on_robot_stop_response(self, future):
         """기다리지는 않지만 버리지도 않는다. 정지 완료는 어차피 /robot/status 로만 확인한다."""
@@ -656,17 +706,24 @@ class ScanManager(Node):
     # ---- /scan/set_config ----
 
     def _on_set_config(self, request, response):
-        outcome = self.state_machine.request(Command.SET_CONFIG)
         values = conversions.config_values_from_msg(request.config)
-        problems = () if not outcome.accepted else scan_params.check_values(values)
-        if not outcome.accepted:
-            response.reason_code, response.detail = int(outcome.reason), outcome.detail
-        elif problems:
-            response.reason_code, response.detail = int(Reason.INVALID_VALUE), '; '.join(problems)
-        else:
-            self._config.update(values)  # *_set 인 항목만. 다른 노드로의 전파(P01~P03)는 T19b
-            response.success = True
-            response.detail = '적용: ' + (', '.join(sorted(values)) or '없음')
+        with self._job_lock:  # 접수 판정과 반영 사이에 START 가 끼면 "성공"한 값이 그 작업에 안 실린다
+            outcome = self.state_machine.request(Command.SET_CONFIG)
+            problems = () if not outcome.accepted else scan_params.check_values(values)
+            if not outcome.accepted:
+                response.reason_code, response.detail = int(outcome.reason), outcome.detail
+            elif problems:
+                response.reason_code = int(Reason.INVALID_VALUE)
+                response.detail = '; '.join(problems)
+            else:
+                self._config.update(values)  # *_set 인 항목만
+                applied = sorted(set(values) & set(scan_params.MOTION_CONFIG_NAMES))
+                kept = sorted(set(values) - set(scan_params.MOTION_CONFIG_NAMES))
+                response.success = True
+                response.detail = '적용: ' + (', '.join(applied) or '없음')
+                if kept:
+                    # 다른 노드의 값이다. 전파(P01~P03)는 T19b 라서 그 노드는 아직 yaml 값으로 돈다
+                    response.detail += ' / 보관만(미전파, T19b): ' + ', '.join(kept)
         # applied 는 "적용 후 전체 값"이다. 모르는 값은 NaN + *_set=false 로 둔다(0 금지)
         response.applied = conversions.config_to_msg(self._effective_config())
         self.log(
@@ -699,15 +756,17 @@ class _NodePorts(Ports):
         self._node = node
         self._job = job
         self._params = job.params
-        self._recorded = recorded   # result_store 에 이 작업의 기록이 있는가
+        self.recorded = recorded    # result_store 에 이 작업의 기록이 있는가(쓸 수 있는가)
         self.last_motion_id = 0
         self.last_result = None   # 가장 최근에 받은 Result (정지 좌표의 출처)
         self._last_event = None   # 가장 최근에 짝이 맞은 ContactEvent (판정 좌표의 출처)
 
     def _stop_pose(self):
-        """(정지 좌표의 원본 Pose, frame_id). 받은 Result 가 없으면 (None, '')."""
+        """(정지 좌표의 원본 Pose, frame_id). 받은 Result 가 없거나 pose 가 채워지지 않았으면 (None, '')."""
         raw = self.last_result.raw if self.last_result is not None else None
-        return (raw.pose, raw.frame_id) if raw is not None else (None, '')
+        if raw is None or not conversions.has_stop_pose(raw):
+            return None, ''
+        return raw.pose, raw.frame_id
 
     def stop_requested(self):
         return self._job.stop_event.is_set()
@@ -720,12 +779,24 @@ class _NodePorts(Ports):
         self.last_motion_id = motion_id
         if not node._motion_client.wait_for_server(timeout_sec=p.server_wait_timeout_s):
             return MotionResult(available=False)
-        node._matcher.begin(job.scan_id, motion_id, _EXPECTED_EVENT.get(request.operation))
+        node._matcher.begin(
+            job.scan_id, motion_id, _EXPECTED_EVENT.get(request.operation), p.motion_frame_id)
         node.state_machine.set_motion_id(motion_id)
+        handle = None
         try:
             goal = conversions.goal_from_request(request, job.scan_id, motion_id, p.motion_frame_id)
-            sent = node._motion_client.send_goal_async(goal)
+            with job.lock:
+                # 시퀀스의 중지 확인과 여기 사이(서버 대기 등)에 /scan/stop 이 왔으면 goal 을 보내지 않는다.
+                # /scan/stop 은 이 락 안에서 stop_event 를 세우므로, 이 뒤에 오는 중지는 아래의 cancel 이 받는다.
+                if job.stop_event.is_set():
+                    return MotionResult(
+                        reason=MotionReason.STOP_REQUESTED, reason_code=int(Reason.STOP_REQUESTED),
+                        detail=f'{request.label}: 중지가 접수돼 goal 을 보내지 않았다')
+                sent = node._motion_client.send_goal_async(goal)
             if not node.wait_future(sent, p.server_wait_timeout_s):
+                # 요청은 이미 나갔다. 늦게 수락되면 아무도 모르는 모션이 돈다 → 늦은 수락은 바로 취소하고 정지도 요청한다
+                sent.add_done_callback(self._cancel_late_goal)
+                self._stop_untracked(f'{request.label}: goal 응답이 오지 않았다')
                 return MotionResult(available=False)
             handle = sent.result()
             if not handle.accepted:
@@ -740,17 +811,49 @@ class _NodePorts(Ports):
             backstop = request.timeout_s + p.stop_confirm_timeout_s
             if not node.wait_future(done, backstop):
                 handle.cancel_goal_async()
+                self._stop_untracked(f'{request.label}: Result 가 오지 않았다')
                 return MotionResult(
                     reason=MotionReason.TIMEOUT, detail=f'{backstop:.1f} s 안에 Result 가 오지 않았다')
-            self.last_result = conversions.motion_result_from_msg(done.result().result)
+            raw = done.result().result
+            handle = None  # 끝난 goal 이다
+            if conversions.has_stop_pose(raw) and raw.frame_id != p.motion_frame_id:
+                # 좌표를 쓰는 쪽은 frame_id 를 확인한다(계약 1장). 다른 프레임의 좌표로 다음 모션을 만들지 않는다
+                return MotionResult(
+                    reason=MotionReason.ROBOT_ERROR, reason_code=int(Reason.ROBOT_ERROR),
+                    detail=f'Result.frame_id={raw.frame_id!r} 가 {p.motion_frame_id!r} 가 아니다',
+                    compliance_released=bool(raw.compliance_released))
+            self.last_result = conversions.motion_result_from_msg(raw)
             return self.last_result
+        except BaseException:
+            if handle is not None:
+                handle.cancel_goal_async()  # 수락된 모션을 두고 빠져나가지 않는다(종료 중 포함)
+            raise
         finally:
             with job.lock:
                 job.motion_handle = None
             node.state_machine.set_motion_id(0)
 
+    @staticmethod
+    def _cancel_late_goal(future):
+        try:
+            handle = future.result()
+        except Exception:
+            return
+        if handle.accepted:
+            handle.cancel_goal_async()
+
+    def _stop_untracked(self, detail):
+        """추적하지 못하는 모션이 돌고 있을 수 있다. 정지를 요청한다(멱등). 홈 복귀 · 재시작은 부르지 않는다."""
+        sent = self._node.request_robot_stop(
+            f'scan_manager-{self._job.scan_id}', int(Reason.ROBOT_ERROR), detail)
+        self._node.log(
+            ScanLog.LEVEL_WARN, Reason.ROBOT_ERROR,
+            f'{detail}. /robot/stop {"요청함" if sent else "서버가 없다"}')
+
     def wait_event(self, event_id):
         event = self._node._matcher.wait(event_id, self._params.event_wait_timeout_s)
+        if self._node._closing.is_set():
+            raise _Closing()  # 종료가 기다림을 깨웠다. 이벤트 미도착(실패)으로 적지 않는다
         if event is None:
             return None
         self._last_event = event
@@ -801,18 +904,21 @@ class _NodePorts(Ports):
             raw.frame_id)
 
     def record_attempt_failed(self, target, reason_code, detail, result):
-        stop_pose = conversions.stop_pose_record(result.raw) if result.raw is not None else None
+        stop_pose = conversions.stop_pose_record(result.raw)
         self._node._write(
             self._node._store.record_attempt_failed, self._job.scan_id, target, reason_code, detail,
             stop_pose)
 
     def notify(self, signal):
-        try:
-            self._node.state_machine.notify(signal)
-        except InvalidTransition:
-            if self._node.state_machine.phase is Phase.STOPPING:
-                return False  # 그 사이에 /scan/stop 이 접수됐다
-            raise
+        # 작업 락 안에서 알린다. /scan/stop 이 "접수 직전의 Snapshot" 을 뜨고 STOP 을 요청하는 사이에
+        # 전이가 끼면 중단 기록의 phase · 방향 · 진행도가 실제와 어긋난다(마무리 HOMING 에서는 ValueError).
+        with self._job.lock:
+            try:
+                self._node.state_machine.notify(signal)
+            except InvalidTransition:
+                if self._node.state_machine.phase is Phase.STOPPING:
+                    return False  # 그 사이에 /scan/stop 이 접수됐다
+                raise
         return True
 
     def compute_geometry(self):
@@ -839,7 +945,7 @@ class _NodePorts(Ports):
         where = '정지 좌표' if pose is not None else '좌표 없음'
         node.log(ScanLog.LEVEL_ERROR, reason_code, f'{phase} 실패: {detail} ({where})', pose, frame_id)
         node.state_machine.notify(Signal.FAILED, reason_code=reason_code, detail=detail)
-        if self._recorded and job.scan_id:
+        if self.recorded and job.scan_id:
             try:
                 node._write(node._store.record_failure, job.scan_id, node.state_machine.failure)
             except Exception as exc:  # 기록을 못 해도(디스크 오류 등) 결과 발행까지는 간다
@@ -851,10 +957,8 @@ class _NodePorts(Ports):
         node, job = self._node, self._job
         with job.lock:
             before = job.stop_snapshot
-        pose = None
-        if result is not None and result.raw is not None:
-            pose = conversions.stop_pose_record(result.raw)
-        if self._recorded and job.scan_id and before is not None:
+        pose = conversions.stop_pose_record(result.raw) if result is not None else None
+        if self.recorded and job.scan_id and before is not None:
             node._write(node._store.record_stop, job.scan_id, Interruption(
                 before.phase, before.direction, before.progress, pose=pose,
                 during_final_homing=during_final_homing))
@@ -891,7 +995,8 @@ def main(args=None):
         finally:
             _shutdown_quietly(node, executor)
     except KeyboardInterrupt:
-        pass  # 첫 SIGINT 를 처리하러 가는 사이에 온 두 번째 SIGINT
+        # 첫 SIGINT 를 처리하러 가는 사이에 온 두 번째 SIGINT. 기다리는 시퀀스 스레드는 풀어 준다
+        _shutdown_quietly(node, executor)
 
 
 def _shutdown_quietly(node, executor):

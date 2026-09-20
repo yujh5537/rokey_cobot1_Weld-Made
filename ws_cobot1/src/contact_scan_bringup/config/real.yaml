@@ -47,7 +47,7 @@ scan_manager:
   ros__parameters:
     state_publish_period_s: 1.0      # /scan/state 주기 발행 간격(s). 상태가 바뀌면 이 값과 무관하게 바로 발행한다
                                      #   0 이하면 노드가 기동하지 않는다. 설계 출발값이며 실측값이 아니다 (병후, PR #50)
-    # --- T19a (병후). 아래 수치는 설계 출발값이다. 실측값이 아니다 ---
+    # --- T19a (병후). 아래 수치는 설계 출발값이다. 실측값이 아니다(tip_radius_m 한 줄만 실측) ---
     # 필수 항목이 비어 있으면 노드는 기동하되 START 를 INVALID_VALUE 로 거절하고 빠진 이름을 알려 준다(코드 예비값 없음).
     # **TBD 로 남긴 항목을 채우기 전에는 실기에서 START 가 거절된다. 의도한 fail-safe 다.**
     # descend_speed_mps:             # 계약 이름. TBD (계약 9장). 하강 중 관성력 · 감속 거리로 정한다(T13 · T24)
@@ -55,7 +55,8 @@ scan_manager:
     # max_descend_m:                 # 계약 이름. TBD. 조건은 units-frames.md '탐색 기준점 높이': 하한 = 기준점 → 부재 윗면 거리 + 여유,
                                      #   상한 < 기준점 팁 높이 - 안전 여유(넘으면 부재가 없을 때 작업대 면을 윗면으로 잡는다)
     # max_slide_m:                   # 계약 이름. TBD. 부재 크기 · 작업영역으로 정한다
-    # motion_timeout_s:              # 계약 이름. TBD
+    # motion_timeout_s:              # 계약 이름. TBD. **이 값이 없으면 START 뿐 아니라 안전복귀(/scan/home)도 거절된다**
+                                     #   (OP_HOME 에 실을 제한 시간이다. 실기 세션 전에 가장 먼저 채운다)
     lift_height_m: 0.05              # 계약 이름. 방향 전환 · 마무리 때 팁 상승량. 출발값 50 mm (BRD 4.2.6)
     # move_speed_mps:                # OP_MOVE_TO 속도. TBD. robot_manager 는 OP_HOME 이 아닌 goal 의 speed <= 0 을 거절한다(PR #73)
     recontact_margin_m: 0.001        # 방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값. 출발값 1 mm (계약 7.3). drop_limit_m 보다 충분히 작아야 한다

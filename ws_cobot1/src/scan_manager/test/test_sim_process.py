@@ -27,10 +27,13 @@ SIM_YAML = Path(__file__).resolve().parents[2] / 'contact_scan_bringup' / 'confi
 if not SIM_YAML.exists():
     pytest.skip('contact_scan_bringup/config/sim.yaml 이 없다', allow_module_level=True)
 
-os.environ['ROS_DOMAIN_ID'] = str(100 + os.getpid() % 100)
+from sequence_helpers import isolated_domain_id  # noqa: E402
+
+os.environ['ROS_DOMAIN_ID'] = isolated_domain_id()
 
 from contact_scan_interfaces.action import RunScan  # noqa: E402
 from contact_scan_interfaces.msg import ScanResult  # noqa: E402
+from contact_scan_interfaces.msg import ScanState  # noqa: E402
 from contact_scan_interfaces.srv import StopScan  # noqa: E402
 from contact_scan_qos import QOS_STATE  # noqa: E402
 import fake_peers as F  # noqa: E402
@@ -42,6 +45,7 @@ from sequence_helpers import BOX_SIZE  # noqa: E402
 
 TEST_LATENCY_S = 0.02   # 테스트 전용 임의값
 TIMEOUT_S = 60.0
+DISCOVERY_SETTLE_S = 1.0
 
 
 class SimProcess:
@@ -64,8 +68,9 @@ class SimProcess:
         rclpy.init()
         self.peers = F.FakePeers(model={**params, 'detect_latency_s': TEST_LATENCY_S})
         self.client = rclpy.create_node('fake_bridge')
-        self.results = []
+        self.results, self.states = [], []
         self.client.create_subscription(ScanResult, '/scan/result', self.results.append, QOS_STATE)
+        self.client.create_subscription(ScanState, '/scan/state', self.states.append, QOS_STATE)
         self.run_client = ActionClient(self.client, RunScan, '/scan/run')
         self.stop_client = self.client.create_client(StopScan, '/scan/stop')
         self.executor = MultiThreadedExecutor(num_threads=4)
@@ -97,6 +102,10 @@ class SimProcess:
     def run_scan(self):
         assert self._ready.wait(TIMEOUT_S), self.log()
         assert self.run_client.wait_for_server(timeout_sec=TIMEOUT_S)
+        # 다른 프로세스와 막 발견된 직후에 goal 을 보내면 응답이 버려질 수 있다(rclpy: "failed to send response
+        # (timeout): client will not receive response"). 서버 쪽의 응답 경로까지 맞물리기를 기다린다.
+        assert self.wait(lambda: self.states), self.log()
+        time.sleep(DISCOVERY_SETTLE_S)
         # scan_manager 가 가짜 상대 노드의 /robot/status · /safety/status 를 받을 때까지 START 는 거절된다
         deadline = time.monotonic() + TIMEOUT_S
         while True:
@@ -125,6 +134,7 @@ class SimProcess:
             code = self.process.wait(timeout=30.0)
         finally:
             self.process.kill()
+            self.peers.quiet()
             self._stop_spin.set()
             self._spin.join(timeout=10.0)
             self.executor.shutdown(timeout_sec=5.0)

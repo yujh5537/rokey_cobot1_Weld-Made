@@ -51,6 +51,10 @@ EVENT_NEVER = 'event_never'        # Result 는 event_id 를 가리키는데 이
 STRAY_EVENT = 'stray_event'        # motion_id 가 다른 이벤트가 먼저 끼어든다
 HOLD_THEN_OVER_FORCE = 'hold_then_over_force'   # 정지 요청이 올 때까지 움직이다가 과대 외력으로 끝난다
 
+NO_POSE = 'no_pose'                # 실패로 끝나면서 Result.pose 를 채우지 못했다(pose_stamp = 0)
+EVENT_WRONG_FRAME = 'event_wrong_frame'    # 이벤트의 frame_id 가 Base 가 아니다
+RESULT_WRONG_FRAME = 'result_wrong_frame'  # Result 의 frame_id 가 Base 가 아니다
+
 MODEL_KEYS = ('detect_latency_s', 'tip_radius_m', 'edge_round_radius_m', 'edge_bias_offset_m')
 
 
@@ -72,6 +76,7 @@ class FakePeers(Node):
         self.tare_error = 0            # 0 이 아니면 그 코드로 실패한다
         self.latch_during_tare = 0     # 0 이 아니면 tare 도중에 그 코드로 안전 래치가 걸린다(모션 사이의 래치)
         self.reject_operations = set() # 이 operation 의 goal 은 거절한다
+        self.slow_accept = {}          # operation → goal 응답을 이만큼(s) 늦게 돌려준다
         self.goals = []                # 수락한 goal
         self.rejected = 0
         self.stop_requests = []
@@ -87,12 +92,21 @@ class FakePeers(Node):
         self._safety = self.create_publisher(SafetyStatus, '/safety/status', QOS_STATE)
         self.publish_status = True
         self.publish_safety = True
-        self.create_timer(STATUS_PERIOD_S, self._publish, callback_group=group)
+        self._timer = self.create_timer(STATUS_PERIOD_S, self._publish, callback_group=group)
         self._server = ActionServer(
             self, ExecuteMotion, '/robot/execute_motion', self._execute, callback_group=group,
             goal_callback=self._on_goal, cancel_callback=self._on_cancel)
         self.create_service(StopRobot, '/robot/stop', self._on_stop, callback_group=group)
         self.create_service(TareForce, '/contact/tare', self._on_tare, callback_group=group)
+
+    def quiet(self):
+        """정리 전에 부른다. 주기 발행을 멈추고 돌고 있던 콜백이 끝나기를 잠깐 기다린다.
+
+        executor 를 내리는 순간에 50 Hz 타이머 콜백이 돌고 있으면 rclpy 가 "exception was never retrieved" 를 남긴다.
+        """
+        self._timer.cancel()
+        self._halt.set()
+        time.sleep(3 * STATUS_PERIOD_S)
 
     def destroy_node(self):
         self._halt.set()
@@ -135,6 +149,7 @@ class FakePeers(Node):
     # -- /robot/execute_motion --
 
     def _on_goal(self, goal):
+        time.sleep(self.slow_accept.get(int(goal.operation), 0.0))
         invalid = goal.operation != Operation.HOME and goal.speed <= 0.0
         refused = goal.operation in self.reject_operations
         if not self.connected or invalid or refused or self._busy.locked():
@@ -184,6 +199,15 @@ class FakePeers(Node):
     def _run(self, goal):
         R = ExecuteMotion.Result
         behavior = self.behavior.get(key(goal.operation, goal.direction), NORMAL)
+        if behavior == NO_POSE:
+            result = self._result(R.REASON_ROBOT_ERROR, 204, detail='fake: pose unknown')
+            result.pose, result.frame_id = type(result.pose)(), ''
+            result.pose_stamp.sec = result.pose_stamp.nanosec = 0
+            return result
+        if behavior == RESULT_WRONG_FRAME:
+            result = self._result(R.REASON_TARGET_REACHED)
+            result.frame_id = 'workpiece_fixture'
+            return result
         if behavior == ROBOT_ERROR:
             return self._result(R.REASON_ROBOT_ERROR, 204, detail='fake driver error')
         if behavior == HOLD_THEN_OVER_FORCE:
@@ -255,6 +279,8 @@ class FakePeers(Node):
             unknown = self._event(goal, event_type, (8.0, 8.0, 8.0), z_drop, self._event_id + 2000)
             unknown.motion_id = 0
             self._events.publish(unknown)
+        if behavior == EVENT_WRONG_FRAME:
+            event.frame_id = 'workpiece_fixture'
         if behavior == EVENT_AFTER:
             threading.Timer(0.15, self._events.publish, args=(event,)).start()
         elif behavior != EVENT_NEVER:

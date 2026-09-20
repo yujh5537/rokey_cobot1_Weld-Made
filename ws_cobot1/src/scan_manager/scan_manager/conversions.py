@@ -15,6 +15,7 @@ from contact_scan_interfaces.msg import ScanResult
 from contact_scan_interfaces.msg import ScanState
 from contact_scan_interfaces.msg import Segment
 from geometry_msgs.msg import Point
+from geometry_msgs.msg import Pose
 
 from .contract_enums import MotionReason
 from .result_store import ConfigSnapshot
@@ -119,6 +120,16 @@ def goal_from_request(request: MotionRequest, scan_id: str, motion_id: int,
     return goal
 
 
+def has_stop_pose(result: ExecuteMotion.Result) -> bool:
+    """Result.pose 가 채워졌는가.
+
+    계약에는 Result.pose 의 유효 플래그가 없다. robot_manager 는 아는 pose 가 없으면 pose 와 pose_stamp 를
+    msg 기본값(0)으로 둔다(PR #73 build_result). 취득 시각 0 은 실제 시각일 수 없으므로 "없음"으로 읽는다.
+    그러지 않으면 재지 못한 정지 좌표가 (0, 0, 0) 으로 기록되고 다음 들어 올림의 목표가 된다(규칙 4).
+    """
+    return bool(result.pose_stamp.sec or result.pose_stamp.nanosec)
+
+
 def motion_result_from_msg(result: ExecuteMotion.Result) -> MotionResult:
     try:
         reason = MotionReason(result.reason)
@@ -126,13 +137,24 @@ def motion_result_from_msg(result: ExecuteMotion.Result) -> MotionResult:
         reason = None  # 모르는 값은 classify 가 실패로 판정한다
     return MotionResult(
         reason=reason, reason_code=int(result.reason_code), detail=result.detail,
-        event_id=int(result.event_id), position=position_of(result.pose),
+        event_id=int(result.event_id),
+        position=position_of(result.pose) if has_stop_pose(result) else None,
         compliance_released=bool(result.compliance_released), raw=result)
 
 
-def stop_pose_record(result: ExecuteMotion.Result) -> PoseRecord:
-    """정지 좌표(ExecuteMotion.Result.pose). 판정 좌표와 섞지 않는다."""
+def stop_pose_record(result: ExecuteMotion.Result):
+    """정지 좌표(ExecuteMotion.Result.pose). 판정 좌표와 섞지 않는다. 채워지지 않았으면 None."""
+    if result is None or not has_stop_pose(result):
+        return None
     return pose_record(result.pose, result.frame_id, result.pose_stamp)
+
+
+def nan_pose() -> Pose:
+    """재지 못한 pose. 기본 자세 (0, 0, 0, 1) 을 남기지 않는다."""
+    pose = Pose()
+    p, q = pose.position, pose.orientation
+    p.x = p.y = p.z = q.x = q.y = q.z = q.w = NAN
+    return pose
 
 
 # ---- 설정 ----
@@ -179,6 +201,19 @@ def _segment(record) -> Segment:
     return Segment(
         start=_point(record.start), end=_point(record.end),
         length=record.length if record.valid else NAN, valid=record.valid)
+
+
+def blank_result_msg() -> ScanResult:
+    """측정값이 하나도 없는 ScanResult(거절된 명령의 Result 에 싣는다). float 는 전부 NaN, *_valid 는 false."""
+    msg = ScanResult()
+    for name in ('z_top', 'x_pos', 'x_neg', 'y_pos', 'y_neg', 'support_z', 'width', 'length', 'height'):
+        setattr(msg, name, NAN)
+    msg.vertices = [_point(None) for _ in msg.vertices]
+    blank = Segment(start=_point(None), end=_point(None), length=NAN, valid=False)
+    msg.edges = [blank for _ in msg.edges]
+    msg.path_candidates = [blank for _ in msg.path_candidates]
+    msg.config = config_to_msg({})
+    return msg
 
 
 def result_to_msg(scan_id: str, shape: ShapeResult, config: ScanConfig, stamp_msg) -> ScanResult:

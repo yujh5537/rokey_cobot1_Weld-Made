@@ -30,6 +30,7 @@ T19a까지 들어 있다: 시퀀스 · 서버 · geometry 연결. **검증은 �
 | HOMING | `OP_MOVE_TO` 들어 올림 → `OP_HOME` | `HOMING_DONE` → DONE |
 
 - 측정값의 출처는 판정 좌표(`ContactEvent.pose`)다. 정지 좌표(`ExecuteMotion.Result.pose`)는 따로 기록한다.
+- **좌표는 `frame_id`를 확인하고 쓴다**(계약 1장). `motion_frame_id`와 다른 프레임의 이벤트는 측정값으로 받지 않고(`frame_id_mismatch`로 무시), 다른 프레임의 `Result.pose`로는 다음 모션을 만들지 않는다(실패).
 - 정의서 1.1절은 tare → 기준점 이동 순서다. 여기서는 기준점으로 간 뒤 그 자리에서 tare를 한다(측정을 시작할 자세 · 위치에서 F₀를 잡는다). 계약 4.2절은 "`moving=false`를 확인하고 호출한다"만 정한다.
 - **스캔의 모든 모션(마무리 복귀 포함)은 보내기 전에 안전 래치를 본다.** 모션 사이(tare · 기록 · 형상 계산 중)에 래치가 걸렸으면 `SafetyStatus.reason_code`로 실패한다. 모션 중의 래치는 로봇 정지의 Result로 잡힌다. 관제자의 안전복귀(`/scan/home`)는 래치가 막지 않는다.
 - **실패 · 중지 · 형상 계산 실패에서는 모션을 더 보내지 않는다.** 자동 홈 복귀는 없다(계약 7.4절). `test/test_sequence.py`가 고정한다.
@@ -38,7 +39,7 @@ T19a까지 들어 있다: 시퀀스 · 서버 · geometry 연결. **검증은 �
 
 | `ExecuteMotion.Result` | 판정 |
 |---|---|
-| 서버 없음 / goal 거절 | 실패 `ROBOT_DISCONNECTED(104)` / `ROBOT_ERROR(204)` + "goal rejected"(ROS 2의 거절에는 사유가 없어 추측하지 않는다) |
+| 서버 없음 · goal 응답 없음 / goal 거절 | 실패 `ROBOT_DISCONNECTED(104)` / `ROBOT_ERROR(204)` + "goal rejected"(ROS 2의 거절에는 사유가 없어 추측하지 않는다) |
 | `compliance_released=false` | 실패. Result의 코드, 없으면 `ROBOT_ERROR`. 계약 9장 TBD |
 | `REASON_STOP_REQUESTED` · `REASON_CANCELED` | `/scan/stop`을 접수했으면 중지 경로. 아니면(예: safety_monitor의 정지) 실패: 래치 중이면 `SafetyStatus.reason_code`, 아니면 `ROBOT_ERROR` |
 | 중지 접수 뒤에 도달 · 측정으로 끝남 | 중지 경로. 그때 도착한 측정값은 기록하지 않고 로그만 남긴다(방침은 T26) |
@@ -70,7 +71,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 |---|---|---|---|---|
 | `state_publish_period_s` | double | — (출발값 1.0) | > 0 | `/scan/state` 주기 발행 간격. 상태가 바뀌면 이 주기와 상관없이 바로 발행한다. 0 이하면 노드가 기동하지 않는다 |
 | `descend_speed_mps` · `slide_speed_mps` | double | ● | > 0 | 계약 이름. `OP_DESCEND` · `OP_SLIDE` 속도 |
-| `max_descend_m` · `max_slide_m` | double | ● | > 0 | 계약 이름. 미접촉 · 미소실 실패 한계 |
+| `max_descend_m` · `max_slide_m` | double | ● | > 0. `max_descend_m`은 기준점에서 지지면까지의 거리(`search_origin_pose.z` − `base_to_fixture.z` − `support_z_m`) 미만 | 계약 이름. 미접촉 · 미소실 실패 한계. 하강 한계가 지지면에 닿으면 부재가 없을 때 작업대 면을 윗면으로 잡는다(`units-frames.md`). 안전 여유 값은 TBD |
 | `motion_timeout_s` | double | ● | > 0 | 계약 이름. 단위 모션 제한 시간. tare 응답을 기다리는 한도로도 쓴다 |
 | `lift_height_m` | double | ● | > 0 | 계약 이름. 방향 전환 · 마무리 때 팁 상승량 |
 | `move_speed_mps` | double | ● | > 0 | `OP_MOVE_TO` 속도(기준점 이동, 방향 전환의 올림 · 수평 이동, 마무리 들어 올림). robot_manager는 `OP_HOME`이 아닌 goal의 `speed <= 0`을 거절한다 |
@@ -90,7 +91,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `result_frame_id` · `motion_frame_id` | string | — (`workpiece_fixture` · `base_link`) | | 프레임 이름(가칭) |
 | `direction_order` | string[] | — (`POS_X, NEG_X, POS_Y, NEG_Y`) | 네 방향을 한 번씩 | 모서리 탐색 순서. **기동할 때만 읽는다**(상태 기계가 순서를 들고 있다). 나머지는 START 때마다 읽는다 |
 
-실행에 쓰는 값 = yaml 파라미터 ← `/scan/set_config`로 받은 값 ← `RunScan.config_override`(`use_override=true`일 때, 그 작업에만). scan_manager가 직접 쓰는 것은 계약의 모션 6개뿐이고, 나머지 6개(`contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` · `target_force_n` · `drop_limit_m`)는 받은 것만 보관한다. **다른 노드의 현재 값은 모른다**(전파 P01~P03은 T19b). 그래서 `SetConfig.applied` · `ScanResult.config`에서 모르는 항목은 `NaN` + `*_set=false`다. 0을 채우지 않는다. `debounce_n`은 uint8이라 NaN을 실을 수 없으므로 `debounce_set`으로만 판단한다.
+실행에 쓰는 값 = yaml 파라미터 ← `/scan/set_config`로 받은 값 ← `RunScan.config_override`(`use_override=true`일 때, 그 작업에만). scan_manager가 직접 쓰는 것은 계약의 모션 6개뿐이고, 나머지 6개(`contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` · `target_force_n` · `drop_limit_m`)는 **받아서 보관만 한다**(전파 P01~P03은 T19b). 그 노드에 전파하기 전에는 실제로 적용된 값이 아니고 다른 노드의 현재 값도 모르므로, `SetConfig.applied` · `ScanResult.config` · 기록의 `config`에서 이 6개는 `NaN` + `*_set=false`다. SetConfig 응답의 detail에 "보관만(미전파, T19b)"로 이름을 밝힌다(웹이 안전 임계값이 바뀐 것으로 읽지 않게). 0을 채우지 않는다. `debounce_n`은 uint8이라 NaN을 실을 수 없으므로 `debounce_set`으로만 판단한다.
 
 ## 서버
 노드가 뜨자마자 5개가 준비된다. 상대 노드가 없어도 된다(mqtt_bridge가 `server_is_ready()`로 본다).
@@ -98,9 +99,9 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | 이름 | 처리 |
 |---|---|
 | `/scan/run` | 시작 조건(BUSY → 파라미터 → 래치 → 연결)을 확인하고 시퀀스를 돈다. **기록(`begin_scan`)이 디스크에 만들어진 것을 확인한 뒤에 첫 모션을 보낸다**(못 만들면 로봇을 움직이지 않고 ERROR). `scan_id`가 이미 있는 기록과 겹치면 다시 발급한다. Result는 DONE · ERROR · STOPPED에서 돌려준다. `success`는 명령 전체(마무리 복귀 포함), `result.success`는 측정의 성공 여부다 |
-| `/scan/home` | 휴지 phase에서만. `OP_HOME` 하나를 보낸다(경로 · 순서는 TBD). 안전 래치는 막지 않는다. 작업 기록이 있으면 `record_home_requested` · `record_home_finished`를 남긴다 |
+| `/scan/home` | 휴지 phase에서만. `OP_HOME` 하나를 보낸다(경로 · 순서는 TBD). 안전 래치도, 측정 파라미터 누락도, **기록 실패(디스크 오류 등)도** 복귀를 막지 않는다(기록 실패는 ERROR 로그). 작업 기록이 있으면 `record_home_requested` · `record_home_finished`를 남긴다. `motion_timeout_s`가 없으면 거절된다(`real.yaml`은 TBD라 실기에서 먼저 채워야 한다) |
 | `/scan/resume` | **T26 전까지 `NOT_SUPPORTED(107)`.** 상태 기계에 묻지 않으므로 phase가 바뀌지 않는다 |
-| `/scan/stop` | `/robot/stop` 호출과 진행 중 goal cancel을 **함께** 보내고 접수를 바로 돌려준다. 정지 완료 확인 · 중단 위치 기록 · `STOP_CONFIRMED`는 시퀀스 스레드가 한다. **홈 복귀 · 재시작을 부르지 않는다.** 멈출 작업이 없어도 `/robot/stop`은 보낸다(멱등). `/robot/stop`의 응답은 기다리지 않되, 접수되지 않았으면 WARN 로그를 남긴다 |
+| `/scan/stop` | `/robot/stop` 호출과 진행 중 goal cancel을 **함께** 보내고 접수를 바로 돌려준다. 정지 완료 확인 · 중단 위치 기록 · `STOP_CONFIRMED`는 시퀀스 스레드가 한다. **홈 복귀 · 재시작을 부르지 않는다.** 멈출 작업이 없어도 `/robot/stop`은 보낸다(멱등). `/robot/stop`의 응답은 기다리지 않되, 접수되지 않았으면 WARN 로그를 남긴다. START · HOME의 접수와 겹치지 않게 명령 접수 락을 쥐고 처리하고, 시퀀스는 goal을 보내기 직전에 작업 락 안에서 중지를 한 번 더 본다(중지 접수 뒤에 goal이 나가지 않는다) |
 | `/scan/set_config` | 동작 중이면 `BUSY`, 범위 밖이면 `INVALID_VALUE`(같이 온 정상값도 적용하지 않는다). `*_set`인 항목만 적용. 전파는 T19b |
 
 **goal 거절 방식.** ROS 2의 goal reject에는 사유 필드가 없고, main의 mqtt_bridge는 reject를 `BUSY`로 고정해 낸다. 그래서 **goal은 항상 accept하고, 거절할 요청은 phase를 바꾸지 않은 채 바로 Result(`success=false`, `reason_code`=1xx, `scan_id=""`)로 끝낸다(abort).** 실제 사유(`SAFETY_LATCHED` · `INVALID_VALUE` …)가 `scan/command_result`로 웹에 간다. 계약 5.1~5.3절의 "거절" 문구와 다르므로 계약 문서 PR에서 문구를 맞춘다. 거절 처리는 `ScanManager._reject` 한 곳에 있다.
@@ -110,8 +111,8 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 | 토픽 | 시점 |
 |---|---|
 | `/scan/state` | 상태가 바뀔 때 + 주기. 주기 발행이 방금 나간 변경을 옛 상태로 덮어쓰지 않게 순번으로 거른다 |
-| `/scan/result` | 작업 종료 시 1회. 정상이면 GEOMETRY 끝(복귀를 기다리지 않는다, `finished_at`도 그 시각). 실패 · 중단이면 확보한 값만 유효하고 나머지는 `NaN` + `*_valid=false`(좌표는 작업대 프레임). `stamp`는 발행할 때마다 새로 찍는다(mqtt_bridge의 중복 제거 키). 마무리 복귀가 실패해도 다시 발행하지 않는다 |
-| `/scan/log` | 시작 · 측정 확정 · 무시한 이벤트 · 거절 · 실패(원인 · 단계 · 위치) · 중지. 좌표가 판정 좌표인지 정지 좌표인지 message에 적는다. `pose`는 원본(`ContactEvent.pose` · `ExecuteMotion.Result.pose`)을 자세까지 그대로 싣고, 관련 좌표가 없으면 위치 · 자세 모두 `NaN` + `pose_valid=false`다 |
+| `/scan/result` | 작업 종료 시 1회. 정상이면 GEOMETRY 끝(복귀를 기다리지 않는다, `finished_at`도 그 시각). 실패 · 중단이면 확보한 값만 유효하고 나머지는 `NaN` + `*_valid=false`(좌표는 작업대 프레임). 거절된 명령의 `RunScan.Result.result`도 전부 `NaN`이다. `stamp`는 발행할 때마다 새로 찍는다(mqtt_bridge의 중복 제거 키). 마무리 복귀가 실패해도 다시 발행하지 않는다 |
+| `/scan/log` | 시작 · 측정 확정 · 무시한 이벤트 · 거절 · 실패(원인 · 단계 · 위치) · 중지. 좌표가 판정 좌표인지 정지 좌표인지 message에 적는다. `pose`는 원본(`ContactEvent.pose` · `ExecuteMotion.Result.pose`)을 자세까지 그대로 싣고, `Result.pose`가 채워지지 않았으면(`pose_stamp=0`. 계약에 유효 플래그가 없어 이렇게 읽는다) 정지 좌표로 쓰지 않으며, 관련 좌표가 없으면 위치 · 자세 모두 `NaN` + `pose_valid=false`다 |
 
 `result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작(T26)이 끝까지 간 뒤에 쓸 자리를 남겨 둔다.
 
@@ -123,6 +124,8 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 - 상태 기계의 `on_change`(락 안)는 발행과 쓰기 큐 투입만 한다. 디스크 쓰기 · 서비스 호출 · 대기가 없어서 `/scan/stop`의 `request(STOP)`이 디스크를 기다리지 않는다.
 - 락의 순서는 한 방향이다: (명령 접수 락 →) 작업 락 → 상태 기계 락 → 발행 락. 주기 발행은 상태 기계 락을 놓은 뒤에 발행 락을 잡는다.
 - `/scan/stop` 콜백은 아무것도 기다리지 않는다(`call_async` · `cancel_goal_async`).
+- 상태 전이(`notify`)는 작업 락 안에서 한다. `/scan/stop`이 "접수 직전의 Snapshot"을 뜨고 STOP을 요청하는 사이에 전이가 끼지 않아 중단 기록이 실제와 같다.
+- **추적하지 못하는 모션을 남기지 않는다.** goal 응답이 `server_wait_timeout_s` 안에 오지 않거나 Result가 끝내 오지 않으면 실패로 끝내면서 `/robot/stop`(멱등)을 요청하고, 늦게 수락된 goal은 바로 취소한다. 수락된 goal을 두고 예외로 빠져나갈 때도 취소한다. 홈 복귀 · 재시작은 부르지 않는다.
 - 모든 기다림에는 파라미터로 준 한도가 있고, 종료 요청이 오면 바로 빠져나온다.
 
 종료: SIGINT가 두 번 와도(launch의 Ctrl-C) 트레이스백 없이 코드 0으로 끝난다. 큐에 남은 기록을 디스크에 쓴 뒤 닫는다. **모션 도중에 노드가 죽으면 robot_manager는 그 모션을 끝까지(`max_distance` · `timeout`) 실행한다.** 종료할 때 `/robot/stop`을 보내지 않는다(context가 이미 내려가 있다) → T19b에서 다룬다.

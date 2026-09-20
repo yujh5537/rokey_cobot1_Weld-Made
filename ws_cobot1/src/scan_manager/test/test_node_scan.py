@@ -7,6 +7,7 @@
 import math
 import os
 from pathlib import Path
+import shutil
 import threading
 import time
 
@@ -16,7 +17,9 @@ rclpy = pytest.importorskip('rclpy')
 pytest.importorskip('contact_scan_interfaces')
 
 # 다른 패키지의 테스트 · 실행 중인 노드와 섞이지 않게 한다
-os.environ['ROS_DOMAIN_ID'] = str(100 + os.getpid() % 100)
+from sequence_helpers import isolated_domain_id  # noqa: E402
+
+os.environ['ROS_DOMAIN_ID'] = isolated_domain_id()
 
 from contact_scan_interfaces.action import Resume  # noqa: E402
 from contact_scan_interfaces.action import ReturnHome  # noqa: E402
@@ -83,6 +86,9 @@ class Rig:
 
     def close(self):
         self.node.close()
+        self.node._state_timer.cancel()
+        if self.peers is not None:
+            self.peers.quiet()
         # spin 을 먼저 멈춘다. 도는 중에 executor.shutdown() 을 부르면 rclpy 가 guard condition 을 없애면서 예외를 낸다
         self._stop_spin.set()
         self._thread.join(timeout=10.0)
@@ -203,6 +209,9 @@ def test_start_without_status_is_refused_with_the_real_reason(make_rig):
     result = rig._result_of(result_future).result
     assert not result.success and result.scan_id == ''
     assert result.reason_code == Reason.SAFETY_LATCHED and '미수신' in result.detail
+    # 거절된 명령의 Result 에도 0 을 남기지 않는다
+    assert math.isnan(result.result.z_top) and not result.result.z_top_valid
+    assert math.isnan(result.result.vertices[0].x) and math.isnan(result.result.config.slide_speed_mps)
     assert rig.node.state_machine.phase is Phase.IDLE     # 거절은 phase 를 바꾸지 않는다
     assert not (rig.result_dir).exists()                  # 거절된 작업의 기록도 없다
 
@@ -407,6 +416,52 @@ def test_record_that_cannot_be_created_fails_before_any_motion(make_rig, tmp_pat
     assert not rig.results[0].success and not rig.results[0].z_top_valid
 
 
+def test_result_without_a_pose_is_not_recorded_as_the_origin(rig):
+    rig.peers.behavior[F.key(Operation.DESCEND)] = F.NO_POSE     # pose_stamp = 0, pose = (0, 0, 0)
+
+    result = rig.run()
+
+    assert result.reason_code == Reason.ROBOT_ERROR
+    record = rig.store().load(result.scan_id)
+    assert record.top.status == STATUS_FAILED and record.top.stop_pose is None   # (0, 0, 0) 을 적지 않는다
+    error = rig.error_logs()[0]
+    # 이 모션의 정지 좌표는 모른다. 직전 모션의 좌표를 "정지 좌표"라고 싣지도, (0, 0, 0) 을 싣지도 않는다
+    assert not error.pose_valid and math.isnan(error.pose.position.z) and '좌표 없음' in error.message
+
+
+@pytest.mark.parametrize('behavior, code', [
+    (F.EVENT_WRONG_FRAME, Reason.TIMEOUT),        # 다른 프레임의 이벤트는 측정값이 아니다 → 짝이 오지 않은 것
+    (F.RESULT_WRONG_FRAME, Reason.ROBOT_ERROR),   # 다른 프레임의 정지 좌표로 다음 모션을 만들지 않는다
+])
+def test_coordinates_in_another_frame_are_not_used(rig, behavior, code):
+    op = Operation.SLIDE if behavior == F.EVENT_WRONG_FRAME else Operation.MOVE_TO
+    direction = Direction.POS_X if op is Operation.SLIDE else Direction.NONE
+    rig.peers.behavior[F.key(op, direction)] = behavior
+    result = rig.run()
+    assert not result.success and result.reason_code == code
+    assert rig.node.state_machine.phase is Phase.ERROR
+    assert not result.result.x_pos_valid
+    if behavior == F.EVENT_WRONG_FRAME:
+        assert any('frame_id_mismatch' in log.message for log in rig.logs)
+    else:
+        assert 'frame_id' in result.detail and rig.operations() == [Operation.MOVE_TO]
+
+
+def test_goal_accepted_too_late_is_stopped_not_left_running(rig):
+    rig.peers.slow_accept[int(Operation.DESCEND)] = 3 * VALUES['server_wait_timeout_s']
+    rig.peers.behavior[F.key(Operation.DESCEND)] = F.HOLD      # 늦게 수락된 하강은 누가 멈추기 전까지 돈다
+
+    result = rig.run()
+
+    assert not result.success and result.reason_code == Reason.ROBOT_DISCONNECTED
+    assert rig.node.state_machine.phase is Phase.ERROR
+    # 아무도 모르는 모션으로 남기지 않는다: /robot/stop 을 요청했고, 늦게 수락된 goal 은 취소했다
+    assert rig.wait(lambda: rig.peers.stop_requests and rig.peers.cancel_count)
+    assert rig.peers.stop_requests[0].requester == 'scan_manager'
+    assert rig.wait(lambda: not rig.peers._moving)
+    assert not RETURN_OPS & set(rig.operations())
+
+
 def test_tare_failure_code_is_passed_through(rig):
     rig.peers.tare_error = int(Reason.TARE_UNSTABLE)
     result = rig.run()
@@ -482,6 +537,30 @@ def test_failure_while_stopping_is_an_error_not_a_stop(rig):
     assert not RETURN_OPS & set(rig.operations())
 
 
+def test_stop_between_the_stop_check_and_the_send_keeps_the_goal_unsent(rig):
+    """시퀀스의 중지 확인과 goal 전송 사이(서버 대기 중)에 온 STOP. 그 goal 은 나가지 않아야 한다."""
+    client, calls = rig.node._motion_client, []
+    original = client.wait_for_server
+
+    def stop_while_waiting(timeout_sec=None):
+        calls.append(1)
+        if len(calls) == 2:  # 하강을 보내기 직전
+            response = rig.node._on_stop(
+                StopScan.Request(request_id='stop-1', requester='fake_bridge', reason=200),
+                StopScan.Response())
+            assert response.accepted
+        return original(timeout_sec=timeout_sec)
+    client.wait_for_server = stop_while_waiting
+
+    result = rig.run()
+
+    assert result.reason_code == Reason.STOP_REQUESTED
+    assert rig.operations() == [Operation.MOVE_TO]             # 하강은 보내지 않았다
+    assert rig.node.state_machine.phase is Phase.STOPPED
+    stop = rig.store().load(result.scan_id).interruptions[0]
+    assert stop.phase is Phase.TOP_SEARCH
+
+
 def test_stop_does_not_call_home_or_resume(rig):
     _response, _result = stop_during_slide(rig)
     sent = len(rig.peers.goals)
@@ -530,6 +609,16 @@ def test_home_after_stop_is_a_separate_command(rig):
     record = rig.store().load(stopped.scan_id)
     assert record.home_return.requested and record.home_return.completed
     assert record.home_return_since_resume_point
+
+
+def test_home_is_not_blocked_by_a_record_that_cannot_be_written(rig):
+    _response, stopped = stop_during_slide(rig)
+    shutil.rmtree(rig.result_dir / stopped.scan_id)        # 기록을 쓸 수 없다(RecordNotFound)
+
+    result = rig.home()
+
+    assert result.success and rig.operations()[-1] is Operation.HOME
+    assert any('안전복귀 기록 실패' in log.message for log in rig.error_logs())
 
 
 def test_home_is_not_blocked_by_missing_measurement_parameters(make_rig):
@@ -618,7 +707,10 @@ def test_set_config_applies_only_flagged_fields_and_reports_unknowns_as_nan(rig)
     assert response.success and response.reason_code == 0
     applied = response.applied
     assert (applied.slide_speed_mps, applied.slide_speed_set) == (0.02, True)
-    assert (applied.over_force_n, applied.over_force_set) == (25.0, True)
+    # 다른 노드의 값은 보관만 한다. 전파(T19b) 전에는 "적용된 값"으로 내보내지 않는다
+    assert math.isnan(applied.over_force_n) and not applied.over_force_set
+    assert '미전파' in response.detail and 'over_force_n' in response.detail
+    assert rig.node._config['over_force_n'] == 25.0
     assert applied.descend_speed_mps == VALUES['descend_speed_mps'] and applied.descend_speed_set
     assert math.isnan(applied.contact_threshold_n) and not applied.contact_threshold_set
 
@@ -651,5 +743,6 @@ def test_each_scan_gets_a_fresh_result_stamp(rig):
     second = rig.run()
     assert first.success and second.success and first.scan_id != second.scan_id
     assert len(rig.results) == 2
-    keys = {(r.scan_id, r.stamp.sec, r.stamp.nanosec) for r in rig.results}
-    assert len(keys) == 2  # mqtt_bridge 의 중복 제거 키 (scan_id, stamp)
+    stamps = [(r.stamp.sec, r.stamp.nanosec) for r in rig.results]
+    assert stamps[0] != stamps[1] and stamps[0] > (0, 0)   # 발행할 때마다 새로 찍는다
+    assert stamps == sorted(stamps)

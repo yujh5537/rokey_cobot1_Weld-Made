@@ -55,7 +55,7 @@ scan_manager:
   ros__parameters:
     state_publish_period_s: 1.0      # /scan/state 주기 발행 간격(s). 상태가 바뀌면 이 값과 무관하게 바로 발행한다
                                      #   0 이하면 노드가 기동하지 않는다. 설계 출발값이며 실측값이 아니다 (병후, PR #50)
-    # --- T19a (병후). 아래는 전부 sim 전용 가상값이거나 설계 출발값이다. 실측값이 아니다 ---
+    # --- T19a (병후). 아래는 sim 전용 가상값이거나 설계 출발값이다. 실측값이 아니다(tip_radius_m 한 줄만 실측) ---
     # 필수 항목이 비어 있으면 노드는 기동하되 START 를 INVALID_VALUE 로 거절하고 빠진 이름을 알려 준다(코드 예비값 없음).
     descend_speed_mps: 0.005         # 계약 이름. OP_DESCEND 속도
     slide_speed_mps: 0.010           # 계약 이름. OP_SLIDE 속도
