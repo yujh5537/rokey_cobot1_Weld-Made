@@ -73,6 +73,11 @@ function formatLogTime(timestampMs) {
   return new Date(timestampMs).toLocaleTimeString()
 }
 
+function formatNumber(value) {
+  return Number.isFinite(value)
+    ? value.toFixed(2)
+    : '-'
+}
 
 function formatScanLogMessage(payload) {
   const parts = []
@@ -119,9 +124,9 @@ function formatScanLogMessage(payload) {
       payload.pose.z_mm
 
     parts.push(
-      `좌표 X ${x.toFixed(2)} mm / ` +
-      `Y ${y.toFixed(2)} mm / ` +
-      `Z ${z.toFixed(2)} mm`
+      `좌표 X ${formatNumber(x)} mm / ` +
+      `Y ${formatNumber(y)} mm / ` +
+      `Z ${formatNumber(z)} mm`
     )
 
     if (payload.frame_id) {
@@ -893,11 +898,11 @@ function App() {
             <p>
               팁 위치:
               {' '}
-              X {tipPose.x.toFixed(2)} mm /
+              X {formatNumber(tipPose.x)} mm /
               {' '}
-              Y {tipPose.y.toFixed(2)} mm /
+              Y {formatNumber(tipPose.y)} mm /
               {' '}
-              Z {tipPose.z.toFixed(2)} mm
+              Z {formatNumber(tipPose.z)} mm
             </p>
           </>
         ) : (
@@ -950,6 +955,28 @@ function App() {
             <p>
               상태 코드: {command.status}
             </p>
+
+            {command.ack?.accepted === false &&
+              command.ack?.reason && (
+                <p>
+                  거절 사유: {command.ack.reason}
+                  {command.ack.reason_code != null &&
+                    ` (${command.ack.reason_code})`}
+                  {command.ack.detail &&
+                    ` — ${command.ack.detail}`}
+                </p>
+              )}
+
+            {command.status === 'FAILED' &&
+              command.result?.reason && (
+                <p>
+                  실패 사유: {command.result.reason}
+                  {command.result.reason_code != null &&
+                    ` (${command.result.reason_code})`}
+                  {command.result.detail &&
+                    ` — ${command.result.detail}`}
+                </p>
+              )}
 
             <p>
               Request ID: {command.requestId}
