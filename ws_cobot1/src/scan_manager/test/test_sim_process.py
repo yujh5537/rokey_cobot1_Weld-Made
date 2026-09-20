@@ -31,6 +31,7 @@ from sequence_helpers import isolated_ros_env  # noqa: E402
 
 os.environ.update(isolated_ros_env())  # 조 범위의 도메인 + LOCALHOST. rclpy.init 전에 건다
 
+from contact_scan_interfaces.action import Resume  # noqa: E402
 from contact_scan_interfaces.action import RunScan  # noqa: E402
 from contact_scan_interfaces.msg import ScanResult  # noqa: E402
 from contact_scan_interfaces.msg import ScanState  # noqa: E402
@@ -61,17 +62,14 @@ class SimProcess:
             params.pop('detect_latency_s', None)
             params_file = Path(result_dir).parent / 'sim_without_latency.yaml'
             params_file.write_text(yaml.safe_dump(data, allow_unicode=True), encoding='utf-8')
-        command = [
+        self._command = [
             sys.executable, '-c', 'from scan_manager.scan_manager import main; main()',
             '--ros-args', '--params-file', str(params_file), '-p', f'result_dir:={result_dir}']
         if with_latency:
-            command += ['-p', f'detect_latency_s:={TEST_LATENCY_S}']
-        self.process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=dict(os.environ))
-        self.lines, self._ready = [], threading.Event()
+            self._command += ['-p', f'detect_latency_s:={TEST_LATENCY_S}']
+        self.lines = []
         self._closed = False
-        self._reader = threading.Thread(target=self._read, daemon=True)
-        self._reader.start()
+        self.spawn()
 
         rclpy.init()
         self.peers = F.FakePeers(model={**params, 'detect_latency_s': TEST_LATENCY_S})
@@ -80,6 +78,7 @@ class SimProcess:
         self.client.create_subscription(ScanResult, '/scan/result', self.results.append, QOS_STATE)
         self.client.create_subscription(ScanState, '/scan/state', self.states.append, QOS_STATE)
         self.run_client = ActionClient(self.client, RunScan, '/scan/run')
+        self.resume_client = ActionClient(self.client, Resume, '/scan/resume')
         self.stop_client = self.client.create_client(StopScan, '/scan/stop')
         self.executor = MultiThreadedExecutor(num_threads=4)
         self.executor.add_node(self.peers)
@@ -92,11 +91,27 @@ class SimProcess:
         while not self._stop_spin.is_set():
             self.executor.spin_once(timeout_sec=0.05)
 
-    def _read(self):
-        for line in self.process.stderr:
+    def spawn(self):
+        """scan_manager 프로세스를 띄운다. 가짜 상대 노드(= 로봇)는 그대로 둔다."""
+        self.process = subprocess.Popen(
+            self._command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=dict(os.environ))
+        self._ready = threading.Event()
+        self._reader = threading.Thread(
+            target=self._read, args=(self.process, self._ready), daemon=True)
+        self._reader.start()
+
+    def kill_process(self):
+        """전원이 나간 것처럼 죽인다(SIGKILL). 종료 처리 · 큐에 남은 기록 쓰기는 돌지 않는다."""
+        self.process.kill()
+        self.process.wait(timeout=30.0)
+        self._reader.join(timeout=5.0)
+
+    def _read(self, process, ready):
+        for line in process.stderr:
             self.lines.append(line)
             if 'scan_manager 준비' in line:
-                self._ready.set()
+                ready.set()
 
     def log(self):
         return ''.join(self.lines)
@@ -107,26 +122,54 @@ class SimProcess:
             time.sleep(0.02)
         return condition()
 
-    def run_scan(self):
+    def wait_process_ready(self, client):
         assert self._ready.wait(TIMEOUT_S), self.log()
-        assert self.run_client.wait_for_server(timeout_sec=TIMEOUT_S)
+        assert client.wait_for_server(timeout_sec=TIMEOUT_S)
         # 다른 프로세스와 막 발견된 직후에 goal 을 보내면 응답이 버려질 수 있다(rclpy: "failed to send response
         # (timeout): client will not receive response"). 서버 쪽의 응답 경로까지 맞물리기를 기다린다.
-        assert self.wait(lambda: self.states), self.log()
+        seen = len(self.states)
+        assert self.wait(lambda: len(self.states) > seen), self.log()
         time.sleep(DISCOVERY_SETTLE_S)
-        # scan_manager 가 가짜 상대 노드의 /robot/status · /safety/status 를 받을 때까지 START 는 거절된다
+
+    def start_command(self, client, goal):
+        """goal 을 보내고 Result 의 future 를 돌려준다. 상태 미수신으로 거절되면 다시 보낸다.
+
+        scan_manager 가 가짜 상대 노드의 /robot/status · /safety/status 를 받을 때까지 START · RESUME 은 거절된다.
+        """
         deadline = time.monotonic() + TIMEOUT_S
         while True:
-            sent = self.run_client.send_goal_async(RunScan.Goal(request_id='sim-run'))
+            sent = client.send_goal_async(goal)
             assert self.wait(sent.done), self.log()
             done = sent.result().get_result_async()
-            assert self.wait(done.done), self.log()
+            if not self.wait(done.done, timeout_s=0.5):
+                return done   # 접수돼 돌고 있다
             result = done.result().result
             waiting_for_status = result.reason_code in (
                 Reason.SAFETY_LATCHED, Reason.ROBOT_DISCONNECTED) and '미수신' in result.detail
             if not waiting_for_status or time.monotonic() > deadline:
-                return result
+                return done
             time.sleep(0.1)
+
+    def result_of(self, done):
+        assert self.wait(done.done), self.log()
+        return done.result().result
+
+    def run_scan(self):
+        self.wait_process_ready(self.run_client)
+        return self.result_of(self.start_command(self.run_client, RunScan.Goal(request_id='sim-run')))
+
+    def stop_at_goal(self, n, client, goal):
+        """n 번째로 수락된 goal 이 도는 동안 /scan/stop 을 보낸다."""
+        self.peers.hold_goal = n
+        done = self.start_command(client, goal)
+        assert self.wait(lambda: len(self.peers.goals) >= n), self.log()
+        response = self.stop_client.call_async(
+            StopScan.Request(request_id='sim-stop', requester='fake_bridge', reason=200))
+        assert self.wait(response.done) and response.result().accepted, self.log()
+        result = self.result_of(done)
+        self.peers.hold_goal = None
+        assert result.reason_code == Reason.STOP_REQUESTED, (result.reason_code, result.detail)
+        return result
 
     def close(self):
         """SIGINT 두 번(launch 의 Ctrl-C). 종료 코드를 돌려준다."""
@@ -220,3 +263,66 @@ def test_sim_yaml_as_is_refuses_start_and_names_the_missing_value(sim):
     assert 'detect_latency_s' in result.detail
     assert rig.peers.goals == []
     assert rig.close() == 0, rig.log()
+
+
+# ---- 재시작 (T26) ----
+SLIDE_POS_X = 3   # 1 기준점, 2 하강, 3 +x 밀기
+
+
+def _progress(tmp_path, scan_id):
+    return json.loads((tmp_path / 'data' / scan_id / 'progress.json').read_text())
+
+
+def _assert_resumed_to_the_end(rig, tmp_path, stopped, result, top_before):
+    assert result.success, (result.reason_code, result.detail, rig.log())
+    assert result.scan_id == stopped.scan_id
+    shape = result.result
+    assert (shape.width, shape.length, shape.height) == pytest.approx(BOX_SIZE)
+    assert shape.z_top == pytest.approx(stopped.result.z_top)
+
+    progress = _progress(tmp_path, stopped.scan_id)
+    assert progress['state']['phase'] == 'DONE' and progress['result_saved'] is True
+    assert progress['measurements']['top'] == top_before        # 같은 판정 좌표 · 같은 stamp. 다시 재지 않았다
+    assert [i['phase'] for i in progress['interruptions']] == ['EDGE_SEARCH']
+    assert progress['interruptions'][0]['resumed_at'] is not None
+    saved = json.loads((tmp_path / 'data' / stopped.scan_id / 'result.json').read_text())
+    assert saved['shape']['success'] is True and saved['shape']['width'] == pytest.approx(0.10)
+
+    operations = [Operation(g.operation) for g in rig.peers.goals]
+    assert operations.count(Operation.DESCEND) == 1 and operations.count(Operation.HOME) == 1
+    assert [g.motion_id for g in rig.peers.goals] == list(range(1, len(operations) + 1))
+    assert len(rig.peers.tare_requests) == 2
+
+
+def test_stop_in_pos_x_then_resume_in_the_same_process(sim, tmp_path):
+    rig = sim()
+    rig.wait_process_ready(rig.run_client)
+    stopped = rig.stop_at_goal(SLIDE_POS_X, rig.run_client, RunScan.Goal(request_id='sim-run'))
+    top_before = _progress(tmp_path, stopped.scan_id)['measurements']['top']
+    assert top_before['valid'] and _progress(tmp_path, stopped.scan_id)['state']['phase'] == 'STOPPED'
+
+    result = rig.result_of(
+        rig.start_command(rig.resume_client, Resume.Goal(request_id='sim-resume', scan_id='')))
+
+    _assert_resumed_to_the_end(rig, tmp_path, stopped, result, top_before)
+    assert rig.close() == 0, rig.log()
+    assert 'Traceback' not in rig.log() and '[ERROR]' not in rig.log(), rig.log()
+
+
+def test_stop_in_pos_x_then_kill_the_process_then_resume_from_the_files(sim, tmp_path):
+    """중지한 뒤 scan_manager 가 죽었다 다시 뜬다. 메모리는 없고 progress.json 만 있다(이슈 #26 완료 조건 3)."""
+    rig = sim()
+    rig.wait_process_ready(rig.run_client)
+    stopped = rig.stop_at_goal(SLIDE_POS_X, rig.run_client, RunScan.Goal(request_id='sim-run'))
+    top_before = _progress(tmp_path, stopped.scan_id)['measurements']['top']
+
+    rig.kill_process()
+    rig.spawn()
+    rig.wait_process_ready(rig.resume_client)
+    result = rig.result_of(
+        rig.start_command(rig.resume_client, Resume.Goal(request_id='sim-resume', scan_id='')))
+
+    _assert_resumed_to_the_end(rig, tmp_path, stopped, result, top_before)
+    assert '기록에서 되돌렸다' in rig.log()
+    assert rig.close() == 0, rig.log()
+    assert 'Traceback' not in rig.log(), rig.log()

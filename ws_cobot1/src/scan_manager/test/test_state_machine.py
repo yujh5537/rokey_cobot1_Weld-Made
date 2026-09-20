@@ -185,3 +185,83 @@ def test_motion_id_is_cleared_at_rest():
 def test_start_requires_scan_id(sm):
     with pytest.raises(ValueError):
         sm.request(Command.START, conditions=READY)
+
+
+# ---- check() · restore() (T26) ----
+
+def test_check_gives_the_verdict_of_request_without_changing_anything(sm):
+    stopped = REACH[Phase.STOPPED](sm)
+    before = stopped.snapshot()
+    assert stopped.check(Command.RESUME, conditions=READY) == (Reason.OK, '')
+    assert stopped.check(Command.RESUME)[0] is Reason.SAFETY_LATCHED      # 조건 미수신
+    assert stopped.check(Command.RESUME, conditions=READY, scan_id='20990101-000000-0000')[0] \
+        is Reason.NO_RESUMABLE_SCAN
+    assert stopped.snapshot() == before
+    assert stopped.request(Command.RESUME, conditions=READY).accepted
+
+
+@pytest.mark.parametrize('phase', list(Phase))
+@pytest.mark.parametrize('command', list(Command))
+def test_check_agrees_with_request_in_every_phase(phase, command):
+    kwargs = {'conditions': READY, 'scan_id': '20260918-220000-0002' if command is Command.START else ''}
+    checked = REACH[phase](ScanStateMachine()).check(command, **kwargs)
+    outcome = REACH[phase](ScanStateMachine()).request(command, **kwargs)
+    assert checked == (outcome.reason, outcome.detail)
+
+
+def test_restore_rebuilds_a_stopped_scan_that_resumes_like_the_original():
+    original = _then(_stop(drive(ScanStateMachine(), 3)), Signal.STOP_CONFIRMED)   # EDGE_SEARCH 1/4 에서 중지
+    seen = []
+    restored = ScanStateMachine(on_change=seen.append)
+    snapshot = restored.restore(
+        scan_id=original.snapshot().scan_id, phase=Phase.STOPPED, progress=1,
+        resume_phase=Phase.EDGE_SEARCH)
+
+    assert snapshot == original.snapshot() and seen == [snapshot]
+    for machine in (original, restored):
+        assert machine.request(Command.RESUME, conditions=READY).accepted
+        state = machine.notify(Signal.RESUME_READY)
+        assert (state.phase, state.direction, state.progress) == (
+            Phase.EDGE_SEARCH, Direction.NEG_X, 1)
+
+
+def test_restore_keeps_the_facts_that_refuse_a_resume():
+    scan_id = '20260918-210000-0001'
+    moved = ScanStateMachine()
+    moved.restore(
+        scan_id=scan_id, phase=Phase.STOPPED, progress=2, resume_phase=Phase.EDGE_SEARCH,
+        moved_since_stop=True)
+    assert moved.check(Command.RESUME, conditions=READY)[0] is Reason.NOT_SUPPORTED
+
+    finished = ScanStateMachine()
+    finished.restore(scan_id=scan_id, phase=Phase.STOPPED, progress=4)     # 마무리 복귀 중의 중지
+    assert finished.check(Command.RESUME, conditions=READY)[0] is Reason.NO_RESUMABLE_SCAN
+
+    failed = ScanStateMachine()
+    failed.restore(scan_id=scan_id, phase=Phase.ERROR, progress=1)
+    assert failed.check(Command.RESUME, conditions=READY)[0] is Reason.NOT_SUPPORTED
+    assert failed.request(Command.HOME, conditions=READY).accepted         # 안전복귀는 된다
+
+
+@pytest.mark.parametrize('phase', [p for p in Phase if p is not Phase.IDLE])
+def test_restore_is_only_for_an_idle_machine(phase):
+    machine = REACH[phase](ScanStateMachine())
+    before = machine.snapshot()
+    with pytest.raises(ValueError):
+        machine.restore(scan_id='20260918-230000-0003', phase=Phase.STOPPED, progress=0)
+    assert machine.snapshot() == before
+
+
+@pytest.mark.parametrize('kwargs', [
+    {'phase': Phase.EDGE_SEARCH, 'progress': 0},                           # 동작 중인 phase 로는 되돌리지 않는다
+    {'phase': Phase.DONE, 'progress': 4},
+    {'phase': Phase.STOPPED, 'progress': 5},
+    {'phase': Phase.STOPPED, 'progress': 0, 'resume_phase': Phase.HOMING},
+    {'phase': Phase.ERROR, 'progress': 0, 'resume_phase': Phase.EDGE_SEARCH},
+    {'phase': Phase.STOPPED, 'progress': 0, 'scan_id': ''},
+])
+def test_restore_rejects_what_the_table_could_never_produce(sm, kwargs):
+    arguments = {'scan_id': '20260918-210000-0001', **kwargs}
+    with pytest.raises(ValueError):
+        sm.restore(**arguments)
+    assert sm.phase is Phase.IDLE and sm.snapshot().scan_id == ''

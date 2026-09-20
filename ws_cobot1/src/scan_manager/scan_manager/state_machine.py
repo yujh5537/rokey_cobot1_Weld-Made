@@ -13,6 +13,8 @@
 작업 중지 · 안전복귀 · 재시작은 서로 독립된 명령이다. STOP 은 STOPPING 으로만 가고,
 STOPPING 에서는 STOP_CONFIRMED(→ STOPPED) 와 FAILED(→ ERROR) 만 받는다.
 홈 복귀나 재시작으로 이어지는 전이는 표에 없다.
+
+restore() 는 입력이 아니다. 프로세스가 재시작된 뒤 기록의 휴지 상태를 되돌리는 입구이며 전이표를 거치지 않는다.
 """
 
 from dataclasses import dataclass
@@ -247,6 +249,61 @@ class ScanStateMachine:
             if changed:
                 self._emit()
             return Outcome(True, Reason.OK, '', changed, self.snapshot())
+
+    def check(
+        self,
+        command: Command,
+        *,
+        conditions: Optional[Conditions] = None,
+        scan_id: str = '',
+    ):
+        """request() 가 내릴 판정 (Reason, detail) 만 돌려준다. 상태는 바뀌지 않는다.
+
+        재시작은 접수 전에 기록을 읽어 계획을 세운다. 그 전에 상태 기계의 답을 먼저 알아야
+        거절될 요청이 RESUMING 에 들어가지 않는다.
+        """
+        with self._lock:
+            return self._check(Command(command), conditions or Conditions(), scan_id)
+
+    def restore(
+        self,
+        *,
+        scan_id: str,
+        phase: Phase,
+        progress: int,
+        resume_phase: Optional[Phase] = None,
+        moved_since_stop: bool = False,
+        failure: Optional[Failure] = None,
+    ) -> Snapshot:
+        """프로세스가 재시작된 뒤, 기록에 남은 휴지 상태(STOPPED · ERROR)로 되돌린다.
+
+        전이가 아니다. 이 프로세스가 죽지 않았다면 있었을 상태를 기록의 사실로 다시 만든다.
+        그 뒤의 HOME · RESUME 은 같은 프로세스에서 중지한 경우와 같은 판정을 받는다.
+        IDLE 에서만 부를 수 있다. 어떤 기록을 되돌릴지는 호출 측(resume.restoration_from)이 정한다.
+        """
+        phase = Phase(phase)
+        with self._lock:
+            if self._phase is not Phase.IDLE:
+                raise ValueError(f'phase={self._phase.name} 에서는 되돌릴 수 없다(IDLE 에서만)')
+            if phase not in (Phase.STOPPED, Phase.ERROR):
+                raise ValueError(f'되돌릴 수 있는 phase 는 STOPPED · ERROR 다({phase.name})')
+            if not scan_id:
+                raise ValueError('되돌릴 작업의 scan_id 가 필요하다')
+            if isinstance(progress, bool) or not 0 <= int(progress) <= self.progress_total:
+                raise ValueError(f'progress 가 0~{self.progress_total} 이 아니다({progress!r})')
+            if resume_phase is not None:
+                resume_phase = Phase(resume_phase)
+                if phase is not Phase.STOPPED or resume_phase not in RESUMABLE_PHASES:
+                    raise ValueError(
+                        f'재개 지점 {resume_phase.name} 은 phase={phase.name} 에 둘 수 없다')
+            self._scan_id = scan_id
+            self._progress = int(progress)
+            self._failure = failure
+            self._resume_phase = resume_phase
+            self._moved_since_stop = bool(moved_since_stop)
+            self._enter(phase)
+            self._emit()
+            return self.snapshot()
 
     def _check(self, command, conditions, scan_id):
         phase = self._phase

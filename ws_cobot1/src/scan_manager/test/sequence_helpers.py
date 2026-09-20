@@ -19,10 +19,12 @@ from scan_manager.result_store import Stamp
 from scan_manager.sequence import MatchedEvent
 from scan_manager.sequence import MotionResult
 from scan_manager.sequence import Ports
+from scan_manager.sequence import ResumePlan
 from scan_manager.sequence import StepOutcome
 from scan_manager.state_machine import Command
 from scan_manager.state_machine import Conditions
 from scan_manager.state_machine import InvalidTransition
+from scan_manager.state_machine import RESUMABLE_PHASES
 from scan_manager.state_machine import ScanStateMachine
 
 DOWN = (0.0, 1.0, 0.0, 0.0)
@@ -90,10 +92,13 @@ def edge_coordinate(direction, box_center=BOX_CENTER, box_size=BOX_SIZE):
 class FakePorts(Ports):
     """가상 직육면체 위의 가짜 로봇 + 실제 상태 기계. 부른 순서를 trace 에 남긴다."""
 
-    def __init__(self, params, direction_order=None):
+    def __init__(self, params, direction_order=None, on_change=None, start=True):
+        """start=False: 상태 기계를 IDLE 로 둔다(프로세스를 다시 띄운 직후)."""
         self.params = params
-        self.sm = ScanStateMachine(direction_order=direction_order or params.direction_order)
-        assert self.sm.request(Command.START, conditions=READY, scan_id=SCAN_ID).accepted
+        self.order = tuple(direction_order or params.direction_order)
+        self.sm = ScanStateMachine(direction_order=self.order, on_change=on_change)
+        if start:
+            assert self.sm.request(Command.START, conditions=READY, scan_id=SCAN_ID).accepted
         self.trace = []
         self.requests = []            # (motion_id, MotionRequest)
         self.position = HOME_POSITION
@@ -104,6 +109,10 @@ class FakePorts(Ports):
         self.failure = None           # (code, detail, position)
         self.stop_record = None       # (position, result, during_final_homing)
         self.geometry = None
+        self.republished = 0
+        self.resume_point = None      # 재개 지점이 되는 중지 직전의 Snapshot (result_store 의 resume_point 와 같은 규칙)
+        self.stop_snapshot = None     # 가장 최근 중지 직전의 Snapshot
+        self.resumed_at_request = 0
         self.infos = []
         self._event_ids = itertools.count(101)
         self._events = {}
@@ -112,8 +121,10 @@ class FakePorts(Ports):
         self.override = {}            # label → MotionResult | callable(request) → MotionResult
         self.drop_events = set()      # 이 label 의 이벤트는 끝내 오지 않는다
         self.stop_during = None       # 이 label 의 모션 도중에 /scan/stop 이 온다
+        self.stop_at_request = None   # n 번째(1 부터, 작업 전체에서 센다) 모션 도중에 /scan/stop 이 온다
         self.stop_after_event = None  # 이 label 의 측정값을 받은 직후에 /scan/stop 이 온다
-        self.stop_before_notify = None  # 이 Signal 을 알리기 직전에 /scan/stop 이 온다
+        self.stop_before_notify = None  # 이 Signal(또는 (Signal, n 번째))을 알리기 직전에 /scan/stop 이 온다
+        self._notify_counts = {}
         self.latch_after = None       # 이 label 의 모션이 끝난 직후에 안전 래치가 걸린다(모션 사이의 래치)
         self.still = True
         self.tare_outcome = StepOutcome(True)
@@ -123,9 +134,31 @@ class FakePorts(Ports):
     # -- 관제자 --
 
     def request_stop(self):
+        before = self.sm.snapshot()
         outcome = self.sm.request(Command.STOP)
         assert outcome.accepted
+        self.stop_snapshot = before
+        if outcome.changed and before.phase in RESUMABLE_PHASES:
+            self.resume_point = before   # RESUMING · HOMING 중의 중지는 재개 지점을 바꾸지 않는다
         self._stop = True
+
+    def resume(self) -> ResumePlan:
+        """관제자의 재시작을 접수하고 memory_plan() 을 돌려준다."""
+        assert self.sm.request(Command.RESUME, conditions=READY).accepted
+        self._stop = False
+        self.stop_during = self.stop_at_request = None
+        self.stop_after_event = self.stop_before_notify = None
+        self.resumed_at_request = len(self.requests)
+        return self.memory_plan()
+
+    def memory_plan(self) -> ResumePlan:
+        """가짜 "기록"(top · edges · stop_record · geometry)으로 만든 계획."""
+        point = self.resume_point
+        return ResumePlan(
+            phase=point.phase, progress=point.progress,
+            confirmed=tuple(d for d in self.order if d in self.edges),
+            first_contact_z=None if self.top is None else self.top.position_m[2],
+            position=self.stop_record[0], result_saved=self.geometry is not None)
 
     # -- Ports --
 
@@ -143,7 +176,7 @@ class FakePorts(Ports):
             injected = self.override.get(request.label)
             if injected is not None:
                 return injected(request) if callable(injected) else injected
-            if self.stop_during == request.label:
+            if self.stop_during == request.label or self.stop_at_request == len(self.requests):
                 self.request_stop()
                 return MotionResult(
                     reason=MotionReason.STOP_REQUESTED, reason_code=200, position=self.position)
@@ -215,7 +248,8 @@ class FakePorts(Ports):
         self.attempt_failures.append((target, reason_code, detail))
 
     def notify(self, signal):
-        if self.stop_before_notify == signal:
+        self._notify_counts[signal] = self._notify_counts.get(signal, 0) + 1
+        if self.stop_before_notify in (signal, (signal, self._notify_counts[signal])):
             self.request_stop()
         try:
             self.sm.notify(signal)
@@ -232,6 +266,12 @@ class FakePorts(Ports):
             return self.geometry_outcome
         self.geometry = geometry_adapter.compute_shape(
             self.top, self.edges, self.params, started_at=Stamp(1), finished_at=Stamp(2))
+        shape = self.geometry.shape
+        return StepOutcome(shape.success, shape.reason_code, shape.detail)
+
+    def republish_result(self):
+        self.trace.append(('republish_result',))
+        self.republished += 1
         shape = self.geometry.shape
         return StepOutcome(shape.success, shape.reason_code, shape.detail)
 
@@ -252,3 +292,6 @@ class FakePorts(Ports):
 
     def labels(self):
         return [request.label for _, request in self.requests]
+
+    def labels_since_resume(self):
+        return self.labels()[self.resumed_at_request:]

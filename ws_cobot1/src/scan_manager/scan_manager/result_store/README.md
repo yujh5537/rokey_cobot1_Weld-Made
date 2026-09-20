@@ -4,7 +4,7 @@
 중지 · 프로세스 종료 뒤에도 "어디까지 했고 무엇을 확정했는지"가 남아 있어야 재시작(4.4.8)이 기존 측정값을 유지한 채 이어 갈 수 있다.
 
 - `rclpy` · `contact_scan_interfaces` · `state_machine`을 import하지 않는 순수 Python이다. `contract_enums`(`Phase` · `Direction`)만 쓴다.
-- **사실만 기록한다.** 재시작을 허용할지는 판단하지 않는다(T26). 웹 전달 · DB 저장 여부도 기록하지 않는다(그것은 웹 쪽의 사실이다).
+- **사실만 기록한다.** 재시작을 허용할지는 판단하지 않는다(판단은 `scan_manager/resume.py`와 상태 기계). 웹 전달 · DB 저장 여부도 기록하지 않는다(그것은 웹 쪽의 사실이다).
 - 단위는 ROS 내부 단위(m · rad · N) 그대로다. mm 변환은 mqtt_bridge에서만 한다.
 - 기준은 `docs/contracts/ros-interfaces.md` v0.1.1이다. 파일 형식은 계약 9장의 TBD이며 아래는 그에 대한 안이다.
 
@@ -172,7 +172,7 @@ self._writer.submit(self._store.record_edge, scan_id, direction, measurement).re
 self._sm.notify(Signal.EDGE_FOUND)
 ```
 - `_begin_args`(config · frames · direction_order · started_at · node_params)는 `request(START)`를 부르기 **전에** 준비해 둔다. START가 거절되면 `on_change`가 불리지 않으므로 기록도 생기지 않는다.
-- 재시작으로 기존 작업을 이을 때는 `self._begun = record.scan_id`로 둔다(`begin_scan`을 다시 부르지 않는다).
+- 재시작으로 기존 작업을 이을 때는 `self._begun = record.scan_id`로 둔다(`begin_scan`을 다시 부르지 않는다). 노드는 기록에서 상태를 되돌릴 때(`_adopt_recorded_scan`) 그렇게 한다.
 - 이 연결은 `test/test_result_store_scenario.py`의 `SimScanManager`가 그대로 쓰며, 쓰기 스레드가 멈춰 있어도 STOP이 접수 · 확인되는 것을 테스트로 고정했다.
 
 ## 테스트
