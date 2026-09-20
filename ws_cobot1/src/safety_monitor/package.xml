@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>safety_monitor</name>
+  <version>0.1.0</version>
+  <description>소프트웨어 이상 감시(과대 외력 · 하강 제한 · 데이터 최신성) → 웹을 거치지 않는 정지 요청. 소유: 현지 (T18, T33)</description>
+  <maintainer email="yujh5537@users.noreply.github.com">yujh5537</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>contact_scan_interfaces</depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
