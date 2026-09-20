@@ -644,7 +644,9 @@ T01 회의에서 **담당 · 기한 없이 TBD로 두기로** 했다. 정해지�
   STANDBY(1)를 돌려줘 쓸 수 없었다(2026-09-20 실측: z 540.6 → 527.6으로 움직이는 동안 30회 모두 1).
   robot_manager는 최근 `moving_window_s`(0.3 s) 안의 TCP 위치 변화가 `moving_eps_m`(0.2 mm)를 넘으면
   이동 중으로 본다. 위치를 모르면 이동 중으로 본다(정지로 보고하면 scan_manager가 STOPPING에서 못 빠져나온다).
-  실기에서 `get_robot_state`가 제대로 동작하면 다시 본다. 두산 서비스 실제 이름은 `docs/env/api-check-log.md`
+  실기에서 `get_robot_state`가 제대로 동작하면 다시 본다. 두산 서비스 실제 이름은 `docs/env/api-check-log.md`.
+  **`moving_eps_m` · `moving_window_s`를 바꾸면 scan_manager의 정지 확인 지연(`STOPPING` → `STOPPED`)과
+  safety_monitor의 `stop_confirmed` 시점이 같이 바뀐다. 값을 고칠 때는 전원에게 알린다.**
 - 순응 · 힘 제어 **해제 호출이 실패했을 때** 무엇을 보고하는가(`ExecuteMotion.Result.compliance_released` · `reason_code` · `RobotStatus`의 두 플래그). 5.4절의 "항상 true 여야 한다"는 목표이며 실패 경로는 정해지지 않았다
 - 정지 시 `move_stop` → 순응 · 힘 제어 해제의 순서(4.1절). 순응이 켜진 채 급정지할 때의 반동을 실기에서 확인한 뒤 확정한다
 - 홈 복귀 경로 · 순서, 중단 위치 재접근 절차, 이상 상태별 재시작 허용 조건
