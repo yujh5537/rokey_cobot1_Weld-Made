@@ -1,11 +1,23 @@
 """robot_manager 노드 테스트 (T15).
 
-두산 드라이버(dsr_msgs2)가 없으면 건너뛴다. CI에는 드라이버가 없다.
+두산 드라이버(dsr_msgs2)가 없는 개인 PC 에서는 건너뛴다. **CI 에는 dsr_msgs2 를 고정 커밋으로
+빌드해 넣으므로 반드시 돌아야 하고**, 없으면 건너뛰지 않고 실패한다.
 여기서는 **드라이버가 없을 때의 동작**을 본다. 실기·Virtual 동작은 PR 본문에 따로 적는다.
 """
+import importlib.util
+import os
+
 import pytest
 
-pytest.importorskip('dsr_msgs2', reason='두산 드라이버가 없는 환경(CI)에서는 건너뛴다')
+# CI 에는 dsr_msgs2 를 고정 커밋으로 빌드해 넣는다(.github/workflows/ci.yml). 없는데 조용히
+# 건너뛰면 실기에서 로봇을 움직이는 코드가 검증 밖에 있게 되므로, CI 에서는 실패로 만든다.
+# 드라이버가 없는 개인 PC 에서는 그대로 건너뛴다.
+if importlib.util.find_spec('dsr_msgs2') is None:
+    if os.environ.get('CI'):
+        raise AssertionError(
+            'CI 인데 dsr_msgs2 가 없다. 이 파일이 통째로 건너뛰어지면 robot_manager 노드 시험이 '
+            '한 건도 돌지 않는다. .github/workflows/ci.yml 의 "dsr_msgs2 빌드" 단계를 확인한다')
+    pytest.skip('두산 드라이버가 없는 환경에서는 건너뛴다', allow_module_level=True)
 
 import rclpy  # noqa: E402
 from contact_scan_interfaces.msg import RobotSample, RobotStatus  # noqa: E402
