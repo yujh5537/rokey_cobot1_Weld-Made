@@ -4,14 +4,24 @@
   1. tare: 무접촉 · 정지 상태의 외력 평균을 기준값 F0 로 저장한다 (TareAccumulator)
   2. 접촉 발생(CONTACT): OP_DESCEND 중 |F - F0| 가 임계를 넘는 샘플이 연속 N 회면 확정한다
   3. 과대 외력(OVER_FORCE): 모든 동작에서 원시 |F| 로 판정한다. 영점에 의존하지 않는다
+  4. 접촉 소실(EDGE): OP_SLIDE 중 누르는 힘이 확인된 뒤, TCP z 가 최근 구간의 추세선보다
+     edge_drop_m 넘게 내려간 샘플이 연속 N 회면 확정한다 (BRD 4.1.2 의 주 신호)
 
-접촉 소실(EDGE) 판정은 아직 없다.
+EDGE 를 "밀기 시작 z 대비 누적 하강량"으로 재지 않는 이유 — 모서리가 아닌데도 z 가 내려가는 경우가 셋 있다:
+  - SLIDE 는 접촉면 위 틈(recontact_margin_m)에서 시작해 목표 힘이 그 틈을 메운다 (계약 7.3)
+  - 윗면이 기울어 있으면 미는 동안 z 가 단조로 내려간다 (0.87° 면 80 mm 에 1.2 mm, PR #75 리뷰)
+  - 탐침이 홀더 안으로 서서히 밀려 들어가면 같은 힘을 유지하려고 로봇이 그만큼 더 내려간다 (PR #80)
+그래서 (a) |F - F0| 가 edge_arm_force_n 을 넘어 "누르고 있다"가 확인된 뒤부터만 판정하고,
+(b) 기준을 최근 edge_trend_window_s 구간의 z 직선 맞춤으로 둔다. 천천히 내려가는 것은 추세에 흡수된다.
+한 번에 툭 내려앉는 것(모서리, 그리고 탐침이 갑자기 미끄러지는 것)만 남는다. 뒤의 것은 소프트웨어로 가를 수 없다.
+외력 감소(보조 신호)는 쓰지 않는다.
 
 단위: m · N · s. 수치(임계 · 횟수)는 전부 DetectorConfig 로 받는다. 이 파일에 기본값을 두지 않는다.
 """
 import math
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from collections import deque
+from typing import Deque, List, Optional, Tuple
 
 # RobotSample.OP_* (ros-interfaces.md 3.1). 번호는 계약이다
 OP_NONE = 0
@@ -61,6 +71,21 @@ class DetectorConfig:
 
 
 @dataclass(frozen=True)
+class EdgeConfig:
+    edge_drop_m: float              # 추세선 대비 이만큼 넘게 내려가면 접촉 소실 조건 성립
+    debounce_n: int                 # EDGE 를 확정하는 연속 횟수. 누름 확인에도 같은 횟수를 쓴다
+    arm_force_n: float              # |F - F0| 가 이 값을 넘으면 "누르고 있다"로 본다. 그 뒤부터 EDGE 를 판정한다
+    trend_window_s: float           # 추세선을 맞추는 최근 구간의 길이
+    trend_min_samples: int          # 구간 안의 샘플이 이보다 적으면 판정하지 않는다
+
+    def __post_init__(self):
+        if not (self.edge_drop_m > 0 and self.arm_force_n > 0 and self.trend_window_s > 0):
+            raise ValueError('edge_drop_m, arm_force_n, trend_window_s 는 0 보다 커야 한다')
+        if self.debounce_n < 1 or self.trend_min_samples < 2:
+            raise ValueError('debounce_n 은 1 이상, trend_min_samples 는 2 이상이어야 한다')
+
+
+@dataclass(frozen=True)
 class Detection:
     """확정된 판정 1건.
 
@@ -75,8 +100,9 @@ class Detection:
     type: int
     sample: Sample
     first_sample: Sample
-    force_delta_n: float          # CONTACT: |F - F0|, OVER_FORCE: 원시 |F|
+    force_delta_n: float          # 확정 샘플의 값. CONTACT · EDGE: |F - F0|, OVER_FORCE: 원시 |F|
     debounce_count: int
+    z_drop_m: Optional[float] = None   # EDGE 만. first_sample 에서 추세선보다 내려간 양 (편향 보정의 δ)
 
     @property
     def debounce_delay_s(self) -> float:
@@ -104,17 +130,75 @@ class _Run:
         self.first = None
 
 
-class ContactDetector:
-    """샘플을 하나씩 받아 확정된 판정을 돌려준다. 상태는 이 객체 안에만 있다."""
+class _Trend:
+    """최근 구간의 (시각, z) 를 직선으로 맞춰 지금 시각의 z 를 예측한다."""
 
-    def __init__(self, config: DetectorConfig):
+    def __init__(self, window_s: float, min_samples: int):
+        self.window_s = window_s
+        self.min_samples = min_samples
+        self.points: Deque[Tuple[float, float]] = deque()
+
+    def add(self, t: float, z: float):
+        self.points.append((t, z))
+
+    def clear(self):
+        self.points.clear()
+
+    def predict(self, t: float) -> Optional[float]:
+        # 구간은 지금 시각이 아니라 마지막으로 들어온 점에서 거꾸로 잰다. 점이 들어오지 않는 동안(기준선을 얼린 동안,
+        # 최근 샘플을 기다리게 하는 동안)에는 구간이 줄지 않는다. 지금 시각에서 재면 debounce_n 을 키울수록
+        # 구간 안의 점이 모자라 EDGE 가 조용히 나오지 않게 된다
+        while self.points and self.points[0][0] < self.points[-1][0] - self.window_s:
+            self.points.popleft()
+        n = len(self.points)
+        if n < self.min_samples:
+            return None
+        mean_t = sum(p[0] for p in self.points) / n
+        mean_z = sum(p[1] for p in self.points) / n
+        var_t = sum((p[0] - mean_t) ** 2 for p in self.points)
+        if var_t <= 0.0:
+            return None
+        slope = sum((p[0] - mean_t) * (p[1] - mean_z) for p in self.points) / var_t
+        return mean_z + slope * (t - mean_t)
+
+
+class ContactDetector:
+    """샘플을 하나씩 받아 확정된 판정을 돌려준다. 상태는 이 객체 안에만 있다.
+
+    edge_config 가 None 이면 EDGE 를 판정하지 않는다.
+    """
+
+    def __init__(self, config: DetectorConfig, edge_config: Optional[EdgeConfig] = None):
         self.config = config
+        self.edge_config = edge_config
         self.baseline: Optional[Vector3] = None      # F0. None = tare 전
         self._contact_run = _Run()
         self._over_run = _Run()
         self._motion_id = 0
         self._contact_latched = False                # 한 motion_id 에서 CONTACT 는 1 회만
         self._over_latched = False                   # 과대 외력 구간마다 1 회만
+        self._arm_run = _Run()
+        self._edge_run = _Run()
+        self._edge_armed = False                     # 이 동작에서 누름이 확인됐다
+        self._edge_latched = False                   # 한 motion_id 에서 EDGE 는 1 회만
+        self._edge_first_drop: Optional[float] = None
+        self._pending: Deque[Tuple[float, float]] = deque()   # 아직 추세선에 넣지 않은 최근 샘플
+        self._trend = (_Trend(edge_config.trend_window_s, edge_config.trend_min_samples)
+                       if edge_config else None)
+
+    @property
+    def edge_armed(self) -> bool:
+        return self._edge_armed
+
+    def _reset_edge(self):
+        self._arm_run.reset()
+        self._edge_run.reset()
+        self._edge_armed = False
+        self._edge_latched = False
+        self._edge_first_drop = None
+        self._pending.clear()
+        if self._trend:
+            self._trend.clear()
 
     def set_baseline(self, baseline: Optional[Vector3]):
         self.baseline = baseline
@@ -129,6 +213,7 @@ class ContactDetector:
             self._motion_id = sample.motion_id
             self._contact_run.reset()
             self._contact_latched = False
+            self._reset_edge()
 
         detections = []
         over = self._update_over_force(sample)
@@ -137,6 +222,9 @@ class ContactDetector:
         contact = self._update_contact(sample)
         if contact:
             detections.append(contact)
+        edge = self._update_edge(sample)
+        if edge:
+            detections.append(edge)
         return detections
 
     def _update_over_force(self, sample: Sample) -> Optional[Detection]:
@@ -164,6 +252,41 @@ class ContactDetector:
             return None
         self._contact_latched = True
         return Detection(TYPE_CONTACT, sample, self._contact_run.first, delta, count)
+
+    def _update_edge(self, sample: Sample) -> Optional[Detection]:
+        cfg = self.edge_config
+        if cfg is None:
+            return None
+        if sample.operation != OP_SLIDE or self.baseline is None:
+            self._reset_edge()
+            return None
+
+        t, z = sample.pose_stamp, sample.position[2]
+        if not self._edge_armed:
+            # 틈을 메우며 내려가는 동안에는 판정하지 않는다. 누르는 힘이 확인된 뒤의 z 만 기준선에 쓴다
+            if self._arm_run.update(self.force_delta(sample) > cfg.arm_force_n, sample) >= cfg.debounce_n:
+                self._edge_armed = True
+                self._pending.append((t, z))
+            return None
+
+        predicted = self._trend.predict(t)
+        drop = None if predicted is None else predicted - z
+        count = self._edge_run.update(drop is not None and drop > cfg.edge_drop_m, sample)
+        if count == 0:
+            # 최근 debounce_n 개는 추세선에 넣지 않고 기다리게 한다. 임계에 못 미친 채 내려앉기 시작한 샘플이
+            # 기준선을 끌고 내려가면 하강량이 작게 나온다. 조건이 성립한 동안에는 아무것도 넣지 않는다(기준선을 얼린다)
+            self._pending.append((t, z))
+            while len(self._pending) > cfg.debounce_n:
+                self._trend.add(*self._pending.popleft())
+            if self._motion_id == 0:
+                self._edge_latched = False           # CONTACT 와 같은 이유 (motion_id 0 = 동작 경계를 모른다)
+        elif count == 1:
+            self._edge_first_drop = drop
+        if self._edge_latched or count < cfg.debounce_n:
+            return None
+        self._edge_latched = True
+        return Detection(TYPE_EDGE, sample, self._edge_run.first, self.force_delta(sample), count,
+                         z_drop_m=self._edge_first_drop)
 
     def force_delta(self, sample: Sample) -> float:
         """|F - F0|. 성분별로 뺀 뒤 크기를 구한다 (크기끼리 빼지 않는다)."""

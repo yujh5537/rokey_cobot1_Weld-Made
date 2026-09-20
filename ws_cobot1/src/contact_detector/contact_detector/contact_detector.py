@@ -1,48 +1,274 @@
-"""contact_detector 노드.
+"""contact_detector 노드 (계약: docs/contracts/ros-interfaces.md 2.1 · 3.3 · 4.2).
 
-지금은 골격이다: 파라미터를 읽어 검증하고 판정기(detector_core.ContactDetector)를 만든다.
-/robot/sample 구독, /contact/event 발행, /contact/tare 서비스는 아직 없다.
+    /robot/sample (RobotSample, SENSOR) → 판정(detector_core) → /contact/event (ContactEvent, EVENT)
+    /scan/state  (ScanState, STATE)     → scan_id 태깅에만 쓴다
+    /contact/tare (TareForce)           → 무접촉 · 정지 구간의 외력 평균을 기준값 F0 로 저장
 
-파라미터에 코드 기본값을 두지 않는다(CLAUDE.md 규칙 7). 값은 contact_scan_bringup/config/*.yaml 에서 온다.
-값이 없으면 기동하지 않는다.
+- 판정 로직은 detector_core 에 있다. 이 파일은 메시지 ↔ Sample 변환, 발행, 서비스만 맡는다.
+- 이벤트에 싣는 값(3.3절 v0.1.5): 좌표 · 시각 · 외력 · sample_id · z_drop_m 은 조건이 처음 성립한 샘플,
+  detect_stamp · force_delta_n 은 확정 샘플.
+- 파라미터에 코드 기본값을 두지 않는다(CLAUDE.md 규칙 7). 값이 없으면 기동하지 않는다.
+- 이 노드는 로봇을 움직이지 않는다. 두산 API 를 부르지 않는다.
+- source = 'sim' 의 가상 직육면체는 아직 없다. 지금은 두 입력원 모두 샘플의 외력 · 위치를 그대로 판정한다.
 """
+import math
+import threading
+import time
+from collections import OrderedDict
+
 import rclpy
+from contact_scan_interfaces.msg import ContactEvent, ReasonCode, RobotSample, ScanState
+from contact_scan_interfaces.srv import TareForce
+from contact_scan_qos import QOS_EVENT, QOS_SENSOR, QOS_STATE
+from rcl_interfaces.msg import SetParametersResult
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from rclpy.task import Future
 
-from contact_detector.detector_core import ContactDetector, DetectorConfig
+from contact_detector.detector_core import (
+    ContactDetector,
+    DetectorConfig,
+    EdgeConfig,
+    OP_DESCEND,
+    OP_SLIDE,
+    Sample,
+    TARE_NO_SAMPLE,
+    TARE_TOO_FEW,
+    TARE_TOOL_REG_SUSPECT,
+    TARE_UNSTABLE,
+    TareAccumulator,
+    TareConfig,
+    TYPE_EDGE,
+)
 
 SOURCES = ('sim', 'robot_force')
+KEPT_MESSAGES = 256          # 판정 샘플의 원본 메시지를 찾으려고 들고 있는 최근 샘플 수 (약 6 s 분량)
+WARN_PERIOD_S = 2.0          # 같은 경고를 되풀이하는 최소 간격
+
+PARAMS = {
+    'source': Parameter.Type.STRING,
+    'contact_threshold_n': Parameter.Type.DOUBLE,      # 계약 이름 (6.4). SetConfig 가 실행 중에 바꾼다
+    'edge_drop_m': Parameter.Type.DOUBLE,              # 계약 이름
+    'debounce_n': Parameter.Type.INTEGER,              # 계약 이름
+    'over_force_n': Parameter.Type.DOUBLE,             # 계약 이름
+    'over_force_debounce_n': Parameter.Type.INTEGER,
+    'edge_arm_force_n': Parameter.Type.DOUBLE,
+    'edge_trend_window_s': Parameter.Type.DOUBLE,
+    'edge_trend_min_samples': Parameter.Type.INTEGER,
+    'stale_age_ms': Parameter.Type.INTEGER,
+    'tare_duration_s': Parameter.Type.DOUBLE,
+    'tare_min_samples': Parameter.Type.INTEGER,
+    'tare_max_std_n': Parameter.Type.DOUBLE,
+    'tare_max_force_n': Parameter.Type.DOUBLE,
+}
+
+TARE_REASON = {
+    TARE_NO_SAMPLE: ReasonCode.NO_SAMPLE,
+    TARE_TOO_FEW: ReasonCode.TARE_TIMEOUT,
+    TARE_UNSTABLE: ReasonCode.TARE_UNSTABLE,
+    TARE_TOOL_REG_SUSPECT: ReasonCode.TOOL_REG_SUSPECT,
+}
+
+
+def stamp_s(stamp) -> float:
+    return stamp.sec + stamp.nanosec * 1e-9
+
+
+def _nan_if_none(value) -> float:
+    return math.nan if value is None else float(value)
 
 
 class ContactDetectorNode(Node):
 
     def __init__(self, **kwargs):
         super().__init__('contact_detector', **kwargs)
-        self.source = self._required('source', Parameter.Type.STRING)
+        self.values = {name: self._required(name, kind) for name, kind in PARAMS.items()}
+        self.source = self.values['source']
         if self.source not in SOURCES:
             raise ValueError(f"source='{self.source}' 는 지원하지 않는다. {' | '.join(SOURCES)} 중에서 고른다")
 
-        self.detector = ContactDetector(DetectorConfig(
-            contact_threshold_n=self._required('contact_threshold_n', Parameter.Type.DOUBLE),
-            debounce_n=self._required('debounce_n', Parameter.Type.INTEGER),
-            over_force_n=self._required('over_force_n', Parameter.Type.DOUBLE),
-            over_force_debounce_n=self._required('over_force_debounce_n', Parameter.Type.INTEGER),
-        ))
-        self.edge_drop_m = self._required('edge_drop_m', Parameter.Type.DOUBLE)
+        self.lock = threading.Lock()                 # 다중 스레드 executor 에 올려도 판정 상태가 깨지지 않게 한다
+        self.detector = ContactDetector(*self._configs(self.values))
+        self.tare = None                             # 수집 중인 TareAccumulator. 평소에는 None
+        self.messages = OrderedDict()                # sample_id → RobotSample
+        self.scan_id = ''
+        self.event_id = 0
+        self.last_force_stamp = None
+        self.last_warn = {}
 
-        c = self.detector.config
-        self.get_logger().info(
-            f'source={self.source} contact_threshold_n={c.contact_threshold_n} debounce_n={c.debounce_n} '
-            f'over_force_n={c.over_force_n} over_force_debounce_n={c.over_force_debounce_n} '
-            f'edge_drop_m={self.edge_drop_m}')
+        self.publisher = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
+        self.create_subscription(RobotSample, '/robot/sample', self.on_sample, QOS_SENSOR)
+        self.create_subscription(ScanState, '/scan/state', self.on_scan_state, QOS_STATE)
+        # tare 는 구간이 끝날 때까지 기다리는 코루틴이다. 기다리는 동안 그 콜백 그룹은 '실행 중'으로 잡히므로,
+        # 서비스와 그 타이머를 샘플 구독(기본 그룹)과 다른 그룹에 둔다. 같은 그룹이면 샘플도 타이머도 돌지 못한다
+        self.tare_timer_group = MutuallyExclusiveCallbackGroup()
+        self.create_service(TareForce, '/contact/tare', self.on_tare,
+                            callback_group=MutuallyExclusiveCallbackGroup())
+        self.add_on_set_parameters_callback(self.on_set_parameters)
 
-    def _required(self, name, param_type):
-        value = self.declare_parameter(name, param_type).value
+        if self.source == 'sim':
+            self.get_logger().warn('source=sim 의 가상 직육면체는 아직 없다. 샘플의 외력 · 위치를 그대로 판정한다')
+        self.get_logger().info(' '.join(f'{k}={v}' for k, v in self.values.items()))
+
+    # ---------------------------------------------------------------- 파라미터
+
+    def _required(self, name, kind):
+        value = self.declare_parameter(name, kind).value
         if value is None:
             raise ValueError(f"파라미터 '{name}' 값이 없다. contact_scan_bringup/config/*.yaml 의 contact_detector 절을 확인한다")
         return value
+
+    @staticmethod
+    def _configs(v):
+        return (
+            DetectorConfig(v['contact_threshold_n'], v['debounce_n'], v['over_force_n'], v['over_force_debounce_n']),
+            EdgeConfig(v['edge_drop_m'], v['debounce_n'], v['edge_arm_force_n'],
+                       v['edge_trend_window_s'], v['edge_trend_min_samples']),
+        )
+
+    def on_set_parameters(self, params):
+        """SetConfig 전파(계약 2.4 P02). 범위를 벗어나면 거절한다. 기준값 F0 는 유지한다."""
+        changed = dict(self.values)
+        for p in params:
+            if p.name == 'source':
+                return SetParametersResult(successful=False, reason='source 는 실행 중에 바꾸지 않는다')
+            if p.name in changed:
+                changed[p.name] = p.value
+        try:
+            config, edge_config = self._configs(changed)
+            if changed['stale_age_ms'] <= 0:
+                raise ValueError('stale_age_ms 는 0 보다 커야 한다')
+        except (TypeError, ValueError) as e:
+            return SetParametersResult(successful=False, reason=str(e))
+        with self.lock:
+            baseline = self.detector.baseline
+            self.detector = ContactDetector(config, edge_config)
+            self.detector.set_baseline(baseline)
+            self.values = changed
+        return SetParametersResult(successful=True)
+
+    # ---------------------------------------------------------------- 구독
+
+    def on_scan_state(self, msg):
+        self.scan_id = msg.scan_id
+
+    def on_sample(self, msg):
+        now_s = self.get_clock().now().nanoseconds * 1e-9
+        force_s, pose_s = stamp_s(msg.force_stamp), stamp_s(msg.pose_stamp)
+        limit_s = self.values['stale_age_ms'] * 1e-3
+
+        # 샘플 간격 감시. 판정은 바꾸지 않고 알리기만 한다 (샘플이 비는 동안에는 접촉도 하강도 볼 수 없다)
+        if msg.valid and self.last_force_stamp is not None and force_s - self.last_force_stamp > limit_s:
+            self.warn('gap', f'샘플 간격 {1000 * (force_s - self.last_force_stamp):.0f} ms > stale_age_ms')
+        if msg.valid:
+            self.last_force_stamp = force_s
+
+        # 오래된 샘플은 버린다 (계약 3.1)
+        if msg.valid and now_s - max(force_s, pose_s) > limit_s:
+            self.warn('stale', f'샘플이 {1000 * (now_s - max(force_s, pose_s)):.0f} ms 묵었다. 버린다')
+            return
+        if msg.valid and msg.motion_id == 0 and msg.operation in (OP_DESCEND, OP_SLIDE):
+            self.warn('motion_id', 'DESCEND · SLIDE 인데 motion_id 가 0 이다. robot_manager 는 이 이벤트로 정지하지 않는다')
+
+        sample = Sample(
+            sample_id=msg.sample_id, pose_stamp=pose_s, force_stamp=force_s,
+            position=(msg.pose.position.x, msg.pose.position.y, msg.pose.position.z),
+            force=(msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z),
+            valid=msg.valid, motion_id=msg.motion_id, operation=msg.operation)
+
+        with self.lock:
+            self.messages[msg.sample_id] = msg
+            while len(self.messages) > KEPT_MESSAGES:
+                self.messages.popitem(last=False)
+            if self.tare is not None:
+                self.tare.add(sample)
+            detections = self.detector.update(sample)
+            if msg.valid and msg.operation == OP_SLIDE and self.detector.baseline is None:
+                self.warn('no_tare', 'SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다')
+            events = [self.to_event(d) for d in detections]
+        for event in events:
+            self.publisher.publish(event)
+
+    def warn(self, key, text):
+        now = time.monotonic()
+        if now - self.last_warn.get(key, -math.inf) >= WARN_PERIOD_S:
+            self.last_warn[key] = now
+            self.get_logger().warn(text)
+
+    def to_event(self, detection) -> ContactEvent:
+        first = self.messages.get(detection.first_sample.sample_id)
+        confirm = self.messages.get(detection.sample.sample_id)
+        self.event_id += 1
+        event = ContactEvent()
+        event.event_id = self.event_id
+        event.scan_id = self.scan_id
+        event.type = detection.type
+        event.source = self.source
+        # 판정 샘플 = 조건이 처음 성립한 샘플
+        event.motion_id = first.motion_id
+        event.sample_id = first.sample_id
+        event.frame_id = first.frame_id
+        event.pose = first.pose
+        event.wrench = first.wrench
+        event.pose_stamp = first.pose_stamp
+        event.force_stamp = first.force_stamp
+        event.z_drop_valid = detection.type == TYPE_EDGE and detection.z_drop_m is not None
+        event.z_drop_m = float(detection.z_drop_m) if event.z_drop_valid else math.nan
+        # 확정 샘플
+        event.detect_stamp = confirm.force_stamp
+        event.force_delta_n = float(detection.force_delta_n)
+        event.debounce_count = detection.debounce_count
+        return event
+
+    # ---------------------------------------------------------------- tare
+
+    async def on_tare(self, request, response):
+        duration_s = request.duration_s if request.duration_s > 0 else self.values['tare_duration_s']
+        with self.lock:
+            busy = self.tare is not None
+            if not busy:
+                self.tare = TareAccumulator(TareConfig(
+                    self.values['tare_min_samples'], self.values['tare_max_std_n'], self.values['tare_max_force_n']))
+        if busy:
+            response.success = False
+            response.error = ReasonCode.BUSY
+            response.detail = 'tare 가 이미 진행 중이다'
+            return response
+
+        # 구간이 끝날 때까지 기다린다. sleep 으로 기다리면 그동안 샘플 콜백이 돌지 못해 모을 샘플이 없다.
+        # 코루틴으로 기다리면 executor 가 그사이 다른 콜백을 돌린다
+        finished = Future(executor=self.executor)
+        timer = self.create_timer(duration_s, lambda: finished.done() or finished.set_result(True),
+                                  callback_group=self.tare_timer_group)
+        try:
+            await finished
+        finally:
+            timer.cancel()
+            self.destroy_timer(timer)
+        with self.lock:
+            result, self.tare = self.tare.result(), None
+            if result.success:
+                self.detector.set_baseline(result.baseline)
+
+        response.success = result.success
+        response.error = ReasonCode.OK if result.success else TARE_REASON.get(result.error, ReasonCode.TARE_FAILED)
+        response.sample_count = result.sample_count
+        response.baseline_norm_n = _nan_if_none(result.baseline_norm_n)
+        response.std_norm_n = _nan_if_none(result.std_norm_n)
+        for axis in 'xyz':                           # 토크 기준값은 쓰지 않는다. 0 이 아니라 NaN 으로 둔다
+            setattr(response.offset.torque, axis, math.nan)
+        if result.baseline is not None:
+            response.offset.force.x, response.offset.force.y, response.offset.force.z = result.baseline
+        else:
+            for axis in 'xyz':
+                setattr(response.offset.force, axis, math.nan)
+        rms = _nan_if_none(result.std_vector_n)
+        response.detail = (f'{result.error or "OK"}: {result.sample_count} samples / {duration_s:.2f} s, '
+                           f'|F0| {response.baseline_norm_n:.2f} N, |F-F0| rms {rms:.3f} N')
+        self.get_logger().info(f'tare {response.detail}' + ('' if result.success else ' → 기준값을 바꾸지 않았다'))
+        return response
 
 
 def main(args=None):
