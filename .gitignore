@@ -41,3 +41,6 @@ CLAUDE.local.md
 
 # 강의안 파생 자료 (공개 레포 제외, 로컬 보관)
 /docs/_local/
+
+# 개인 작업 링크 (레포에 올리지 않는다)
+ws_cobot1/src/qt_hmi
