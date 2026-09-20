@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
-"""무접촉 정지 상태의 외력 측정 (T02, BRD 4.1.5).
+"""무접촉 정지 상태의 외력 측정과 샘플 기록 (T02 BRD 4.1.5, T08 · T24 TR-01).
 
-조회만 한다. 로봇을 움직이는 서비스는 부르지 않는다.
-현재 툴·TCP 이름, 현재 TCP 위치, 외력(get_tool_force)을 N번 읽어 요약한다.
+조회만 한다. 로봇을 움직이는 서비스는 부르지 않는다. 하강은 사람이 따로 시킨다.
+현재 툴·TCP 이름, 현재 TCP 위치, 외력(get_tool_force)을 N번 읽어 요약하고,
+`--csv`를 주면 샘플마다 위치·힘을 파일로 남긴다.
 
     sod && sodvir (또는 sodreal)      # 다른 터미널에서 브링업
     sod
     python3 docs/env/measure_idle_force.py --pose home --samples 50 --interval 0.1
+
+    # ① 정지 · 무접촉 30초
+    python3 docs/env/measure_idle_force.py --pose home --duration 30 --interval 0.02 \
+        --csv idle_30s.csv
+    # ② 정지 2초 → 저속 하강 → 접촉 → 정지 (하강은 사람이 시킨다)
+    python3 docs/env/measure_idle_force.py --pose origin_above --duration 30 --interval 0 \
+        --csv descend_01.csv
+
+`--csv` 형식은 `contact_detector`의 오프라인 분석기(`analyze_samples`)가 읽는 형식이다.
+
+    t_pose_s,t_force_s,x_mm,y_mm,z_mm,fx_n,fy_n,fz_n,valid
+
+- `t_*_s`: 각 조회의 **응답을 받은 시각** [s]. 기록 시작이 0인 같은 시계다
+- 위치는 `get_current_posx(ref=DR_BASE)`의 x · y · z [mm], 힘은 `get_tool_force(ref=DR_BASE)`의 Fx · Fy · Fz [N]
+- `valid`: 위치와 힘을 모두 제대로 받은 줄만 1이다. 실패한 줄은 숫자 칸을 비우고 `valid=0`으로 남긴다
 
 실패한 조회는 0으로 채우지 않고 invalid로 센다(CLAUDE.md 규칙 4).
 
@@ -32,7 +48,10 @@ def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument('--pose', required=True, help='측정 자세 이름 (기록용, 예: home, origin_above)')
     p.add_argument('--samples', type=int, default=50)
-    p.add_argument('--interval', type=float, default=0.1, help='조회 간격 [s]')
+    p.add_argument('--duration', type=float, default=None,
+                   help='기록 시간 [s]. 주면 --samples 대신 이 시간 동안 읽는다')
+    p.add_argument('--interval', type=float, default=0.1, help='조회 간격 [s]. 0이면 쉬지 않고 읽는다')
+    p.add_argument('--csv', help='샘플을 기록할 파일. 주면 샘플마다 위치도 같이 읽는다')
     p.add_argument('--ref', choices=tuple(REF), default='base', help='힘 기준 좌표계')
     p.add_argument('--timeout', type=float, default=1.5, help='조회 1회 시간 제한 [s]')
     p.add_argument('--retries', type=int, default=3, help='응답이 없을 때 다시 보내는 횟수')
@@ -60,6 +79,43 @@ class Caller:
         return None
 
 
+def read_posx(res):
+    """응답에서 x · y · z [mm]를 꺼낸다. 실패하면 None (0으로 채우지 않는다)."""
+    if not (res and res.success and res.task_pos_info):
+        return None
+    xyz = list(res.task_pos_info[0].data[:3])
+    return xyz if len(xyz) == 3 and all(math.isfinite(v) for v in xyz) else None
+
+
+class Recorder:
+    """분석기(`contact_detector`의 analyze_samples)가 읽는 CSV로 남긴다."""
+
+    HEADER = 't_pose_s,t_force_s,x_mm,y_mm,z_mm,fx_n,fy_n,fz_n,valid\n'
+    FLUSH_EVERY = 50
+
+    def __init__(self, path):
+        self.f = open(path, 'w', encoding='utf-8', newline='')
+        self.f.write(self.HEADER)
+        self.n = 0
+
+    def row(self, t_pose, t_force, pos, force):
+        """위치나 힘이 없으면 그 칸을 비우고 valid=0으로 남긴다."""
+        valid = pos is not None and force is not None
+        cell = lambda v, n=3: '' if v is None else f'{v:.{n}f}'
+        pos = pos if pos is not None else (None,) * 3
+        force = force if force is not None else (None,) * 3
+        self.f.write(','.join([cell(t_pose), cell(t_force),
+                               *[cell(v, 4) for v in pos[:3]],
+                               *[cell(v, 4) for v in force[:3]],
+                               '1' if valid else '0']) + '\n')
+        self.n += 1
+        if self.n % self.FLUSH_EVERY == 0:
+            self.f.flush()  # 중간에 멈춰도 기록이 남게 한다
+
+    def close(self):
+        self.f.close()
+
+
 def summarize(values):
     return statistics.fmean(values), (statistics.stdev(values) if len(values) > 1 else float('nan'))
 
@@ -83,21 +139,44 @@ def measure(args, node):
     tcp = caller.call(c_tcp, GetCurrentTcp.Request())
     print(f"tool = {tool.info if tool else None!r}, tcp = {tcp.info if tcp else None!r}")
     posx = caller.call(c_posx, GetCurrentPosx.Request(ref=0))
-    if posx and posx.success and posx.task_pos_info:
+    if read_posx(posx):
         print('posx (mm, deg) = [' + ', '.join(f'{v:.3f}' for v in posx.task_pos_info[0].data[:6]) + ']')
     else:
         print('posx (mm, deg) = 조회 실패')
 
     samples, invalid = [], 0
-    req = GetToolForce.Request(ref=REF[args.ref])
-    for _ in range(args.samples):
-        res = caller.call(c_force, req)
-        f = list(res.tool_force) if res and res.success else None
-        if f and len(f) == 6 and all(math.isfinite(v) for v in f):
-            samples.append(f)
-        else:
-            invalid += 1
-        time.sleep(args.interval)
+    req_force = GetToolForce.Request(ref=REF[args.ref])
+    req_posx = GetCurrentPosx.Request(ref=0)
+    recorder = Recorder(args.csv) if args.csv else None
+    t0 = time.monotonic()
+    rows = 0
+    try:
+        while (time.monotonic() - t0 < args.duration) if args.duration is not None else (rows < args.samples):
+            rows += 1
+            pos = t_pose = None
+            if recorder:  # 기록할 때만 샘플마다 위치를 읽는다. 조회 수가 두 배가 된다
+                res = caller.call(c_posx, req_posx)
+                t_pose = time.monotonic() - t0
+                pos = read_posx(res)
+            res = caller.call(c_force, req_force)
+            t_force = time.monotonic() - t0
+            f = list(res.tool_force) if res and res.success else None
+            if not (f and len(f) == 6 and all(math.isfinite(v) for v in f)):
+                f = None
+            if f:
+                samples.append(f)
+            else:
+                invalid += 1
+            if recorder:
+                recorder.row(t_pose, t_force, pos, f)
+            if args.interval > 0:
+                time.sleep(args.interval)
+    finally:
+        if recorder:
+            elapsed = time.monotonic() - t0
+            recorder.close()
+            hz = rows / elapsed if elapsed > 0 else float('nan')
+            print(f'기록: {rows}줄, {elapsed:.1f} s, 평균 {hz:.1f} Hz → {args.csv}')
     return samples, invalid, caller.timeouts
 
 
