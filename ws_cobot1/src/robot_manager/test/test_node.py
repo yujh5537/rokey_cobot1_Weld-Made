@@ -20,7 +20,7 @@ if importlib.util.find_spec('dsr_msgs2') is None:
     pytest.skip('두산 드라이버가 없는 환경에서는 건너뛴다', allow_module_level=True)
 
 import rclpy  # noqa: E402
-from contact_scan_interfaces.msg import RobotSample, RobotStatus  # noqa: E402
+from contact_scan_interfaces.msg import ReasonCode, RobotSample, RobotStatus  # noqa: E402
 from contact_scan_qos import QOS_SENSOR, QOS_STATE  # noqa: E402
 from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.parameter import Parameter  # noqa: E402
@@ -38,6 +38,7 @@ PARAMS = [
     Parameter('slide_target_force_n', Parameter.Type.DOUBLE, 3.0),
     Parameter('compliance_stiffness', Parameter.Type.DOUBLE_ARRAY,
               [3000.0, 3000.0, 3000.0, 200.0, 200.0, 200.0]),
+    Parameter('arrival_tolerance_m', Parameter.Type.DOUBLE, 0.003),
 ]
 
 
@@ -174,7 +175,8 @@ def test_moving_is_true_again_when_positions_go_stale(ros):
         node.destroy_node()
 
 
-@pytest.mark.parametrize('missing', ['drop_limit_m', 'slide_target_force_n', 'compliance_stiffness'])
+@pytest.mark.parametrize('missing', ['drop_limit_m', 'slide_target_force_n',
+                                     'compliance_stiffness', 'arrival_tolerance_m'])
 def test_refuses_to_start_without_required_params(ros, missing):
     """값이 없으면 기본값으로 조용히 도는 대신 기동을 거부한다.
 
@@ -197,5 +199,62 @@ def test_slide_is_rejected_when_start_z_is_unknown(ros):
         goal = ExecuteMotion.Goal(scan_id='t', motion_id=1, operation=RobotSample.OP_SLIDE,
                                   direction=1, speed=0.01, max_distance=0.02)
         assert 'start_z' in node.reject_reason(goal) or '위치' in node.reject_reason(goal)
+    finally:
+        node.destroy_node()
+
+
+def test_move_to_that_stops_short_of_the_target_is_a_robot_error(ros):
+    """멈춘 것과 도착한 것은 다르다.
+
+    드라이버 알람 · 외력 · 충돌 · 관절 한계로 중간에 서도 moving 은 false 가 된다.
+    scan_manager 는 TARGET_REACHED · OK 를 믿고 바로 하강하므로, 엉뚱한 자리에서
+    작업대나 부재 옆면을 윗면으로 잡게 된다 (병후 리뷰, PR #73).
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        goal = ExecuteMotion.Goal(scan_id='t', motion_id=1, operation=RobotSample.OP_MOVE_TO,
+                                  speed=0.02)
+        goal.target.position.x, goal.target.position.y, goal.target.position.z = 0.4, -0.2, 0.3
+        motion = type('M', (), {'goal': goal})()
+
+        node.last_pose = None                       # 위치를 모르면 도착을 말할 수 없다
+        reason, code, detail = node.finished_without_event(motion)
+        assert code == ReasonCode.ROBOT_ERROR and '위치' in detail
+
+        node.last_pose = (None, None, (0.4, -0.2, 0.3))          # 목표와 같은 자리
+        reason, code, _ = node.finished_without_event(motion)
+        assert reason == ExecuteMotion.Result.REASON_TARGET_REACHED and code == ReasonCode.OK
+
+        node.last_pose = (None, None, (0.4, -0.2, 0.28))         # 20 mm 모자람 (허용 3 mm)
+        reason, code, detail = node.finished_without_event(motion)
+        assert code == ReasonCode.ROBOT_ERROR and '20.0 mm' in detail
+    finally:
+        node.destroy_node()
+
+
+def test_stop_that_is_not_confirmed_is_reported_as_robot_error(ros, monkeypatch):
+    """정지 미확인을 정상 코드로 돌려주면 scan_manager 는 STOPPED 로 가는데 로봇은 움직인다.
+
+    계약 4.1 "접수와 정지 완료는 다르다" (병후 리뷰, PR #73).
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+    from contact_scan_interfaces.msg import ContactEvent
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        event = ContactEvent()
+        event.type = ContactEvent.TYPE_EDGE
+        motion = type('M', (), {'event': event})()
+
+        monkeypatch.setattr(node, 'stop_robot', lambda why: (False, '멈춤을 확인하지 못했다'))
+        reason, code, detail = node.stop_for_event(motion)
+        assert reason == ExecuteMotion.Result.REASON_ROBOT_ERROR
+        assert code == ReasonCode.ROBOT_ERROR and '확인하지 못했다' in detail
+
+        monkeypatch.setattr(node, 'stop_robot', lambda why: (True, ''))
+        reason, code, _ = node.stop_for_event(motion)
+        assert reason == ExecuteMotion.Result.REASON_EDGE and code == ReasonCode.OK
     finally:
         node.destroy_node()

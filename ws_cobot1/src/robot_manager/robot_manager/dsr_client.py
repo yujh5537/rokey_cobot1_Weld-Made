@@ -114,8 +114,16 @@ def force_on_request(target_force_n):
                                    dir=[0, 0, 1, 0, 0, 0], ref=DR_BASE, time=0.0, mod=DR_FC_MOD_REL)
 
 
-def force_off_request():
-    return ReleaseForce.Request(time=0.0)
+def force_off_request(transition_s=0.3):
+    """힘 제어 해제.
+
+    `time` 은 강성 제어로 넘어가는 전환 시간 [s] (0~1.0). **0 이면 즉시 전환이다.**
+    두산 매뉴얼 5.1.4 알아두기: 해제 시 참조 외력이 센서값으로 바뀌므로
+    `DR_FC_MOD_REL` 을 쓴 경우 그 순간 참조 외력이 점프한다. EDGE 로 멈춘 직후
+    탐침이 모서리에 걸쳐 있는 상태에서 순응 제어가 그 점프에 반응하면 튀거나 더
+    눌릴 수 있다. 매뉴얼 예제도 `release_force(0.5)` 를 쓴다 (현지 리뷰, PR #73).
+    """
+    return ReleaseForce.Request(time=float(transition_s))
 
 
 def succeeded(response):
