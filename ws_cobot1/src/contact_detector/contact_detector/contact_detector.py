@@ -9,7 +9,8 @@
   detect_stamp · force_delta_n 은 확정 샘플.
 - 파라미터에 코드 기본값을 두지 않는다(CLAUDE.md 규칙 7). 값이 없으면 기동하지 않는다.
 - 이 노드는 로봇을 움직이지 않는다. 두산 API 를 부르지 않는다.
-- source = 'sim' 의 가상 직육면체는 아직 없다. 지금은 두 입력원 모두 샘플의 외력 · 위치를 그대로 판정한다.
+- source = 'sim' 이면 샘플의 외력 · z 를 가상 직육면체 모델(sim_source)의 값으로 바꿔서 판정한다.
+  x · y 는 실제 로봇 값을 그대로 쓴다. 이벤트에도 바꾼 값을 싣는다(sim 결과의 치수가 맞아야 한다).
 """
 import math
 import threading
@@ -27,6 +28,7 @@ from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.task import Future
 
+from contact_detector.sim_source import SimBox, SimSource
 from contact_detector.detector_core import (
     ContactDetector,
     DetectorConfig,
@@ -64,6 +66,17 @@ PARAMS = {
     'tare_max_force_n': Parameter.Type.DOUBLE,
 }
 
+# source = 'sim' 일 때만 필요한 파라미터
+SIM_PARAMS = {
+    'sim_box_frame_id': Parameter.Type.STRING,
+    'sim_box_origin_m': Parameter.Type.DOUBLE_ARRAY,
+    'sim_box_size_m': Parameter.Type.DOUBLE_ARRAY,
+    'sim_stiffness_n_per_m': Parameter.Type.DOUBLE,
+    'sim_tip_radius_m': Parameter.Type.DOUBLE,
+    'sim_fall_speed_mps': Parameter.Type.DOUBLE,
+    'sim_slide_press_n': Parameter.Type.DOUBLE,
+}
+
 TARE_REASON = {
     TARE_NO_SAMPLE: ReasonCode.NO_SAMPLE,
     TARE_TOO_FEW: ReasonCode.TARE_TIMEOUT,
@@ -89,6 +102,16 @@ class ContactDetectorNode(Node):
         if self.source not in SOURCES:
             raise ValueError(f"source='{self.source}' 는 지원하지 않는다. {' | '.join(SOURCES)} 중에서 고른다")
 
+        self.sim = None
+        if self.source == 'sim':
+            v = {name: self._required(name, kind) for name, kind in SIM_PARAMS.items()}
+            self.values.update(v)
+            self.sim = SimSource(SimBox(
+                frame_id=v['sim_box_frame_id'], origin_m=tuple(v['sim_box_origin_m']),
+                size_m=tuple(v['sim_box_size_m']), stiffness_n_per_m=v['sim_stiffness_n_per_m'],
+                tip_radius_m=v['sim_tip_radius_m'], fall_speed_mps=v['sim_fall_speed_mps'],
+                slide_press_n=v['sim_slide_press_n']))
+
         self.lock = threading.Lock()                 # 다중 스레드 executor 에 올려도 판정 상태가 깨지지 않게 한다
         self.detector = ContactDetector(*self._configs(self.values))
         self.tare = None                             # 수집 중인 TareAccumulator. 평소에는 None
@@ -108,8 +131,11 @@ class ContactDetectorNode(Node):
                             callback_group=MutuallyExclusiveCallbackGroup())
         self.add_on_set_parameters_callback(self.on_set_parameters)
 
-        if self.source == 'sim':
-            self.get_logger().warn('source=sim 의 가상 직육면체는 아직 없다. 샘플의 외력 · 위치를 그대로 판정한다')
+        if self.sim is not None:
+            box = self.sim.box
+            self.get_logger().info(
+                f'sim 가상 직육면체: 밑면 중심 {box.origin_m} m, 크기 {box.size_m} m, '
+                f'윗면 z={box.top_z:.4f} m (frame_id={box.frame_id})')
         self.get_logger().info(' '.join(f'{k}={v}' for k, v in self.values.items()))
 
     # ---------------------------------------------------------------- 파라미터
@@ -125,7 +151,8 @@ class ContactDetectorNode(Node):
         return (
             DetectorConfig(v['contact_threshold_n'], v['debounce_n'], v['over_force_n'], v['over_force_debounce_n']),
             EdgeConfig(v['edge_drop_m'], v['debounce_n'], v['edge_arm_force_n'],
-                       v['edge_trend_window_s'], v['edge_trend_min_samples']),
+                       v['edge_trend_window_s'], v['edge_trend_min_samples'],
+                       max_gap_s=v['stale_age_ms'] * 1e-3),
         )
 
     def on_set_parameters(self, params):
@@ -178,6 +205,14 @@ class ContactDetectorNode(Node):
             force=(msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z),
             valid=msg.valid, motion_id=msg.motion_id, operation=msg.operation)
 
+        if self.sim is not None:
+            if msg.frame_id != self.sim.box.frame_id:
+                self.warn('sim_frame', f"샘플 frame_id='{msg.frame_id}' 가 "
+                                       f"sim_box_frame_id='{self.sim.box.frame_id}' 와 다르다. 판정하지 않는다")
+                return
+            sample = self.sim.apply(sample)
+            msg = self.sim_message(msg, sample)      # 이벤트에도 가상 값을 싣는다
+
         with self.lock:
             self.messages[msg.sample_id] = msg
             while len(self.messages) > KEPT_MESSAGES:
@@ -188,8 +223,24 @@ class ContactDetectorNode(Node):
             if msg.valid and msg.operation == OP_SLIDE and self.detector.baseline is None:
                 self.warn('no_tare', 'SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다')
             events = [self.to_event(d) for d in detections]
+            gap = self.detector.trend_gap
+        if gap:
+            self.warn('trend_gap', '샘플 공백으로 EDGE 추세선을 버리고 다시 쌓는다. '
+                                   '그동안 접촉 소실을 볼 수 없다')
         for event in events:
             self.publisher.publish(event)
+
+    @staticmethod
+    def sim_message(msg, sample):
+        """원본 메시지에 가상 외력 · z 를 덮어쓴 사본. 이벤트가 이 값을 싣는다."""
+        out = RobotSample()
+        out.sample_id, out.frame_id, out.valid = msg.sample_id, msg.frame_id, msg.valid
+        out.motion_id, out.operation = msg.motion_id, msg.operation
+        out.pose_stamp, out.force_stamp = msg.pose_stamp, msg.force_stamp
+        out.pose = msg.pose
+        out.pose.position.z = sample.position[2]
+        out.wrench.force.x, out.wrench.force.y, out.wrench.force.z = sample.force
+        return out
 
     def warn(self, key, text):
         now = time.monotonic()
