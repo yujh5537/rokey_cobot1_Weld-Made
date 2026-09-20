@@ -2,7 +2,7 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
-## v0.1.7 (2026-09-20, T19a, PR 번호는 올린 뒤 적는다)
+## v0.1.7 (2026-09-20, T19a, PR #82)
 타입 변경 없음. `units-frames.md`의 **탐색 기준점** 행에서 "별도 파라미터를 두지 않는다"를 "scan_manager 파라미터 `search_origin_pose`(Base, x y z + quaternion)로 둔다"로 바꿨다. PR #77(T19a 2/2) 리뷰에서 현지가 계약과 코드의 불일치를 지적했다. 영향: scan_manager(T19a · T19b), `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절.
 - 이유: scan_manager는 홈 자세의 TCP를 모른다(홈은 robot_manager의 관절각이고 scan_manager는 `/robot/sample`을 구독하지 않는다). `OP_MOVE_TO`의 목표에는 자세가 필요한데 자세(수직 고정)는 홈과 `base_to_fixture`만으로 나오지 않는다
 - 값을 정하는 규칙은 그대로다: x · y = 작업대 원점, z = 첫 하강을 시작할 높이(초안: 홈 팁 높이), 자세 = 탐침 수직. 자세는 quaternion으로 적는다(두산 ZYZ 오일러와 혼동하지 않게)
