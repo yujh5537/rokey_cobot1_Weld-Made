@@ -7,6 +7,7 @@
 - 실측(Virtual): `/robot/sample` 37.6 Hz, `/robot/status` 9.3~9.8 Hz. 설정값 50 · 10 Hz에 못 미친다. 두산 서비스를 직렬로 불러야 해서다(동시 호출 시 드라이버가 응답을 멈췄다)
 - `moving`: `get_robot_state`가 Virtual에서 이동 중에도 STANDBY를 돌려줘 쓸 수 없다. 최근 0.3 s 안의 TCP 위치 변화가 0.2 mm를 넘으면 이동 중으로 본다. 위치를 모르면 이동 중으로 본다
 - TBD 목록에서 "실측 발행 주기(T15)"와 "`RobotStatus.moving`의 근거"를 지웠다
+- **(PR #83 추가)** `moving_eps_m` · `moving_window_s`를 바꾸면 scan_manager의 정지 확인 지연과 safety_monitor의 `stop_confirmed` 시점이 같이 바뀐다. 값을 고칠 때는 전원에게 알린다
 
 ## v0.1.3 (2026-09-19, T03, PR #60)
 타입 변경 없음. `units-frames.md`의 **z=0**, **작업대 원점(초안)**, **축 평행**, **홈 관절각**, **탐색 기준점 높이(초안)**를 실측 · 계산해 적었다. 측정 원본은 `docs/env/origin-home-register.md`. 측정은 모두 플랜지 posx(`get_current_tool_flange_posx`)를 읽고, TCP [-1.30, 3.71, 249.99]를 적용해 팁 위치로 바꿨다. TCP 적용 상태에 영향을 받지 않도록 이렇게 했다. 영향: scan_manager(`base_to_fixture`, 결과 변환) · robot_manager(홈) · safety_monitor(작업영역) · sim 가상 직육면체.
