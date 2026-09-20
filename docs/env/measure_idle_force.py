@@ -13,14 +13,20 @@
     python3 docs/env/measure_idle_force.py --pose home --duration 30 --interval 0.02 \
         --csv idle_30s.csv
     # ② 정지 2초 → 저속 하강 → 접촉 → 정지 (하강은 사람이 시킨다)
-    python3 docs/env/measure_idle_force.py --pose origin_above --duration 30 --interval 0 \
+    python3 docs/env/measure_idle_force.py --pose origin_above --duration 30 --interval 0.02 \
         --csv descend_01.csv
+
+**실기에서 `--interval 0` 은 쓰지 않는다.** `--csv` 를 주면 샘플마다 posx + force 라 조회가 두 배이고,
+간격 0 이면 Virtual 기준 초당 400회를 넘는다. dsr_controller2 가 호출 과부하로 모든 응답을 멈춘 적이
+있는데(2026-09-20) 그것이 동시 호출 때문인지 호출량 때문인지 아직 모른다. 하강 중에 그 일이 나면
+모션은 이미 걸려 있고 정지 명령도 먹지 않는다. `docs/env/api-check-log.md` 의 실기 확인이 끝난 뒤에 쓴다
+(현지 리뷰, PR #71).
 
 `--csv` 형식은 `contact_detector`의 오프라인 분석기(`analyze_samples`)가 읽는 형식이다.
 
     t_pose_s,t_force_s,x_mm,y_mm,z_mm,fx_n,fy_n,fz_n,valid
 
-- `t_*_s`: 각 조회의 **응답을 받은 시각** [s]. 기록 시작이 0인 같은 시계다
+- `t_*_s`: 각 조회의 **응답을 받은 시각** [s], 소수점 6자리(1 µs). 기록 시작이 0인 같은 시계다
 - 위치는 `get_current_posx(ref=DR_BASE)`의 x · y · z [mm], 힘은 `get_tool_force(ref=DR_BASE)`의 Fx · Fy · Fz [N]
 - `valid`: 위치와 힘을 모두 제대로 받은 줄만 1이다. 실패한 줄은 숫자 칸을 비우고 `valid=0`으로 남긴다
 
@@ -32,14 +38,17 @@ DSR_ROBOT2를 쓰지 않고 dsr_controller2 서비스를 직접 부른다. DSR_R
 """
 import argparse
 import math
+import os
 import statistics
 import sys
 import time
 
 import rclpy
-from dsr_msgs2.srv import GetCurrentPosx, GetCurrentTcp, GetCurrentTool, GetToolForce
+from dsr_msgs2.srv import (GetCurrentPosx, GetCurrentTcp, GetCurrentTool, GetRobotSystem,
+                           GetToolForce)
 
 PREFIX = '/dsr01/dsr_controller2/'
+MIN_REAL_INTERVAL_S = 0.01   # 실기에서 --csv 와 함께 쓸 때의 최소 간격 (현지 리뷰, PR #71)
 AXES = ('Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz')
 REF = {'base': 0, 'tool': 1}
 
@@ -52,6 +61,8 @@ def parse_args(argv):
                    help='기록 시간 [s]. 주면 --samples 대신 이 시간 동안 읽는다')
     p.add_argument('--interval', type=float, default=0.1, help='조회 간격 [s]. 0이면 쉬지 않고 읽는다')
     p.add_argument('--csv', help='샘플을 기록할 파일. 주면 샘플마다 위치도 같이 읽는다')
+    p.add_argument('--allow-fast-on-real', action='store_true',
+                   help='실기에서도 --interval 을 0.01 미만으로 쓴다 (api-check-log 실기 확인 뒤에만)')
     p.add_argument('--ref', choices=tuple(REF), default='base', help='힘 기준 좌표계')
     p.add_argument('--timeout', type=float, default=1.5, help='조회 1회 시간 제한 [s]')
     p.add_argument('--retries', type=int, default=3, help='응답이 없을 때 다시 보내는 횟수')
@@ -94,6 +105,9 @@ class Recorder:
     FLUSH_EVERY = 50
 
     def __init__(self, path):
+        # 실기 기록은 다시 찍을 수 없다. 같은 이름이 있으면 덮어쓰지 않는다 (현지 리뷰, PR #71)
+        if os.path.exists(path):
+            raise SystemExit(f'{path} 가 이미 있다. 다른 이름을 쓰거나 옮긴 뒤 다시 실행한다')
         self.f = open(path, 'w', encoding='utf-8', newline='')
         self.f.write(self.HEADER)
         self.n = 0
@@ -104,7 +118,7 @@ class Recorder:
         cell = lambda v, n=3: '' if v is None else f'{v:.{n}f}'
         pos = pos if pos is not None else (None,) * 3
         force = force if force is not None else (None,) * 3
-        self.f.write(','.join([cell(t_pose), cell(t_force),
+        self.f.write(','.join([cell(t_pose, 6), cell(t_force, 6),
                                *[cell(v, 4) for v in pos[:3]],
                                *[cell(v, 4) for v in force[:3]],
                                '1' if valid else '0']) + '\n')
@@ -127,6 +141,8 @@ def measure(args, node):
     c_posx = caller.client(GetCurrentPosx, 'aux_control/get_current_posx')
     c_force = caller.client(GetToolForce, 'aux_control/get_tool_force')
 
+    c_system = caller.client(GetRobotSystem, 'system/get_robot_system')
+
     deadline = time.monotonic() + 10.0
     missing = [c.srv_name for c in (c_tool, c_tcp, c_posx, c_force)
                if not c.wait_for_service(timeout_sec=max(0.1, deadline - time.monotonic()))]
@@ -134,6 +150,15 @@ def measure(args, node):
         print(f'서비스 연결 안 됨: {missing}. sodreal이 떠 있는지 확인')
         return None
     time.sleep(0.5)  # 응답 경로까지 연결될 시간을 준다
+
+    system = caller.call(c_system, GetRobotSystem.Request())
+    is_real = bool(system and system.success and system.robot_system == 0)   # 0 = REAL
+    if is_real and args.csv and args.interval < MIN_REAL_INTERVAL_S and not args.allow_fast_on_real:
+        print(f'실기에서는 --interval 을 {MIN_REAL_INTERVAL_S} 이상으로 둔다 (지금 {args.interval}).')
+        print('  --csv 는 샘플마다 posx + force 라 조회가 두 배다. 호출 과부하로 드라이버가 응답을')
+        print('  멈춘 적이 있고(2026-09-20), 하강 중에 그러면 정지 명령도 먹지 않는다.')
+        print('  docs/env/api-check-log.md 의 실기 확인이 끝났으면 --allow-fast-on-real 로 넘긴다.')
+        return None
 
     tool = caller.call(c_tool, GetCurrentTool.Request())
     tcp = caller.call(c_tcp, GetCurrentTcp.Request())
@@ -176,7 +201,8 @@ def measure(args, node):
             elapsed = time.monotonic() - t0
             recorder.close()
             hz = rows / elapsed if elapsed > 0 else float('nan')
-            print(f'기록: {rows}줄, {elapsed:.1f} s, 평균 {hz:.1f} Hz → {args.csv}')
+            print(f'기록: {rows}줄, {elapsed:.1f} s, 평균 {hz:.1f} Hz (posx + force 한 묶음 기준) '
+                  f'→ {args.csv}')
     return samples, invalid, caller.timeouts
 
 
