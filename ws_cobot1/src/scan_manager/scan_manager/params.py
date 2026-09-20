@@ -186,7 +186,7 @@ def _plain(value):
 class ParamCheck:
     """check() 의 결과. params 는 missing · invalid 가 모두 비었을 때만 있다."""
 
-    params: Optional[ScanParams]
+    params: Optional[object]  # check() 는 ScanParams, check_home() 은 HomeParams
     missing: Tuple[str, ...]
     invalid: Tuple[str, ...]  # '이름 = 값: 이유'
 
@@ -256,3 +256,35 @@ def check(values: Mapping[str, object]) -> ParamCheck:
             merged[spec.name] = tuple(float(v) for v in merged[spec.name])
     merged['direction_order'] = tuple(Direction[name] for name in merged['direction_order'])
     return ParamCheck(ScanParams(**merged), (), ())
+
+
+# 안전복귀(/scan/home)에 필요한 것. 측정 · 보정 파라미터가 비어 있다고 홈 복귀까지 막지 않는다.
+HOME_PARAM_NAMES = (
+    'motion_timeout_s', 'stop_confirm_timeout_s', 'server_wait_timeout_s', 'motion_frame_id')
+
+
+@dataclass(frozen=True)
+class HomeParams:
+    motion_timeout_s: float
+    stop_confirm_timeout_s: float
+    server_wait_timeout_s: float
+    motion_frame_id: str
+
+
+def check_home(values: Mapping[str, object]) -> ParamCheck:
+    """안전복귀용 검사. ParamCheck.params 는 HomeParams 다."""
+    merged, missing = {}, []
+    for name in HOME_PARAM_NAMES:
+        spec = SPEC_BY_NAME[name]
+        value = values.get(name)
+        if value is None:
+            value = spec.default
+        if value is None:
+            missing.append(name)
+            continue
+        merged[name] = value
+    invalid = check_values(merged)
+    if missing or invalid:
+        return ParamCheck(None, tuple(missing), invalid)
+    return ParamCheck(HomeParams(**merged), (), ())
+

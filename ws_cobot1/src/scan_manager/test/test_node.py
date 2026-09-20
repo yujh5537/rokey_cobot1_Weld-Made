@@ -1,5 +1,10 @@
 """노드 껍데기가 /scan/state 를 계약대로 발행하는지 확인한다 (로봇 · 드라이버 연결 없음)."""
 
+import os
+import signal
+import subprocess
+import sys
+import threading
 import time
 
 import pytest
@@ -14,6 +19,9 @@ from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.parameter import Parameter  # noqa: E402
 from scan_manager.scan_manager import ScanManager  # noqa: E402
 from scan_manager.state_machine import Command  # noqa: E402
+from sequence_helpers import isolated_ros_env  # noqa: E402
+
+os.environ.update(isolated_ros_env())  # 이 파일만 돌려도 조 공용 도메인(30)에 뜨지 않는다
 
 
 @pytest.fixture
@@ -65,3 +73,31 @@ def test_rejects_non_positive_period(ros):
     with pytest.raises(ValueError):
         ScanManager(parameter_overrides=[
             Parameter('state_publish_period_s', value=0.0)])
+
+
+@pytest.mark.parametrize('gap_s', [0.0, 0.05, 0.5])
+def test_two_sigints_exit_quietly(gap_s):
+    """launch 의 Ctrl-C 는 SIGINT 를 두 번 보낼 수 있다. 트레이스백 · 0 이 아닌 종료 코드 없이 끝나야 한다."""
+    env = {**os.environ, **isolated_ros_env()}
+    process = subprocess.Popen(
+        [sys.executable, '-c', 'from scan_manager.scan_manager import main; main()'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
+    lines, ready = [], threading.Event()
+
+    def read():
+        for line in process.stderr:
+            lines.append(line)
+            if 'scan_manager 준비' in line:
+                ready.set()
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    try:
+        assert ready.wait(30.0), ''.join(lines)
+        process.send_signal(signal.SIGINT)
+        time.sleep(gap_s)
+        process.send_signal(signal.SIGINT)
+        assert process.wait(timeout=30.0) == 0, ''.join(lines)
+    finally:
+        process.kill()
+    reader.join(timeout=5.0)
+    assert 'Traceback' not in ''.join(lines), ''.join(lines)

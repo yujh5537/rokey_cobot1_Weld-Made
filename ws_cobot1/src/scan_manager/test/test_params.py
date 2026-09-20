@@ -119,3 +119,15 @@ def test_node_params_snapshot_is_plain_and_excludes_contract_config():
     assert snapshot['tip_radius_m'] == VALUES['tip_radius_m']
     assert snapshot['search_origin_pose'] == VALUES['search_origin_pose']
     assert isinstance(snapshot['base_to_fixture'], list)
+
+
+def test_home_needs_only_its_own_parameters():
+    # 측정 · 보정 파라미터가 비어 있어도 안전복귀는 막지 않는다
+    values = {name: VALUES[name] for name in P.HOME_PARAM_NAMES if name in VALUES}
+    result = P.check_home(values)
+    assert result.ok and result.params.motion_timeout_s == VALUES['motion_timeout_s']
+    assert result.params.motion_frame_id == 'base_link'
+
+    result = P.check_home({'motion_timeout_s': -1.0, 'server_wait_timeout_s': 0.2})
+    assert not result.ok and result.missing == ('stop_confirm_timeout_s',)
+    assert any(problem.startswith('motion_timeout_s = ') for problem in result.invalid)

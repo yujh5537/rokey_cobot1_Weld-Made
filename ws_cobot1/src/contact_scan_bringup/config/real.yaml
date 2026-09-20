@@ -47,7 +47,43 @@ scan_manager:
   ros__parameters:
     state_publish_period_s: 1.0      # /scan/state 주기 발행 간격(s). 상태가 바뀌면 이 값과 무관하게 바로 발행한다
                                      #   0 이하면 노드가 기동하지 않는다. 설계 출발값이며 실측값이 아니다 (병후, PR #50)
-    # 계약 이름(T19에서 추가): descend_speed_mps · slide_speed_mps · max_descend_m · max_slide_m · motion_timeout_s · lift_height_m
+    # --- T19a (병후). 아래 수치는 설계 출발값이다. 실측값이 아니다(tip_radius_m 한 줄만 실측) ---
+    # 필수 항목이 비어 있으면 노드는 기동하되 START 를 INVALID_VALUE 로 거절하고 빠진 이름을 알려 준다(코드 예비값 없음).
+    # **TBD 로 남긴 항목을 채우기 전에는 실기에서 START 가 거절된다. 의도한 fail-safe 다.**
+    # descend_speed_mps:             # 계약 이름. TBD (계약 9장). 하강 중 관성력 · 감속 거리로 정한다(T13 · T24)
+    # slide_speed_mps:               # 계약 이름. TBD
+    # max_descend_m:                 # 계약 이름. TBD. 조건은 units-frames.md '탐색 기준점 높이': 하한 = 기준점 → 부재 윗면 거리 + 여유,
+                                     #   상한 < 기준점 팁 높이 - 안전 여유(넘으면 부재가 없을 때 작업대 면을 윗면으로 잡는다)
+    # max_slide_m:                   # 계약 이름. TBD. 부재 크기 · 작업영역으로 정한다
+    # motion_timeout_s:              # 계약 이름. TBD. **이 값이 없으면 START 뿐 아니라 안전복귀(/scan/home)도 거절된다**
+                                     #   (OP_HOME 에 실을 제한 시간이다. 실기 세션 전에 가장 먼저 채운다)
+    lift_height_m: 0.05              # 계약 이름. 방향 전환 · 마무리 때 팁 상승량. 출발값 50 mm (BRD 4.2.6)
+    # move_speed_mps:                # OP_MOVE_TO 속도. TBD. robot_manager 는 OP_HOME 이 아닌 goal 의 speed <= 0 을 거절한다(PR #73)
+    recontact_margin_m: 0.001        # 방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값. 출발값 1 mm (계약 7.3). drop_limit_m 보다 충분히 작아야 한다
+    # recontact_speed_mps:           # 방향 전환 뒤 내림 속도(저속). TBD (계약 9장)
+    # search_origin_pose:            # 탐색 기준점 상공. Base, x y z qx qy qz qw. **TBD**: units-frames.md 에서 기준점 높이가 초안이다
+                                     #   자세는 수직 고정. 오일러로 두지 않는다(두산 ZYZ 규약 혼동)
+    # base_to_fixture:               # 작업대 원점의 Base 좌표 x y z. 평행 이동만. **TBD**
+                                     #   units-frames.md v0.1.3 의 초안은 [0.42356, -0.18606, 0.1006] 이다(2026-09-19 학민, PR #60).
+                                     #   그 세션 한정 초안이고 부재를 같은 자리에 놓는 방법이 없어, 값을 확인한 사람이 날짜 · 조건과 함께 넣는다
+    support_z_m: 0.0                 # 지지면 높이(작업대 좌표). z=0 이 작업대 표면이다(units-frames.md). 0 이 정당한 값이다
+    tip_radius_m: 0.000225           # 편향 보정 r. **반지름**이다(지름 0.45 mm). 실측: 2026-09-19 학민, 인공눈물 용기 끝(units-frames.md, PR #57)
+    # detect_latency_s:              # 편향 보정 지연 t. TBD (T24 · T30 실측). '판정 샘플'의 정의(이슈 #69)에 따라 뜻이 달라진다
+    edge_round_radius_m: 0.0         # 부재 모서리 둥글림 R. 기준 큐브(80 x 80 x 80 mm)는 모서리가 예리하다: 라운드 없음
+                                     #   실측: 2026-09-20 학민, 캘리퍼 · 손끝(PR #80, docs/test-reports/T03-follow-up_20260920.md).
+                                     #   2026-09-19 의 라운드 가설은 폐기됐다. 다른 부재를 쓰면 다시 잰다. 0 이 정당한 값이다
+    edge_bias_offset_m: 0.0          # 실측 나머지 편향. **아직 재지 않아 0 이다.** T25 에서 누름 힘별로 재서 채운다(PR #80 4절:
+                                     #   접촉 소실 검출이 진짜 변보다 바깥에서 걸린다. 값은 그 PR 에서 확정 중)
+                                     #   스칼라 하나, 방향당 값((추정 폭 - 캘리퍼 폭) / 2). 검출점이 진행 방향으로 더 나간 거리가 + 이고,
+                                     #   geometry_estimator 가 그만큼 진행 방향 반대로 뺀다(README, PR #75)
+    result_dir: data                 # result_store 경로. 상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이다
+                                     #   ws_cobot1 에서 launch 하면 ws_cobot1/data (gitignore). 실기 PC 에만 남은 기록은 없는 기록이다
+    result_frame_id: workpiece_fixture    # ScanResult 의 프레임(가칭)
+    motion_frame_id: base_link            # ExecuteMotion goal 의 프레임(가칭)
+    direction_order: [POS_X, NEG_X, POS_Y, NEG_Y]   # 모서리 탐색 순서. 기동할 때만 읽는다
+    event_wait_timeout_s: 1.0        # Result 가 가리킨 ContactEvent 를 기다리는 한도. 설계 출발값
+    stop_confirm_timeout_s: 5.0      # 정지 완료(connected && !moving)를 기다리는 한도. 설계 출발값
+    server_wait_timeout_s: 2.0       # 상대 서버의 미기동 판단. 설계 출발값
 
 # mqtt_bridge:                       # (병후)
 #   ros__parameters:

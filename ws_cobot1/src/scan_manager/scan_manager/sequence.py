@@ -25,7 +25,6 @@ from .contract_enums import Direction
 from .contract_enums import MotionReason
 from .contract_enums import Operation
 from .contract_enums import Reason
-from .params import ScanParams
 from .result_store import TOP  # 측정 대상 '윗면'(record_attempt_failed 의 target). 모서리는 Direction
 from .state_machine import Signal
 
@@ -51,7 +50,8 @@ class MotionRequest:
 
 class MotionPlanner:
 
-    def __init__(self, params: ScanParams):
+    def __init__(self, params):
+        """params: ScanParams. home() 만 쓸 때는 motion_timeout_s 만 있으면 된다(HomeParams)."""
         self._p = params
 
     def _move_to(self, label, position, speed) -> MotionRequest:
