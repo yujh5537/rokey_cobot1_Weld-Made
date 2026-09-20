@@ -30,6 +30,7 @@ def get_db_connection():
         dbname=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
+        connect_timeout=3,
     )
 
 def to_jsonb(value):

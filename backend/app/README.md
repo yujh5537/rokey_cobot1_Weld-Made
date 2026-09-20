@@ -35,10 +35,12 @@ FastAPI는 다음 MQTT 토픽을 구독한다.
 
 수신한 MQTT 메시지는 다음 형식으로 WebSocket 클라이언트에 전달한다.
 
-    {
-      "topic": "scan/state",
-      "payload": {}
-    }
+```json
+{
+  "topic": "scan/state",
+  "payload": {}
+}
+```
 
 WebSocket endpoint:
 
@@ -96,7 +98,9 @@ FastAPI는 상태 변경을 WebSocket의 가상 토픽 `command/status`로도 �
 
 테스트용 Python 환경에서:
 
-    PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest backend/app/tests -q
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest backend/app/tests -q
+```
 
 현재 테스트는 다음 상태 전이를 검증한다.
 
@@ -154,6 +158,36 @@ T28에서는 다음 4개 테이블을 사용한다.
 PostgreSQL 컨테이너에서는 다음 경로로 mount한다.
 
     /docker-entrypoint-initdb.d/001_schema.sql
+
+**주의**: `/docker-entrypoint-initdb.d`의 초기화 스크립트는 PostgreSQL 데이터 볼륨이 비어 있을 때만 실행된다.
+
+기존 `postgres_data` 볼륨이 이미 생성되어 있다면 새 스키마가 자동으로 적용되지 않는다.
+
+이 경우 다음 중 하나가 필요하다.
+
+기존 PostgreSQL 데이터를 삭제해도 되는 경우:
+
+```bash
+docker compose \
+  --env-file docker/.env \
+  -f docker/docker-compose.yml \
+  down -v
+```
+
+이후 다시 컨테이너를 기동하면 초기화 스크립트가 실행된다.
+
+기존 PostgreSQL 데이터를 유지해야 하는 경우:
+
+```bash
+docker compose \
+  --env-file docker/.env \
+  -f docker/docker-compose.yml \
+  exec -T postgres \
+  psql -U contact_scan -d contact_scan \
+  < docker/postgres/init/001_schema.sql
+```
+
+`001_schema.sql`은 `CREATE TABLE IF NOT EXISTS`를 사용하므로 동일 스키마에 다시 실행해도 된다.
 
 ### scan/result 저장
 
@@ -219,10 +253,12 @@ MQTT 메시지를 FastAPI가 수신한 것과 PostgreSQL 저장 완료는 같은
 
 FastAPI 로그는 두 상태를 구분한다.
 
+정상 저장:
+
     [MQTT] received ...
     [DB] scan/result committed ...
 
-또는 저장 실패 시:
+저장 실패:
 
     [MQTT] received ...
     [DB] scan/result save failed ...
