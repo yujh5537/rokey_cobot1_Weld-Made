@@ -142,7 +142,10 @@ class RobotManager(Node):
         stamp = self.get_clock().now().to_msg()  # 응답을 받은 시각 (발행 시각이 아니다)
         response = None
         if future is not None:
-            self.pending_calls = max(0, self.pending_calls - 1)
+            # 포기한 attempt 의 뒤늦은 응답이 현재 attempt 를 지키는 카운터를 깎으면,
+            # 드라이버가 느려졌다 살아나는 순간 두 호출이 동시에 뜬다 (병후 리뷰, PR #72)
+            if attempt is self.attempt:
+                self.pending_calls = max(0, self.pending_calls - 1)
             try:
                 response = future.result()
             except Exception as exc:  # 드라이버가 죽는 등
