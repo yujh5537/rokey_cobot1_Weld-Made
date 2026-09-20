@@ -6,6 +6,7 @@
 
 import math
 import os
+from pathlib import Path
 import threading
 import time
 
@@ -72,13 +73,20 @@ class Rig:
         self.executor = MultiThreadedExecutor(num_threads=8)
         for node in filter(None, (self.node, self.peers, self.client)):
             self.executor.add_node(node)
-        self._thread = threading.Thread(target=self.executor.spin, daemon=True)
+        self._stop_spin = threading.Event()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
         self._thread.start()
+
+    def _spin(self):
+        while not self._stop_spin.is_set():
+            self.executor.spin_once(timeout_sec=0.05)
 
     def close(self):
         self.node.close()
+        # spin 을 먼저 멈춘다. 도는 중에 executor.shutdown() 을 부르면 rclpy 가 guard condition 을 없애면서 예외를 낸다
+        self._stop_spin.set()
+        self._thread.join(timeout=10.0)
         self.executor.shutdown(timeout_sec=5.0)
-        self._thread.join(timeout=5.0)  # spin 이 끝난 뒤에 노드를 없앤다
         for node in filter(None, (self.client, self.peers, self.node)):
             node.destroy_node()
 
@@ -153,8 +161,8 @@ def ros():
 def make_rig(ros, tmp_path):
     rigs = []
 
-    def make(**changes):
-        rig = Rig(tmp_path / 'data', **changes)
+    def make(result_dir=None, **changes):
+        rig = Rig(Path(result_dir) if result_dir else tmp_path / 'data', **changes)
         rigs.append(rig)
         return rig
     yield make
@@ -370,6 +378,35 @@ def test_rejected_motion_goal_fails_without_guessing_the_reason(rig):
     assert not RETURN_OPS & set(rig.operations())
 
 
+def test_latch_between_motions_blocks_the_next_motion(rig):
+    rig.peers.latch_during_tare = int(Reason.HB_EXPIRED)  # 모션이 없는 동안 걸린 래치
+
+    result = rig.run()
+
+    assert not result.success and result.reason_code == Reason.HB_EXPIRED
+    assert '안전 래치' in result.detail
+    assert rig.operations() == [Operation.MOVE_TO]        # 하강을 보내지 않았다
+    assert rig.node.state_machine.phase is Phase.ERROR
+    assert rig.home().success                             # 관제자의 안전복귀는 래치가 막지 않는다
+
+
+def test_record_that_cannot_be_created_fails_before_any_motion(make_rig, tmp_path):
+    blocker = tmp_path / 'not_a_directory'
+    blocker.write_text('x')
+    rig = make_rig(result_dir=str(blocker / 'data'))      # 기록을 만들 수 없는 경로
+    rig.wait_ready()
+
+    result = rig.run()
+
+    assert not result.success and result.reason_code == Reason.ROBOT_ERROR
+    assert result.detail.startswith('internal:')
+    assert rig.peers.goals == []                          # 로봇을 움직이기 전에 끝났다
+    assert rig.node.state_machine.phase is Phase.ERROR
+    # 기록은 못 해도 결과는 1회 발행한다(실패, 값은 전부 무효)
+    assert rig.wait(lambda: rig.results) and len(rig.results) == 1
+    assert not rig.results[0].success and not rig.results[0].z_top_valid
+
+
 def test_tare_failure_code_is_passed_through(rig):
     rig.peers.tare_error = int(Reason.TARE_UNSTABLE)
     result = rig.run()
@@ -426,6 +463,23 @@ def test_stop_requests_robot_stop_and_cancel_then_confirms_by_a_fresh_status(rig
     published = rig.results[0]
     assert not published.success and published.reason_code == Reason.STOP_REQUESTED
     assert published.x_pos_valid and not published.x_neg_valid and math.isnan(published.x_neg)
+
+
+def test_failure_while_stopping_is_an_error_not_a_stop(rig):
+    rig.peers.behavior[F.key(Operation.SLIDE, Direction.POS_Y)] = F.HOLD_THEN_OVER_FORCE
+    _handle, result_future = rig.send(rig.run_client, RunScan.Goal(request_id='run-1'))
+    assert rig.wait(lambda: any(
+        g.operation == Operation.SLIDE and g.direction == Direction.POS_Y for g in rig.peers.goals))
+
+    rig.stop()
+    result = rig._result_of(result_future).result
+
+    assert not result.success and result.reason_code == Reason.OVER_FORCE  # 중지에 가려지지 않는다
+    assert rig.node.state_machine.phase is Phase.ERROR
+    record = rig.store().load(result.scan_id)
+    assert record.interruptions == [] and record.failure.reason_code == Reason.OVER_FORCE
+    assert record.edges[Direction.POS_Y].status == STATUS_FAILED
+    assert not RETURN_OPS & set(rig.operations())
 
 
 def test_stop_does_not_call_home_or_resume(rig):
@@ -504,6 +558,52 @@ def test_second_run_while_busy_is_refused_and_leaves_the_first_alone(rig):
     assert rig.node.state_machine.phase is Phase.TOP_SEARCH
     rig.stop()
     assert rig._result_of(first).result.reason_code == Reason.STOP_REQUESTED
+
+
+def test_log_pose_is_the_source_pose_or_nan(rig):
+    rig.peers.behavior[F.key(Operation.SLIDE, Direction.NEG_X)] = F.MAX_DISTANCE
+    rig.run()
+    assert rig.wait(lambda: rig.error_logs())
+    error = rig.error_logs()[0]
+    q = error.pose.orientation
+    assert error.pose_valid and error.frame_id == 'base_link'
+    assert (q.x, q.y, q.z, q.w) == (0.0, 1.0, 0.0, 0.0)          # Result.pose 의 자세 그대로
+    without_pose = next(log for log in rig.logs if not log.pose_valid)
+    assert math.isnan(without_pose.pose.position.x) and math.isnan(without_pose.pose.orientation.w)
+
+
+# ---- 운영 시나리오 (시뮬레이션) ----
+
+def test_operator_session_set_config_stop_home_then_full_scan(rig):
+    """한 프로세스에서 이어지는 관제: 설정 → 스캔 중 중지 → 안전복귀 → 새 스캔 완료."""
+    assert rig.set_config(ScanConfig(slide_speed_mps=0.02, slide_speed_set=True)).success
+
+    _response, stopped = stop_during_slide(rig, Direction.POS_Y)
+    assert stopped.reason_code == Reason.STOP_REQUESTED and stopped.result.x_neg_valid
+    assert not stopped.result.y_pos_valid and math.isnan(stopped.result.y_pos)
+    first_goals = len(rig.peers.goals)
+
+    assert rig.home().success
+    assert rig.node.state_machine.phase is Phase.STOPPED
+    assert rig.peers.goals[-1].motion_id == first_goals + 1      # 같은 작업의 motion_id 를 잇는다
+
+    rig.peers.behavior.clear()
+    done = rig.run(RunScan.Goal(request_id='run-2'))
+
+    assert done.success and done.scan_id != stopped.scan_id
+    assert rig.node.state_machine.phase is Phase.DONE
+    assert (done.result.width, done.result.length, done.result.height) == pytest.approx(BOX_SIZE)
+    second = [g for g in rig.peers.goals if g.scan_id == done.scan_id]
+    assert [g.motion_id for g in second] == list(range(1, len(second) + 1))   # 새 작업은 1 부터
+    assert {g.speed for g in second if g.operation == Operation.SLIDE} == {0.02}   # 설정이 유지된다
+    assert [r.scan_id for r in rig.results] == [stopped.scan_id, done.scan_id]
+
+    store = rig.store()
+    old, new = store.load(stopped.scan_id), store.load(done.scan_id)
+    assert old.state.phase is Phase.STOPPED and not old.result_saved
+    assert old.home_return.completed and len(old.interruptions) == 1
+    assert new.state.phase is Phase.DONE and new.result_saved and new.interruptions == []
+    assert rig.error_logs() == []
 
 
 # ---- 설정 ----

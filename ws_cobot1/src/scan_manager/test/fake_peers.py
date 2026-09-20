@@ -5,6 +5,8 @@
 - /robot/execute_motion: 동시에 1개. 실행 중 · 미연결 · speed <= 0(OP_HOME 제외)이면 goal 을 거절한다.
 - /contact/event: DESCEND → CONTACT, SLIDE → EDGE. 발행 시점(Result 앞 · 뒤 · 없음)을 바꿀 수 있다.
 - /robot/status: 주기 발행. stamp 는 발행 시각이다.
+- 가상 직육면체까지의 거리가 goal 의 max_distance 를 넘으면 REASON_MAX_DISTANCE 로 끝낸다
+  (yaml 의 max_descend_m · max_slide_m · 기준점이 상자를 실제로 덮는지 드러난다).
 가상 직육면체와 정방향 모델은 sequence_helpers 와 같다. 수치는 테스트용 임의값이다.
 """
 
@@ -47,6 +49,9 @@ ROBOT_ERROR = 'robot_error'
 EVENT_AFTER = 'event_after'        # 이벤트가 Result 보다 늦게 온다
 EVENT_NEVER = 'event_never'        # Result 는 event_id 를 가리키는데 이벤트가 끝내 오지 않는다
 STRAY_EVENT = 'stray_event'        # motion_id 가 다른 이벤트가 먼저 끼어든다
+HOLD_THEN_OVER_FORCE = 'hold_then_over_force'   # 정지 요청이 올 때까지 움직이다가 과대 외력으로 끝난다
+
+MODEL_KEYS = ('detect_latency_s', 'tip_radius_m', 'edge_round_radius_m', 'edge_bias_offset_m')
 
 
 def key(operation, direction=Direction.NONE):
@@ -55,14 +60,17 @@ def key(operation, direction=Direction.NONE):
 
 class FakePeers(Node):
 
-    def __init__(self):
+    def __init__(self, model=None):
+        """model: 정방향 모델의 값(MODEL_KEYS). scan_manager 의 보정 파라미터와 같아야 치수가 복원된다."""
         super().__init__('fake_peers')
+        self.model = {name: (model or VALUES)[name] for name in MODEL_KEYS}
         group = ReentrantCallbackGroup()
         self.behavior = {}             # key(op, dir) → 위의 상수
         self.connected = True
         self.latched = False
         self.safety_code = 0
         self.tare_error = 0            # 0 이 아니면 그 코드로 실패한다
+        self.latch_during_tare = 0     # 0 이 아니면 tare 도중에 그 코드로 안전 래치가 걸린다(모션 사이의 래치)
         self.reject_operations = set() # 이 operation 의 goal 은 거절한다
         self.goals = []                # 수락한 goal
         self.rejected = 0
@@ -113,6 +121,9 @@ class FakePeers(Node):
 
     def _on_tare(self, request, response):
         self.tare_requests.append(request)
+        if self.latch_during_tare:
+            self.latched, self.safety_code = True, self.latch_during_tare
+            time.sleep(10 * STATUS_PERIOD_S)  # 래치가 /safety/status 로 나간 뒤에 응답한다
         response.success = not self.tare_error
         response.error = self.tare_error
         response.detail = 'fake tare failure' if self.tare_error else ''
@@ -175,6 +186,10 @@ class FakePeers(Node):
         behavior = self.behavior.get(key(goal.operation, goal.direction), NORMAL)
         if behavior == ROBOT_ERROR:
             return self._result(R.REASON_ROBOT_ERROR, 204, detail='fake driver error')
+        if behavior == HOLD_THEN_OVER_FORCE:
+            while not self._halt.wait(0.005):
+                pass
+            return self._result(R.REASON_OVER_FORCE, 400, detail='fake over force while stopping')
         if behavior == HOLD:
             while not self._halt.wait(0.005):
                 pass
@@ -204,20 +219,28 @@ class FakePeers(Node):
                 self.position = tuple(moved)
             return self._result(R.REASON_MAX_DISTANCE, 300 if descend else 301)
 
-        latency, r = VALUES['detect_latency_s'], VALUES['tip_radius_m']
+        latency, r = self.model['detect_latency_s'], self.model['tip_radius_m']
         if descend:
             detected = (x, y, BOX_BOTTOM_Z + BOX_SIZE[2] - goal.speed * latency)
+            if z - detected[2] > goal.max_distance:   # 상자 윗면이 max_descend_m 보다 멀다
+                self.position = (x, y, z - goal.max_distance)
+                return self._result(R.REASON_MAX_DISTANCE, 300)
             self.position = (x, y, detected[2] - 0.0002)
             event_type, z_drop = ContactEvent.TYPE_CONTACT, None
         else:
             direction = Direction(goal.direction)
             axis = geometry_adapter.AXIS[direction]
-            reach = r + VALUES['edge_round_radius_m']
+            reach = r + self.model['edge_round_radius_m']
             d = reach if Z_DROP_M >= reach else math.sqrt(2 * reach * Z_DROP_M - Z_DROP_M ** 2)
-            overshoot = (d - VALUES['edge_round_radius_m'] + goal.speed * latency
-                         + VALUES['edge_bias_offset_m'])
+            overshoot = (d - self.model['edge_round_radius_m'] + goal.speed * latency
+                         + self.model['edge_bias_offset_m'])
             detected = [x, y, z - Z_DROP_M]
             detected[axis] = edge_coordinate(direction) + SIGN[direction] * overshoot
+            if abs(detected[axis] - self.position[axis]) > goal.max_distance:   # 모서리가 max_slide_m 보다 멀다
+                moved = [x, y, z]
+                moved[axis] += SIGN[direction] * goal.max_distance
+                self.position = tuple(moved)
+                return self._result(R.REASON_MAX_DISTANCE, 301)
             stopped = list(detected)
             stopped[axis] += SIGN[direction] * 0.0004
             self.position, detected = tuple(stopped), tuple(detected)

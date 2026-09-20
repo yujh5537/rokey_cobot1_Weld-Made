@@ -46,8 +46,9 @@ def stamp_to_msg(stamp: Stamp) -> Time:
 
 
 def duration_msg(seconds: float) -> Duration:
-    whole = int(seconds)
-    return Duration(sec=whole, nanosec=int(round((seconds - whole) * 1e9)))
+    # 정수 ns 로 바꾼 뒤에 나눈다. 소수부를 따로 반올림하면 29.9999999999 s 에서 nanosec 이 10^9 이 된다.
+    sec, nanosec = divmod(int(round(seconds * 1e9)), 1_000_000_000)
+    return Duration(sec=sec, nanosec=nanosec)
 
 
 def position_of(pose_msg):
