@@ -78,10 +78,12 @@ robot_manager:
                                      #   SLIDE 는 DESCEND 가 접촉으로 끝난 직후에 오므로 기준선이
                                      #   접촉력(증분 3~5 N 추정)이고, 실제 누름은 그만큼 더 커진다.
                                      #   실기에서 SLIDE 시작 로그의 기준선 Fz 를 보고 정한다 (#73).
-                                     #   하한 두 개: contact_detector 의 edge_arm_force_n(1.5 N)
-                                     #   보다 충분히 커야 EDGE 판정이 무장되고, contact_threshold_n
-                                     #   (3 N, 증분 기준)보다 커야 슬라이드 내내 접촉으로 잡힌다.
-                                     #   9/20 실기 편향 2.25 mm 는 증분 2~4 N 에서 잰 값이다.
+                                     #   ⚠️ edge_arm_force_n · contact_threshold_n 과 직접 비교하지
+                                     #   않는다. 그 둘은 tare 대비 증분(|F − F0|)이고 이 값은 호출
+                                     #   시점 기준이라, 기준이 다른 값끼리는 대소 비교가 성립하지
+                                     #   않는다 (현지 리뷰, PR #73). 실제 누름을 tare 기준으로
+                                     #   환산하려면 SLIDE 시작 로그의 기준선 Fz 를 더해야 한다.
+                                     #   9/20 실기 편향 2.25 mm 는 tare 대비 증분 2~4 N 에서 잰 값이다.
                                      #   확정 순서: 이동 중 잡음 → 임계 → 누름 힘 → 편향 (병후)
     compliance_stiffness: [3000.0, 3000.0, 3000.0, 200.0, 200.0, 200.0]
                                      # task_compliance_ctrl 강성 [N/m ×3, N·m/rad ×3].
