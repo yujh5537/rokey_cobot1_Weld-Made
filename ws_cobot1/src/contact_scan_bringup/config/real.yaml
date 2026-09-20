@@ -32,6 +32,16 @@ robot_manager:
   ros__parameters:
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
     # slide_target_force_n:          # 계약 이름. 값 TBD (학민)
+    frame_id: base_link              # units-frames.md 가칭. 계약에서 확정되면 같이 바꾼다
+    dsr_namespace: dsr01
+    sample_rate_hz: 50.0             # 설정값. 실측은 Virtual 37.6 Hz, 실기 42.8 Hz
+    status_rate_hz: 10.0
+    service_timeout_s: 0.5
+    moving_eps_m: 0.0002             # 이 창 안에서 이만큼 움직이면 이동 중.
+                                     #   실기 posx 잡음이 0.2 mm 를 넘으면 영원히 '이동 중'이 되어
+                                     #   정지 완료가 안 나오고, 너무 크면 느린 하강을 정지로 본다.
+                                     #   실기에서 확인해 조정한다 (다음 세션 'moving 오탐 여부')
+    moving_window_s: 0.3
 
 scan_manager:
   ros__parameters:

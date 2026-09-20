@@ -43,6 +43,13 @@ robot_manager:
   ros__parameters:
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
     # slide_target_force_n:          # 계약 이름. 값 TBD (학민)
+    frame_id: base_link              # units-frames.md 가칭. 계약에서 확정되면 같이 바꾼다
+    dsr_namespace: dsr01
+    sample_rate_hz: 50.0             # 설정값. 실측은 Virtual 37.6 Hz, 실기 42.8 Hz
+    status_rate_hz: 10.0
+    service_timeout_s: 0.5
+    moving_eps_m: 0.0002             # 이 창 안에서 이만큼 움직이면 이동 중
+    moving_window_s: 0.3
 
 scan_manager:
   ros__parameters:
