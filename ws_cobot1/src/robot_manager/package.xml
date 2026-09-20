@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>robot_manager</name>
+  <version>0.1.0</version>
+  <description>두산 M0609 제어와 RobotSample · RobotStatus 발행. 두산 mm·deg ↔ 계약 m·rad 변환은 이 패키지에만 둔다. 소유: 학민 (T13~T15)</description>
+  <maintainer email="rokeyhak@users.noreply.github.com">rokeyhak</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>contact_scan_interfaces</exec_depend>
+  <!-- 두산 드라이버(dsr_msgs2)는 ws_dsr 에만 있고 CI 에는 없다. 그래서 의존으로 선언하지 않고
+       노드에서만 import 한다. 순수 계산(conversions)과 그 테스트는 dsr_msgs2 없이 돈다. -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

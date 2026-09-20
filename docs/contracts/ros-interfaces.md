@@ -558,7 +558,13 @@ from contact_scan_qos import QOS_SENSOR, QOS_STATE, QOS_EVENT, QOS_LOG, QOS_HEAR
 | `LOG` | RELIABLE | VOLATILE | KEEP_LAST 100 |
 | `HEARTBEAT` | BEST_EFFORT | VOLATILE | KEEP_LAST 1 |
 
-Service · Action은 기본값. 설계 목표(샘플 50 Hz · 표시 10 Hz · heartbeat 1 Hz)는 **측정 결과가 아니다.** 실측 주기는 T15에서 적는다.
+Service · Action은 기본값. 설계 목표(샘플 50 Hz · 표시 10 Hz · heartbeat 1 Hz)는 **측정 결과가 아니다.**
+
+**실측 (2026-09-20, Virtual, 학민 PC, T15).** `sample_rate_hz=50` · `status_rate_hz=10`으로 두었을 때
+`/robot/sample` **37.6 Hz**(간격 평균 24.8 ms, 최대 97.7 ms, 유효 376/376), `/robot/status` **9.3~9.8 Hz**였다.
+한 샘플의 `pose_stamp`와 `force_stamp`는 2~16 ms 떨어져 있었다. 두 값을 동시 취득으로 보면 안 된다.
+설정값에 못 미치는 이유는 robot_manager가 두산 서비스를 **직렬로** 부르기 때문이다(동시 호출 시 드라이버가
+서비스 응답을 멈췄다. `docs/env/api-check-log.md`). 실기 주기는 T24 전에 다시 잰다.
 
 ### 6.4 계약에 속하는 파라미터 이름
 SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는다. 값은 yaml에서 담당자가 정한다. 그 밖의 파라미터는 노드 담당자 재량이다(전체 목록은 정의서 6장).
@@ -634,10 +640,13 @@ T01 회의에서 **담당 · 기한 없이 TBD로 두기로** 했다. 정해지�
 
 - 하강 속도 · 누름 목표 힘 · 내림 속도 · `recontact_margin_m`의 값
 - tare 허용치(`tare_max_force_n` · 불안정 판정) · 외력 감소 보조 신호
-- `RobotStatus.moving`의 근거, 두산 서비스 실제 이름
+- ~~`RobotStatus.moving`의 근거~~ → **T15에서 정했다.** `get_robot_state`는 Virtual에서 이동 중에도
+  STANDBY(1)를 돌려줘 쓸 수 없었다(2026-09-20 실측: z 540.6 → 527.6으로 움직이는 동안 30회 모두 1).
+  robot_manager는 최근 `moving_window_s`(0.3 s) 안의 TCP 위치 변화가 `moving_eps_m`(0.2 mm)를 넘으면
+  이동 중으로 본다. 위치를 모르면 이동 중으로 본다(정지로 보고하면 scan_manager가 STOPPING에서 못 빠져나온다).
+  실기에서 `get_robot_state`가 제대로 동작하면 다시 본다. 두산 서비스 실제 이름은 `docs/env/api-check-log.md`
 - 순응 · 힘 제어 **해제 호출이 실패했을 때** 무엇을 보고하는가(`ExecuteMotion.Result.compliance_released` · `reason_code` · `RobotStatus`의 두 플래그). 5.4절의 "항상 true 여야 한다"는 목표이며 실패 경로는 정해지지 않았다
 - 정지 시 `move_stop` → 순응 · 힘 제어 해제의 순서(4.1절). 순응이 켜진 채 급정지할 때의 반동을 실기에서 확인한 뒤 확정한다
 - 홈 복귀 경로 · 순서, 중단 위치 재접근 절차, 이상 상태별 재시작 허용 조건
 - heartbeat 만료 시 조치(`warn`/`stop`) · 브라우저 단절 정책, 데이터 최신성 한계
-- 실측 발행 주기(T15)
 - result_store 파일 형식 · 스키마
