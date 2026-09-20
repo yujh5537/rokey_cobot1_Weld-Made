@@ -97,6 +97,13 @@ def test_motion_id_zero_rearms_when_force_drops(config):
     assert all(d.sample.motion_id == 0 for d in detections)
 
 
+def test_motion_id_transition_from_zero(config):
+    # 0 으로 오다가 robot_manager 가 붙어 1 로 바뀌는 순간: 새 동작으로 취급해 다시 1 회 낸다
+    detector = tared(config)
+    assert len(run(detector, make_samples([10] * 5, motion_id=0))) == 1
+    assert len(run(detector, make_samples([10] * 5, motion_id=1, start_id=100))) == 1
+
+
 def test_run_does_not_carry_over_between_motions(config):
     detector = tared(config)
     assert run(detector, make_samples([10, 10], motion_id=1)) == []
