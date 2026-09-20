@@ -2,6 +2,12 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.1.6 (2026-09-20, T19a, PR #82)
+타입 변경 없음. `units-frames.md`의 **탐색 기준점** 행에서 "별도 파라미터를 두지 않는다"를 "scan_manager 파라미터 `search_origin_pose`(Base, x y z + quaternion)로 둔다"로 바꿨다. PR #77(T19a 2/2) 리뷰에서 현지가 계약과 코드의 불일치를 지적했다. 영향: scan_manager(T19a · T19b), `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절.
+- 이유: scan_manager는 홈 자세의 TCP를 모른다(홈은 robot_manager의 관절각이고 scan_manager는 `/robot/sample`을 구독하지 않는다). `OP_MOVE_TO`의 목표에는 자세가 필요한데 자세(수직 고정)는 홈과 `base_to_fixture`만으로 나오지 않는다
+- 값을 정하는 규칙은 그대로다: x · y = 작업대 원점, z = 첫 하강을 시작할 높이(초안: 홈 팁 높이), 자세 = 탐침 수직. 자세는 quaternion으로 적는다(두산 ZYZ 오일러와 혼동하지 않게)
+- `max_descend_m` 조건(하한 · 상한)은 바꾸지 않았다. 값은 여전히 TBD다
+- 번호: main은 v0.1.5(PR #79, 머지됨)다. 팀에서 합의한 순서(#79 → #82 → #80)로 배정했다 — **v0.1.6 = 이 PR**, **v0.1.7 · v0.1.8 = PR #80**(T03 후속, 두 항목), **v0.1.9 = 후속 PR**(#51 · #54). PR #80도 같은 행(홈 팁 높이 수치)을 고치므로 나중에 머지되는 쪽이 rebase한다
 ## v0.1.5 (2026-09-20, #69, PR #79)
 타입 변경 없음. `ros-interfaces.md` 3.3절의 **"판정 샘플"** 을 **조건이 처음 성립한 샘플**(연속 구간의 첫 샘플)로 확정하고, `ContactEvent` 필드별로 어느 샘플의 값인지 적었다. 주석만 바뀌었고 필드 이름 · 타입 · 순서 · 상수값은 그대로다. 영향: contact_detector(T16 배선에서 고르는 필드) · scan_manager/geometry_estimator(`detect_latency_s`의 뜻에서 디바운스 몫이 빠진다) · mqtt_bridge · 웹(`pose`의 뜻만 달라진다). robot_manager는 이벤트를 정지 트리거로만 쓰므로 영향 없음.
 - 첫 샘플: `pose` · `pose_stamp` · `wrench` · `force_stamp` · `sample_id` · `z_drop_m`(EDGE). 확정 샘플: `force_delta_n` · `detect_stamp`. `debounce_count`는 그대로
