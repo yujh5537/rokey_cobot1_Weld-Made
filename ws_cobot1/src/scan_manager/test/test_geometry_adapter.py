@@ -1,7 +1,5 @@
 """측정 5점 → 실제 geometry_estimator → ShapeResult (ROS 없음). 수치는 테스트용 임의값이다."""
 
-import math
-
 import pytest
 from result_store_helpers import CONFIG
 from result_store_helpers import FakeClock
@@ -49,7 +47,9 @@ def compute(params, top, edges, **kwargs):
 
 @pytest.fixture
 def params():
-    return make_params(base_to_fixture=list(ORIGIN))
+    # 기준점은 작업대 원점의 위 0.10 m (하강 한계가 지지면에 닿지 않아야 한다)
+    origin = [ORIGIN[0], ORIGIN[1], ORIGIN[2] + 0.10, 0.0, 1.0, 0.0, 0.0]
+    return make_params(base_to_fixture=list(ORIGIN), search_origin_pose=origin)
 
 
 def test_to_fixture_is_a_translation():
@@ -163,5 +163,5 @@ def test_output_is_accepted_by_result_store(params, tmp_path):
     assert saved.bias_corrections[Direction.POS_X].correction_m == pytest.approx(
         output.bias_corrections[Direction.POS_X].correction_m)
     assert saved.node_params['tip_radius_m'] == params.tip_radius_m
-    assert not any(
-        isinstance(v, float) and math.isnan(v) for v in saved.shape.to_dict().values())
+    # 파일에는 NaN 이 나오지 않는다(무효 값은 null)
+    assert 'NaN' not in (tmp_path / SCAN_ID / 'result.json').read_text(encoding='utf-8')

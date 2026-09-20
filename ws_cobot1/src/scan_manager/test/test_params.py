@@ -96,6 +96,16 @@ def test_recontact_margin_must_stay_below_the_lift():
     assert not result.ok and 'recontact_margin_m' in result.describe()
 
 
+def test_descend_limit_must_not_reach_the_support_surface():
+    # 기준점 z 0.10, 지지면 z 0.0 → 하강 한계는 0.10 미만이어야 한다(units-frames.md: 작업대 면을 윗면으로 잡지 않게)
+    assert P.check({**VALUES, 'max_descend_m': 0.0999}).ok
+    for too_far in (0.10, 0.15):
+        result = P.check({**VALUES, 'max_descend_m': too_far})
+        assert not result.ok and 'max_descend_m' in result.describe()
+    raised_table = P.check({**VALUES, 'base_to_fixture': [0.40, 0.00, 0.05]})  # 지지면이 올라오면 같은 값도 닿는다
+    assert not raised_table.ok and 'max_descend_m' in raised_table.describe()
+
+
 def test_check_values_covers_other_nodes_config():
     assert P.check_values({'contact_threshold_n': 3.0, 'debounce_n': 3, 'drop_limit_m': 0.004}) == ()
     problems = P.check_values({'over_force_n': -1.0, 'debounce_n': 0, 'edge_drop_m': None})

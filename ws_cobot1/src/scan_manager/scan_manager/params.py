@@ -238,6 +238,14 @@ def check(values: Mapping[str, object]) -> ParamCheck:
         if margin >= lift:
             invalid.append(
                 f'recontact_margin_m = {margin!r}: lift_height_m({lift!r}) 보다 작아야 한다')
+        # units-frames.md '탐색 기준점 높이': 하강 한계가 지지면에 닿으면 부재가 없을 때 작업대 면을 윗면으로 잡는다.
+        # 안전 여유 값은 TBD(T13)라 여기서는 "지지면에 닿지 않는다"만 본다.
+        clearance = (merged['search_origin_pose'][2]
+                     - (merged['base_to_fixture'][2] + merged['support_z_m']))
+        if merged['max_descend_m'] >= clearance:
+            invalid.append(
+                f"max_descend_m = {merged['max_descend_m']!r}: 기준점에서 지지면까지의 거리"
+                f'({clearance:.6f}) 보다 작아야 한다')
     if missing or invalid:
         return ParamCheck(None, tuple(missing), tuple(invalid))
 

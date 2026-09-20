@@ -5,7 +5,7 @@
 - 짝은 Result.event_id == ContactEvent.event_id 로 맞춘다.
 - 이벤트는 Result 보다 먼저 올 수도 나중에 올 수도 있다. 먼저 온 것은 보관하고, 늦는 것은 wait() 가 기다린다.
 
-이벤트 객체는 motion_id · event_id · type · scan_id 속성만 본다(ContactEvent.msg 를 그대로 넣는다).
+이벤트 객체는 motion_id · event_id · type · scan_id · frame_id 속성만 본다(ContactEvent.msg 를 그대로 넣는다).
 offer() 는 구독 콜백에서, begin() · wait() · end() 는 시퀀스 스레드에서 부른다.
 """
 
@@ -16,6 +16,7 @@ IGNORED_NO_MOTION = 'no_motion'            # 진행 중인 동작이 없다
 IGNORED_MOTION_ID = 'motion_id_mismatch'   # motion_id 가 0 이거나 현재 동작과 다르다
 IGNORED_SCAN_ID = 'scan_id_mismatch'       # 다른 작업의 이벤트
 IGNORED_TYPE = 'type_mismatch'             # 이 동작이 기다리는 종류가 아니다 (예: DESCEND 중의 EDGE)
+IGNORED_FRAME = 'frame_id_mismatch'        # 좌표의 프레임이 다르다. 좌표를 쓰는 쪽은 frame_id 를 확인한다(계약 1장)
 
 
 class EventMatcher:
@@ -26,13 +27,15 @@ class EventMatcher:
         self._scan_id = ''
         self._motion_id = 0
         self._expected_type = None
+        self._frame_id = ''
         self._events = {}
 
-    def begin(self, scan_id: str, motion_id: int, expected_type=None) -> None:
+    def begin(self, scan_id: str, motion_id: int, expected_type=None, frame_id: str = '') -> None:
         """새 동작을 시작한다. 앞선 동작의 이벤트는 버린다.
 
         expected_type: 측정값으로 쓸 ContactEvent.type. None 이면 이 동작은 이벤트를 기다리지 않는다
         (OP_MOVE_TO · OP_HOME). 그동안 온 이벤트는 전부 무시된다.
+        frame_id: 측정값으로 받을 좌표의 프레임. 주면 event.frame_id 가 다른 이벤트를 무시한다.
         """
         if not motion_id:
             raise ValueError('motion_id 는 0 이 아니어야 한다(0 = 없음)')
@@ -40,6 +43,7 @@ class EventMatcher:
             self._scan_id = scan_id
             self._motion_id = int(motion_id)
             self._expected_type = expected_type
+            self._frame_id = frame_id
             self._events = {}
 
     def end(self) -> None:
@@ -71,6 +75,8 @@ class EventMatcher:
             return IGNORED_SCAN_ID
         if self._expected_type is None or int(event.type) != int(self._expected_type):
             return IGNORED_TYPE
+        if self._frame_id and event.frame_id != self._frame_id:
+            return IGNORED_FRAME
         return None
 
     def wait(self, event_id: int, timeout_s: float):

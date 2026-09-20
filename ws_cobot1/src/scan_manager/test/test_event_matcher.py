@@ -17,6 +17,7 @@ class Event:
     motion_id: int
     type: int = EDGE
     scan_id: str = SCAN
+    frame_id: str = 'base_link'
 
 
 @pytest.fixture
@@ -94,6 +95,14 @@ def test_scan_id_is_checked_only_when_tagged(matcher, ignored):
     assert matcher.offer(Event(event_id=23, motion_id=3, scan_id=''))
     assert not matcher.offer(Event(event_id=24, motion_id=3, scan_id='20260920-110000-9999'))
     assert ignored == [(24, M.IGNORED_SCAN_ID)]
+
+
+def test_event_in_another_frame_is_not_a_measurement(matcher, ignored):
+    matcher.begin(SCAN, 3, EDGE, frame_id='base_link')
+    assert not matcher.offer(Event(event_id=27, motion_id=3, frame_id='workpiece_fixture'))
+    assert not matcher.offer(Event(event_id=28, motion_id=3, frame_id=''))
+    assert matcher.offer(Event(event_id=29, motion_id=3, frame_id='base_link'))
+    assert ignored == [(27, M.IGNORED_FRAME), (28, M.IGNORED_FRAME)]
 
 
 def test_begin_drops_events_of_the_previous_motion(matcher):

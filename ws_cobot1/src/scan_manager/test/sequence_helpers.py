@@ -7,6 +7,7 @@
 
 import itertools
 import math
+import os
 
 from scan_manager import geometry_adapter
 from scan_manager.contract_enums import Direction
@@ -57,6 +58,16 @@ BOX_BOTTOM_Z = 0.0
 Z_DROP_M = 0.0005   # tip_radius_m 보다 크다 → 팁이 모서리를 완전히 벗어난 구간(d = r)
 HOME_POSITION = (0.42, -0.18, 0.29)
 SIGN = {Direction.POS_X: 1.0, Direction.NEG_X: -1.0, Direction.POS_Y: 1.0, Direction.NEG_Y: -1.0}
+
+
+def isolated_domain_id() -> str:
+    """노드 테스트용 ROS_DOMAIN_ID. 다른 테스트 · 떠 있는 노드 · 조 공용 도메인과 섞이지 않게 한다.
+
+    1~101 안에서 고른다. Linux 에서 102 이상은 DDS 포트(7400 + 250 x 도메인)가 임시 포트 범위
+    (32768~)에 들어가 드물게 충돌한다. 30 은 이 조의 공용 도메인(실기 · Virtual)이라 피한다.
+    """
+    domain = 1 + os.getpid() % 100
+    return str(101 if domain == 30 else domain)
 
 
 def make_params(**overrides):

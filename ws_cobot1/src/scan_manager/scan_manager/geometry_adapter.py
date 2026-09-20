@@ -15,7 +15,6 @@ from typing import Dict, Mapping, Optional, Tuple
 from .contract_enums import Direction
 from .contract_enums import Reason
 from .geometry_estimator import BiasParams
-from .geometry_estimator import BoxEstimate
 from .geometry_estimator import Correction
 from .geometry_estimator import EDGE_DIRECTIONS
 from .geometry_estimator import EdgeObservation
@@ -61,7 +60,6 @@ class GeometryOutput:
     shape: ShapeResult
     bias_corrections: Dict[Direction, BiasCorrection]  # result.json 에만 남긴다(계약 3.5절)
     top_correction: Correction                         # result_store 에 아직 자리가 없다
-    estimate: BoxEstimate
 
 
 def to_fixture(position_m: Position, base_to_fixture: Position) -> Position:
@@ -157,4 +155,4 @@ def compute_shape(
         direction: _bias_correction(direction, box.bias_corrections[direction], edges.get(direction))
         for direction in EDGE_DIRECTIONS
     }
-    return GeometryOutput(shape, corrections, box.top_correction, box)
+    return GeometryOutput(shape, corrections, box.top_correction)
