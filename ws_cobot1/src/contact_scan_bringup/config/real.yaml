@@ -31,14 +31,18 @@ contact_detector:
     edge_trend_min_samples: 10       # 구간 안의 샘플이 이보다 적으면 판정하지 않는다 (실기 42.7 Hz 면 0.5 s 에 약 21 개)
 
     stale_age_ms: 100                # 샘플 최신성 한계(정의서 6.2 제안값). 넘게 묵은 샘플은 버리고, 간격이 넘으면 경고한다
-                                     #   실측 간격 최대: 실기 기록기 29 ms (2026-09-20), Virtual robot_manager 97.7 ms (PR #72)
+                                     #   실기 실측 간격 최대 29 ms (2026-09-20 기록기 단독, idle_30s.csv). robot_manager 의 실기 주기는 미측정
+                                     #   sim.yaml 은 Virtual 최대 97.7 ms(계약 6.3) 때문에 200 이다
 
     # --- tare (/contact/tare): 무접촉 · 정지 구간의 외력 평균을 기준값 F0 로 저장 ---
     tare_duration_s: 1.5             # 요청의 duration_s 가 0 일 때 쓰는 구간. BRD 4.1.3 의 1~2 s
     tare_min_samples: 30             # 구간 안의 유효 샘플이 이보다 적으면 TARE_TIMEOUT
     tare_max_std_n: 0.3              # |F - F0| 의 RMS 가 넘으면 TARE_UNSTABLE. 설계 출발값. 실기 정지 상태 실측 0.035 N (2026-09-20)
-    tare_max_force_n: 5.0            # |F0| 가 넘으면 TOOL_REG_SUSPECT (BRD 4.1.5). **허용치는 팀이 아직 정하지 않았다**(PR #57)
-                                     #   실측 |F0|: 1.81 N (2026-09-20 홈 자세), 2.1~2.9 N · 최대 3.7 N (2026-09-19 3자세)
+    tare_max_force_n: 6.0            # |F0| 가 넘으면 TOOL_REG_SUSPECT (BRD 4.1.5 툴 등록 점검). 병후 제안값 (PR #57 코멘트)
+                                     #   실측 |F0|: 툴 등록 1.81 N (2026-09-20 홈 자세) · 2.1~2.9 N, 최대 3.7 N (2026-09-19 3자세)
+                                     #             툴 미등록 11~12.5 N. 두 구간 사이가 벌어져 있어 6 N 으로 가른다
+                                     #   낮게 잡으면 안 되는 이유: 탐침이 홀더 안으로 밀리는 중이면 |F0| 가 올라갈 수 있고(PR #80),
+                                     #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
 
 safety_monitor:
   ros__parameters:
