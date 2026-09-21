@@ -111,6 +111,77 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest backend/app/tests -q
 - Service 명령의 ACK 최종 성공 처리
 - 요청별 서로 다른 `request_id` 생성
 
+## T27 mqtt_bridge ↔ FastAPI 실제 통합 검증
+
+2026-09-21 Main PC의 ROS 2 / DSR Virtual 환경과 Web PC의
+Mosquitto / FastAPI / React를 실제 연결해 양방향 통신을 검증했다.
+
+### 검증 경로
+
+ROS → Web:
+
+    DSR Virtual
+      → robot_manager / scan_manager
+      → mqtt_bridge
+      → Web PC Mosquitto
+      → FastAPI
+      → WebSocket
+      → React
+
+Web → ROS:
+
+    React
+      → FastAPI REST
+      → Web PC Mosquitto
+      → mqtt_bridge
+      → scan_manager
+      → robot_manager
+      → DSR Virtual
+
+Main PC의 mqtt_bridge는 Web PC Broker를 사용했다.
+
+    broker_host = <Web PC 주소>
+    broker_port = 1883
+
+### 실제 검증 결과
+
+- `conn/ros`, `hb/ros`가 Main PC mqtt_bridge에서 Web PC Mosquitto를 거쳐 FastAPI까지 수신됨
+- FastAPI `/ws` WebSocket에서 실제 `hb/ros` 메시지 수신 확인
+- React `시작` 버튼으로 실제 스캔 실행
+  - `cmd/scan/start`
+  - `cmd/ack accepted=true`
+  - `PREPARING → TOP_SEARCH → EDGE_SEARCH → DONE`
+  - 진행도 `4 / 4`
+  - 명령 상태 `SUCCEEDED`
+- 실행 중 React `중지` 버튼으로 실제 스캔 중단
+  - `cmd/scan/stop`
+  - `cmd/ack accepted=true`
+  - 최종 `scan/state phase=STOPPED`
+  - Stop 명령 상태 `SUCCEEDED`
+- 중지된 Start 명령은 `STOP_REQUESTED(200) — stopped` 결과로 종료됨
+- 실제 mqtt_bridge 메시지와 `docs/contracts/mqtt-schema.md` v0.1 사이에
+  스키마 차이는 발견되지 않음
+
+### 통합 시 주의사항
+
+동일한 ROS graph에 `/mqtt_bridge` 노드를 두 개 띄우지 않는다.
+
+`contact_scan_bringup`에서 자동 실행된 mqtt_bridge와 별도로
+Web PC Broker를 지정한 mqtt_bridge를 실행하면 동일 노드가 두 개 생길 수 있다.
+실제 통합 시 Web PC Broker에 연결된 mqtt_bridge 하나만 유지한다.
+
+현재 Stop 검증에서는 `/scan/stop`이 정상 접수되고 Action cancel을 통해
+실제 로봇 동작이 중지되어 `STOPPED`까지 전이했다.
+
+이때 ACK detail에 `/robot/stop 서버가 없다`가 표시됐다. 계약상 `/robot/stop`은
+robot_manager가 제공하고, scan_manager는 중지 시 `/robot/stop` 호출과 goal cancel을
+함께 한다(ros-interfaces.md 2장·4.4절). 이번 검증은 **goal cancel 경로 하나로만**
+정지했다.
+
+현재 main의 robot_manager에는 `/robot/stop` 서버가 없다(T14, 진행 중 PR 있음).
+safety_monitor의 웹 비경유 정지도 이 서비스를 쓰므로, **시연 전에 반드시 들어가야 한다.**
+해당 PR 머지 후 중지 경로를 다시 확인한다.
+
 ## T28 PostgreSQL 측정·이벤트 저장
 
 FastAPI는 MQTT로 수신한 `scan/result`와 `contact/event`를 PostgreSQL에 저장한다.
