@@ -161,7 +161,7 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 `result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작이 끝까지 간 뒤에 쓸 자리를 남겨 둔다. 원본을 쓴 직후에 중지된 작업의 재시작은 그 파일을 읽어 재발행한다.
 
 ## executor · 스레드
-`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 다섯이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버(`/scan/stop`), **`/scan/set_config` 전용**, 클라이언트(Reentrant). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
+`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 여섯이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버(`/scan/stop`), **`/scan/set_config` 전용**, 클라이언트(Reentrant), 기동 뒤 되읽기 전용(한 번만 도는 타이머. 상태 발행 타이머를 막지 않게 뺐다). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
 
 `/scan/set_config`를 따로 둔 이유: 전파가 상대 노드의 응답을 기다리므로, `/scan/stop`과 같은 MutuallyExclusive 그룹이면 그동안 정지가 아예 돌지 못한다(규칙 3: 정지는 독립된 명령이다).
 
@@ -170,7 +170,9 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 - 상태 기계의 `on_change`(락 안)는 발행과 쓰기 큐 투입만 한다. 디스크 쓰기 · 서비스 호출 · 대기가 없어서 `/scan/stop`의 `request(STOP)`이 디스크를 기다리지 않는다.
 - 명령 접수 락 안에서는 쓰기 스레드를 기다리지 않는다. 다만 HOME · RESUME의 접수는 그 락 안에서 **기록 파일 한두 개를 읽는다**(가장 최근 기록 · 이을 작업의 기록). 그동안 온 `/scan/stop`은 읽기가 끝날 때까지 기다린다. 이 구간은 휴지 phase라 scan_manager가 보낸 모션이 없다. 재시작의 쓰기 큐 대기는 락을 잡기 **전에** 한다.
 - 락의 순서는 한 방향이다: (명령 접수 락 →) **설정 락 →** 작업 락 → 상태 기계 락 → 발행 락. 주기 발행은 상태 기계 락을 놓은 뒤에 발행 락을 잡는다.
-- **전파는 설정 락만 쥔 채 기다린다.** SetConfig의 접수 · 전파 · 되읽기 전체가 설정 락 안이고, 작업 락은 접수 판정과 자기 값 반영에만 짧게 잡는다. 그래서 상대 노드가 꺼져 있어 전파가 `server_wait_timeout_s × 노드 수`만큼 걸려도 **START만 기다리고 `/scan/stop`은 기다리지 않는다.** START가 기다리는 것은 의도다 — 반쯤 전파된 값으로 재지 않는다. `set_parameters` · `get_parameters`의 응답은 클라이언트 그룹의 다른 스레드가 처리하고, 콜백 안에서 spin하지 않는다.
+- **다른 노드를 기다리는 동안 잡고 있는 것은 설정 락뿐이다.** SetConfig의 접수 · 전파 · 되읽기 전체가 설정 락 안이고, 작업 락은 접수 판정과 자기 값 반영에만 짧게 잡는다. START도 마찬가지로 **되읽기를 끝낸 뒤에** 작업 락을 잡는다. 그래서 상대 노드가 꺼져 있어도 **`/scan/stop`은 기다리지 않는다.** 기다리는 것은 START뿐이고, 그것은 의도다 — 반쯤 전파된 값으로 재지 않는다.
+- 상대 노드가 꺼져 있을 때의 지연은 **꺼진 노드마다 `server_wait_timeout_s`가 두 번**이다(보낼 때 한 번, 되읽을 때 한 번). START는 자기 되읽기 몫만 든다.
+- `set_parameters` · `get_parameters`의 응답은 클라이언트 그룹의 다른 스레드가 처리하고, 콜백 안에서 spin하지 않는다. **다만 계약 1장의 "Service 콜백은 다른 노드의 완료를 동기 대기하지 않는다"와는 어긋난다** — 계약 4.3이 `applied`를 "적용 후 전체 값"으로, 6.1이 `PARAM_SET_FAILED`를 SetConfig의 응답 코드로 정해 둬서 기다리지 않고는 답할 수 없다. 계약 쪽 정리는 #52다.
 - `/scan/stop` 콜백은 아무것도 기다리지 않는다(`call_async` · `cancel_goal_async`).
 - 상태 전이(`notify`)는 작업 락 안에서 한다. `/scan/stop`이 "접수 직전의 Snapshot"을 뜨고 STOP을 요청하는 사이에 전이가 끼지 않아 중단 기록이 실제와 같다.
 - **추적하지 못하는 모션을 남기지 않는다.** goal 응답이 `server_wait_timeout_s` 안에 오지 않거나 Result가 끝내 오지 않으면 실패로 끝내면서 `/robot/stop`(멱등)을 요청하고, 늦게 수락된 goal은 바로 취소한다. 수락된 goal을 두고 예외로 빠져나갈 때도 취소한다. 홈 복귀 · 재시작은 부르지 않는다.

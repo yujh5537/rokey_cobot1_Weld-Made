@@ -18,6 +18,8 @@ from sequence_helpers import isolated_ros_env  # noqa: E402
 
 os.environ.update(isolated_ros_env())  # 조 범위의 도메인 + LOCALHOST. rclpy.init 전에 건다
 
+from contact_scan_interfaces.action import Resume  # noqa: E402
+from contact_scan_interfaces.action import ReturnHome  # noqa: E402
 from contact_scan_interfaces.action import RunScan  # noqa: E402
 from contact_scan_interfaces.msg import ScanConfig  # noqa: E402
 from contact_scan_interfaces.srv import SetConfig  # noqa: E402
@@ -59,6 +61,8 @@ class Rig:
         self.config_client = self.client.create_client(SetConfig, '/scan/set_config')
         self.stop_client = self.client.create_client(StopScan, '/scan/stop')
         self.run_client = ActionClient(self.client, RunScan, '/scan/run')
+        self.resume_client = ActionClient(self.client, Resume, '/scan/resume')
+        self.home_client = ActionClient(self.client, ReturnHome, '/scan/home')
         self.executor = MultiThreadedExecutor(num_threads=8)
         for node in [self.node, self.client, self.motion, *self.peers.values()]:
             if node is not None:
@@ -306,6 +310,45 @@ def test_한쪽을_못_읽으면_START_를_막지_않는다(rig):
     assert result.reason_code != int(Reason.SAFETY_LATCHED), result.detail
 
 
+def test_어긋난_채로는_RESUME_도_거절한다(rig):
+    """재시작도 로봇을 다시 움직인다. START 와 같은 규칙이다 (계약 7.2)."""
+    r = rig(peers={'safety_monitor': {'values': {'over_force_n': 10.0, 'drop_limit_m': 0.005}}},
+            motion_peers=True)
+    assert r.resume_client.wait_for_server(timeout_sec=TIMEOUT_S)
+    sent = r.resume_client.send_goal_async(Resume.Goal(request_id='resume-mismatch'))
+    assert r.wait(sent.done) and sent.result().accepted
+    got = sent.result().get_result_async()
+    assert r.wait(got.done, timeout_s=30.0)
+    result = got.result().result
+    assert not result.success
+    assert result.reason_code == int(Reason.PARAM_SET_FAILED), result.detail
+    assert 'over_force_n' in result.detail
+
+
+def test_안전복귀는_어긋나도_막지_않는다(rig):
+    """안전복귀는 독립된 명령이다(CLAUDE.md 규칙 3). 설정이 어긋났다고 못 돌아가면 안 된다."""
+    r = rig(peers={'safety_monitor': {'values': {'over_force_n': 10.0, 'drop_limit_m': 0.005}}},
+            motion_peers=True)
+    r.motion.reject_operations = set()
+    assert r.home_client.wait_for_server(timeout_sec=TIMEOUT_S)
+    sent = r.home_client.send_goal_async(ReturnHome.Goal(request_id='home-mismatch'))
+    assert r.wait(sent.done) and sent.result().accepted
+    got = sent.result().get_result_async()
+    assert r.wait(got.done, timeout_s=30.0)
+    assert got.result().result.success, got.result().result.detail
+
+
+def test_상대를_기다릴_한도가_없으면_전파하지_않고_알린다(rig):
+    """server_wait_timeout_s 가 없으면 한도 없는 기다림을 만들지 않는다(CLAUDE.md 규칙 7: 예비값 없음)."""
+    r = rig(server_wait_timeout_s=None)
+    response = r.set_config(over_force_n=12.0)
+    assert not response.success
+    assert response.reason_code == int(Reason.PARAM_SET_FAILED)
+    assert 'server_wait_timeout_s' in response.detail
+    assert all(not peer.set_calls for peer in r.peers.values())
+    assert applied(response, 'over_force_n')[1] is False
+
+
 # ---- 다른 명령을 막지 않는다 ----
 
 def test_전파가_늦어도_STOP_은_기다리지_않는다(rig):
@@ -319,6 +362,33 @@ def test_전파가_늦어도_STOP_은_기다리지_않는다(rig):
     assert r.wait(stop.done, timeout_s=1.5), 'SetConfig 가 도는 동안 /scan/stop 이 막혔다'
     assert time.monotonic() - started < 1.5
     assert r.wait(pending.done, timeout_s=TIMEOUT_S) and pending.result().success
+
+
+def test_START_의_되읽기가_늦어도_STOP_은_기다리지_않는다(rig):
+    """START 접수의 되읽기는 작업 락을 잡기 **전에** 끝낸다. 상대가 꺼져 있어도 정지는 받는다."""
+    r = rig(peers={'names': ('contact_detector',)}, motion_peers=True,
+            server_wait_timeout_s=3.0)
+    assert r.stop_client.wait_for_service(timeout_sec=TIMEOUT_S)
+    assert r.run_client.wait_for_server(timeout_sec=TIMEOUT_S)
+    sent = r.run_client.send_goal_async(RunScan.Goal(request_id='run-while-reading'))
+    assert r.wait(sent.done) and sent.result().accepted
+    time.sleep(0.3)                      # 되읽기가 없는 노드 두 개를 기다리는 동안
+    started = time.monotonic()
+    stop = r.stop_client.call_async(StopScan.Request(request_id='stop-while-start'))
+    assert r.wait(stop.done, timeout_s=2.0), 'START 접수가 도는 동안 /scan/stop 이 막혔다'
+    assert time.monotonic() - started < 2.0
+    r.wait(lambda: sent.result().get_result_async().done, timeout_s=30.0)
+
+
+def test_기동_뒤에_다른_노드_값을_한_번_읽는다(rig):
+    """announce_ready 가 거는 한 번짜리 타이머. SetConfig 없이도 기록의 config 가 찬다."""
+    r = rig()
+    assert r.node._peer_config == {}
+    r.node.announce_ready()
+    assert r.wait(lambda: r.node._peer_config.get('contact_detector', {}).get(
+        'contact_threshold_n') == 3.0), r.node._peer_config
+    config = r.node._effective_config()
+    assert config['over_force_n'] == 30.0 and config['target_force_n'] == 3.0
 
 
 def test_전파가_도는_동안_START_는_끝난_값을_쓴다(rig):
