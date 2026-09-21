@@ -124,6 +124,7 @@ class FakePorts(Ports):
         self.stop_at_request = None   # n 번째(1 부터, 작업 전체에서 센다) 모션 도중에 /scan/stop 이 온다
         self.stop_after_event = None  # 이 label 의 측정값을 받은 직후에 /scan/stop 이 온다
         self.stop_before_notify = None  # 이 Signal(또는 (Signal, n 번째))을 알리기 직전에 /scan/stop 이 온다
+        self.stop_after_notify = None   # 이 (Signal, n 번째) 통지가 받아들여진 직후에 /scan/stop 이 온다
         self._notify_counts = {}
         self.latch_after = None       # 이 label 의 모션이 끝난 직후에 안전 래치가 걸린다(모션 사이의 래치)
         self.still = True
@@ -147,7 +148,7 @@ class FakePorts(Ports):
         assert self.sm.request(Command.RESUME, conditions=READY).accepted
         self._stop = False
         self.stop_during = self.stop_at_request = None
-        self.stop_after_event = self.stop_before_notify = None
+        self.stop_after_event = self.stop_before_notify = self.stop_after_notify = None
         self.resumed_at_request = len(self.requests)
         return self.memory_plan()
 
@@ -258,6 +259,8 @@ class FakePorts(Ports):
             self.trace.append(('notify_refused', signal))
             return False
         self.trace.append(('notify', signal))
+        if self.stop_after_notify == (signal, self._notify_counts[signal]):
+            self.request_stop()
         return True
 
     def compute_geometry(self):

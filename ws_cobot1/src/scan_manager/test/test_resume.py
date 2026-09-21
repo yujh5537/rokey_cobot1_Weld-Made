@@ -163,7 +163,10 @@ def reopen(params, result_dir, old):
 
 def adopt(ports):
     """노드의 _adopt_recorded_scan 과 같다. 되돌리지 않았으면 그 이유."""
-    restoration, why = scan_resume.restoration_from(ports.store.find_resume_candidate(''))
+    record, why = scan_resume.latest_record(ports.store)
+    restoration = None
+    if record is not None:
+        restoration, why = scan_resume.restoration_from(record)
     if restoration is not None:
         ports.sm.restore(
             scan_id=restoration.scan_id, phase=restoration.phase, progress=restoration.progress,
@@ -243,6 +246,24 @@ def test_result_saved_before_the_stop_is_read_back_after_a_restart(params, resul
     assert ports.labels_since_resume() == ['final_lift', 'home']
 
 
+def test_stop_in_geometry_before_the_result_exists_is_computed_after_a_restart(params, result_dir):
+    old, _ = scan(params, result_dir, stop_after_notify=(Signal.EDGE_FOUND, 4))
+    before = old.store.load(SCAN_ID)
+    assert before.resume_point.phase is Phase.GEOMETRY and not old.store.has_result(SCAN_ID)
+    ports = reopen(params, result_dir, old)
+    adopt(ports)
+
+    assert not plan_from_record(ports, params).plan.result_saved
+    assert resume_from_record(ports, params).kind is OutcomeKind.DONE
+
+    assert ports.trace.count(('compute_geometry',)) == 1 and ports.republished == 0
+    assert ports.labels_since_resume() == ['final_lift', 'home']
+    after = ports.store.load(SCAN_ID)
+    assert after.top == before.top and after.edges == before.edges
+    shape = ports.store.load_result(SCAN_ID).shape
+    assert (shape.width, shape.length, shape.height) == pytest.approx(BOX_SIZE, abs=1e-9)
+
+
 def test_result_file_without_the_flag_is_still_republished(params, result_dir):
     """원본을 쓴 직후 · 진행 기록에 표시하기 전에 프로세스가 죽었다."""
     old, _ = scan(params, result_dir, stop_before_notify=Signal.GEOMETRY_DONE)
@@ -272,14 +293,15 @@ def test_nothing_recorded_means_nothing_to_adopt(params, result_dir):
 def test_a_record_left_in_an_active_phase_is_not_adopted(params, result_dir):
     """작업 도중에 프로세스가 죽었다. 중지 기록이 없어 로봇이 어디서 멈췄는지 모른다."""
     old, _ = scan(params, result_dir, stop_at=SLIDE_POS_X)
-    record = old.store.load(SCAN_ID)
-    record.state = type(record.state)(Phase.EDGE_SEARCH, Direction.POS_X, 0, 4, 3)
-    candidate = type(old.store.find_resume_candidate(''))(record=record)
+    snapshot = old.sm.snapshot()
+    old.store.record_state(type(snapshot)(SCAN_ID, Phase.EDGE_SEARCH, Direction.POS_X, 0, 4, 3))
 
-    restoration, why = scan_resume.restoration_from(candidate)
+    ports = reopen(params, result_dir, old)
+    restoration, why = adopt(ports)                          # 노드와 같은 길: 파일에서 읽는다
     assert restoration is None and 'phase=EDGE_SEARCH' in why and '모른다' in why
-    refusal = scan_resume.plan_resume(
-        record, result_file_exists=False, direction_order=params.direction_order)
+    assert ports.sm.phase is Phase.IDLE
+    assert ports.sm.check(Command.RESUME, conditions=READY)[0] is Reason.NO_RESUMABLE_SCAN
+    refusal = plan_from_record(ports, params)
     assert refusal.reason is Reason.NO_RESUMABLE_SCAN
 
 
@@ -292,9 +314,38 @@ def test_a_newer_scan_hides_the_stopped_one(params, result_dir):
         direction_order=params.direction_order)
     old.store.record_state(type(snapshot)(NEWER_SCAN_ID, Phase.DONE, Direction.NONE, 4, 4, 0))
 
-    candidate = old.store.find_resume_candidate(SCAN_ID)
-    restoration, why = scan_resume.restoration_from(candidate)
-    assert restoration is None and NEWER_SCAN_ID in why
+    ports = reopen(params, result_dir, old)
+    restoration, why = adopt(ports)
+    assert restoration is None and NEWER_SCAN_ID in why and 'DONE' in why
+    assert ports.sm.check(Command.RESUME, conditions=READY)[0] is Reason.NO_RESUMABLE_SCAN
+
+
+def test_an_unreadable_latest_record_is_not_skipped_for_an_older_one(params, result_dir):
+    old, _ = scan(params, result_dir, stop_at=SLIDE_POS_X)
+    newer = result_dir / NEWER_SCAN_ID
+    newer.mkdir()
+    (newer / 'progress.json').write_text('{ not json', encoding='utf-8')
+
+    ports = reopen(params, result_dir, old)
+    restoration, why = adopt(ports)
+    assert restoration is None and NEWER_SCAN_ID in why and '읽을 수 없다' in why
+    assert ports.sm.phase is Phase.IDLE
+
+
+def test_a_resume_that_got_past_its_preparation_used_up_the_resume_point(params, result_dir):
+    """중지 → 재시작 → DONE → 안전복귀 중 중지. 상태 기계는 RESUME_READY 에서 재개 지점을 지웠다."""
+    old, _ = scan(params, result_dir, stop_at=SLIDE_POS_X)
+    assert resume_from_record(old, params).kind is OutcomeKind.DONE
+    assert old.home(stop=True).kind is OutcomeKind.STOPPED
+    live = old.sm.check(Command.RESUME, conditions=READY)
+    assert live[0] is Reason.NO_RESUMABLE_SCAN
+
+    ports = reopen(params, result_dir, old)
+    restoration, _why = adopt(ports)
+    assert restoration.resume_phase is None
+    assert ports.sm.snapshot() == old.sm.snapshot()
+    assert ports.sm.check(Command.RESUME, conditions=READY) == live
+    assert plan_from_record(ports, params).reason is Reason.NO_RESUMABLE_SCAN
 
 
 @pytest.mark.parametrize('ending, reason', [
@@ -428,7 +479,10 @@ def test_restored_and_live_state_machines_never_disagree(params, result_dir, see
         if ports.sm.phase is Phase.DONE:
             assert restoration is None and restored.sm.check(
                 Command.RESUME, conditions=READY)[0] is live[0] is Reason.NO_RESUMABLE_SCAN
-            break
+            if rng.random() < 0.5:
+                break
+            ports.home(stop=True)                           # 끝난 작업의 안전복귀 중 중지 → STOPPED
+            continue
         assert restoration is not None, why
         assert restored.sm.snapshot() == ports.sm.snapshot()
         assert restored.sm.check(Command.RESUME, conditions=READY) == live

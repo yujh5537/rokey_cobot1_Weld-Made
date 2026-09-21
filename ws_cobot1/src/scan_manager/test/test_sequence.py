@@ -603,6 +603,20 @@ def test_result_saved_before_the_stop_is_republished_not_recomputed(ports, param
     assert ports.labels_since_resume() == ['final_lift', 'home']
 
 
+def test_stop_in_geometry_before_the_result_exists_computes_it_from_the_kept_measurements(ports, params):
+    ports.stop_after_notify = (Signal.EDGE_FOUND, 4)          # GEOMETRY 에 들어선 직후 · 계산 전
+    assert run(ports, params).kind is OutcomeKind.STOPPED
+    assert ports.resume_point.phase is Phase.GEOMETRY and ports.geometry is None
+    edges_before = dict(ports.edges)
+
+    assert resume(ports, params).kind is OutcomeKind.DONE
+
+    assert ports.trace.count(('compute_geometry',)) == 1 and ports.republished == 0
+    assert ports.labels_since_resume() == ['final_lift', 'home']
+    assert all(ports.edges[d] is edges_before[d] for d in edges_before)
+    assert_box_recovered(ports)
+
+
 def test_stop_during_resume_preparation_can_be_resumed_again(ports, params):
     stopped_at(ports, params, NORMAL_LABELS.index('slide_NEG_X') + 1)
     plan = ports.resume()

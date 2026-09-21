@@ -2,7 +2,8 @@
 
 - 서버: /scan/run · /scan/home · /scan/resume (Action), /scan/stop · /scan/set_config (Service).
   노드가 뜨자마자 준비된다(mqtt_bridge 가 server_is_ready() 로 본다).
-- 시퀀스는 /scan/run 의 execute 콜백 안에서 돈다. 순서는 sequence.ScanRunner, 이 파일은 그 Ports 를 구현한다.
+- 시퀀스는 /scan/run · /scan/resume 의 execute 콜백 안에서 돈다. 순서는 sequence.ScanRunner · ResumeRunner,
+  이 파일은 그 Ports 를 구현한다.
 - 작업 중지 · 안전복귀 · 재시작은 독립된 명령이다. /scan/stop 은 정지만 요청하고, 홈 복귀나 재시작을 부르지 않는다.
 - 상태 기계의 on_change(락 안)에서는 /scan/state 발행과 쓰기 큐 투입만 한다. 디스크 쓰기는 전용 스레드 1개가 한다.
 - 재시작(/scan/resume)은 기록(result_store)을 읽어 중단됐던 단계부터 잇는다. 판단은 resume.py, 순서는 sequence.ResumeRunner.
@@ -163,6 +164,9 @@ class ScanManager(Node):
         self._job_lock = threading.Lock()
         self._config = {name: None for name, _flag in CONFIG_FIELDS}  # SetConfig 로 받은 값
         self._last_motion_id = {}                                     # scan_id → 마지막 motion_id
+        # 기록에 남기지 못한 안전복귀가 있었다(기록 없음 · 읽기 실패 · 쓰기 실패). 다음 START 까지, 기록에서
+        # 되돌린 작업의 재시작을 받지 않는다: 기록은 "복귀한 적 없음"인데 로봇은 홈에 있을 수 있다.
+        self._unrecorded_home = False
         self._status_cond = threading.Condition()
         self._robot_status = None
         self._safety_status = None
@@ -533,6 +537,7 @@ class ScanManager(Node):
             if not outcome.accepted:
                 self._job = self._begin_args = None
                 return outcome.reason, outcome.detail
+            self._unrecorded_home = False
         self.log(ScanLog.LEVEL_INFO, Reason.OK, f'작업 시작 request_id={request.request_id}')
         return job
 
@@ -611,6 +616,8 @@ class ScanManager(Node):
                 # 기록 실패(디스크 오류 · 기록 파일 없음)는 안전복귀를 막지 않는다(래치 · 측정 파라미터와 같은 방침).
                 recorded = ports.recorded = self._record_home(
                     self._store.record_home_requested, job.scan_id, before.phase)
+            if not recorded:
+                self._unrecorded_home = True
             self.log(
                 ScanLog.LEVEL_INFO, Reason.OK,
                 f'안전복귀 시작 request_id={goal_handle.request.request_id}')
@@ -678,6 +685,11 @@ class ScanManager(Node):
         판정 · 기록 읽기 · 계획을 **접수 전에** 끝낸다. 거절된 재시작은 RESUMING 에 들어가지 않는다.
         """
         machine = self.state_machine
+        try:
+            # 큐에 남은 상태 기록이 디스크에 쓰인 뒤에 읽는다. **락 밖에서** 기다린다: /scan/stop 이 같은 락을 쓴다
+            self._write(lambda: None)
+        except _Closing:
+            return scan_resume.Refusal(Reason.CANCELED, 'scan_manager 종료')
         with self._job_lock:
             if machine.is_busy:
                 return scan_resume.Refusal(Reason.BUSY, f'phase={machine.phase.name}')
@@ -686,6 +698,10 @@ class ScanManager(Node):
                 if not self.get_parameter_or('result_dir').value:
                     return scan_resume.Refusal(
                         Reason.INVALID_VALUE, 'result_dir 파라미터가 없어 기록을 찾을 수 없다')
+                if self._unrecorded_home:
+                    return scan_resume.Refusal(
+                        Reason.NOT_SUPPORTED,
+                        '기록에 남기지 못한 안전복귀가 있었다. 홈 안전복귀 뒤의 재접근 절차는 TBD')
                 not_adopted = self._adopt_recorded_scan()
             conditions = self.conditions()
             reason, detail = machine.check(
@@ -698,11 +714,8 @@ class ScanManager(Node):
                 return scan_resume.Refusal(
                     Reason.NO_RESUMABLE_SCAN, f'{scan_id} 의 기록이 없다(기록을 만들지 못한 작업)')
             try:
-                self._write(lambda: None)  # 큐에 남은 상태 기록이 디스크에 쓰인 뒤에 읽는다
                 record = self._store.load(scan_id)
                 has_result = self._store.has_result(scan_id)
-            except _Closing:
-                return scan_resume.Refusal(Reason.CANCELED, 'scan_manager 종료')
             except (ResultStoreError, OSError) as exc:
                 return scan_resume.Refusal(
                     Reason.NO_RESUMABLE_SCAN, f'{scan_id} 의 기록을 읽을 수 없다: {exc}')
@@ -740,11 +753,10 @@ class ScanManager(Node):
         if not result_dir:
             return 'result_dir 파라미터가 없어 기록을 찾을 수 없다'
         try:
-            store = self._store_for(result_dir)
-            candidate = store.find_resume_candidate('')
-            for error in candidate.skipped_errors:
-                self.get_logger().warning(f'읽지 못한 기록이 있다: {error}')
-            restoration, why = scan_resume.restoration_from(candidate)
+            record, why = scan_resume.latest_record(self._store_for(result_dir))
+            if record is None:
+                return why
+            restoration, why = scan_resume.restoration_from(record)
             if restoration is None:
                 return why
             self._begun, self._begin_args = restoration.scan_id, None  # begin_scan 을 다시 부르지 않는다
@@ -903,6 +915,8 @@ class _NodePorts(Ports):
     def execute(self, motion_id, request):
         node, job, p = self._node, self._job, self._params
         self.last_motion_id = motion_id
+        # 발급하자마자 남긴다. 명령이 끝난 뒤에 남기면, 중지 직후에 접수된 안전복귀가 옛 값으로 번호를 되풀이한다(계약 6.2절)
+        node._last_motion_id[job.scan_id] = max(motion_id, node._last_motion_id.get(job.scan_id, 0))
         if not node._motion_client.wait_for_server(timeout_sec=p.server_wait_timeout_s):
             return MotionResult(available=False)
         node._matcher.begin(

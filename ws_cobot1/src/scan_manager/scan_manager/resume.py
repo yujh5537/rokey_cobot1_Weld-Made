@@ -21,6 +21,7 @@ from .geometry_adapter import EdgeMeasurement
 from .geometry_adapter import TopMeasurement
 from .params import ScanParams
 from .result_store import PoseRecord
+from .result_store import ResultStoreError
 from .result_store import Stamp
 from .result_store.records import CONFIG_FIELDS
 from .sequence import ResumePlan
@@ -61,29 +62,59 @@ class Resumption:
     last_motion_id: int
 
 
-def restoration_from(candidate) -> Tuple[Optional[Restoration], str]:
-    """find_resume_candidate("") 의 결과 → (되돌릴 값, 되돌리지 않는 이유).
+def latest_record(store):
+    """가장 최근 작업의 기록 → (기록, 읽지 못한 이유). **그 하나만** 읽는다.
+
+    명령 접수 락 안에서 불린다(/scan/stop 이 같은 락을 기다린다). 기록이 쌓여도 읽는 양이 늘지 않아야 한다.
+    가장 최근 기록을 읽지 못하면 그보다 오래된 작업으로 넘어가지 않는다(조용히 건너뛰지 않는다).
+    """
+    scan_ids = store.scan_ids()
+    if not scan_ids:
+        return None, '이을 수 있는 작업의 기록이 없다'
+    try:
+        return store.load(scan_ids[0]), ''
+    except ResultStoreError as error:
+        return None, f'가장 최근 작업 {scan_ids[0]} 의 기록을 읽을 수 없다: {error}'
+
+
+def resume_point_consumed(record) -> bool:
+    """재개 지점에서 시작한 재시작이 RESUME_READY 를 지났는가(상태 기계는 그때 재개 지점을 지운다).
+
+    재시작을 접수하면 그때의 마지막 중지에 resumed_at 이 찍힌다. 준비(RESUMING) 중에 다시 중지됐다면 바로 뒤에
+    RESUMING 중지가 이어진다. 이어지지 않았다면 그 재시작은 준비를 지나 측정 단계로 돌아갔다.
+    그 뒤에 남을 수 있는 중지는 안전복귀 중의 중지뿐이다(예: 재시작 → DONE → 안전복귀 중 중지).
+    """
+    items = record.interruptions
+    start = next((i for i, item in enumerate(items) if item is record.resume_point), None)
+    if start is None:
+        return False
+    for index in range(start, len(items)):
+        if items[index].resumed_at is None:
+            continue
+        if index + 1 == len(items) or items[index + 1].phase is not Phase.RESUMING:
+            return True
+    return False
+
+
+def restoration_from(record) -> Tuple[Optional[Restoration], str]:
+    """가장 최근 작업의 기록 → (되돌릴 값, 되돌리지 않는 이유).
 
     되돌리는 것은 **가장 최근 작업이 휴지 상태(STOPPED · ERROR)로 끝나 있을 때**뿐이다.
     기록이 동작 중인 phase 로 끝나 있으면 작업 도중에 프로세스가 죽은 것이다. 중지 기록이 없어
     로봇이 어디서 멈췄는지 모르므로 되돌리지 않는다(재시작은 NO_RESUMABLE_SCAN).
     """
-    record = candidate.record
-    if record is None:
-        return None, '이을 수 있는 작업의 기록이 없다'
-    if not candidate.is_latest:
-        return None, f'{record.scan_id} 보다 새 작업이 있다: {", ".join(candidate.newer_scan_ids)}'
     phase = record.state.phase
     if phase not in (Phase.STOPPED, Phase.ERROR):
-        return None, (
-            f'{record.scan_id} 의 기록이 phase={phase.name} 인 채 끝나 있다(작업 도중에 프로세스가 끝났다). '
-            '로봇이 어디서 멈췄는지 모른다')
+        why = '끝난 작업이다' if phase is Phase.DONE else (
+            '작업 도중에 프로세스가 끝났다. 로봇이 어디서 멈췄는지 모른다')
+        return None, f'가장 최근 작업 {record.scan_id} 의 기록이 phase={phase.name} 이다({why})'
 
-    # 상태 기계의 규칙 그대로: FAILED 와 마무리 HOMING 중의 중지는 재개 지점을 지운다
+    # 상태 기계의 규칙 그대로: FAILED · 마무리 HOMING 중의 중지 · RESUME_READY 는 재개 지점을 지운다
     point = record.resume_point
     resumable = (
         phase is Phase.STOPPED and record.failure is None and point is not None
-        and not point.during_final_homing and point.phase in RESUMABLE_PHASES)
+        and not point.during_final_homing and point.phase in RESUMABLE_PHASES
+        and not resume_point_consumed(record))
     failure = record.failure
     return Restoration(
         scan_id=record.scan_id, phase=phase, progress=record.state.progress,
@@ -114,6 +145,8 @@ def plan_resume(record, *, result_file_exists: bool, direction_order) -> Union[R
     last, point = record.last_interruption, record.resume_point
     if last is None or last.resumed_at is not None or point is None:
         return _refuse(f'{scan_id}: 재시작하지 않은 중지 기록이 없다')
+    if resume_point_consumed(record):
+        return _refuse(f'{scan_id}: 그 중지에서 시작한 재시작이 이미 측정 단계로 돌아갔다')
     # 아래 셋은 상태 기계가 먼저 거른다. 기록이 메모리와 어긋난 경우의 대비다
     if record.failure is not None:
         return _refuse(f'{scan_id}: 오류로 끝난 작업의 재시작 절차는 TBD', Reason.NOT_SUPPORTED)

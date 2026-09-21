@@ -982,8 +982,9 @@ def test_resume_after_the_safe_return_is_not_supported_and_keeps_the_record(rig)
     after = rig.store().load(stopped.scan_id)
     assert after.top == before.top and after.interruptions == before.interruptions   # 측정값 · 로그 보존
     assert after.home_return.completed and after.interruptions[0].resumed_at is None
-    time.sleep(0.3)
-    assert len(rig.peers.goals) == sent          # 안전복귀는 재시작을 부르지 않는다
+    # 안전복귀는 재시작을 부르지 않는다: RESUMING 은 한 번도 없었고, 거절된 재시작은 관제자가 보낸 하나뿐이다
+    assert Phase.RESUMING not in phases(rig)
+    assert len([log for log in rig.logs if '명령 거절' in log.message]) == 1
 
 
 def test_resume_after_an_error_is_not_supported(rig):
@@ -1149,3 +1150,66 @@ def test_a_finished_scan_leaves_nothing_to_resume_after_a_restart(make_rig, rig)
     result = resume(fresh)
     assert result.reason_code == Reason.NO_RESUMABLE_SCAN
     assert fresh.node.state_machine.phase is Phase.IDLE
+
+
+def test_resume_without_a_result_dir_cannot_look_for_a_record(make_rig, rig):
+    stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+    fresh.node.set_parameters([Parameter('result_dir', value='')])
+
+    result = resume(fresh)
+
+    assert result.reason_code == Reason.INVALID_VALUE and 'result_dir' in result.detail
+    assert fresh.node.state_machine.phase is Phase.IDLE and fresh.peers.goals == []
+
+
+def test_resume_of_a_record_that_cannot_be_read_is_refused(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    (rig.result_dir / stopped.scan_id / 'progress.json').write_text('{ not json', encoding='utf-8')
+
+    result = resume(rig)
+
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN and '읽을 수 없다' in result.detail
+    assert rig.node.state_machine.phase is Phase.STOPPED and len(rig.peers.goals) == sent
+
+
+def test_a_safe_return_that_could_not_be_recorded_blocks_the_resume_until_a_new_start(make_rig, rig):
+    """재기동 뒤 기록을 읽지 못해도 안전복귀는 한다. 그 복귀는 기록에 없으므로, 기록만 믿는 재시작을 받지 않는다."""
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+    store_for, calls = fresh.node._store_for, []
+
+    def fail_once(result_dir):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError('fake: disk not ready')
+        return store_for(result_dir)
+    fresh.node._store_for = fail_once
+
+    assert fresh.home().success                                   # 되돌리지 못해도 복귀는 한다
+    assert fresh.node.state_machine.phase is Phase.IDLE
+    assert not fresh.store().load(stopped.scan_id).home_return.requested
+
+    result = resume(fresh)
+
+    assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
+    assert fresh.node.state_machine.phase is Phase.IDLE
+    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+    assert fresh.run().success                                    # 새 작업은 된다
+    assert fresh.node._unrecorded_home is False
+
+
+def test_motion_id_is_remembered_as_soon_as_it_is_issued(rig):
+    """명령이 끝난 뒤에 남기면, 중지 직후에 접수된 안전복귀가 옛 값으로 번호를 되풀이한다(계약 6.2절)."""
+    rig.peers.hold_goal = SLIDE_POS_X
+    _handle, running = rig.send(rig.run_client, RunScan.Goal(request_id='run-1'))
+    assert rig.wait(lambda: len(rig.peers.goals) >= SLIDE_POS_X)
+    goal = rig.peers.goals[-1]
+
+    assert rig.node._last_motion_id[goal.scan_id] == goal.motion_id == SLIDE_POS_X
+
+    assert rig.stop().accepted
+    rig._result_of(running)
+    assert rig.home().success
+    assert rig.peers.goals[-1].motion_id == SLIDE_POS_X + 1
