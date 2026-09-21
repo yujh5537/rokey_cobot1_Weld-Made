@@ -23,6 +23,10 @@
 실기(robot_system=REAL)에서는 조회 외 단계를 --real-ok 없이는 실행하지 않는다.
 실기 명령은 사람이 직접 실행한다(CLAUDE.md 규칙 1).
 
+**robot_manager(contact_scan_bringup launch)와 동시에 돌리지 않는다.** 두산 서비스 조회가 겹치면
+dsr_controller2 가 응답을 멈출 수 있고(api-check-log.md), 끝날 때 로봇 모드를 되돌리므로 스캔 중인
+로봇의 모드가 바뀐다. launch 를 끄고 돌린다.
+
 DSR_ROBOT2 함수 대신 서비스를 직접 부른다. DSR_ROBOT2 함수는 응답을 시간 제한 없이 기다려
 실기에서 멈춘 적이 있다(`measure_idle_force.py` 참고). 움직이는 호출은 다시 보내지 않는다.
 """
@@ -51,6 +55,7 @@ DR_QSTOP = 1
 DR_FC_MOD_REL = 1
 SYNC, ASYNC = 0, 1
 ROBOT_SYSTEM = {0: 'REAL', 1: 'VIRTUAL'}
+ROBOT_MODE_MANUAL = 0
 ROBOT_MODE_AUTONOMOUS = 1
 DRL_STATE = {0: 'PLAY', 1: 'STOP', 2: 'HOLD'}
 
@@ -187,7 +192,9 @@ def ensure_autonomous(ck):
     res, _ = ck.call(GetRobotMode, 'system/get_robot_mode', GetRobotMode.Request(), retries=2)
     if res and res.success and res.robot_mode == ROBOT_MODE_AUTONOMOUS:
         return True, None
-    previous = res.robot_mode if res and res.success else None
+    # 원래 모드를 읽지 못하면 안전한 쪽(수동)으로 되돌린다. None 이면 restore_mode 가 아무것도 하지 않아
+    # 자동 모드로 남는다 — 이 함수가 막으려던 바로 그 상태다(ok778ts123 리뷰, PR #66)
+    previous = res.robot_mode if res and res.success else ROBOT_MODE_MANUAL
     res, _ = ck.call(SetRobotMode, 'system/set_robot_mode', SetRobotMode.Request(robot_mode=ROBOT_MODE_AUTONOMOUS))
     ck.record('set_robot_mode (AUTONOMOUS)', 'system/set_robot_mode', ok_of(res),
               f'모션 명령 전 자동 모드 전환 (원래 모드 {previous})')
@@ -202,11 +209,19 @@ def restore_mode(ck, previous):
               'finally 에서 되돌림' + ('' if res and res.success else '. 실패 — 펜던트에서 직접 되돌린다'))
 
 
-def move_home(ck, joint):
+def move_home(ck, joint, real):
     # J6 기본값 -204.84 deg 는 ±180 밖이다. 현재 자세에 따라 J6 가 크게 돌 수 있다(#60 · ok778ts123 리뷰)
     if any(abs(j) > 180.0 for j in joint):
-        print(f'주의: 홈 관절각 {fmt(joint)} 에 ±180° 밖 값이 있다. 현재 자세에 따라 크게 돌 수 있다. '
-              '케이블과 주변을 먼저 확인했다면 계속된다')
+        print(f'주의: 홈 관절각 {fmt(joint)} 에 ±180° 밖 값이 있다. 현재 자세에 따라 크게 돌 수 있다.')
+        if real:
+            # 경고만 찍고 바로 움직이면 반응할 틈이 없다. 실기에서만 한 번 확인받는다
+            try:
+                answer = input('케이블과 주변을 확인했으면 y 를 누른다 (그 밖은 홈 이동을 건너뛴다): ')
+            except EOFError:
+                answer = ''
+            if answer.strip().lower() != 'y':
+                ck.record('move_joint (SYNC, 홈)', 'motion/move_joint', 'skip', '사람이 확인하지 않아 건너뜀')
+                return False
     req = MoveJoint.Request(pos=joint, vel=20.0, acc=40.0, time=0.0, radius=0.0, mode=DR_MV_MOD_ABS,
                             blend_type=0, sync_type=SYNC)
     ck.timeout, saved = 60.0, ck.timeout  # 동기 이동은 도착까지 응답하지 않는다
@@ -344,7 +359,7 @@ def run(args, node):
             if not switched:
                 print('자동 모드 전환 실패. 움직이는 단계를 건너뛴다.')
                 moving = ['gripper'] if 'gripper' in moving else []
-            elif args.move_home and not move_home(ck, args.home_joint):
+            elif args.move_home and not move_home(ck, args.home_joint, real=system != 1):
                 print('홈 이동 실패. 움직이는 단계를 건너뛴다.')
                 moving = ['gripper'] if 'gripper' in moving else []
         if 'amovel_stop' in moving:
