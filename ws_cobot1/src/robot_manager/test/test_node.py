@@ -203,6 +203,30 @@ def test_slide_is_rejected_when_start_z_is_unknown(ros):
         node.destroy_node()
 
 
+def test_move_to_in_another_frame_is_rejected(ros):
+    """target 프레임이 이 노드의 프레임이 아니면 거절한다. 빈 문자열도 거절한다.
+
+    작업대 프레임 좌표를 Base 로 알고 움직이면 약 47 cm 어긋나고, 도착 판정도 같은
+    착각 위에서 재므로 "도착"까지 찍어 준다 (현지 리뷰, PR #73).
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        def goal(frame):
+            return ExecuteMotion.Goal(scan_id='t', motion_id=1, operation=RobotSample.OP_MOVE_TO,
+                                      frame_id=frame, speed=0.01)
+        assert node.reject_reason(goal(node.frame_id)) == ''
+        assert 'fixture' in node.reject_reason(goal('fixture'))
+        assert node.reject_reason(goal('')) != '', '빈 프레임을 Base 로 보지 않는다'
+        # HOME 은 관절각 목표라 프레임을 보지 않는다. PARAMS 에 home_joint_deg 가 없으므로
+        # 예외가 아니라 그 이유로 거절되어야 한다
+        home = ExecuteMotion.Goal(scan_id='t', motion_id=2, operation=RobotSample.OP_HOME)
+        assert 'home_joint_deg' in node.reject_reason(home)
+    finally:
+        node.destroy_node()
+
+
 def test_move_to_that_stops_short_of_the_target_is_a_robot_error(ros):
     """멈춘 것과 도착한 것은 다르다.
 

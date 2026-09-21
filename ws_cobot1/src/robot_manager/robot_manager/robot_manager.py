@@ -186,8 +186,15 @@ class RobotManager(Node):
         return self.get_parameter(name).value
 
     def home_joint_deg(self):
-        """홈 관절각 [deg] 6개. 설정되지 않았으면 빈 목록 (OP_HOME 을 거절한다)."""
-        return list(self.param('home_joint_deg') or [])
+        """홈 관절각 [deg] 6개. 설정되지 않았으면 빈 목록 (OP_HOME 을 거절한다).
+
+        기본값 없이 선언한 파라미터는 읽을 때 예외가 나므로, 여기서 잡지 않으면 거절이
+        아니라 goal 콜백 예외가 된다 (2026-09-21 노드 시험에서 발견).
+        """
+        try:
+            return list(self.param('home_joint_deg') or [])
+        except ParameterUninitializedException:
+            return []
 
     # ---- 샘플 -------------------------------------------------------------
     def on_sample_timer(self):
@@ -378,6 +385,13 @@ class RobotManager(Node):
             return 'INVALID_VALUE: max_distance'
         if op == RobotSample.OP_HOME and not self.home_joint_deg():
             return 'INVALID_VALUE: home_joint_deg 파라미터가 비어 있다'
+        # target 은 이 노드의 프레임(Base)으로만 받는다. 작업대 프레임(base_to_fixture 약
+        # 0.42 · -0.19 · 0.10 m)의 좌표를 Base 로 알고 movel 하면 세 축 합쳐 약 47 cm 어긋나고,
+        # distance_to_target 도 같은 착각 위에서 재므로 도착까지 찍어 준다. 빈 문자열도 거절한다.
+        # "비었으면 Base 로 본다"는 관용이 바로 그 경로다 (현지 리뷰, PR #73)
+        if op == RobotSample.OP_MOVE_TO and goal.frame_id != self.frame_id:
+            return (f'INVALID_VALUE: target 프레임 {goal.frame_id!r} 는 이 노드의 '
+                    f'{self.frame_id!r} 가 아니다')
         if op != RobotSample.OP_HOME and goal.speed <= 0.0:
             return 'INVALID_VALUE: speed'
         return ''
