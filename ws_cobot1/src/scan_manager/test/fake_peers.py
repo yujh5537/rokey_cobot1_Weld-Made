@@ -10,6 +10,10 @@
 - 상자는 Box 로 받는다. 기본값은 sequence_helpers 의 상수(테스트 안의 가상값)이고,
   **sim.yaml 을 쓰는 시험은 그 yaml 의 sim_box_* 로 만든 Box 를 넘긴다** — 상자가 yaml 과
   따로 놀면 yaml 을 옮겼을 때 "접촉이 없다"로 깨진다(2026-09-21, PR #100).
+- FakeParamPeer: 계약 2.4 의 전파 대상(P01~P03)을 흉내 낸다. 계약 파라미터만 선언해 두면 rclpy 가
+  /<노드 이름>/set_parameters · get_parameters 를 열어 주므로, scan_manager 가 실제로 쓰는 경로 그대로
+  시험할 수 있다. 이름이 계약 이름과 같아야 하므로 노드 이름을 robot_manager · contact_detector ·
+  safety_monitor 로 둔다.
 가상 직육면체와 정방향 모델은 sequence_helpers 와 같다. 수치는 테스트용 임의값이다.
 """
 
@@ -26,6 +30,7 @@ from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.srv import TareForce
 from contact_scan_qos import QOS_EVENT
 from contact_scan_qos import QOS_STATE
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.action import ActionServer
 from rclpy.action import CancelResponse
 from rclpy.action import GoalResponse
@@ -61,6 +66,53 @@ EVENT_WRONG_FRAME = 'event_wrong_frame'    # 이벤트의 frame_id 가 Base 가 
 RESULT_WRONG_FRAME = 'result_wrong_frame'  # Result 의 frame_id 가 Base 가 아니다
 
 MODEL_KEYS = ('detect_latency_s', 'tip_radius_m', 'edge_round_radius_m', 'edge_bias_offset_m')
+
+# 전파 대상 노드의 출발값. 실제 yaml 과 같은 이름이고, 값은 테스트용이다.
+# over_force_n 과 drop_limit_m 은 두 노드가 같은 값으로 시작한다(계약 7.2).
+PEER_PARAMS = {
+    'safety_monitor': {'over_force_n': 30.0, 'drop_limit_m': 0.005},
+    'contact_detector': {
+        'contact_threshold_n': 3.0, 'edge_drop_m': 0.0005, 'debounce_n': 3, 'over_force_n': 30.0},
+    'robot_manager': {'slide_target_force_n': 3.0, 'drop_limit_m': 0.005},
+}
+
+
+class FakeParamPeer(Node):
+    """계약 파라미터만 들고 있는 가짜 노드. 전파(P01~P03)의 상대 역할만 한다.
+
+    reject: 이 이름들은 범위 밖으로 보고 거절한다(상대 노드의 on_set_parameters 가 거절하는 경우).
+    delay_s: set_parameters 응답을 이만큼 늦춘다(응답 지연 · 사실상 무응답).
+    """
+
+    def __init__(self, name, values=None, reject=(), delay_s=0.0):
+        super().__init__(name)
+        self.reject = set(reject)
+        self.delay_s = delay_s
+        self.set_calls = []            # 받은 (이름, 값) 목록
+        self.first_set_s = None        # 처음 받은 시각. 노드 사이의 전파 순서를 본다
+        for param, value in (values or PEER_PARAMS[name]).items():
+            self.declare_parameter(param, value)
+        self.add_on_set_parameters_callback(self._on_set)
+
+    def _on_set(self, params):
+        if self.delay_s:
+            time.sleep(self.delay_s)
+        if self.first_set_s is None:
+            self.first_set_s = time.monotonic()
+        self.set_calls.extend((p.name, p.value) for p in params)
+        refused = sorted(p.name for p in params if p.name in self.reject)
+        if refused:
+            return SetParametersResult(
+                successful=False, reason=f'{", ".join(refused)} 가 범위 밖이다')
+        return SetParametersResult(successful=True)
+
+    def value(self, name):
+        return self.get_parameter(name).value
+
+
+def param_peers(names=('safety_monitor', 'contact_detector', 'robot_manager'), **kwargs):
+    """전파 대상 3개(또는 그 일부). 빠진 이름은 "그 노드가 안 떠 있다"가 된다."""
+    return {name: FakeParamPeer(name, **kwargs.get(name, {})) for name in names}
 
 
 class Box(NamedTuple):

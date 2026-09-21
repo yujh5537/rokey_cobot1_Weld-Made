@@ -17,7 +17,7 @@
 | `scan_manager/conversions.py` | msg ↔ 순수 자료형: `ContactEvent` → `Detection`, `MotionRequest` → goal, `ShapeResult` → `ScanResult`(None → NaN + `*_valid=false`), `ScanConfig` ↔ 값 | msg 타입만 |
 | `scan_manager/scan_manager.py` | 노드. 서버 5개 · 구독 · 클라이언트 · `Ports` 구현 · 쓰기 스레드 · 종료 처리 | 씀 |
 
-T19a(시퀀스 · 서버 · geometry 연결)와 T26(재시작)까지 들어 있다. **검증은 테스트 안에서 띄운 가짜 상대 노드(`test/fake_peers.py`)로만 했다.** 실제 contact_detector · robot_manager와의 sim 종단 구동과 SetConfig 전파(P01~P03)는 T19b다.
+T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig 전파 P01~P03)까지 들어 있다. **전파를 포함한 검증은 테스트 안에서 띄운 가짜 상대 노드(`test/fake_peers.py`)로 한다.** 실제 노드 · Virtual Mode 종단은 T19b에서 홈 복귀 · tare · 윗면 접촉 · 첫 모서리까지 확인했고, 그 뒤는 에뮬레이터가 조회에 응답을 멈춰 못 갔다(#100 코멘트 · #102).
 
 ## 시퀀스 (`sequence.py`)
 기준은 계약 5.4 · 7.1 · 7.3 · 7.4절과 BRD 4.2.5 · 4.2.6이다.
@@ -99,7 +99,7 @@ colcon test --packages-select scan_manager && colcon test-result --verbose
 ros2 run scan_manager scan_manager             # 로봇 · 드라이버 연결 없이 단독 실행. 파라미터가 없어 START 는 거절된다
 ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽는다. 자체 노드만 뜬다
 ```
-**시뮬레이션 테스트**는 두 단계다. ① `test_node_scan.py`: 노드를 테스트 프로세스 안에 만들어 서버 · 실패 · 중지 경로와 운영 시나리오(설정 → 스캔 중 중지 → 안전복귀 → 새 스캔)를 본다. ② `test_sim_process.py`: **실제 `scan_manager` 프로세스에 bringup의 `sim.yaml`을 `--params-file`로 주고** 전체 스캔을 돌려, `main()`(executor · 종료 처리)과 yaml의 값(기준점 · `max_descend_m` · `max_slide_m` · `base_to_fixture` · `tip_radius_m`)이 가상 직육면체에서 실제로 동작하는지 본다. `sim.yaml`의 `detect_latency_s`는 TBD라 테스트 전용 임의값을 덮어쓴다. 가짜 상대 노드는 상자까지의 거리가 `max_distance`를 넘으면 `REASON_MAX_DISTANCE`로 끝낸다.
+**시뮬레이션 테스트**는 세 갈래다. ⓪ `test_node_config.py`: 전파 대상 3개를 가짜 노드로 띄워 `/scan/set_config` → `SetParameters` → 그 노드의 실제 값까지 본다(`test_propagation.py`가 계획 · 부분 실패 · 쌍 검사를 ROS 없이 전수로 본다). ① `test_node_scan.py`: 노드를 테스트 프로세스 안에 만들어 서버 · 실패 · 중지 경로와 운영 시나리오(설정 → 스캔 중 중지 → 안전복귀 → 새 스캔)를 본다. ② `test_sim_process.py`: **실제 `scan_manager` 프로세스에 bringup의 `sim.yaml`을 `--params-file`로 주고** 전체 스캔을 돌려, `main()`(executor · 종료 처리)과 yaml의 값(기준점 · `max_descend_m` · `max_slide_m` · `base_to_fixture` · `tip_radius_m`)이 가상 직육면체에서 실제로 동작하는지 본다. `sim.yaml`의 `detect_latency_s`는 TBD라 테스트 전용 임의값을 덮어쓴다. 가짜 상대 노드는 상자까지의 거리가 `max_distance`를 넘으면 `REASON_MAX_DISTANCE`로 끝낸다.
 재시작: `test_resume.py`(순수. 실제 `ResultStore` + 가짜 로봇으로 모든 측정 모션에서의 중지 → "프로세스 재시작" → 기록만으로 재개, `plan_resume`의 거절 전부, 죽지 않은 상태 기계와 되돌린 상태 기계의 판정 일치를 무작위 명령열로), `test_sequence.py`(재개 지점 표의 모든 행 · 확정된 방향에 모션이 나가지 않음 · `motion_id` 연속), `test_node_scan.py`(+x 중 중지 → 재시작 → z_top 유지, 단계별 중지, 중지 → 재시작 ×2, 상태 기계의 거절과 기록을 읽을 수 없는 경우 · `result_dir` 없음 · 기록하지 못한 안전복귀, 새 노드 인스턴스로 흉내 낸 재기동. **기록 내용에 따른 거절(중단 좌표 없음 · 설정 · 탐색 순서)과 "GEOMETRY에서 중지 · 원본 없음"은 순수 테스트에만 있다**), `test_sim_process.py`(+x 중 중지 → 같은 프로세스에서 재시작 / **프로세스를 SIGKILL로 죽이고 다시 띄운 뒤** 재시작 → `progress.json` · `result.json` 확인).
 두 테스트 모두 `ROS_DOMAIN_ID`를 따로 잡고 가짜 `/robot/execute_motion` · `/contact/tare` · `/robot/stop` 서버와 가짜 `/contact/event` · `/robot/status` · `/safety/status` 발행기를 같은 프로세스에 띄운다. 로봇 · 드라이버 · Virtual Mode를 쓰지 않는다.
 
@@ -130,7 +130,12 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `result_frame_id` · `motion_frame_id` | string | — (`workpiece_fixture` · `base_link`) | | 프레임 이름(가칭) |
 | `direction_order` | string[] | — (`POS_X, NEG_X, POS_Y, NEG_Y`) | 네 방향을 한 번씩 | 모서리 탐색 순서. **기동할 때만 읽는다**(상태 기계가 순서를 들고 있다). 나머지는 START 때마다 읽는다 |
 
-실행에 쓰는 값 = yaml 파라미터 ← `/scan/set_config`로 받은 값 ← `RunScan.config_override`(`use_override=true`일 때, 그 작업에만). scan_manager가 직접 쓰는 것은 계약의 모션 6개뿐이고, 나머지 6개(`contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` · `target_force_n` · `drop_limit_m`)는 **받아서 보관만 한다**(전파 P01~P03은 T19b). 그 노드에 전파하기 전에는 실제로 적용된 값이 아니고 다른 노드의 현재 값도 모르므로, `SetConfig.applied` · `ScanResult.config` · 기록의 `config`에서 이 6개는 `NaN` + `*_set=false`다. SetConfig 응답의 detail에 "보관만(미전파, T19b)"로 이름을 밝힌다(웹이 안전 임계값이 바뀐 것으로 읽지 않게). 0을 채우지 않는다. `debounce_n`은 uint8이라 NaN을 실을 수 없으므로 `debounce_set`으로만 판단한다.
+실행에 쓰는 값 = yaml 파라미터 ← `/scan/set_config`로 받은 값 ← `RunScan.config_override`(`use_override=true`일 때, 그 작업에만). scan_manager가 직접 쓰는 것은 계약의 모션 6개뿐이고, 나머지 6개(`contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` · `target_force_n` · `drop_limit_m`)는 **이름으로 그 노드에 전파한다**(계약 2.4 P01~P03). 무엇을 어디로 보내고 부분 실패를 어떻게 알리는지는 `propagation.py`(순수)에 있고, 서비스 호출만 `scan_manager.py`가 한다.
+
+- **보내는 순서는 safety_monitor → contact_detector → robot_manager다.** 감시 쪽을 먼저 바꾸면 도중에 실패해도 safety_monitor는 늘 요청한 값에 가 있고, 어긋남은 "1차 감시가 옛 값에 남았다"로만 남는다. 반대 순서면 관제자가 조인 줄 아는 임계가 감시에는 안 들어간 조합이 생긴다.
+- **되돌리지 않는다.** 되돌리기도 실패할 수 있다. 대신 노드마다 무엇이 어떻게 됐는지 detail에 적고 `success=false` · `PARAM_SET_FAILED`로 답한다. `SetParameters`는 파라미터마다 결과가 따로 오므로 거절은 그 이름 하나에만 걸린다.
+- **`SetConfig.applied`와 `ScanResult.config`의 다른 노드 칸은 `GetParameters`로 읽은 실제 값이다**(요청값이 아니다). 기동 직후와 START 직전에도 읽으므로, 전파한 적이 없어도 그 노드의 yaml 값이 채워진다. 읽지 못한 칸만 `NaN` + `*_set=false`다. 0을 채우지 않는다. `debounce_n`은 uint8이라 NaN을 실을 수 없으므로 `debounce_set`으로만 판단한다.
+- **`over_force_n` · `drop_limit_m`은 두 노드가 같은 값이어야 한다**(계약 7.2). 읽어 온 값이 서로 다르면 대표값이 없으므로 그 칸은 `NaN` + `*_set=false`이고, **다음 START를 `PARAM_SET_FAILED`로 거절한다**(어긋난 이름과 노드별 값을 detail에 적는다). 한쪽을 읽지 못한 것은 어긋남으로 보지 않는다 — 다르다는 것을 본 적이 없고, 모른다고 막으면 노드 하나가 늦게 뜬 것만으로 모든 START가 막힌다. 부분 실패 규칙 자체는 계약에 아직 없다(#52).
 
 ## 서버
 노드가 뜨자마자 5개가 준비된다. 상대 노드가 없어도 된다(mqtt_bridge가 `server_is_ready()`로 본다).
@@ -141,7 +146,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `/scan/home` | 휴지 phase에서만. `OP_HOME` 하나를 보낸다(경로 · 순서는 TBD). 안전 래치도, 측정 파라미터 누락도, **기록 실패(디스크 오류 등)도** 복귀를 막지 않는다(기록 실패는 ERROR 로그). 작업 기록이 있으면 `record_home_requested` · `record_home_finished`를 남긴다(프로세스가 재시작된 뒤에도. "재시작" 절). 측정값 · 중지 기록은 건드리지 않는다. **복귀가 실패해도 기록의 `failure`(작업이 실패한 원인)는 덮어쓰지 않는다**: 첫 실패가 남고, 복귀의 실패는 `home_return.completed=false`와 `/scan/log`에 남는다. `motion_timeout_s`가 없으면 거절된다(`real.yaml`은 TBD라 실기에서 먼저 채워야 한다) |
 | `/scan/resume` | 중단된 작업을 잇는다("재시작" 절). 판정 순서: `BUSY` → (IDLE이면 기록에서 되돌림) → 상태 기계의 판정(`NO_RESUMABLE_SCAN` · `NOT_SUPPORTED` · `SAFETY_LATCHED` · `ROBOT_DISCONNECTED`) → 기록으로 계획(아래 표). 재시작의 사실(`record_resume`)을 디스크에 남긴 뒤에 첫 모션을 보낸다(못 남기면 로봇을 움직이지 않고 ERROR) |
 | `/scan/stop` | `/robot/stop` 호출과 진행 중 goal cancel을 **함께** 보내고 접수를 바로 돌려준다. 정지 완료 확인 · 중단 위치 기록 · `STOP_CONFIRMED`는 시퀀스 스레드가 한다. **홈 복귀 · 재시작을 부르지 않는다.** 멈출 작업이 없어도 `/robot/stop`은 보낸다(멱등). `/robot/stop`의 응답은 기다리지 않되, 접수되지 않았으면 WARN 로그를 남긴다. START · HOME의 접수와 겹치지 않게 명령 접수 락을 쥐고 처리하고, 시퀀스는 goal을 보내기 직전에 작업 락 안에서 중지를 한 번 더 본다(중지 접수 뒤에 goal이 나가지 않는다) |
-| `/scan/set_config` | 동작 중이면 `BUSY`, 범위 밖이면 `INVALID_VALUE`(같이 온 정상값도 적용하지 않는다). `*_set`인 항목만 적용. 전파는 T19b |
+| `/scan/set_config` | 동작 중이면 `BUSY`, 범위 밖이면 `INVALID_VALUE`(같이 온 정상값도 적용하지 않고 전파도 하지 않는다). `*_set`인 항목만 적용. 다른 노드가 거절하거나 안 떠 있으면 `PARAM_SET_FAILED` |
 
 **goal 거절 방식.** ROS 2의 goal reject에는 사유 필드가 없고, main의 mqtt_bridge는 reject를 `BUSY`로 고정해 낸다. 그래서 **goal은 항상 accept하고, 거절할 요청은 phase를 바꾸지 않은 채 바로 Result(`success=false`, `reason_code`=1xx, `scan_id=""`)로 끝낸다(abort).** 실제 사유(`SAFETY_LATCHED` · `INVALID_VALUE` …)가 `scan/command_result`로 웹에 간다. 계약 5.1~5.3절의 "거절" 문구와 다르므로 계약 문서 PR에서 문구를 맞춘다. 거절 처리는 `ScanManager._reject` 한 곳에 있다.
 Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하나로 한다(정지 확인과 중단 위치 기록이 거기에 묶여 있다). Feedback은 보내지 않는다(같은 내용이 `/scan/state`에 있다).
@@ -156,19 +161,22 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 `result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작이 끝까지 간 뒤에 쓸 자리를 남겨 둔다. 원본을 쓴 직후에 중지된 작업의 재시작은 그 파일을 읽어 재발행한다.
 
 ## executor · 스레드
-`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 넷이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버, 클라이언트(Reentrant). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
+`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 다섯이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버(`/scan/stop`), **`/scan/set_config` 전용**, 클라이언트(Reentrant). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
+
+`/scan/set_config`를 따로 둔 이유: 전파가 상대 노드의 응답을 기다리므로, `/scan/stop`과 같은 MutuallyExclusive 그룹이면 그동안 정지가 아예 돌지 못한다(규칙 3: 정지는 독립된 명령이다).
 
 시퀀스는 `/scan/run`의 execute 콜백 안에서 돌며 executor 스레드 하나를 차지한다. 교착이 없는 이유:
 - 시퀀스 스레드는 **락을 쥔 채 기다리지 않는다.** 상대 노드의 응답은 `add_done_callback`이 세우는 `threading.Event`로 기다리고, 콜백 안에서 spin하지 않는다. 그 완료 콜백 · 구독 · `/scan/stop`은 다른 그룹이라 남은 스레드에서 돈다.
 - 상태 기계의 `on_change`(락 안)는 발행과 쓰기 큐 투입만 한다. 디스크 쓰기 · 서비스 호출 · 대기가 없어서 `/scan/stop`의 `request(STOP)`이 디스크를 기다리지 않는다.
 - 명령 접수 락 안에서는 쓰기 스레드를 기다리지 않는다. 다만 HOME · RESUME의 접수는 그 락 안에서 **기록 파일 한두 개를 읽는다**(가장 최근 기록 · 이을 작업의 기록). 그동안 온 `/scan/stop`은 읽기가 끝날 때까지 기다린다. 이 구간은 휴지 phase라 scan_manager가 보낸 모션이 없다. 재시작의 쓰기 큐 대기는 락을 잡기 **전에** 한다.
-- 락의 순서는 한 방향이다: (명령 접수 락 →) 작업 락 → 상태 기계 락 → 발행 락. 주기 발행은 상태 기계 락을 놓은 뒤에 발행 락을 잡는다.
+- 락의 순서는 한 방향이다: (명령 접수 락 →) **설정 락 →** 작업 락 → 상태 기계 락 → 발행 락. 주기 발행은 상태 기계 락을 놓은 뒤에 발행 락을 잡는다.
+- **전파는 설정 락만 쥔 채 기다린다.** SetConfig의 접수 · 전파 · 되읽기 전체가 설정 락 안이고, 작업 락은 접수 판정과 자기 값 반영에만 짧게 잡는다. 그래서 상대 노드가 꺼져 있어 전파가 `server_wait_timeout_s × 노드 수`만큼 걸려도 **START만 기다리고 `/scan/stop`은 기다리지 않는다.** START가 기다리는 것은 의도다 — 반쯤 전파된 값으로 재지 않는다. `set_parameters` · `get_parameters`의 응답은 클라이언트 그룹의 다른 스레드가 처리하고, 콜백 안에서 spin하지 않는다.
 - `/scan/stop` 콜백은 아무것도 기다리지 않는다(`call_async` · `cancel_goal_async`).
 - 상태 전이(`notify`)는 작업 락 안에서 한다. `/scan/stop`이 "접수 직전의 Snapshot"을 뜨고 STOP을 요청하는 사이에 전이가 끼지 않아 중단 기록이 실제와 같다.
 - **추적하지 못하는 모션을 남기지 않는다.** goal 응답이 `server_wait_timeout_s` 안에 오지 않거나 Result가 끝내 오지 않으면 실패로 끝내면서 `/robot/stop`(멱등)을 요청하고, 늦게 수락된 goal은 바로 취소한다. 수락된 goal을 두고 예외로 빠져나갈 때도 취소한다. 홈 복귀 · 재시작은 부르지 않는다.
 - 모든 기다림에는 파라미터로 준 한도가 있고, 종료 요청이 오면 바로 빠져나온다.
 
-종료: SIGINT가 두 번 와도(launch의 Ctrl-C) 트레이스백 없이 코드 0으로 끝난다. 큐에 남은 기록을 디스크에 쓴 뒤 닫는다. **모션 도중에 노드가 죽으면 robot_manager는 그 모션을 끝까지(`max_distance` · `timeout`) 실행한다.** 종료할 때 `/robot/stop`을 보내지 않는다(context가 이미 내려가 있다) → T19b에서 다룬다.
+종료: SIGINT가 두 번 와도(launch의 Ctrl-C) 트레이스백 없이 코드 0으로 끝난다. 큐에 남은 기록을 디스크에 쓴 뒤 닫는다. **모션 도중에 노드가 죽으면 robot_manager는 그 모션을 끝까지(`max_distance` · `timeout`) 실행한다.** 종료할 때 `/robot/stop`을 보내지 않는다(context가 이미 내려가 있다). **아직 안 고쳤다** — 진행 중인 goal의 cancel을 종료 경로에서 시도할지는 팀 안건이다(T19b D2).
 
 ## 상태 기계
 

@@ -701,18 +701,24 @@ def test_operator_session_set_config_stop_home_then_full_scan(rig):
 # ---- 설정 ----
 
 def test_set_config_applies_only_flagged_fields_and_reports_unknowns_as_nan(rig):
+    """자기 몫(모션 6개)만 이 파일이 본다. 전파(P01~P03)는 test_node_config.py 가 본다.
+
+    이 rig 에는 전파 대상 노드(robot_manager · contact_detector · safety_monitor)가 없다.
+    그래서 over_force_n 은 어디에도 들어가지 못하고 PARAM_SET_FAILED 로 실패한다 — 값이 실제로
+    바뀌지 않았는데 success 로 답하지 않는다. 자기 몫은 그대로 적용된다(되돌리지 않는다).
+    """
     config = ScanConfig(
         slide_speed_mps=0.02, slide_speed_set=True, over_force_n=25.0, over_force_set=True,
         descend_speed_mps=9.9)  # descend_speed_set=false 라 적용되지 않는다
 
     response = rig.set_config(config)
 
-    assert response.success and response.reason_code == 0
+    assert not response.success and response.reason_code == Reason.PARAM_SET_FAILED
+    assert '미기동' in response.detail
     applied = response.applied
     assert (applied.slide_speed_mps, applied.slide_speed_set) == (0.02, True)
-    # 다른 노드의 값은 보관만 한다. 전파(T19b) 전에는 "적용된 값"으로 내보내지 않는다
+    # 읽지 못한 다른 노드의 값은 NaN + *_set=false 다(0 을 채우지 않는다)
     assert math.isnan(applied.over_force_n) and not applied.over_force_set
-    assert '미전파' in response.detail and 'over_force_n' in response.detail
     assert rig.node._config['over_force_n'] == 25.0
     assert applied.descend_speed_mps == VALUES['descend_speed_mps'] and applied.descend_speed_set
     assert math.isnan(applied.contact_threshold_n) and not applied.contact_threshold_set
