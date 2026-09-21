@@ -1,0 +1,110 @@
+rosbag2_bagfile_information:
+  version: 9
+  storage_identifier: mcap
+  duration:
+    nanoseconds: 1549853412038
+  starting_time:
+    nanoseconds_since_epoch: 1789954039709654196
+  message_count: 90375
+  topics_with_message_count:
+    - topic_metadata:
+        name: /contact/event
+        type: contact_scan_interfaces/msg/ContactEvent
+        serialization_format: cdr
+        offered_qos_profiles:
+          - history: unknown
+            depth: 0
+            reliability: reliable
+            durability: volatile
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: automatic
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+        type_description_hash: RIHS01_ebdb2858629a1294b46f0e0513fc3e6a2df075fb744451d3a5c836d503cd0eb0
+      message_count: 15
+    - topic_metadata:
+        name: /robot/status
+        type: contact_scan_interfaces/msg/RobotStatus
+        serialization_format: cdr
+        offered_qos_profiles:
+          - history: unknown
+            depth: 0
+            reliability: reliable
+            durability: transient_local
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: automatic
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+        type_description_hash: RIHS01_a63c2de5a26e24ae572de3b2e942a58f0c20c24ba6eabfec3c1bf2d6b68dc7fc
+      message_count: 15212
+    - topic_metadata:
+        name: /robot/sample
+        type: contact_scan_interfaces/msg/RobotSample
+        serialization_format: cdr
+        offered_qos_profiles:
+          - history: unknown
+            depth: 0
+            reliability: best_effort
+            durability: volatile
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: automatic
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+        type_description_hash: RIHS01_f72817dd185f1064784233134f970c9424aa2949b229b90ee99895f806275d3a
+      message_count: 74698
+    - topic_metadata:
+        name: /safety/status
+        type: contact_scan_interfaces/msg/SafetyStatus
+        serialization_format: cdr
+        offered_qos_profiles:
+          - history: unknown
+            depth: 0
+            reliability: reliable
+            durability: transient_local
+            deadline:
+              sec: 9223372036
+              nsec: 854775807
+            lifespan:
+              sec: 9223372036
+              nsec: 854775807
+            liveliness: automatic
+            liveliness_lease_duration:
+              sec: 9223372036
+              nsec: 854775807
+            avoid_ros_namespace_conventions: false
+        type_description_hash: RIHS01_4f5fa5d2dcf9252c904a863b1c450a402653cf43061a799e0aacbfe07c91af4c
+      message_count: 450
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - rm_real_01_0.mcap
+  files:
+    - path: rm_real_01_0.mcap
+      starting_time:
+        nanoseconds_since_epoch: 1789954039709654196
+      duration:
+        nanoseconds: 1549853412038
+      message_count: 90375
+  custom_data: ~
+  ros_distro: jazzy

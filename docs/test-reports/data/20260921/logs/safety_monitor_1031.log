@@ -1,0 +1,2 @@
+[INFO] [1789954311.941817779] [safety_monitor]: over_force_n=30.0 drop_limit_m=0.005 sample_stale_ms=300 robot_status_timeout_ms=500 confirm_n=1 startup_grace_s=3.0 stop_confirm_timeout_s=0.6 stop_retry_period_s=2.0 status_publish_period_s=1.0 check_period_s=0.05
+[WARN] [1789954443.113732710] [safety_monitor]: SAMPLE_STALE: 335 ms 동안 수신 없음 (> 300 ms) (정지 중이라 경고만 남긴다)
