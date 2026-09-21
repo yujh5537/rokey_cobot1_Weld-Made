@@ -108,7 +108,7 @@ class Checker:
 
     def record(self, api, name, ok, note):
         path = name if name.startswith('/') else PREFIX + name
-        mark = {True: '성공', False: '실패', None: '응답 없음'}[ok]
+        mark = {True: '성공', False: '실패', None: '응답 없음', 'skip': '건너뜀'}[ok]
         self.rows.append((api, path, mark, note))
         print(f'[{mark:5}] {api:40} {path}  {note}')
 
@@ -161,6 +161,10 @@ def step_poscond(ck):
         ck.record('check_position_condition', 'force/check_position_condition', None, 'posx 조회 실패로 건너뜀')
         return
     z = pos[2]
+    # 비교값이 어느 성분인지 가리려고 호출 직전 posx 6개를 그대로 남긴다. Virtual 에서 구한 비교값
+    # z 179.89 가 홈 posx 의 ry(-179.87)와 0.02 차이라, 위치가 아니라 자세 성분과 비교할 가능성이
+    # 있다(yujh5537 리뷰, PR #66)
+    ck.record('posx (poscond 직전)', 'aux_control/get_current_posx', True, f'posx={fmt(pos)}')
     # 넓은 범위는 컨트롤러가 비교하는 값이 무엇이든 참이다. 호출 자체가 True를 돌려줄 수 있는지 본다
     for label, lo, hi, expected in (('참 조건', z - 5.0, z + 5.0, True), ('거짓 조건', z + 50.0, z + 60.0, False),
                                     ('넓은 범위', -10000.0, 10000.0, True)):
@@ -175,15 +179,34 @@ def step_poscond(ck):
 
 
 def ensure_autonomous(ck):
+    """자동 모드로 바꾼다. (성공 여부, 되돌릴 원래 모드 또는 None)을 돌려준다.
+
+    원래 모드를 돌려주는 이유: 스크립트가 끝난 뒤 로봇이 자동 모드로 남으면 원격 모션 명령이
+    계속 먹는 상태로 방치된다. run() 이 finally 에서 되돌린다(ok778ts123 리뷰, PR #66).
+    """
     res, _ = ck.call(GetRobotMode, 'system/get_robot_mode', GetRobotMode.Request(), retries=2)
     if res and res.success and res.robot_mode == ROBOT_MODE_AUTONOMOUS:
-        return True
+        return True, None
+    previous = res.robot_mode if res and res.success else None
     res, _ = ck.call(SetRobotMode, 'system/set_robot_mode', SetRobotMode.Request(robot_mode=ROBOT_MODE_AUTONOMOUS))
-    ck.record('set_robot_mode (AUTONOMOUS)', 'system/set_robot_mode', ok_of(res), '모션 명령 전 자동 모드 전환')
-    return bool(res and res.success)
+    ck.record('set_robot_mode (AUTONOMOUS)', 'system/set_robot_mode', ok_of(res),
+              f'모션 명령 전 자동 모드 전환 (원래 모드 {previous})')
+    return bool(res and res.success), previous
+
+
+def restore_mode(ck, previous):
+    if previous is None:
+        return
+    res, _ = ck.call(SetRobotMode, 'system/set_robot_mode', SetRobotMode.Request(robot_mode=previous), retries=2)
+    ck.record(f'set_robot_mode (원래 모드 {previous})', 'system/set_robot_mode', ok_of(res),
+              'finally 에서 되돌림' + ('' if res and res.success else '. 실패 — 펜던트에서 직접 되돌린다'))
 
 
 def move_home(ck, joint):
+    # J6 기본값 -204.84 deg 는 ±180 밖이다. 현재 자세에 따라 J6 가 크게 돌 수 있다(#60 · ok778ts123 리뷰)
+    if any(abs(j) > 180.0 for j in joint):
+        print(f'주의: 홈 관절각 {fmt(joint)} 에 ±180° 밖 값이 있다. 현재 자세에 따라 크게 돌 수 있다. '
+              '케이블과 주변을 먼저 확인했다면 계속된다')
     req = MoveJoint.Request(pos=joint, vel=20.0, acc=40.0, time=0.0, radius=0.0, mode=DR_MV_MOD_ABS,
                             blend_type=0, sync_type=SYNC)
     ck.timeout, saved = 60.0, ck.timeout  # 동기 이동은 도착까지 응답하지 않는다
@@ -287,7 +310,7 @@ def step_drl(ck, robot_system):
 
 def step_gripper(ck, robot_system):
     if robot_system != 1:
-        ck.record('/onrobot/sendCommand', GRIPPER_SRV, None, '실기에서는 거부 (탐침 파지 중 열면 떨어진다)')
+        ck.record('/onrobot/sendCommand', GRIPPER_SRV, 'skip', '실기에서는 거부 (탐침 파지 중 열면 떨어진다)')
         return
     for cmd in ('o', 'c'):
         res, dt = ck.call(SetCommand, GRIPPER_SRV, SetCommand.Request(command=cmd))
@@ -314,21 +337,26 @@ def run(args, node):
         step_query(ck)
     if 'poscond' in args.steps:
         step_poscond(ck)
-    if moving and moving != ['gripper']:
-        if not ensure_autonomous(ck):
-            print('자동 모드 전환 실패. 움직이는 단계를 건너뛴다.')
-            moving = ['gripper'] if 'gripper' in moving else []
-        elif args.move_home and not move_home(ck, args.home_joint):
-            print('홈 이동 실패. 움직이는 단계를 건너뛴다.')
-            moving = ['gripper'] if 'gripper' in moving else []
-    if 'amovel_stop' in moving:
-        step_amovel_stop(ck, args)
-    if 'compliance_force' in moving:
-        step_compliance_force(ck)
-    if 'drl' in moving:
-        step_drl(ck, system)
-    if 'gripper' in moving:
-        step_gripper(ck, system)
+    previous_mode = None
+    try:
+        if moving and moving != ['gripper']:
+            switched, previous_mode = ensure_autonomous(ck)
+            if not switched:
+                print('자동 모드 전환 실패. 움직이는 단계를 건너뛴다.')
+                moving = ['gripper'] if 'gripper' in moving else []
+            elif args.move_home and not move_home(ck, args.home_joint):
+                print('홈 이동 실패. 움직이는 단계를 건너뛴다.')
+                moving = ['gripper'] if 'gripper' in moving else []
+        if 'amovel_stop' in moving:
+            step_amovel_stop(ck, args)
+        if 'compliance_force' in moving:
+            step_compliance_force(ck)
+        if 'drl' in moving:
+            step_drl(ck, system)
+        if 'gripper' in moving:
+            step_gripper(ck, system)
+    finally:
+        restore_mode(ck, previous_mode)
     return ck.rows, system
 
 
@@ -348,7 +376,7 @@ def main():
     print('| API | 경로 | 결과 | 비고 |\n|---|---|---|---|')
     for api, path, mark, note in rows:
         print(f'| {api} | `{path}` | {mark} | {note} |')
-    return 0 if all(r[2] == '성공' for r in rows) else 2
+    return 0 if all(r[2] in ('성공', '건너뜀') for r in rows) else 2
 
 
 if __name__ == '__main__':
