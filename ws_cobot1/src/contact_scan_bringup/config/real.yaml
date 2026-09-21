@@ -74,6 +74,10 @@ safety_monitor:
 
 robot_manager:
   ros__parameters:
+    home_joint_deg: [-24.14, 17.03, 51.68, -0.18, 111.39, -204.84]   # OP_HOME 목적지(관절각 J1~J6, deg). 없으면 robot_manager 가 OP_HOME 을 거절한다
+                                     #   units-frames.md 의 홈위치 관절각. 2026-09-19 학민이 실기에서 확정했다
+                                     #   ⚠️ J6 이 -204.84 deg 다. 현재 자세에 따라 크게 도는 경로가 나올 수 있다(PR #66 학민 경고)
+    home_speed_deg_s: 20.0           # 홈 복귀 관절 속도. 실기는 낮춘다
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
     slide_target_force_n: 3.0        # 계약 이름 [N]. 출발값이고 잠정이다.
                                      #   ⚠️ set_desired_force 를 DR_FC_MOD_REL 로 부른다. 드라이버
