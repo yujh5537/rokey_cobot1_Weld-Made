@@ -1,6 +1,6 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
@@ -63,6 +63,10 @@ SetConfig를 수락하면 scan_manager가 `rcl_interfaces/srv/SetParameters`로 
 | P01 | scan_manager → `/robot_manager/set_parameters` | `slide_target_force_n` · `drop_limit_m` |
 | P02 | scan_manager → `/contact_detector/set_parameters` | `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` |
 | P03 **[v0.1 변경 · 신설]** | scan_manager → `/safety_monitor/set_parameters` | `over_force_n` · `drop_limit_m` |
+
+`ScanConfig.target_force_n`(메시지 필드)은 P01에서 robot_manager 파라미터 **`slide_target_force_n`**으로 전파된다. 숫자는 그대로 전달된다. 나머지 항목은 필드 이름과 파라미터 이름이 같다(`drop_limit_m` 등).
+
+**이 값의 기준 [v0.1.9].** robot_manager는 이 값을 `set_desired_force`에 **`DR_FC_MOD_REL`**로 싣는다(#73). 두산 매뉴얼 5.1.4의 정의가 "힘제어 초기의 센서값을 기준으로 상대적인 외력만 참조"이므로 **기준점은 호출 시점의 힘이고, tare 대비 절대 누름 힘이 아니다.** **SLIDE가 어디서 시작하느냐에 따라 실제 누름이 다르다.** 첫 방향은 DESCEND 접촉 자리에서 바로 밀므로 **접촉력 + 이 값**이고, 2~4 방향과 재시작은 방향 전환(7.3절)으로 윗면 `recontact_margin_m` 위에서 시작하므로 **≈ 이 값**이다. 계약이 이 필드를 "누름 목표 힘"이라 부르므로 웹 표시 문구도 이 기준에 맞춘다(절대값으로 읽히면 안 된다). REL을 유지할지 ABS로 바꿀지는 실기 결과를 보고 정한다(#73. **TBD**).
 
 ### 2.5 외부 (정의하지 않음)
 두산 `dsr_msgs2`(네임스페이스 `/dsr01`)와 OnRobot RG2 드라이버는 **robot_manager만** 호출한다. 실제 서비스 이름 · 동작 여부는 `docs/env/api-check-log.md`. MQTT는 `mqtt-schema.md`.
@@ -312,7 +316,12 @@ bool    motion_timeout_set
 float64 lift_height_m
 bool    lift_height_set
 # 힘/순응 → robot_manager (drop_limit_m 은 safety_monitor 에도)
-float64 target_force_n
+float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 숫자는 그대로 전달된다
+                           #   기준은 DR_FC_MOD_REL: set_desired_force 호출 시점의 힘에 더해지는 값이다.
+                           #   tare 대비 절대 누름 힘이 아니다. SLIDE 가 어디서 시작하느냐에 따라 실제 누름이 다르다:
+                           #   첫 방향은 DESCEND 접촉 자리에서 바로 밀므로 접촉력 + 이 값,
+                           #   2~4 방향과 재시작은 방향 전환(7.3)으로 윗면 recontact_margin_m 위에서 시작하므로 ~ 이 값.
+                           #   REL 유지 여부는 실기 뒤에 정한다 (#73)
 bool    target_force_set
 float64 drop_limit_m
 bool    drop_limit_set
@@ -612,6 +621,8 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 
 `over_force_n`과 `drop_limit_m`은 두 노드가 **같은 값**을 쓴다.
 
+**SetConfig 전파 대상이 아닌 scan_manager 파라미터.** 7.3절의 `recontact_margin_m`(방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값) · `recontact_speed_mps`(그 내림의 속도. 이동 속도가 아니라 저속) · `move_speed_mps`(`OP_MOVE_TO`의 이동 속도)는 scan_manager의 파라미터다. `ScanConfig`에 없고 SetConfig로 바꿀 수 없다. 값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. `recontact_margin_m`은 `drop_limit_m`보다 충분히 작아야 한다(7.3절).
+
 ---
 
 ## 7. 동작 규칙
@@ -639,7 +650,7 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 4. `OP_SLIDE`를 시작한다. 남은 틈은 SLIDE의 −z 목표 힘이 메운다.
 
 - 이 구간은 `OP_MOVE_TO`이므로 접촉 판정을 하지 않는다. 보호 수단은 과대 외력 감시다.
-- 3번의 속도는 이동 속도가 아니라 저속이어야 한다. `recontact_margin_m`과 내림 속도는 scan_manager 파라미터다(값 TBD).
+- 3번의 속도는 이동 속도가 아니라 저속이어야 한다. `recontact_margin_m`과 내림 속도 `recontact_speed_mps`는 scan_manager 파라미터다(6.4절. 값은 TBD).
 - 하강 제한의 기준은 SLIDE 첫 샘플의 z이므로, 틈을 메우는 하강량도 `drop_limit_m`에 포함된다. `recontact_margin_m`은 `drop_limit_m`보다 충분히 작아야 한다.
 
 ### 7.4 스캔 마무리 순서 **[v0.1 변경]**
@@ -658,7 +669,7 @@ EDGE_SEARCH 4/4
 | HOMING 중 작업 중지 | 그 자리에서 정지 → `STOPPED`. 측정은 끝났으므로 재시작 대상이 아니다(`NO_RESUMABLE_SCAN`). 이후는 관제자의 안전복귀 |
 | 형상 계산 실패 | 정상 완료가 아니므로 **자동 복귀하지 않는다.** `phase=ERROR` |
 | 실패 · 중단으로 끝난 작업 | 자동 복귀하지 않는다 |
-| 결과 중복 | `/scan/result`(GEOMETRY 끝)와 `RunScan.Result.result`(DONE)는 같은 내용이다. mqtt_bridge가 `scan_id`로 한 번만 반영한다 |
+| 결과 중복 | `/scan/result`(GEOMETRY 끝)와 `RunScan.Result.result`(DONE)는 같은 내용이다. mqtt_bridge가 **`(scan_id, stamp)`** 로 한 번만 반영한다. 재시작은 `scan_id`를 유지하므로(5.3절) 중단 시의 부분 결과와 재시작 뒤의 최종 결과가 같은 `scan_id`로 두 번 나간다. 키가 `scan_id`뿐이면 나중 결과가 버려진다. scan_manager는 발행할 때마다 `stamp`를 새로 찍는다 |
 
 홈 복귀 경로 · 순서는 TBD(BRD 6장).
 
@@ -672,7 +683,7 @@ EDGE_SEARCH 4/4
 ## 9. TBD
 T01 회의에서 **담당 · 기한 없이 TBD로 두기로** 했다. 정해지면 이 문서와 CHANGELOG를 같이 고친다.
 
-- 하강 속도 · 누름 목표 힘 · 내림 속도 · `recontact_margin_m`의 값
+- 하강 속도 · 누름 목표 힘 · `recontact_speed_mps` · `recontact_margin_m`의 **값**(이름은 6.4절에 적었다)
 - tare 허용치(`tare_max_force_n` · 불안정 판정) · 외력 감소 보조 신호
 - ~~`RobotStatus.moving`의 근거~~ → **T15에서 정했다.** `get_robot_state`는 Virtual에서 이동 중에도
   STANDBY(1)를 돌려줘 쓸 수 없었다(2026-09-20 실측: z 540.6 → 527.6으로 움직이는 동안 30회 모두 1).
