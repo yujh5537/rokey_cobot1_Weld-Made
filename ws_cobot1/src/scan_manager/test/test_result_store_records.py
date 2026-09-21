@@ -279,11 +279,14 @@ def test_failure_without_a_pose_is_null_not_zero():
 
 def test_failure_pose_flag_must_match_the_pose():
     record = FailureRecord(300, '', Phase.TOP_SEARCH, pose=pose(), recorded_at=Stamp(3))
+    without = {key: value for key, value in record.to_dict().items() if key != 'pose'}
     for data in (
             {**record.to_dict(), 'pose_valid': False},
             {**record.to_dict(), 'pose': None},
             {**record.to_dict(), 'pose_valid': None},
             {**FailureRecord(300, '', Phase.TOP_SEARCH).to_dict(), 'pose_valid': True},
+            without,                                        # 한쪽 키만 있다 → 훼손이다
+            {key: value for key, value in record.to_dict().items() if key != 'pose_valid'},
     ):
         with pytest.raises(ValueError):
             FailureRecord.from_dict(data)
@@ -298,8 +301,9 @@ def test_failure_of_an_older_record_without_the_pose_keys_still_reads():
     assert record.pose is None
     assert (record.reason_code, record.phase) == (301, Phase.EDGE_SEARCH)
     assert record.recorded_at == Stamp(3)
-    with pytest.raises(ValueError):
-        FailureRecord.from_dict({**old, 'pose': pose().to_dict()})   # 한쪽만 있으면 훼손이다
+    for half in ({**old, 'pose': pose().to_dict()}, {**old, 'pose_valid': False}):
+        with pytest.raises(ValueError):      # 한쪽 키만 있는 것은 옛 기록이 아니라 훼손이다
+            FailureRecord.from_dict(half)
 
 
 # ---- 최종 결과 ----

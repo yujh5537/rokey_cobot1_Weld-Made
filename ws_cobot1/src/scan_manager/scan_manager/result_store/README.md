@@ -47,7 +47,7 @@
 | `measurements.top` · `measurements.edges.{POS_X,NEG_X,POS_Y,NEG_Y}` | 아래 "측정값 한 칸" |
 | `interruptions[]` | 작업 중지 목록. 중지를 접수한 시점의 `phase` · `direction` · `progress`, 중단 위치 `pose`(+`pose_valid`), `during_final_homing`, `stopped_at`, `resumed_at`(`null` = 아직 재시작하지 않음) |
 | `home_return` | 홈 안전복귀의 사실. `requested` · `request_count` · `requested_at` · `interruptions_at_request`(접수 때까지 기록돼 있던 중지의 수. "어느 중지 뒤의 복귀인가"를 시계에 기대지 않고 남긴다) · `origin_phase` · `completed`(`null` = 끝을 모름) · `completed_at` · `final_pose` |
-| `failure` | `reason_code` · `detail` · `phase`(실패가 난 phase) · 정지 좌표 `pose`(+`pose_valid`) · `recorded_at`. 없으면 `null`. 원인 · 단계 · 위치를 한자리에 남긴다(BRD 4.2.5). `pose`는 실패한 `ExecuteMotion`의 `Result.pose`이고, 얻지 못했으면 `null` + `pose_valid=false`다 (`pose` · `pose_valid`가 **둘 다** 없으면 좌표를 남기지 않던 옛 기록으로 읽는다) |
+| `failure` | `reason_code` · `detail` · `phase`(실패가 난 phase) · 정지 좌표 `pose`(+`pose_valid`) · `recorded_at`. 없으면 `null`. 원인 · 단계 · 위치를 한자리에 남긴다(BRD 4.2.5). `pose`는 실패한 `ExecuteMotion`의 `Result.pose`이고, 얻지 못했으면(Result 없음 · `pose_stamp=0` · 다른 프레임) `null` + `pose_valid=false`다. 무엇을 넣을지 고르는 것은 호출 측(scan_manager)이다 (`pose` · `pose_valid`가 **둘 다** 없으면 좌표를 남기지 않던 옛 기록으로 읽는다. 한쪽만 있으면 훼손이다) |
 | `result_saved` · `result_success` | `result.json`을 썼는지, 그 형상이 성공인지(`null` = 아직 없음) |
 
 **측정값 한 칸**

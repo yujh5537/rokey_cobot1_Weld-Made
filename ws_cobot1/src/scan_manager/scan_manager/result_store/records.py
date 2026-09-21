@@ -681,8 +681,11 @@ class FailureRecord:
             pose=_load(PoseRecord, data.get('pose')),
             recorded_at=_load(Stamp, data['recorded_at']),
         )
-        if 'pose' in data or 'pose_valid' in data:
-            if _bool(data.get('pose_valid'), 'pose_valid') != (item.pose is not None):
+        written = ('pose' in data, 'pose_valid' in data)
+        if any(written):
+            if not all(written):
+                raise ValueError('pose 와 pose_valid 는 같이 있어야 한다')
+            if _bool(data['pose_valid'], 'pose_valid') != (item.pose is not None):
                 raise ValueError('pose_valid 가 pose 와 어긋난다')
         return item
 
