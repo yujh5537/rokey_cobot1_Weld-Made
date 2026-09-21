@@ -79,6 +79,50 @@ function formatNumber(value) {
     : '-'
 }
 
+const DISPLAY_SCALE = 0.01
+
+function toThreePosition(
+  xMm,
+  yMm,
+  zMm
+) {
+  return new THREE.Vector3(
+    xMm * DISPLAY_SCALE,
+    zMm * DISPLAY_SCALE,
+    -yMm * DISPLAY_SCALE
+  )
+}
+
+function getBaseToFixtureMm() {
+  const raw =
+    import.meta.env
+      .VITE_BASE_TO_FIXTURE_MM ?? ''
+
+  const values = raw
+    .split(',')
+    .map((value) =>
+      Number(value.trim())
+    )
+
+  if (
+    values.length !== 3 ||
+    values.some(
+      (value) =>
+        !Number.isFinite(value)
+    )
+  ) {
+    return null
+  }
+
+  return {
+    x: values[0],
+    y: values[1],
+    z: values[2],
+  }
+}
+
+const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
+
 function formatScanLogMessage(payload) {
   const parts = []
 
@@ -397,9 +441,29 @@ function App() {
 
         // scan/state
         if (topic === 'scan/state') {
-          setPhase(
+          const nextPhase =
             payload.phase ?? 'UNKNOWN'
-          )
+
+          const nextScanId =
+            payload.scan_id ?? null
+
+          setScanResult((previousResult) => {
+            const scanIdChanged =
+              previousResult?.scan_id &&
+              nextScanId &&
+              previousResult.scan_id !== nextScanId
+
+            if (
+              nextPhase === 'PREPARING' ||
+              scanIdChanged
+            ) {
+              return null
+            }
+
+            return previousResult
+          })
+
+          setPhase(nextPhase)
 
           setDirection(
             payload.direction ?? '-'
@@ -413,9 +477,7 @@ function App() {
             payload.progress_total ?? 4
           )
 
-          setScanId(
-            payload.scan_id ?? null
-          )
+          setScanId(nextScanId)
         }
 
         // robot/sample
@@ -756,13 +818,12 @@ function App() {
 
     // MQTT/Web 좌표 단위는 mm.
     // 화면 표시를 위해 100 mm = Three.js 1 unit로 축소한다.
-    const DISPLAY_SCALE = 0.01
-
-    // 기존 Three.js 장면은 Y축을 위쪽으로 사용하고 있기 때문
-    tipMeshRef.current.position.set(
-      tipPose.x * DISPLAY_SCALE,
-      tipPose.z * DISPLAY_SCALE,
-      tipPose.y * DISPLAY_SCALE
+    tipMeshRef.current.position.copy(
+      toThreePosition(
+        tipPose.x,
+        tipPose.y,
+        tipPose.z
+      )
     )
 
     tipMeshRef.current.visible = true
@@ -781,14 +842,11 @@ function App() {
       return
     }
 
-    const DISPLAY_SCALE = 0.01
-
-    // tipTrajectory를 Three.js Vector3 배열로 변환
     const points = tipTrajectory.map((pose) =>
-      new THREE.Vector3(
-        pose.x * DISPLAY_SCALE,
-        pose.z * DISPLAY_SCALE,
-        pose.y * DISPLAY_SCALE
+      toThreePosition(
+        pose.x,
+        pose.y,
+        pose.z
       )
     )
 
@@ -818,8 +876,6 @@ function App() {
     // 기존 접촉점 Mesh 제거
     group.clear()
 
-    const DISPLAY_SCALE = 0.01
-
     contactPoints.forEach((point) => {
       const geometry =
         new THREE.SphereGeometry(
@@ -839,10 +895,12 @@ function App() {
           material
         )
 
-      marker.position.set(
-        point.x * DISPLAY_SCALE,
-        point.z * DISPLAY_SCALE,
-        point.y * DISPLAY_SCALE
+      marker.position.copy(
+        toThreePosition(
+          point.x,
+          point.y,
+          point.z
+        )
       )
 
       group.add(marker)
@@ -862,6 +920,8 @@ function App() {
     const group =
       edgeGroupRef.current
 
+    group.position.set(0, 0, 0)
+
     // 이전 scan/result에서 그린 모서리를 정리한다.
     group.children.forEach((child) => {
       child.geometry?.dispose()
@@ -870,6 +930,18 @@ function App() {
 
     group.clear()
 
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
+    group.position.copy(
+      toThreePosition(
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
+      )
+    )
+
     // 성공한 scan/result와 edges 배열이 있을 때만 그린다.
     if (
       scanResult?.success !== true ||
@@ -877,8 +949,6 @@ function App() {
     ) {
       return
     }
-
-    const DISPLAY_SCALE = 0.01
 
     scanResult.edges.forEach((edge) => {
       if (
@@ -890,24 +960,18 @@ function App() {
       }
 
       const start =
-        new THREE.Vector3(
-          edge.start.x_mm *
-            DISPLAY_SCALE,
-          edge.start.z_mm *
-            DISPLAY_SCALE,
-          edge.start.y_mm *
-            DISPLAY_SCALE
-        )
+      toThreePosition(
+        edge.start.x_mm,
+        edge.start.y_mm,
+        edge.start.z_mm
+      )
 
       const end =
-        new THREE.Vector3(
-          edge.end.x_mm *
-            DISPLAY_SCALE,
-          edge.end.z_mm *
-            DISPLAY_SCALE,
-          edge.end.y_mm *
-            DISPLAY_SCALE
-        )
+      toThreePosition(
+        edge.end.x_mm,
+        edge.end.y_mm,
+        edge.end.z_mm
+      )
 
       const geometry =
         new THREE.BufferGeometry()
@@ -943,6 +1007,8 @@ function App() {
     const group =
       pathCandidateGroupRef.current
 
+    group.position.set(0, 0, 0)
+
     // 이전 scan/result에서 그린 선의
     // geometry와 material을 먼저 정리한다.
     group.children.forEach((child) => {
@@ -951,6 +1017,18 @@ function App() {
     })
 
     group.clear()
+
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
+    group.position.copy(
+      toThreePosition(
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
+      )
+    )
 
     // 정상적인 스캔 결과가 아니면
     // 그릴 경로 후보가 없다.
@@ -963,8 +1041,6 @@ function App() {
       return
     }
 
-    const DISPLAY_SCALE = 0.01
-
     scanResult.path_candidates.forEach(
       (candidate) => {
         if (
@@ -976,23 +1052,17 @@ function App() {
         }
 
         const start =
-          new THREE.Vector3(
-            candidate.start.x_mm *
-              DISPLAY_SCALE,
-            candidate.start.z_mm *
-              DISPLAY_SCALE,
-            candidate.start.y_mm *
-              DISPLAY_SCALE
+          toThreePosition(
+            candidate.start.x_mm,
+            candidate.start.y_mm,
+            candidate.start.z_mm
           )
 
         const end =
-          new THREE.Vector3(
-            candidate.end.x_mm *
-              DISPLAY_SCALE,
-            candidate.end.z_mm *
-              DISPLAY_SCALE,
-            candidate.end.y_mm *
-              DISPLAY_SCALE
+          toThreePosition(
+            candidate.end.x_mm,
+            candidate.end.y_mm,
+            candidate.end.z_mm
           )
 
         const geometry =
@@ -1005,6 +1075,7 @@ function App() {
         const material =
           new THREE.LineBasicMaterial({
             color: 0x00ff66,
+            depthTest: false,
           })
 
         const line =
@@ -1012,6 +1083,8 @@ function App() {
             geometry,
             material
           )
+
+        line.renderOrder = 1
 
         group.add(line)
       }
@@ -1126,6 +1199,14 @@ function App() {
           <p>
             결과 좌표 프레임:{' '}
             {scanResult.frame_id ?? '-'}
+          </p>
+        )}
+
+        {scanResult?.success === true &&
+        !BASE_TO_FIXTURE_MM && (
+          <p>
+            작업대 원점 미설정:
+            VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.
           </p>
         )}
 
