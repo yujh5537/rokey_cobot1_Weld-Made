@@ -39,6 +39,10 @@ contact_detector:
     tare_min_samples: 30             # 구간 안의 유효 샘플이 이보다 적으면 TARE_TIMEOUT
     tare_max_std_n: 0.3              # |F - F0| 의 RMS 가 넘으면 TARE_UNSTABLE. 설계 출발값. 실기 정지 상태 실측 0.035 N (2026-09-20)
     tare_max_force_n: 6.0            # |F0| 가 넘으면 TOOL_REG_SUSPECT (BRD 4.1.5 툴 등록 점검). 병후 제안값 (PR #57 코멘트)
+                                     #   실측 |F0|: 툴 등록 1.81 N (2026-09-20 홈 자세) · 2.1~2.9 N, 최대 3.7 N (2026-09-19 3자세)
+                                     #             툴 미등록 11~12.5 N. 두 구간 사이가 벌어져 있어 6 N 으로 가른다
+                                     #   낮게 잡으면 안 되는 이유: 탐침이 홀더 안으로 밀리는 중이면 |F0| 가 올라갈 수 있고(PR #80),
+                                     #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
     # --- 하강 · 밀기 기준 분리 (#109, 2026-09-21 실기) ---
     # 외력 추정값은 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다. 정지 F0 로 하강하면 허공에서 거짓 CONTACT(큐브 45 mm 위),
     # 하강용 F0 를 밀기에 쓰면 옆 이동 이력(허공에서도 Fx -5 N) 때문에 닿기 전에도 |F - F0| 가 수 N 이다
@@ -52,10 +56,6 @@ contact_detector:
     edge_arm_still_window_s: 0.2     # > 0 이면 EDGE 판정을 z 로 켠다: 이 구간 동안 z 가 edge_arm_still_m 안에 머물고
     edge_arm_still_m: 0.0001         #   x · y 가 edge_arm_travel_m 넘게 움직였으면 "누르고 있다". edge_arm_force_n 은 쓰지 않는다
     edge_arm_travel_m: 0.0005        #   (x · y 조건: 힘 제어를 켜는 동안 팁이 떠 있는데 z 도 멈춰 있어서). 설계 출발값
-                                     #   실측 |F0|: 툴 등록 1.81 N (2026-09-20 홈 자세) · 2.1~2.9 N, 최대 3.7 N (2026-09-19 3자세)
-                                     #             툴 미등록 11~12.5 N. 두 구간 사이가 벌어져 있어 6 N 으로 가른다
-                                     #   낮게 잡으면 안 되는 이유: 탐침이 홀더 안으로 밀리는 중이면 |F0| 가 올라갈 수 있고(PR #80),
-                                     #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
 
 safety_monitor:
   ros__parameters:
