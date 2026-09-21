@@ -7,12 +7,16 @@
 - /robot/status: 주기 발행. stamp 는 발행 시각이다.
 - 가상 직육면체까지의 거리가 goal 의 max_distance 를 넘으면 REASON_MAX_DISTANCE 로 끝낸다
   (yaml 의 max_descend_m · max_slide_m · 기준점이 상자를 실제로 덮는지 드러난다).
+- 상자는 Box 로 받는다. 기본값은 sequence_helpers 의 상수(테스트 안의 가상값)이고,
+  **sim.yaml 을 쓰는 시험은 그 yaml 의 sim_box_* 로 만든 Box 를 넘긴다** — 상자가 yaml 과
+  따로 놀면 yaml 을 옮겼을 때 "접촉이 없다"로 깨진다(2026-09-21, PR #100).
 가상 직육면체와 정방향 모델은 sequence_helpers 와 같다. 수치는 테스트용 임의값이다.
 """
 
 import math
 import threading
 import time
+from typing import NamedTuple, Tuple
 
 from contact_scan_interfaces.action import ExecuteMotion
 from contact_scan_interfaces.msg import ContactEvent
@@ -31,6 +35,7 @@ from scan_manager import geometry_adapter
 from scan_manager.contract_enums import Direction
 from scan_manager.contract_enums import Operation
 from sequence_helpers import BOX_BOTTOM_Z
+from sequence_helpers import BOX_CENTER
 from sequence_helpers import BOX_SIZE
 from sequence_helpers import DOWN
 from sequence_helpers import edge_coordinate
@@ -58,16 +63,40 @@ RESULT_WRONG_FRAME = 'result_wrong_frame'  # Result 의 frame_id 가 Base 가 �
 MODEL_KEYS = ('detect_latency_s', 'tip_radius_m', 'edge_round_radius_m', 'edge_bias_offset_m')
 
 
+class Box(NamedTuple):
+    """가짜 로봇이 만지는 가상 직육면체. 기본값은 sequence_helpers 의 상수다."""
+
+    center_xy: Tuple[float, float] = BOX_CENTER
+    size: Tuple[float, float, float] = BOX_SIZE
+    bottom_z: float = BOX_BOTTOM_Z
+
+    @property
+    def top_z(self) -> float:
+        return self.bottom_z + self.size[2]
+
+    @classmethod
+    def from_sim_yaml(cls, contact_detector_params) -> 'Box':
+        """sim.yaml 의 contact_detector 절에서 만든다. 실제 sim 입력원과 같은 상자가 된다."""
+        origin = contact_detector_params['sim_box_origin_m']
+        size = tuple(contact_detector_params['sim_box_size_m'])
+        return cls(center_xy=(origin[0], origin[1]), size=size, bottom_z=origin[2])
+
+
 def key(operation, direction=Direction.NONE):
     return (int(operation), int(direction))
 
 
 class FakePeers(Node):
 
-    def __init__(self, model=None):
-        """model: 정방향 모델의 값(MODEL_KEYS). scan_manager 의 보정 파라미터와 같아야 치수가 복원된다."""
+    def __init__(self, model=None, box=None):
+        """model: 정방향 모델의 값(MODEL_KEYS). scan_manager 의 보정 파라미터와 같아야 치수가 복원된다.
+
+        box: 만질 가상 직육면체. 기본값은 테스트 안의 상수다. sim.yaml 로 띄우는 시험은
+             Box.from_sim_yaml(...) 로 **그 yaml 의 상자**를 넘긴다.
+        """
         super().__init__('fake_peers')
         self.model = {name: (model or VALUES)[name] for name in MODEL_KEYS}
+        self.box = box or Box()
         group = ReentrantCallbackGroup()
         self.behavior = {}             # key(op, dir) → 위의 상수
         self.hold_goal = None          # n 번째로 수락한 goal 을 HOLD 로 돌린다(같은 operation 이 여러 번 나올 때)
@@ -248,7 +277,7 @@ class FakePeers(Node):
 
         latency, r = self.model['detect_latency_s'], self.model['tip_radius_m']
         if descend:
-            detected = (x, y, BOX_BOTTOM_Z + BOX_SIZE[2] - goal.speed * latency)
+            detected = (x, y, self.box.top_z - goal.speed * latency)
             if z - detected[2] > goal.max_distance:   # 상자 윗면이 max_descend_m 보다 멀다
                 self.position = (x, y, z - goal.max_distance)
                 return self._result(R.REASON_MAX_DISTANCE, 300)
@@ -262,7 +291,8 @@ class FakePeers(Node):
             overshoot = (d - self.model['edge_round_radius_m'] + goal.speed * latency
                          + self.model['edge_bias_offset_m'])
             detected = [x, y, z - Z_DROP_M]
-            detected[axis] = edge_coordinate(direction) + SIGN[direction] * overshoot
+            detected[axis] = (edge_coordinate(direction, self.box.center_xy, self.box.size)
+                              + SIGN[direction] * overshoot)
             if abs(detected[axis] - self.position[axis]) > goal.max_distance:   # 모서리가 max_slide_m 보다 멀다
                 moved = [x, y, z]
                 moved[axis] += SIGN[direction] * goal.max_distance

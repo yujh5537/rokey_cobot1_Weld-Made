@@ -5,6 +5,9 @@ test_node_scan.py 는 노드를 테스트 프로세스 안에서 만든다. 여�
 tip_radius_m)이 가상 직육면체에서 실제로 동작하는지 본다.
 
 로봇 · 드라이버 · Virtual Mode 를 쓰지 않는다. 상대 노드는 fake_peers.FakePeers 다.
+가짜 로봇이 만지는 상자도 **같은 sim.yaml 의 contact_detector.sim_box_* 에서 만든다** — 그래야
+"yaml 의 값이 실제로 동작하는지"를 보는 시험이 된다. 상자를 따로 박아 두면 yaml 을 옮겼을 때
+기준점과 상자가 어긋나 접촉이 없다로 깨진다(2026-09-21 PR #100 에서 실제로 그랬다).
 sim.yaml 의 detect_latency_s 는 TBD 라서 **테스트 전용 임의값**을 덮어쓴다. 실측값도 설계 출발값도 아니다.
 """
 
@@ -42,7 +45,6 @@ from rclpy.action import ActionClient  # noqa: E402
 from rclpy.executors import MultiThreadedExecutor  # noqa: E402
 from scan_manager.contract_enums import Operation  # noqa: E402
 from scan_manager.contract_enums import Reason  # noqa: E402
-from sequence_helpers import BOX_SIZE  # noqa: E402
 
 TEST_LATENCY_S = 0.02   # 테스트 전용 임의값
 TIMEOUT_S = 60.0
@@ -55,6 +57,7 @@ class SimProcess:
         data = yaml.safe_load(SIM_YAML.read_text(encoding='utf-8'))
         params = data['scan_manager']['ros__parameters']
         self.yaml_params = params
+        self.box = F.Box.from_sim_yaml(data['contact_detector']['ros__parameters'])
         params_file = SIM_YAML
         if not with_latency:
             # sim.yaml 의 detect_latency_s 가 채워진 뒤(T07)로는, '없는 필수 값' 경로를 보려면
@@ -72,7 +75,8 @@ class SimProcess:
         self.spawn()
 
         rclpy.init()
-        self.peers = F.FakePeers(model={**params, 'detect_latency_s': TEST_LATENCY_S})
+        self.peers = F.FakePeers(
+            model={**params, 'detect_latency_s': TEST_LATENCY_S}, box=self.box)
         self.client = rclpy.create_node('fake_bridge')
         self.results, self.states = [], []
         self.client.create_subscription(ScanResult, '/scan/result', self.results.append, QOS_STATE)
@@ -219,7 +223,7 @@ def test_full_scan_with_sim_yaml_in_a_real_process(sim, tmp_path):
     # sim.yaml 의 base_to_fixture · tip_radius_m 으로 가상 직육면체(0.10 x 0.06 x 0.04)가 복원된다
     assert (shape.x_pos, shape.x_neg) == pytest.approx((0.05, -0.05))
     assert (shape.y_pos, shape.y_neg) == pytest.approx((0.03, -0.03))
-    assert (shape.width, shape.length, shape.height) == pytest.approx(BOX_SIZE)
+    assert (shape.width, shape.length, shape.height) == pytest.approx(rig.box.size)
 
     # goal 에 실린 값은 sim.yaml 의 값이다(코드 예비값이 아니다)
     params = rig.yaml_params
@@ -277,7 +281,7 @@ def _assert_resumed_to_the_end(rig, tmp_path, stopped, result, top_before):
     assert result.success, (result.reason_code, result.detail, rig.log())
     assert result.scan_id == stopped.scan_id
     shape = result.result
-    assert (shape.width, shape.length, shape.height) == pytest.approx(BOX_SIZE)
+    assert (shape.width, shape.length, shape.height) == pytest.approx(rig.box.size)
     assert shape.z_top == pytest.approx(stopped.result.z_top)
 
     progress = _progress(tmp_path, stopped.scan_id)
