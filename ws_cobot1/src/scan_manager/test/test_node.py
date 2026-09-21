@@ -16,8 +16,10 @@ from conftest import READY  # noqa: E402
 from contact_scan_interfaces.msg import ScanLog  # noqa: E402
 from contact_scan_interfaces.msg import ScanState  # noqa: E402
 from contact_scan_qos import QOS_STATE  # noqa: E402
+import fake_peers as F  # noqa: E402
 from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.parameter import Parameter  # noqa: E402
+from scan_manager.contract_enums import Reason  # noqa: E402
 from scan_manager.scan_manager import _Job  # noqa: E402
 from scan_manager.scan_manager import ScanManager  # noqa: E402
 from scan_manager.state_machine import Command  # noqa: E402
@@ -71,6 +73,46 @@ def test_publishes_idle_then_changes(ros):
         executor.shutdown()
         listener.destroy_node()
         node.destroy_node()
+
+
+def test_a_late_node_reads_a_stalled_publishers_retained_message_as_stale(ros):
+    """발행이 멈춘 채 살아 있는 발행자에 늦게 붙으면, 옛 샘플을 "방금" 받는다.
+
+    TRANSIENT_LOCAL 은 **발행자 프로세스가 살아 있는 동안** 늦은 구독자에게 마지막 샘플을 준다.
+    여기서는 타이머만 멈춘다(프로세스는 산다) — 감시자가 행에 걸리거나 발행 타이머가 죽은 경우다.
+    **수신 시각으로 보면 이때 START 가 통과한다.** stamp 로 봐야 걸린다(이슈 #120).
+
+    발행자 프로세스가 아예 죽으면 늦은 구독자는 아무것도 받지 못하고, 그것은 지금도 "미수신"으로
+    거절된다(sim 종단에서 확인). 이 관문이 실제로 막는 쪽은 **이미 떠 있던** scan_manager 가
+    마지막 "안전 정상"을 영원히 들고 있는 경우이며, 그것은 test_node_scan.py 가 시험한다.
+    """
+    peers = F.FakePeers()
+    executor = SingleThreadedExecutor()
+    executor.add_node(peers)
+    node = None
+    try:
+        for _ in range(20):                       # 몇 번 발행하게 둔다
+            executor.spin_once(timeout_sec=0.05)
+        peers.quiet()                             # 여기서 죽는다. 마지막 메시지는 latched=false 다
+        time.sleep(0.4)
+
+        node = ScanManager(parameter_overrides=[
+            Parameter('safety_status_timeout_s', value=0.3),
+            Parameter('robot_status_timeout_s', value=0.3)])
+        executor.add_node(node)
+        assert _spin_until(executor, lambda: node.conditions().safety_latched is not None)
+
+        conditions = node.conditions()
+        assert conditions.safety_latched is False          # 죽은 감시자의 "안전 정상"을 받았다
+        assert conditions.safety_status_age_s > 0.3        # 그러나 stamp 는 오래됐다
+        reason, detail = node.state_machine.check(
+            Command.START, conditions=conditions, scan_id='x')
+        assert reason is Reason.SAFETY_LATCHED and '끊김' in detail
+    finally:
+        executor.shutdown()
+        if node is not None:
+            node.destroy_node()
+        peers.destroy_node()
 
 
 def test_rejects_non_positive_period(ros):

@@ -115,12 +115,46 @@ class InvalidTransition(Exception):
         self.signal = signal
 
 
+def status_stale(topic: str, limit_name: str, age_s, timeout_s) -> Optional[str]:
+    """상태 토픽이 끊겼는가. 끊겼거나 판정할 수 없으면 사람이 읽는 사유, 아니면 None (이슈 #120).
+
+    구독자가 **이미 받은** 마지막 상태는 발행이 끊겨도 그대로 남는다. "한 번도 못 받음"(None)만 걸러서는
+    "받다가 끊김"을 알 수 없고, 죽기 직전의 latched=false 가 영원히 "안전 정상"으로 읽힌다.
+
+    나이를 **수신 시각이 아니라 메시지 stamp** 로 재는 이유는 따로 있다. /safety/status · /robot/status 는
+    TRANSIENT_LOCAL 이라 **발행자 프로세스가 살아 있는 한** 늦게 붙은 구독자도 마지막 샘플을 받는다.
+    발행이 멈춘 채 프로세스만 살아 있으면(행 · 타이머 정지) 늦게 뜬 노드는 옛 샘플을 "방금" 받는다 —
+    수신 시각으로 보면 그것이 통과한다. (발행자 프로세스가 아예 죽었으면 늦은 구독자는 아무것도 받지 못하고,
+    그것은 지금도 "미수신"으로 거절된다.)
+
+    - 한계 시간(파라미터)이 없으면 판정할 수 없다 → 통과시키지 않는다.
+    - 나이를 잴 수 없으면(ROS 시계가 0) 판정할 수 없다 → 통과시키지 않는다.
+    - 나이가 음수(stamp 가 미래)면 발행이 살아 있다는 뜻이므로 통과다. 시계 뒤틀림으로 막지 않는다.
+    - 정확히 한계 시간이면 통과다. 엄격히 넘어야 끊김이다.
+    """
+    if timeout_s is None:
+        return f'{topic} 최신성을 판정할 수 없다({limit_name} 파라미터가 없다)'
+    if age_s is None:
+        return f'{topic} 최신성을 판정할 수 없다(ROS 시계가 0 이다)'
+    if age_s > timeout_s:
+        return f'{topic} 끊김(마지막 stamp 가 {age_s:.1f} s 전, 한계 {timeout_s:.1f} s)'
+    return None
+
+
 @dataclass(frozen=True)
 class Conditions:
-    """명령 시점의 보호 조건. None 은 "아직 수신하지 못함"이며 거절 사유가 된다."""
+    """명령 시점의 보호 조건. None 은 "아직 수신하지 못함"이며 거절 사유가 된다.
+
+    ``*_age_s`` 는 마지막으로 받은 상태 메시지의 stamp 가 지난 시간이다. 노드가 재고(잴 수 없으면 None),
+    한계 시간과 비교해 "끊김"을 판정하는 것은 여기다(``status_stale``). 끊김을 False 나 0 으로 적지 않는다.
+    """
 
     robot_connected: Optional[bool] = None  # /robot/status.connected
     safety_latched: Optional[bool] = None   # /safety/status.latched
+    robot_status_age_s: Optional[float] = None    # /robot/status.stamp 의 나이(s). None = 잴 수 없음
+    safety_status_age_s: Optional[float] = None   # /safety/status.stamp 의 나이(s)
+    robot_status_timeout_s: Optional[float] = None   # 끊김으로 보는 한도. None = 파라미터 없음
+    safety_status_timeout_s: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -326,11 +360,23 @@ class ScanStateMachine:
         if command in (Command.START, Command.RESUME):
             if conditions.safety_latched is None:
                 return Reason.SAFETY_LATCHED, '/safety/status 미수신'
+            # 끊김을 래치보다 먼저 본다: 끊긴 뒤의 latched 는 죽은 감시자가 남긴 옛 값이라 믿을 수 없다.
+            # 안전복귀(HOME)는 이 관문에 들어오지 않는다 — 감시자가 죽었다고 돌아오지 못하면 안 된다(규칙 3).
+            stale = status_stale(
+                '/safety/status', 'safety_status_timeout_s',
+                conditions.safety_status_age_s, conditions.safety_status_timeout_s)
+            if stale:
+                return Reason.SAFETY_LATCHED, stale
             if conditions.safety_latched:
                 return Reason.SAFETY_LATCHED, ''
         if command in (Command.START, Command.RESUME, Command.HOME):
             if conditions.robot_connected is None:
                 return Reason.ROBOT_DISCONNECTED, '/robot/status 미수신'
+            stale = status_stale(
+                '/robot/status', 'robot_status_timeout_s',
+                conditions.robot_status_age_s, conditions.robot_status_timeout_s)
+            if stale:
+                return Reason.ROBOT_DISCONNECTED, stale
             if not conditions.robot_connected:
                 return Reason.ROBOT_DISCONNECTED, ''
         return Reason.OK, ''

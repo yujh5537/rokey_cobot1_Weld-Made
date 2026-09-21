@@ -1,6 +1,7 @@
 """작업 중지 · 안전복귀 · 재시작의 독립성과 거절 사유 (계약 4.1 · 4.3 · 5.1~5.3 · 7.4절)."""
 
 from conftest import drive
+from conftest import FRESH_STATUS
 from conftest import READY
 import pytest
 from scan_manager.contract_enums import Direction
@@ -15,10 +16,11 @@ from scan_manager.state_machine import REST_PHASES
 from scan_manager.state_machine import ScanStateMachine
 from scan_manager.state_machine import Signal
 from scan_manager.state_machine import SIGNAL_TRANSITIONS
+from scan_manager.state_machine import status_stale
 
-LATCHED = Conditions(robot_connected=True, safety_latched=True)
-DISCONNECTED = Conditions(robot_connected=False, safety_latched=False)
-UNKNOWN = Conditions()
+LATCHED = Conditions(robot_connected=True, safety_latched=True, **FRESH_STATUS)
+DISCONNECTED = Conditions(robot_connected=False, safety_latched=False, **FRESH_STATUS)
+UNKNOWN = Conditions()   # 상태를 한 번도 받지 못했다(나이 · 한계도 없다)
 
 
 def stopped_at(steps):
@@ -122,9 +124,11 @@ def test_set_config_needs_no_conditions_and_changes_nothing(sm):
     (LATCHED, Reason.SAFETY_LATCHED),
     (DISCONNECTED, Reason.ROBOT_DISCONNECTED),
     (UNKNOWN, Reason.SAFETY_LATCHED),
-    (Conditions(robot_connected=None, safety_latched=False), Reason.ROBOT_DISCONNECTED),
+    (Conditions(robot_connected=None, safety_latched=False, **FRESH_STATUS),
+     Reason.ROBOT_DISCONNECTED),
     # 둘 다 걸리면 계약 5.1절에 적힌 순서대로 SAFETY_LATCHED 가 먼저다
-    (Conditions(robot_connected=False, safety_latched=True), Reason.SAFETY_LATCHED),
+    (Conditions(robot_connected=False, safety_latched=True, **FRESH_STATUS),
+     Reason.SAFETY_LATCHED),
 ])
 def test_start_rejections(sm, conditions, reason):
     outcome = sm.request(Command.START, conditions=conditions, scan_id='a')
@@ -295,3 +299,85 @@ def test_resume_guard_rejections(conditions, reason):
 
 def test_rest_phases_constant():
     assert REST_PHASES == {Phase.IDLE, Phase.DONE, Phase.ERROR, Phase.STOPPED}
+
+
+# ---- 상태 토픽이 끊긴 경우 (이슈 #120) ----
+# /safety/status · /robot/status 는 TRANSIENT_LOCAL 이라 발행자가 죽어도 마지막 메시지가 남는다.
+# "한 번도 못 받음"(None)만 걸러서는 "받다가 끊김"을 알 수 없다.
+
+LIMITS = dict(robot_status_timeout_s=2.0, safety_status_timeout_s=5.0)
+
+
+def aged(safety=0.0, robot=0.0, latched=False, connected=True, **limits):
+    return Conditions(
+        robot_connected=connected, safety_latched=latched,
+        safety_status_age_s=safety, robot_status_age_s=robot, **{**LIMITS, **limits})
+
+
+def ask(sm, command, conditions):
+    """RESUME 은 중단된 작업을 가리켜야 한다(scan_id='' = 가장 최근 것)."""
+    return sm.check(
+        command, conditions=conditions, scan_id='' if command is Command.RESUME else 'x')
+
+
+@pytest.mark.parametrize('command', [Command.START, Command.RESUME])
+def test_a_stale_safety_status_refuses_start_and_resume(command):
+    reason, detail = ask(stopped_at(3), command, aged(safety=5.01))
+    assert reason is Reason.SAFETY_LATCHED
+    assert '끊김' in detail and '미수신' not in detail   # 한 번도 못 받은 것과 문구가 다르다
+
+
+@pytest.mark.parametrize('command', [Command.START, Command.RESUME, Command.HOME])
+def test_a_stale_robot_status_refuses_start_resume_and_home(command):
+    reason, detail = ask(stopped_at(3), command, aged(robot=2.01))
+    assert (reason, '끊김' in detail) == (Reason.ROBOT_DISCONNECTED, True)
+
+
+def test_home_is_not_blocked_by_a_stale_safety_status():
+    """감시자가 죽었다고 돌아오지 못하면 안 된다 (CLAUDE.md 규칙 3). 래치가 HOME 을 막지 않는 것과 같다."""
+    sm = stopped_at(3)
+    assert sm.request(Command.HOME, conditions=aged(safety=99.0)).accepted
+
+
+def test_the_gap_is_reported_before_the_latch():
+    """끊긴 뒤의 latched 는 죽은 감시자가 남긴 옛 값이다. 사람이 볼 것은 '감시자가 죽었다' 쪽이다."""
+    sm = ScanStateMachine()
+    _reason, detail = sm.check(
+        Command.START, conditions=aged(safety=5.01, latched=True), scan_id='x')
+    assert '끊김' in detail
+
+
+def test_never_received_keeps_its_own_wording():
+    sm = ScanStateMachine()
+    assert sm.check(Command.START, conditions=UNKNOWN, scan_id='x')[1] == '/safety/status 미수신'
+
+
+@pytest.mark.parametrize('conditions', [
+    aged(safety=5.0, robot=2.0),      # 정확히 한계 시간이면 통과다(엄격히 넘어야 끊김)
+    aged(safety=-0.5, robot=-0.5),    # stamp 가 미래다. 시계 뒤틀림으로 막지 않는다
+])
+def test_the_boundary_and_a_future_stamp_still_pass(conditions):
+    sm = ScanStateMachine()
+    assert sm.request(Command.START, conditions=conditions, scan_id='x').accepted
+
+
+@pytest.mark.parametrize('conditions, reason', [
+    # ROS 시계가 0 이다(use_sim_time 인데 /clock 이 없다). 나이를 잴 수 없으면 통과시키지 않는다
+    (aged(safety=None), Reason.SAFETY_LATCHED),
+    (aged(robot=None), Reason.ROBOT_DISCONNECTED),
+    # 한도 파라미터가 없다. 판정할 수 없으면 통과시키지 않는다
+    (aged(safety_status_timeout_s=None), Reason.SAFETY_LATCHED),
+    (aged(robot_status_timeout_s=None), Reason.ROBOT_DISCONNECTED),
+])
+def test_what_cannot_be_judged_does_not_pass(conditions, reason):
+    sm = ScanStateMachine()
+    outcome = sm.request(Command.START, conditions=conditions, scan_id='x')
+    assert (outcome.accepted, outcome.reason) == (False, reason)
+    assert '판정할 수 없다' in outcome.detail
+    assert sm.phase is Phase.IDLE
+
+
+def test_status_stale_names_the_topic_the_age_and_the_limit():
+    text = status_stale('/safety/status', 'safety_status_timeout_s', 7.25, 5.0)
+    assert '/safety/status' in text and '7.2' in text and '5.0' in text
+    assert status_stale('/safety/status', 'safety_status_timeout_s', 4.9, 5.0) is None

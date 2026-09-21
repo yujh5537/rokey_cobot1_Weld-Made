@@ -12,7 +12,12 @@ from scan_manager.state_machine import Conditions  # noqa: E402
 from scan_manager.state_machine import ScanStateMachine  # noqa: E402
 from scan_manager.state_machine import Signal  # noqa: E402
 
-READY = Conditions(robot_connected=True, safety_latched=False)
+# /robot/status · /safety/status 를 "방금 받았다"는 뜻. 한계 시간은 real.yaml 과 같은 값이다.
+# 끊김 자체를 시험하는 테스트만 나이 · 한계를 직접 준다(이슈 #120).
+FRESH_STATUS = dict(
+    robot_status_age_s=0.0, safety_status_age_s=0.0,
+    robot_status_timeout_s=2.0, safety_status_timeout_s=5.0)
+READY = Conditions(robot_connected=True, safety_latched=False, **FRESH_STATUS)
 
 # 정상 경로에서 phase 를 하나씩 앞으로 보내는 Signal 순서 (START 뒤)
 _FORWARD = (

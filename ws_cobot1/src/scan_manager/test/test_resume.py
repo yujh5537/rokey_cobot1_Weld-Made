@@ -37,6 +37,7 @@ from scan_manager.state_machine import Signal
 from sequence_helpers import BOX_SIZE
 from sequence_helpers import DOWN
 from sequence_helpers import FakePorts
+from sequence_helpers import FRESH_STATUS
 from sequence_helpers import make_params
 from sequence_helpers import READY
 from sequence_helpers import SCAN_ID
@@ -389,8 +390,8 @@ def test_conditions_refuse_a_restored_scan_like_any_other(params, result_dir):
     old, _ = scan(params, result_dir, stop_at=SLIDE_POS_X)
     ports = reopen(params, result_dir, old)
     adopt(ports)
-    latched = type(READY)(robot_connected=True, safety_latched=True)
-    offline = type(READY)(robot_connected=False, safety_latched=False)
+    latched = type(READY)(robot_connected=True, safety_latched=True, **FRESH_STATUS)
+    offline = type(READY)(robot_connected=False, safety_latched=False, **FRESH_STATUS)
     assert ports.sm.check(Command.RESUME, conditions=latched)[0] is Reason.SAFETY_LATCHED
     assert ports.sm.check(Command.RESUME, conditions=offline)[0] is Reason.ROBOT_DISCONNECTED
     assert ports.sm.check(Command.RESUME, conditions=READY, scan_id=NEWER_SCAN_ID)[0] \
