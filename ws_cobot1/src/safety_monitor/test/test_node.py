@@ -23,6 +23,7 @@ Z0 = 0.080
 PARAMS = {
     'over_force_n': 30.0, 'drop_limit_m': 5 * MM,
     'sample_stale_ms': 300, 'robot_status_timeout_ms': 600, 'confirm_n': 1,
+    'startup_grace_s': 0.0,      # 테스트는 유예 없이 본다. 실제 값은 yaml 에 있다
     'stop_confirm_timeout_s': 0.3, 'stop_retry_period_s': 0.4,
     'status_publish_period_s': 1.0, 'check_period_s': 0.05,
 }
