@@ -13,14 +13,27 @@ def trim(positions, now_s, window_s):
     return positions
 
 
-def is_moving(positions, eps_m):
+def is_moving(positions, eps_m, window_s=None, min_span_ratio=0.5):
     """창 안의 첫 위치에서 `eps_m`보다 멀어진 적이 있으면 이동 중.
 
-    위치를 모르면(점이 2개 미만) **True**를 돌려준다. 정지 완료의 유일한 근거가
-    `connected && !moving`이라, 모르는 상태를 정지로 보고하면 scan_manager가
-    움직이는 로봇을 멈춘 것으로 본다.
+    **모르면 True**다. 정지 완료의 유일한 근거가 `connected && !moving`이라,
+    모르는 상태를 정지로 보고하면 scan_manager가 움직이는 로봇을 멈춘 것으로 본다.
+    모르는 경우는 둘이다.
+
+    1. 점이 2개 미만이다.
+    2. 남은 점들이 창을 충분히 덮지 않는다(`window_s`를 주었을 때).
+       샘플 공백 뒤에는 창에 갓 들어온 점 두어 개만 남는다. 그 점들 사이의 시간이
+       몇십 ms뿐이라, 움직이는 중이어도 그 사이 변위가 `eps_m`에 못 미쳐 "정지"로
+       읽힌다. `eps_m`은 창 전체(`window_s`)를 덮었을 때만 뜻이 있는 값이다.
+
+       2026-09-21 실기: 359 ms 공백 뒤 창에 25 ms 짜리 두 점만 남았고, 3 mm/s로
+       내려가는 중인데 그 사이 변위가 0.076 mm(< 0.2 mm)라 정지로 판정됐다.
+       robot_manager가 동작을 완료로 보고한 뒤에도 로봇은 12 mm를 더 내려갔고,
+       결과의 정지 좌표도 그만큼 틀렸다.
     """
     if len(positions) < 2:
+        return True
+    if window_s and positions[-1][0] - positions[0][0] < min_span_ratio * window_s:
         return True
     first = positions[0][1]
     return any(math.dist(first, pos) > eps_m for _, pos in positions)

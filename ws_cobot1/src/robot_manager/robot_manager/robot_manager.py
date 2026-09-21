@@ -22,6 +22,7 @@ from collections import deque
 
 import rclpy
 from contact_scan_interfaces.action import ExecuteMotion
+from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.msg import ContactEvent, ReasonCode, RobotSample, RobotStatus
 from contact_scan_qos import QOS_EVENT, QOS_SENSOR, QOS_STATE
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -145,10 +146,15 @@ class RobotManager(Node):
 
         self.motion = None
         self.motion_lock = threading.Lock()
+        self.stop_requested = None     # /robot/stop 접수 내용 (reason_code, 사유)
 
         self.publish_status()  # 기동 직후 1회 (TRANSIENT_LOCAL 이라 늦게 뜬 구독자도 받는다)
         self.create_timer(1.0 / sample_hz, self.on_sample_timer, callback_group=group)
         self.create_timer(1.0 / status_hz, self.on_status_timer, callback_group=group)
+        # 계약 2.x: /robot/stop 은 robot_manager 가 제공한다. safety_monitor 와 scan_manager 의
+        # 유일한 정지 수단이다. 2026-09-21 실기까지 이 서버가 없어서 safety_monitor 의 정지
+        # 요청이 전부 '서버가 없다' 로 떨어졌다. 감시자가 멈출 수단 없이 돌고 있었다.
+        self.create_service(StopRobot, '/robot/stop', self.on_stop_request, callback_group=group)
         self.action_server = ActionServer(
             self, ExecuteMotion, '/robot/execute_motion',
             goal_callback=self.on_goal_request,
@@ -247,7 +253,7 @@ class RobotManager(Node):
         # 판정 직전에도 창을 정리한다. posx 응답이 끊기면 옛 위치만 남아 "정지"로 굳는다
         # (병후 리뷰, PR #72). 창이 비면 점이 2개 미만이 되어 "이동 중"으로 돌아간다
         motion_state.trim(self.positions, self.now_s(), self.moving_window_s)
-        return motion_state.is_moving(self.positions, self.moving_eps_m)
+        return motion_state.is_moving(self.positions, self.moving_eps_m, self.moving_window_s)
 
     def finish(self, attempt):
         self.attempt = None
@@ -403,6 +409,7 @@ class RobotManager(Node):
         motion.start_z = motion.start_position[2] if motion.start_position else None
         # 샘플에 지금 동작을 싣는다. contact_detector 의 판정 모드 스위치다 (계약 3.1)
         self.motion_id, self.operation = goal.motion_id, goal.operation
+        self.stop_requested = None       # 앞 동작 때 들어온 요청을 새 동작에 물리지 않는다
         self.set_state(self.connected, self.moving, f'motion {goal.motion_id} 실행 중')
         self.get_logger().info(
             f'goal 수락: scan={goal.scan_id} motion_id={goal.motion_id} op={goal.operation} '
@@ -524,6 +531,15 @@ class RobotManager(Node):
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'Action 취소. {why}')
                 return (ExecuteMotion.Result.REASON_CANCELED, ReasonCode.CANCELED, 'Action 취소')
+            if self.stop_requested is not None:
+                reason_code, detail = self.stop_requested
+                self.stop_requested = None
+                stopped, why = self.stop_robot(f'정지 요청 ({detail})')
+                if not stopped:   # 접수했다고 멈춘 것이 아니다 (계약 4.1)
+                    return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                            f'정지 요청 ({detail}). {why}')
+                return (ExecuteMotion.Result.REASON_STOP_REQUESTED,
+                        reason_code or ReasonCode.STOP_REQUESTED, detail)
             if motion.event is not None:
                 return self.stop_for_event(motion)
             if goal.operation == RobotSample.OP_SLIDE and motions.drop_exceeded(
@@ -607,6 +623,41 @@ class RobotManager(Node):
         if event.type == ContactEvent.TYPE_CONTACT:
             return (ExecuteMotion.Result.REASON_CONTACT, ReasonCode.OK, '')
         return (ExecuteMotion.Result.REASON_EDGE, ReasonCode.OK, '')
+
+    def on_stop_request(self, request, response):
+        """`/robot/stop` (계약 4.1). **접수는 정지 완료가 아니다.**
+
+        정지 완료는 요청한 쪽이 `/robot/status` 의 `connected && !moving` 으로 확인한다.
+        여기서는 접수만 하고, 실제 정지는 동작 감시 고리(`watch`)가 한다. 동작이 없으면
+        별도 스레드에서 바로 `move_stop` 을 보낸다.
+
+        이미 정지 중이어도 `accepted=true` 다(멱등). 미연결이면 `accepted=false` 와
+        `ROBOT_DISCONNECTED` 로 사실대로 돌려준다 — 드라이버가 응답하지 않으면 이 경로로는
+        멈출 수 없고 물리 비상정지가 유일한 수단이다.
+        """
+        who = request.requester or '알 수 없음'
+        if not self.connected:
+            response.accepted = False
+            response.reason_code = ReasonCode.ROBOT_DISCONNECTED
+            response.detail = ('로봇이 연결되지 않았다. 이 경로로는 멈출 수 없다. '
+                               '물리 비상정지를 눌러야 한다')
+            self.get_logger().error(f'{who} 의 정지 요청을 받았지만 로봇이 미연결이다')
+            return response
+
+        self.stop_requested = (request.reason, f'{who}: {request.detail}'.strip())
+        self.get_logger().warn(
+            f'정지 요청 접수: requester={who} reason={request.reason} {request.detail}')
+        with self.motion_lock:
+            running = self.motion is not None
+        if not running:
+            # 동작이 없으면 감시 고리가 없다. 손으로 움직이는 중일 수 있으니 직접 보낸다.
+            # call_sync 는 줄 선 호출의 응답을 기다리므로 서비스 응답을 막지 않도록 스레드로 뺀다
+            threading.Thread(target=self.stop_robot, args=(f'{who} 요청(동작 없음)',),
+                             daemon=True).start()
+        response.accepted = True
+        response.reason_code = ReasonCode.OK
+        response.detail = '접수. 정지 완료는 /robot/status 의 connected && !moving 으로 확인한다'
+        return response
 
     def stop_robot(self, why):
         """move_stop 뒤 실제로 멈출 때까지 기다린다. 접수와 정지 완료는 다르다(계약 4.1).

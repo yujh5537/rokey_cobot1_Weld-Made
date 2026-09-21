@@ -164,8 +164,8 @@ def test_moving_is_true_again_when_positions_go_stale(ros):
     node = RobotManager(parameter_overrides=PARAMS)
     try:
         now = node.now_s()
-        for i in range(3):
-            node.positions.append((now - 0.2 + i * 0.05, (0.4, 0.0, 0.2)))
+        for i in range(7):                 # 창(0.3 s)을 덮는다
+            node.positions.append((now - 0.29 + i * 0.045, (0.4, 0.0, 0.2)))
         assert node.moving_from_positions() is False
         node.positions.clear()
         for i in range(3):        # 창(0.3 s)보다 오래된 위치만 남은 상태
@@ -280,5 +280,59 @@ def test_stop_that_is_not_confirmed_is_reported_as_robot_error(ros, monkeypatch)
         monkeypatch.setattr(node, 'stop_robot', lambda why: (True, ''))
         reason, code, _ = node.stop_for_event(motion)
         assert reason == ExecuteMotion.Result.REASON_EDGE and code == ReasonCode.OK
+    finally:
+        node.destroy_node()
+
+
+def test_moving_stays_true_when_a_sample_gap_empties_the_window(ros):
+    """샘플 공백 뒤 갓 들어온 점 두어 개로는 "정지"라고 말하지 않는다.
+
+    2026-09-21 실기: 359 ms 공백 뒤 창에 25 ms 짜리 두 점만 남았고, 3 mm/s 로 내려가는
+    중인데 그 사이 변위가 0.076 mm(< moving_eps_m 0.2 mm)라 정지로 판정됐다. robot_manager
+    가 동작을 MAX_DISTANCE 로 완료 보고한 뒤에도 로봇은 12 mm 를 더 내려갔고, 결과의 정지
+    좌표도 그만큼 틀렸다. eps_m 은 창 전체를 덮었을 때만 뜻이 있는 값이다.
+    """
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        now = node.now_s()
+        node.positions.clear()
+        node.positions.append((now - 0.025, (0.4, 0.0, 0.117495)))
+        node.positions.append((now, (0.4, 0.0, 0.117419)))
+        assert node.moving_from_positions() is True, '창을 덜 덮었으면 정지라고 하지 않는다'
+    finally:
+        node.destroy_node()
+
+
+def test_stop_service_is_offered_and_accepts(ros):
+    """/robot/stop 이 없으면 safety_monitor 는 로봇을 멈출 수단이 아예 없다.
+
+    2026-09-21 실기에서 safety_monitor 가 SAMPLE_STALE 로 정지를 요청했지만
+    `/robot/stop 서버가 없다` 로 끝났다. 서버가 한 번도 만들어진 적이 없었다.
+    """
+    from contact_scan_interfaces.srv import StopRobot
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        names = [name for name, _ in node.get_service_names_and_types()]
+        assert '/robot/stop' in names, '계약이 요구하는 정지 서비스가 없다'
+
+        # 미연결이면 사실대로 거절한다. 멈출 수 없는데 접수했다고 하지 않는다
+        node.connected = False
+        response = node.on_stop_request(
+            StopRobot.Request(requester='safety_monitor', reason=ReasonCode.OVER_FORCE,
+                              detail='시험'), StopRobot.Response())
+        assert response.accepted is False
+        assert response.reason_code == ReasonCode.ROBOT_DISCONNECTED
+
+        # 연결돼 있으면 접수하고, 감시 고리가 볼 수 있게 남긴다
+        node.connected = True
+        node.motion = object()        # 동작 중이면 watch 가 처리한다(별도 스레드를 띄우지 않는다)
+        response = node.on_stop_request(
+            StopRobot.Request(requester='safety_monitor', reason=ReasonCode.OVER_FORCE,
+                              detail='과대 외력'), StopRobot.Response())
+        assert response.accepted is True
+        assert node.stop_requested is not None
+        assert node.stop_requested[0] == ReasonCode.OVER_FORCE
+        assert 'safety_monitor' in node.stop_requested[1]
     finally:
         node.destroy_node()
