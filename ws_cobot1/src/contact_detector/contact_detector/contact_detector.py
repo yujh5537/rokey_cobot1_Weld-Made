@@ -71,6 +71,7 @@ PARAMS = {
     'descend_ref_lag_s': Parameter.Type.DOUBLE,        # 구간에서 가장 최근 이만큼은 뺀다
     'descend_ref_min_samples': Parameter.Type.INTEGER, # 구간 안의 샘플이 이보다 적으면 기준이 없다(둔한 판정)
     'descend_hold_threshold_n': Parameter.Type.DOUBLE, # 이동 기준이 없는 동안(출발 직후 · 공백 뒤)의 CONTACT 임계
+    'descend_ref_settle_s': Parameter.Type.DOUBLE,     # 출발 뒤 이 시간까지는 둔한 판정(계단식 치우침이 구간을 지나갈 때까지)
     'edge_arm_still_window_s': Parameter.Type.DOUBLE,  # > 0 이면 EDGE 판정을 z 로 켠다(edge_arm_force_n 대신)
     'edge_arm_still_m': Parameter.Type.DOUBLE,
     'edge_arm_travel_m': Parameter.Type.DOUBLE,
@@ -169,7 +170,7 @@ class ContactDetectorNode(Node):
                        arm_still_m=v['edge_arm_still_m'] if by_z else None,
                        arm_travel_m=v['edge_arm_travel_m'] if by_z else None),
             DescendRefConfig(v['descend_ref_window_s'], v['descend_ref_lag_s'], v['descend_ref_min_samples'],
-                             v['descend_hold_threshold_n'])
+                             v['descend_hold_threshold_n'], v['descend_ref_settle_s'])
             if v['descend_ref_window_s'] > 0 else None,
         )
 

@@ -29,7 +29,7 @@ from contact_detector.detector_core import (
 MM = 1e-3
 DT = 0.02
 CONFIG = DetectorConfig(contact_threshold_n=3.0, debounce_n=3, over_force_n=30.0, over_force_debounce_n=1)
-DESCEND_REF = DescendRefConfig(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0)
+DESCEND_REF = DescendRefConfig(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0, settle_s=5.5)
 
 STATIC_F0 = (0.321, 0.514, 2.101)          # 5-2 정지 tare
 MOVING_BIAS = (1.97, 1.31, 0.56)           # 5-2 출발 4 s 뒤 계단식 치우침 (|.| = 2.43 N)
@@ -111,6 +111,37 @@ def test_drift_along_the_path_does_not_give_a_false_contact():
     found = contacts(run(detector(), descent(path_drift=drift)))
     assert len(found) == 1
     assert found[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
+
+
+def air_deltas(d, samples):
+    """(t, |F - F0|, 둔한 판정인가) — 공중(윗면 위)에서만."""
+    out = []
+    for s in samples:
+        d.update(s)
+        if s.position[2] > Z_TOP:
+            out.append((s.pose_stamp, d.force_delta(s), d.contact_hold))
+    return out
+
+
+def test_step_after_start_is_covered_by_settle():
+    """9/21 실기: 홈 출발 22 회 모두 출발 4.0~4.1 s 에 계단식 치우침, 3 N 으로 본 공중 최대도 전부 4.2~4.4 s.
+    이동 기준은 계단이 구간을 다 지날 때까지(약 1 s) 그 크기만큼 튄다. settle 동안은 6 N 으로 본다."""
+    short = DescendRefConfig(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0, settle_s=1.0)
+    at_three = lambda cfg: max(v for t, v, hold in air_deltas(detector(descend_ref=cfg), descent()) if not hold)
+    assert at_three(short) > 2.4                            # 계단 2.43 N 이 3 N 임계에 그대로 보인다
+    assert at_three(DESCEND_REF) < 0.5                      # 계단이 지나간 뒤부터 3 N 으로 본다
+    hold_part = [v for t, v, hold in air_deltas(detector(), descent()) if hold]
+    assert hold_part and max(hold_part) < DESCEND_REF.hold_threshold_n - 3.0
+
+
+def test_contact_during_settle_is_judged_with_the_hold_threshold():
+    """출발 3 s 뒤(9 mm 아래) 윗면: 구간은 찼지만 settle 안이라 6 N 으로 본다. 과대 외력보다 먼저 멈춘다."""
+    near_top = Z0 - 0.009
+    detections = run(detector(), descent(z_top=near_top, seconds=4.0))
+    found = contacts(detections)
+    assert len(found) == 1 and found[0].hold
+    assert found[0].first_sample.position[2] == pytest.approx(near_top, abs=0.2 * MM)
+    assert contact_before_over_force(detections)
 
 
 def test_contact_right_after_start_is_judged_with_the_hold_threshold():
@@ -208,8 +239,8 @@ def test_descend_after_another_operation_restarts_even_with_the_same_motion_id()
 
 def test_config_rejects_bad_descend_ref_values():
     for bad in (dict(window_s=0.0), dict(lag_s=1.0), dict(lag_s=-0.1), dict(min_samples=0),
-                dict(hold_threshold_n=0.0)):
-        values = dict(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0)
+                dict(hold_threshold_n=0.0), dict(settle_s=0.5), dict(settle_s=math.nan)):
+        values = dict(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0, settle_s=5.5)
         values.update(bad)
         with pytest.raises(ValueError):
             DescendRefConfig(**values)

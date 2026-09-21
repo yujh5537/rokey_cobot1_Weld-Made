@@ -22,8 +22,9 @@ EDGE 를 "밀기 시작 z 대비 누적 하강량"으로 재지 않는 이유 �
     (이동 기준). 추정값은 움직이기 시작하면 계단식으로 바뀌고, 107 mm 를 내려가는 동안 자세에 따라 1~2 N 더
     흐른다(9/21 17 시 54 분 실기: 한 번 잡은 이동 중 F0 가 23 s 뒤 3.15 N 벗어나 윗면 38 mm 위 거짓 접촉).
     접촉은 0.1 s 안에 수 N 오르는 급변이라 최근 구간 기준으로 가를 수 있다. 조건이 성립한 동안에는 구간에
-    넣지 않는다(기준을 얼린다). 구간이 차기 전(출발 직후 · 공백 뒤)에는 판정을 끄지 않고 /contact/tare 의 F0
-    (없으면 DESCEND 첫 샘플의 F)와 hold_threshold_n 으로 둔하게 본다.
+    넣지 않는다(기준을 얼린다). 출발 뒤 settle_s 동안과 구간 샘플이 모자랄 때(공백 뒤)는 판정을 끄지 않고
+    /contact/tare 의 F0(없으면 DESCEND 첫 샘플의 F)와 hold_threshold_n 으로 둔하게 본다. settle_s 는 출발 약 4 s 뒤의
+    계단식 치우침이 구간을 다 지나갈 때까지다(계단은 창이 새 값으로 찰 때까지 그 크기만큼 튄다).
   - 밀기(EDGE 판정 켜기): EdgeConfig 의 arm_still_* 가 있으면 |F - F0| 대신 **z 가 멈췄고(틈을 다 메움) x · y 는
     움직이는 중**일 때 켠다. F0 에 기대지 않는다. x · y 조건이 없으면 힘 제어를 켜는 동안(팁이 아직 떠 있고
     z 도 멈춰 있다) 너무 일찍 켜진다.
@@ -292,7 +293,7 @@ class ContactDetector:
         while self._ref and self._ref[0][0] < t - cfg.window_s:
             self._ref.popleft()
         used = [f for ft, f in self._ref if ft <= t - cfg.lag_s]
-        if t - self._ref_since < cfg.window_s or len(used) < cfg.min_samples:
+        if t - self._ref_since < cfg.settle_s or len(used) < cfg.min_samples:
             self._ref_mean = None
             return
         n = len(used)
@@ -461,6 +462,8 @@ class DescendRefConfig:
     min_samples: int              # 구간 안의 샘플이 이보다 적으면 기준이 없다(둔한 판정)
     hold_threshold_n: float       # 기준이 없는 동안의 CONTACT 임계. 기준은 /contact/tare 의 F0, 없으면 DESCEND 첫 샘플의 F.
                                   # 움직이기 시작할 때의 계단식 치우침(9/21 5-2 최대 3.04 N)보다 높아야 한다
+    settle_s: float               # 출발 뒤 이 시간까지는 구간이 차도 둔한 판정. window_s 이상. 출발 뒤 계단식 치우침이
+                                  # 구간을 다 지나갈 때까지(계단 시각 + window_s + 여유)
 
     def __post_init__(self):
         if not all(math.isfinite(v) and v > 0
@@ -470,6 +473,8 @@ class DescendRefConfig:
             raise ValueError('lag_s 는 0 이상, window_s 보다 작아야 한다')
         if self.min_samples < 1:
             raise ValueError('min_samples 는 1 이상이어야 한다')
+        if not (math.isfinite(self.settle_s) and self.settle_s >= self.window_s):
+            raise ValueError('settle_s 는 window_s 이상이어야 한다')
 
 
 @dataclass(frozen=True)

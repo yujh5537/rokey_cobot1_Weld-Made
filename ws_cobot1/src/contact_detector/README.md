@@ -36,7 +36,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
   - `descend_ref_window_s > 0` 이면 **DESCEND 의 F0 는 최근 구간 `[t − descend_ref_window_s, t − descend_ref_lag_s]` 의 외력 평균(이동 기준)** 이다. 조건이 성립한 샘플은 구간에 넣지 않는다(닿는 힘이 기준을 끌어올리지 않게). 추정값은 움직이기 시작하면 계단식으로 바뀌고 자세에 따라 계속 흐르지만(초당 약 0.2 N) 접촉은 0.1 s 안에 수 N 오르는 급변이다
     - 9/21 실기 하강 23 회 재생: 한 번 잡은 F0(홈 정지 · 하강 중 1회)는 1~2 회 공중 거짓 CONTACT(윗면 38 · 44 · 78 mm 위), 이동 기준은 0 회이고 윗면 z 는 같다. 공중 최대 `|F − F0|` 2.92 N(도중에 멈춘 하강), 홈 출발 정상 하강 2.26 N
     - 샘플 공백으로 구간을 비우지 않는다. 시간 창이라 오래된 샘플은 저절로 빠진다
-  - **이동 기준이 없는 동안**(출발 뒤 `descend_ref_window_s`, 구간 안 샘플이 `descend_ref_min_samples` 보다 적을 때) **CONTACT 를 끄지 않고 둔하게 본다**: `/contact/tare` 의 F0(없으면 이번 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(6 N). 끄면 그 사이에 닿았을 때 과대 외력(30 N)까지 막을 것이 없다(현지 리뷰, PR #127). 이렇게 확정한 CONTACT 는 로그에 경고로 남는다(더 눌린 좌표)
+  - **이동 기준이 없는 동안**(출발 뒤 `descend_ref_settle_s`(5.5 s. 출발 약 4 s 뒤 계단식 치우침이 구간을 지나갈 때까지), 구간 안 샘플이 `descend_ref_min_samples` 보다 적을 때) **CONTACT 를 끄지 않고 둔하게 본다**: `/contact/tare` 의 F0(없으면 이번 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(6 N). 끄면 그 사이에 닿았을 때 과대 외력(30 N)까지 막을 것이 없다(현지 리뷰, PR #127). 이렇게 확정한 CONTACT 는 로그에 경고로 남는다(더 눌린 좌표)
   - 한계: 느리게 오르는 접촉(부드러운 부재)은 흐름으로 흡수될 수 있다. 기준 큐브 · 탐침(43 N/mm, 3 mm/s 면 초당 약 130 N)은 해당하지 않는다
   - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 둔한 판정의 기준으로 남는다. DESCEND 가 아닐 때(밀기의 보고값 `|F − F0|`)는 마지막 CONTACT 의 이동 기준과 `/contact/tare` 중 **나중 것**을 쓴다
   - 하강 중에 파라미터를 바꾸면 detector 를 새로 만들어 구간을 다시 쌓는다(그동안 둔한 판정). 이미 닿아 있을 때는 바꾸지 않는다
@@ -64,7 +64,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 ## 파라미터
 값은 `contact_scan_bringup/config/sim.yaml` · `real.yaml` 에만 둔다. 코드에 기본값이 없어서 값이 빠지면 노드가 기동하지 않는다.
 `source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
-`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
+`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_ref_settle_s` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
 
 `source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
 
