@@ -214,19 +214,45 @@ git diff --check → 통과
 Vite production build는 정상 완료됐으며,
 Three.js가 포함된 bundle에 대해 500 kB 초과 경고만 발생했다.
 
-### 통합 검증 상태
+### Mock 통합 검증
 
-Web PC에서 수행할 다음 통합 검증은 아직 완료하지 않았다.
+Web PC에서 실제 Mosquitto, FastAPI, WebSocket, React를 실행하고
+ROS 측 데이터만 Mock MQTT payload로 발행해 T36 화면 동작을 검증했다.
+
+검증 흐름:
 
 ```text
-Mock MQTT scan/result
+Mock MQTT
   → Mosquitto
   → FastAPI
   → WebSocket
   → React / Three.js
 ```
 
-통합 검증 후 실제 표시 결과를 이 문서에 추가한다.
+검증 결과:
+
+- `scan/result` 수신 확인
+- 결과 좌표 프레임 `workpiece_fixture` 표시 확인
+- `path_candidates` 4개의 시작점/끝점/길이 표 표시 확인
+- 일반 모서리와 외곽 엣지·경로 후보 3D 렌더링 확인
+- 외곽 엣지·경로 후보의 초록색 강조 표시 확인
+- `HOMING` 수신 시 `홈 복귀 진행` 표시 확인
+- `RESUMING` 수신 시 `재시작 진행` 표시 확인
+- FastAPI WebSocket 연결 상태 표시 확인
+
+Mock `scan/result`의 경로 후보 길이는 다음과 같이 표시됐다.
+
+```text
+1: 100.00 mm
+2:  60.00 mm
+3: 100.00 mm
+4:  60.00 mm
+```
+
+이번 검증은 실제 `ROS2 → mqtt_bridge → scan_manager`에서 발생한
+데이터가 아니라 Mock MQTT payload를 이용한 Web 통합 검증이다.
+
+실제 ROS 통합 검증은 별도 통합 단계에서 수행한다.
 
 ---
 
