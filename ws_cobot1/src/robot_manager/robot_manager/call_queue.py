@@ -25,7 +25,7 @@ class CallQueue:
     def __init__(self, now_s, timeout_s, logger=None, abandon_after_s=5.0, slow_s=None):
         self.now_s, self.timeout_s, self.logger = now_s, timeout_s, logger
         # 이보다 늦게 온 응답은 서비스 이름 · 걸린 시간 · 보낸 시각을 남긴다(#130). None 이면 끈다.
-        # 실기에서 정지 중 약 3 s 주기로 한 호출이 330~365 ms 늦었다. 어느 서비스가 언제 늦는지가
+        # 실기에서 정지 중 · 모션 중 모두 약 3 s 주기로 한 호출이 330~365 ms 늦었다. 어느 서비스가 언제 늦는지가
         # 드라이버 쪽 원인을 가르는 근거다
         self.slow_s = slow_s
         self.slow_calls = 0
