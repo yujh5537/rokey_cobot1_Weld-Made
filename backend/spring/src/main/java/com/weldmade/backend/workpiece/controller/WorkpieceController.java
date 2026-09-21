@@ -2,6 +2,7 @@ package com.weldmade.backend.workpiece.controller;
 
 import com.weldmade.backend.workpiece.entity.Workpiece;
 import com.weldmade.backend.workpiece.service.WorkpieceService;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,11 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+
 @RestController
 @RequestMapping("/api/workpieces")
 public class WorkpieceController {
 
     private final WorkpieceService workpieceService;
+
 
     public WorkpieceController(
             WorkpieceService workpieceService
@@ -26,30 +29,50 @@ public class WorkpieceController {
         this.workpieceService = workpieceService;
     }
 
+
     @GetMapping
     public List<Workpiece> getWorkpieces() {
         return workpieceService.getWorkpieces();
     }
 
+
     @GetMapping("/{workpieceId}")
     public ResponseEntity<Workpiece> getWorkpiece(
             @PathVariable String workpieceId
     ) {
-        return workpieceService.getWorkpiece(workpieceId)
+        return workpieceService
+                .getWorkpiece(workpieceId)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(
+                        () -> ResponseEntity
+                                .notFound()
+                                .build()
+                );
     }
+
 
     @PostMapping
     public ResponseEntity<Workpiece> createWorkpiece(
             @RequestBody CreateWorkpieceRequest request
     ) {
+        if (
+                request.workpieceId() == null
+                        || request.workpieceId().isBlank()
+                        || request.name() == null
+                        || request.name().isBlank()
+        ) {
+            return ResponseEntity
+                    .badRequest()
+                    .build();
+        }
+
         try {
-            Workpiece workpiece = workpieceService.createWorkpiece(
-                    request.workpieceId(),
-                    request.name(),
-                    request.description()
-            );
+            Workpiece workpiece =
+                    workpieceService.createWorkpiece(
+                            request.workpieceId(),
+                            request.name(),
+                            request.description()
+                    );
 
             return ResponseEntity
                     .status(HttpStatus.CREATED)
@@ -62,19 +85,34 @@ public class WorkpieceController {
         }
     }
 
+
     @PutMapping("/{workpieceId}")
     public ResponseEntity<Workpiece> updateWorkpiece(
             @PathVariable String workpieceId,
             @RequestBody UpdateWorkpieceRequest request
     ) {
-        return workpieceService.updateWorkpiece(
+        if (
+                request.name() == null
+                        || request.name().isBlank()
+        ) {
+            return ResponseEntity
+                    .badRequest()
+                    .build();
+        }
+
+        return workpieceService
+                .updateWorkpiece(
                         workpieceId,
                         request.name(),
                         request.description(),
                         request.active()
                 )
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(
+                        () -> ResponseEntity
+                                .notFound()
+                                .build()
+                );
     }
 
     public record CreateWorkpieceRequest(

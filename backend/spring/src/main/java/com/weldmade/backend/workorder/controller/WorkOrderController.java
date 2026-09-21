@@ -51,6 +51,18 @@ public class WorkOrderController {
     public ResponseEntity<WorkOrder> createWorkOrder(
             @RequestBody CreateWorkOrderRequest request
     ) {
+        if (request.workOrderId() == null
+                || request.workOrderId().isBlank()
+                || request.workpieceId() == null
+                || request.workpieceId().isBlank()
+                || request.name() == null
+                || request.name().isBlank()) {
+
+            return ResponseEntity
+                    .badRequest()
+                    .build();
+        }
+
         try {
             WorkOrder workOrder = workOrderService.createWorkOrder(
                     request.workOrderId(),
@@ -75,6 +87,12 @@ public class WorkOrderController {
             @PathVariable String workOrderId,
             @RequestBody UpdateWorkOrderRequest request
     ) {
+        if (request.name() == null || request.name().isBlank()) {
+            return ResponseEntity
+                    .badRequest()
+                    .build();
+        }
+
         return workOrderService.updateWorkOrder(
                         workOrderId,
                         request.name(),
