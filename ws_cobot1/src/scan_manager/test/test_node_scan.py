@@ -336,7 +336,9 @@ def test_a_stale_robot_status_refuses_start_and_home(make_rig):
 
 def test_the_gap_and_the_recovery_are_logged_once_each(make_rig):
     """START 를 누를 때까지 기다리지 않는다. 끊긴 순간과 돌아온 순간을 한 번씩 알린다."""
-    rig = make_rig(safety_status_timeout_s=0.3, state_publish_period_s=0.1)
+    # 한도를 가짜 상대 노드의 발행 주기(0.02 s)보다 훨씬 크게 잡는다. 짧게 두면 회복 뒤에 발행이
+    # 한 번 늦은 것만으로 두 번째 WARN 이 나 테스트가 부하에서 흔들린다(#107 · #130 의 교훈).
+    rig = make_rig(safety_status_timeout_s=0.8, state_publish_period_s=0.1)
     rig.wait_ready()
 
     def lines(level, text):
@@ -347,7 +349,7 @@ def test_the_gap_and_the_recovery_are_logged_once_each(make_rig):
     rig.peers.publish_safety = True
     assert rig.wait(lambda: lines(ScanLog.LEVEL_INFO, '/safety/status 수신 회복'))
 
-    time.sleep(0.5)   # 주기가 여러 번 더 돈다. 같은 말을 되풀이하지 않는다
+    time.sleep(1.0)   # 주기가 여러 번 더 돈다. 같은 말을 되풀이하지 않는다
     assert len(lines(ScanLog.LEVEL_WARN, '/safety/status 끊김')) == 1
     assert len(lines(ScanLog.LEVEL_INFO, '/safety/status 수신 회복')) == 1
     assert lines(ScanLog.LEVEL_WARN, '/safety/status 끊김')[0].code == Reason.SAFETY_LATCHED
@@ -356,7 +358,8 @@ def test_the_gap_and_the_recovery_are_logged_once_each(make_rig):
 def test_a_topic_never_received_is_not_reported_as_a_gap(make_rig):
     """기동 직후 상대 노드가 아직 없는 것은 끊김이 아니다. 그것은 START 가 '미수신'으로 거절한다."""
     rig = make_rig(start_peers=False, state_publish_period_s=0.1)
-    time.sleep(0.5)
+    # 주기 점검이 실제로 여러 번 돌았는지 먼저 확인한다. 이것이 없으면 타이머가 죽어도 통과한다
+    assert rig.wait(lambda: len(rig.states) >= 3), '주기 발행이 돌지 않았다'
     assert [log for log in rig.logs if log.level == ScanLog.LEVEL_WARN] == []
 
 
