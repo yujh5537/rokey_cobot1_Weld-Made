@@ -504,8 +504,8 @@ def test_request_arriving_as_the_motion_ends_is_settled_not_carried_over(ros, mo
 def test_unconfirmed_stop_during_a_motion_keeps_the_request_until_stop_is_called_again(ros, monkeypatch):
     """동작 중 경로도 정지를 확인하지 못하면 요청을 남긴다. 동작 없음 경로와 같은 약속이다 (#113).
 
-    지우면 그다음 /scan/home 이 멈췄는지 모르는 로봇에 나간다. 복구는 /robot/stop 을 다시
-    부르는 것이다: 동작이 없으니 정지 스레드가 다시 확인하고, 확인되면 지운다.
+    지우면 멈췄는지 모르는 로봇에 다음 동작이 나간다. 복구는 안전복귀(#115) 또는 /robot/stop 을
+    다시 부르는 것이다: 동작이 없으니 정지 스레드가 다시 확인하고, 확인되면 지운다.
     """
     from contact_scan_interfaces.action import ExecuteMotion
     from robot_manager.robot_manager import Motion
@@ -523,13 +523,71 @@ def test_unconfirmed_stop_during_a_motion_keeps_the_request_until_stop_is_called
         result = node.execute_motion(handle)
         assert result.reason == ExecuteMotion.Result.REASON_ROBOT_ERROR and handle.state == 'aborted'
         assert node.stop_requested is not None, '확인하지 못했는데 요청이 사라졌다'
-        home = ExecuteMotion.Goal(motion_id=6, operation=RobotSample.OP_HOME)
-        assert node.reject_reason(home).startswith('STOP_REQUESTED')
+        # HOME 이 아닌 동작은 거절한다. 안전복귀(OP_HOME)는 받는다(#115, 별도 시험)
+        assert node.reject_reason(_descend_goal()).startswith('STOP_REQUESTED')
 
         # 복구: 멈춘 것을 확인한 뒤 /robot/stop 을 다시 부른다
         monkeypatch.setattr(node, 'stop_robot', lambda why: (True, ''))
         assert _stop(node, '복구').accepted is True
         assert _wait_until(lambda: node.stop_requested is None)
         assert node.reject_reason(_descend_goal()) == ''
+    finally:
+        node.destroy_node()
+
+
+def test_home_is_not_rejected_by_a_leftover_stop_request(ros, monkeypatch):
+    """정지 확인에 실패해 남은 요청이 있어도 안전복귀는 받는다. 시연 중 안전복귀가 막히면 안 된다 (#115).
+
+    다른 동작은 계속 거절한다. HOME 은 출발 전에 정지를 한 번 더 시도하고 그 요청을 지운다.
+    지우지 않으면 watch 의 첫 확인에서 HOME 이 곧바로 멈춘다.
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node = RobotManager(parameter_overrides=PARAMS + [
+        Parameter('home_joint_deg', Parameter.Type.DOUBLE_ARRAY, [-24.14, 17.03, 51.68, -0.18, 111.39, -204.84])])
+    try:
+        node.connected = True
+        node.stop_requested = (ReasonCode.OVER_FORCE, 'safety_monitor: 확인 실패로 남은 요청')
+        assert node.reject_reason(_descend_goal()).startswith('STOP_REQUESTED')
+        home = ExecuteMotion.Goal(motion_id=7, operation=RobotSample.OP_HOME)
+        assert node.reject_reason(home) == ''
+
+        from rclpy.action import GoalResponse
+        assert node.on_goal_request(home) == GoalResponse.ACCEPT
+        stops, sent = [], []
+        monkeypatch.setattr(node, 'stop_robot', lambda why: stops.append(why) or (False, '확인 못 함'))
+        monkeypatch.setattr(node, 'send_move', lambda motion: sent.append(motion) or True)
+        monkeypatch.setattr(node, 'arrived', lambda motion, elapsed: True)
+        monkeypatch.setattr(node, 'finished_without_event', lambda motion: (
+            ExecuteMotion.Result.REASON_TARGET_REACHED, ReasonCode.OK, ''))
+
+        result = node.execute_motion(FakeGoalHandle(home))
+        assert '안전복귀 전' in stops[0]                 # 출발 전에 정지를 한 번 더 시도했다
+        assert sent, '확인에 실패해도 관제자 명령이므로 출발한다'
+        assert result.reason == ExecuteMotion.Result.REASON_TARGET_REACHED
+        assert node.stop_requested is None
+    finally:
+        node.destroy_node()
+
+
+def test_stop_request_arriving_during_home_still_stops_it(ros, monkeypatch):
+    """HOME 을 받은 뒤에 새로 온 정지 요청은 HOME 을 멈춘다. safety_monitor 가 멈출 수 있어야 한다."""
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node = RobotManager(parameter_overrides=PARAMS + [
+        Parameter('home_joint_deg', Parameter.Type.DOUBLE_ARRAY, [-24.14, 17.03, 51.68, -0.18, 111.39, -204.84])])
+    try:
+        node.connected = True
+        home = ExecuteMotion.Goal(motion_id=8, operation=RobotSample.OP_HOME)
+        from rclpy.action import GoalResponse
+        assert node.on_goal_request(home) == GoalResponse.ACCEPT      # 수락 시점에 남은 요청 없음
+        _stop(node, 'HOME 도중 과대 외력')                              # 수락 뒤 · 실행 전
+        monkeypatch.setattr(node, 'stop_robot', lambda why: (True, ''))
+        monkeypatch.setattr(node, 'send_move', lambda motion: True)
+
+        handle = FakeGoalHandle(home)
+        result = node.execute_motion(handle)
+        assert result.reason == ExecuteMotion.Result.REASON_STOP_REQUESTED
+        assert handle.state == 'aborted'
     finally:
         node.destroy_node()
