@@ -499,3 +499,37 @@ def test_request_arriving_as_the_motion_ends_is_settled_not_carried_over(ros, mo
         assert node.reject_reason(_descend_goal()) == ''
     finally:
         node.destroy_node()
+
+
+def test_unconfirmed_stop_during_a_motion_keeps_the_request_until_stop_is_called_again(ros, monkeypatch):
+    """동작 중 경로도 정지를 확인하지 못하면 요청을 남긴다. 동작 없음 경로와 같은 약속이다 (#113).
+
+    지우면 그다음 /scan/home 이 멈췄는지 모르는 로봇에 나간다. 복구는 /robot/stop 을 다시
+    부르는 것이다: 동작이 없으니 정지 스레드가 다시 확인하고, 확인되면 지운다.
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        node.connected = True
+        goal = _descend_goal()
+        node.motion = Motion(goal, node.now_s())
+        _stop(node)
+        monkeypatch.setattr(node, 'send_move', lambda motion: True)
+        monkeypatch.setattr(node, 'stop_robot', lambda why: (False, '멈춤을 확인하지 못했다'))
+
+        handle = FakeGoalHandle(goal)
+        result = node.execute_motion(handle)
+        assert result.reason == ExecuteMotion.Result.REASON_ROBOT_ERROR and handle.state == 'aborted'
+        assert node.stop_requested is not None, '확인하지 못했는데 요청이 사라졌다'
+        home = ExecuteMotion.Goal(motion_id=6, operation=RobotSample.OP_HOME)
+        assert node.reject_reason(home).startswith('STOP_REQUESTED')
+
+        # 복구: 멈춘 것을 확인한 뒤 /robot/stop 을 다시 부른다
+        monkeypatch.setattr(node, 'stop_robot', lambda why: (True, ''))
+        assert _stop(node, '복구').accepted is True
+        assert _wait_until(lambda: node.stop_requested is None)
+        assert node.reject_reason(_descend_goal()) == ''
+    finally:
+        node.destroy_node()

@@ -49,10 +49,11 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 
 - **동시에 1개만 받는다.** 실행 중이면 goal 을 거절한다(BUSY). 미연결 · 잘못된 값도 거절한다.
 - **`/robot/stop` 은 접수만 한다(계약 4.1).** 요청은 정지를 확인할 때까지 남고, 남아 있는 동안 새 goal 을 거절한다(`STOP_REQUESTED`).
-  - 동작 중: `watch` 가 처리해 `REASON_STOP_REQUESTED` 로 끝낸다. 수락 직후 · 실행 전에 온 요청도 `watch` 의 첫 확인에서 처리된다
+  - 동작 중: `watch` 가 처리해 `REASON_STOP_REQUESTED` 로 끝낸다. 수락 직후 · 실행 전에 온 요청도 `watch` 의 첫 확인에서 처리된다. 정지를 확인하지 못하면 `ROBOT_ERROR` 로 끝내고 요청은 **남긴다**(동작 없음 경로와 같다, #113)
   - 동작 없음: 별도 스레드가 `move_stop` 을 보내고, 정지를 확인하면 지운다. 확인하지 못하면 남겨 goal 을 계속 거절한다
   - 동작이 끝나는 사이에 온 요청: 결과는 그대로 두고 `finally` 에서 정지를 확인한 뒤 지운다
   - 지울 때는 자기가 처리한 요청일 때만 지운다(그 사이 새로 온 요청은 남긴다)
+  - **복구**: 확인 실패로 요청이 남으면 `/scan/home` 의 `OP_HOME` 까지 `STOP_REQUESTED` 로 거절된다. 로봇이 실제로 멈춘 것을 눈으로 확인한 뒤 **`/robot/stop` 을 다시 부른다** → 동작이 없으니 정지 스레드가 다시 확인하고, 확인되면 요청이 지워져 goal 을 받는다. 그래도 확인되지 않으면(드라이버 무응답 등) 이 경로로는 풀리지 않는다. 물리 비상정지 후 robot_manager 를 다시 띄운다
 - **이벤트 대조**(계약 5.4): `ContactEvent.motion_id` 가 현재 goal 과 같고 동작이 맞을 때만 정지한다.
   `TYPE_OVER_FORCE` 는 대조 없이 항상 정지한다.
 - **취소**: 취소 접수와 실제 정지 완료는 다르다. `move_stop` 뒤 `moving` 이 false 가 될 때까지 기다린 다음 결과를 돌려준다.
