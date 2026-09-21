@@ -63,10 +63,11 @@ class Resumption:
 
 
 def latest_record(store):
-    """가장 최근 작업의 기록 → (기록, 읽지 못한 이유). **그 하나만** 읽는다.
+    """가장 최근 작업의 기록 → (기록, 기록이 없는 이유). **그 하나만** 읽는다.
 
     명령 접수 락 안에서 불린다(/scan/stop 이 같은 락을 기다린다). 기록이 쌓여도 읽는 양이 늘지 않아야 한다.
-    가장 최근 기록을 읽지 못하면 그보다 오래된 작업으로 넘어가지 않는다(조용히 건너뛰지 않는다).
+    가장 최근 기록을 읽지 못하면 ResultStoreError 다. 그보다 오래된 작업으로 넘어가지 않는다(조용히 건너뛰지 않는다).
+    "기록이 없다"(확실하다)와 "읽지 못했다"(모른다)를 호출 측이 구분해야 해서 예외로 나눈다.
     """
     scan_ids = store.scan_ids()
     if not scan_ids:
@@ -74,7 +75,8 @@ def latest_record(store):
     try:
         return store.load(scan_ids[0]), ''
     except ResultStoreError as error:
-        return None, f'가장 최근 작업 {scan_ids[0]} 의 기록을 읽을 수 없다: {error}'
+        raise ResultStoreError(
+            f'가장 최근 작업 {scan_ids[0]} 의 기록을 읽을 수 없다: {error}') from error
 
 
 def resume_point_consumed(record) -> bool:

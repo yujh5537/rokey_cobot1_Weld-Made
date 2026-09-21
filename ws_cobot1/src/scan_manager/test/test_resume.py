@@ -23,6 +23,7 @@ from scan_manager.result_store import Interruption
 from scan_manager.result_store import Measurement
 from scan_manager.result_store import PoseRecord
 from scan_manager.result_store import ResultStore
+from scan_manager.result_store import ResultStoreError
 from scan_manager.result_store import Stamp
 from scan_manager.sequence import MotionPlanner
 from scan_manager.sequence import MotionResult
@@ -163,7 +164,10 @@ def reopen(params, result_dir, old):
 
 def adopt(ports):
     """노드의 _adopt_recorded_scan 과 같다. 되돌리지 않았으면 그 이유."""
-    record, why = scan_resume.latest_record(ports.store)
+    try:
+        record, why = scan_resume.latest_record(ports.store)
+    except ResultStoreError as error:        # 노드는 이것을 "되돌릴 작업이 있었는지 모른다"로 다룬다
+        record, why = None, str(error)
     restoration = None
     if record is not None:
         restoration, why = scan_resume.restoration_from(record)
@@ -451,6 +455,25 @@ def test_an_interruption_already_resumed_is_not_resumed_twice(params, result_dir
     ports.store.record_resume(SCAN_ID)
     record = ports.store.load(SCAN_ID)
     assert '중지 기록이 없다' in refusal_of(record, params).detail
+
+
+def test_confirmed_directions_out_of_the_search_order_are_refused(params, result_dir):
+    ports, _ = scan(params, result_dir, stop_at=SLIDE_POS_X)
+    ports.store.record_edge(                     # +x 가 없는데 −x 가 확정돼 있다
+        SCAN_ID, Direction.NEG_X, ports._measurement(
+            EVENT_EDGE, type('E', (), {'position': (0.35, 0.0, 0.0395), 'raw': {'z_drop_m': 0.0005}})(),
+            MotionResult(event_id=900, position=(0.349, 0.0, 0.0395))))
+    refusal = refusal_of(ports.store.load(SCAN_ID), params)
+    assert refusal.reason is Reason.NO_RESUMABLE_SCAN and '앞부분이 아니다' in refusal.detail
+
+
+def test_a_recorded_failure_is_not_resumed_even_if_the_phase_says_stopped(params, result_dir):
+    """상태 기계가 먼저 거르지만, 기록만 봐도 같은 답이 나와야 한다(메모리와 기록이 어긋난 경우의 대비)."""
+    ports, _ = scan(params, result_dir, stop_at=SLIDE_POS_X)
+    failure = type('F', (), {'reason_code': 301, 'detail': 'fake', 'phase': Phase.EDGE_SEARCH})()
+    ports.store.record_failure(SCAN_ID, failure)
+    refusal = refusal_of(ports.store.load(SCAN_ID), params)
+    assert refusal.reason is Reason.NOT_SUPPORTED and 'TBD' in refusal.detail
 
 
 def test_the_plan_uses_the_recorded_settings_not_the_current_ones(params, result_dir):

@@ -1213,3 +1213,56 @@ def test_motion_id_is_remembered_as_soon_as_it_is_issued(rig):
     rig._result_of(running)
     assert rig.home().success
     assert rig.peers.goals[-1].motion_id == SLIDE_POS_X + 1
+
+
+def test_the_unrecorded_safe_return_is_remembered_even_after_a_later_home_adopts_the_scan(make_rig, rig):
+    """HOME #1: 기록을 못 읽어 기록 없이 복귀 → HOME #2: 기록에서 되돌렸지만 거절됨(미연결) → RESUME.
+
+    상태 기계는 이미 STOPPED 라서, 표시를 IDLE 에서만 보면 이 재시작이 접수돼 홈에서 중단 좌표로 곧장 움직인다.
+    """
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+    store_for, calls = fresh.node._store_for, []
+
+    def fail_once(result_dir):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError('fake: disk not ready')
+        return store_for(result_dir)
+    fresh.node._store_for = fail_once
+    assert fresh.home().success                                   # #1: 기록 없이 복귀했다
+
+    fresh.peers.connected = False
+    assert fresh.wait(lambda: fresh.node.conditions().robot_connected is False)
+    refused = fresh.home()                                        # #2: 되돌린 뒤에 거절된다
+    assert refused.reason_code == Reason.ROBOT_DISCONNECTED
+    assert fresh.node.state_machine.phase is Phase.STOPPED
+    assert fresh.node.state_machine.snapshot().scan_id == stopped.scan_id
+    fresh.peers.connected = True
+    assert fresh.wait(lambda: fresh.node.conditions().robot_connected)
+
+    result = resume(fresh)
+
+    assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
+    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+
+
+def test_a_safe_return_with_nothing_to_record_does_not_change_the_refusal_code(rig):
+    """새 시스템(기록 없음)의 안전복귀는 기록할 작업이 확실히 없다. 재시작은 계약 5.3절대로 105 다."""
+    assert rig.home().success
+    assert rig.node._unrecorded_home is False
+    result = resume(rig)
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN and '기록이 없다' in result.detail
+
+
+def test_resume_waits_for_the_previous_command_to_finish_writing_its_record(rig):
+    """직전 명령이 STOPPED 를 발행하고 마지막 상태 기록을 쓰는 사이에 온 재시작. 옛 기록을 읽지 않는다."""
+    stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    rig.node._job = object()                     # 직전 명령이 아직 끝나지 않았다(_end_job 전)
+    result = resume(rig)
+    assert result.reason_code == Reason.BUSY and '마무리' in result.detail
+    assert rig.node.state_machine.phase is Phase.STOPPED and len(rig.peers.goals) == sent
+
+    rig.node._job = None
+    assert resume(rig).success
