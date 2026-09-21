@@ -47,12 +47,15 @@ contact_detector:
     # 외력 추정값은 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다. 정지 F0 로 하강하면 허공에서 거짓 CONTACT(큐브 45 mm 위),
     # 하강용 F0 를 밀기에 쓰면 옆 이동 이력(허공에서도 Fx -5 N) 때문에 닿기 전에도 |F - F0| 가 수 N 이다
     descend_tare_enabled: true       # DESCEND 중 이동 중 F0 를 자동으로 다시 잡는다. /contact/tare(정지)는 툴 등록 점검으로 남는다
-    descend_tare_delay_s: 6.0        # DESCEND 시작 뒤 이만큼 지나서 tare_duration_s 동안 모은다. 그동안 CONTACT 보류(과대 외력은 감시)
+    descend_tare_delay_s: 6.0        # DESCEND 시작 뒤 이만큼 지나서 tare_duration_s 동안 모은다. 그동안 CONTACT 는 descend_hold_threshold_n 으로 둔하게 본다
                                      #   근거: 출발 약 4 s 뒤 치우침이 계단식으로 생겼다(5-2), 8 s 뒤 잡은 것은 판정 오차 0.016 mm(5-5 · 5-8)
     descend_tare_max_attempts: 3     # 실패하면 다음 1.5 s 구간을 다시 모은다. 9/21 17 시 실기 7 회 중 1 회 첫 구간 실패 → 정지 F0 로
-                                     #   판정해 윗면 3.8 mm 위 거짓 접촉. 같은 하강의 다음 구간은 성공(rms 0.288). 모두 실패하면 정지 F0
-                                     #   보류 거리 = 하강 속도 x (6.0 + 3 x 1.5) s = 3 mm/s 면 31.5 mm. 홈 → 80 mm 큐브 윗면 107 mm 보다 짧아야 한다
-                                     #   설계 출발값이며 실측으로 조정한다
+                                     #   판정해 윗면 3.8 mm 위 거짓 접촉. 같은 하강의 다음 구간은 성공(rms 0.288)
+                                     #   둔한 판정 거리 = 하강 속도 x (6.0 + 1.5) s, 최악(1 · 2번째 실패) (6.0 + 3 x 1.5) s = 3 mm/s 면
+                                     #   22.5 mm, 최악 31.5 mm. 홈 → 80 mm 큐브 윗면 107 mm 보다 짧아야 원래 임계로 잰다(측정 품질 조건)
+    descend_hold_threshold_n: 6.0    # 이동 중 F0 가 없는 동안(모으는 중 · 전부 실패)의 CONTACT 임계. 기준은 /contact/tare F0, 없으면 DESCEND 첫 샘플의 F.
+                                     #   관측된 이동 치우침 최대 3.04 N(5-2) · 17 시 하강 36 s 공중 최대 1.91 N 보다 높고, 닿으면 43 N/mm 탐침에서
+                                     #   약 0.14 mm 로 멈춘다(판정을 끄면 과대 외력까지 막을 것이 없다. 현지 리뷰, PR #127). 설계 출발값
     edge_arm_still_window_s: 0.2     # > 0 이면 EDGE 판정을 z 로 켠다: 이 구간 동안 z 가 edge_arm_still_m 안에 머물고
     edge_arm_still_m: 0.0001         #   x · y 가 edge_arm_travel_m 넘게 움직였으면 "누르고 있다". edge_arm_force_n 은 쓰지 않는다
     edge_arm_travel_m: 0.0005        #   (x · y 조건: 힘 제어를 켜는 동안 팁이 떠 있는데 z 도 멈춰 있어서). 설계 출발값

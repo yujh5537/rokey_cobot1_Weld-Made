@@ -19,8 +19,9 @@ EDGE 를 "밀기 시작 z 대비 누적 하강량"으로 재지 않는 이유 �
   F0 로 하강하면 허공에서 거짓 CONTACT 가 나고(큐브 45 mm 위), 하강용 F0 를 옆으로 미는 동안 쓰면 닿기 전에도
   |F - F0| 가 수 N 이 된다(+x 밀기 중 허공에서도 Fx -5 N).
   - 하강(CONTACT): DescendTareConfig 가 있으면 DESCEND 가 시작되고 delay_s 뒤부터 duration_s 동안 **이동 중
-    F0 를 자동으로 다시 잡는다.** 그동안 CONTACT 는 보류한다(과대 외력은 원시 |F| 라 그대로 감시한다).
-    잡지 못하면 /contact/tare 의 F0 로 판정한다(이전 동작).
+    F0 를 자동으로 다시 잡는다.** 실패하면 다음 구간을 다시 모은다(max_attempts). 이동 중 F0 가 없는 동안
+    (모으는 중 · 전부 실패)은 판정을 끄지 않고 /contact/tare 의 F0(없으면 DESCEND 첫 샘플의 F)와
+    hold_threshold_n 으로 둔하게 본다. 끄면 그 구간에 닿았을 때 과대 외력까지 막을 것이 없다.
   - 밀기(EDGE 판정 켜기): EdgeConfig 의 arm_still_* 가 있으면 |F - F0| 대신 **z 가 멈췄고(틈을 다 메움) x · y 는
     움직이는 중**일 때 켠다. F0 에 기대지 않는다. x · y 조건이 없으면 힘 제어를 켜는 동안(팁이 아직 떠 있고
     z 도 멈춰 있다) 너무 일찍 켜진다.
@@ -129,6 +130,7 @@ class Detection:
     force_delta_n: float          # 확정 샘플의 값. CONTACT · EDGE: |F - F0|, OVER_FORCE: 원시 |F|
     debounce_count: int
     z_drop_m: Optional[float] = None   # EDGE 만. first_sample 에서 추세선보다 내려간 양 (편향 보정의 δ)
+    hold: bool = False                 # CONTACT 만. 이동 중 F0 없이 올린 임계로 확정했다(측정 품질이 낮다)
 
     @property
     def debounce_delay_s(self) -> float:
@@ -206,6 +208,7 @@ class ContactDetector:
         self._dt_start: Optional[float] = None
         self._dt_acc: Optional['TareAccumulator'] = None
         self.descend_tare_attempt = 0                 # 이번 하강에서 몇 번째 구간을 모으는 중인가 (0 = 아직)
+        self.descend_start_force: Optional[Vector3] = None   # 이번 DESCEND 첫 샘플의 F. /contact/tare 가 없을 때 둔한 판정의 기준
         self._prev_operation = OP_NONE
         self._arm_points: Deque[Tuple[float, Vector3]] = deque()   # z 로 켜기: 최근 (시각, 위치)
         self._contact_run = _Run()
@@ -241,7 +244,11 @@ class ContactDetector:
             self._trend.clear()
 
     def set_baseline(self, baseline: Optional[Vector3]):
+        """/contact/tare 의 F0. 가장 최근 값을 쓴다: 하강에서 자동으로 잡은 F0 가 남아 있으면 버린다
+        (하강 뒤 다시 tare 했는데 밀기의 보고값 |F - F0| 가 하강 때 F0 로 계속 나오지 않게)."""
         self.baseline = baseline
+        if self._dt_state == 'done':
+            self._dt_state, self.descend_baseline = 'idle', None
         self._contact_run.reset()
 
     @property
@@ -254,14 +261,17 @@ class ContactDetector:
         return self._judge_baseline()
 
     @property
-    def contact_withheld(self) -> bool:
-        """이동 중 F0 를 모으는 중이라 CONTACT 를 보류하고 있다."""
-        return self.descend_tare is not None and self._dt_state in ('waiting', 'collecting')
+    def contact_hold(self) -> bool:
+        """이동 중 F0 가 없어(모으는 중 · 전부 실패) CONTACT 를 올린 임계(hold_threshold_n)로 보고 있다."""
+        return self.descend_tare is not None and self._dt_state in ('waiting', 'collecting', 'failed')
 
     def _judge_baseline(self) -> Optional[Vector3]:
-        """판정 · 보고에 쓰는 F0. 이번 하강에서 자동으로 잡았으면 그것, 아니면 /contact/tare 의 값."""
+        """판정 · 보고에 쓰는 F0. 이번 하강에서 자동으로 잡았으면 그것, 아니면 /contact/tare 의 값.
+        둔한 판정 중인데 /contact/tare 가 없으면 이번 DESCEND 첫 샘플의 F."""
         if self.descend_tare is not None and self._dt_state == 'done':
             return self.descend_baseline
+        if self.contact_hold and self.baseline is None:
+            return self.descend_start_force
         return self.baseline
 
     def _update_descend_tare(self, sample: Sample, motion_changed: bool):
@@ -277,6 +287,7 @@ class ContactDetector:
             self._dt_acc = TareAccumulator(cfg.tare)
             self.descend_baseline = None
             self.descend_tare_attempt = 0
+            self.descend_start_force = sample.force
         if self._dt_state not in ('waiting', 'collecting'):
             return
         elapsed = t - self._dt_start
@@ -297,7 +308,8 @@ class ContactDetector:
                     self.descend_tare_attempt += 1
                     self._dt_acc = TareAccumulator(cfg.tare)
                 else:
-                    # 모두 실패하면 /contact/tare 의 F0 로 판정한다. 판정하지 않으면 과대 외력까지 눌러 버린다
+                    # 모두 실패하면 하강 끝까지 둔한 판정(hold_threshold_n)을 유지한다. 원래 임계 3 N 에 정지 F0 를 쓰면
+                    # 9/21 오전 45 mm 위 거짓 접촉을 낸 조합으로 돌아간다(현지 리뷰, PR #127)
                     self._dt_state = 'failed'
                 self._contact_run.reset()
 
@@ -342,16 +354,15 @@ class ContactDetector:
         if sample.operation != OP_DESCEND:
             self._contact_run.reset()
             return None
-        if self.descend_tare is not None and self._dt_state in ('waiting', 'collecting'):
-            # 이동 중 F0 를 잡는 동안은 판정을 보류한다. 정지 F0 로 판정하면 이 구간에서 거짓 접촉이 날 수 있다.
-            # 이 구간(delay_s + duration_s)에 하강하는 거리보다 부재 윗면이 충분히 아래에 있어야 한다(계약 3.3)
-            self._contact_run.reset()
-            return None
         if self._judge_baseline() is None:
             self._contact_run.reset()
             return None
+        # 이동 중 F0 가 없는 동안은 판정을 끄지 않고 둔하게 본다. 끄면 이 구간에서 닿았을 때 과대 외력(실기 30 N)까지
+        # 막을 것이 없다(현지 리뷰, PR #127). 윗면이 이 구간 뒤에 있어야 원래 임계로 재는 것은 측정 품질 조건이다
+        hold = self.contact_hold
+        threshold = self.descend_tare.hold_threshold_n if hold else self.config.contact_threshold_n
         delta = self.force_delta(sample)
-        count = self._contact_run.update(delta > self.config.contact_threshold_n, sample)
+        count = self._contact_run.update(delta > threshold, sample)
         if count == 0 and self._motion_id == 0:
             # motion_id 0 = 없음. 동작의 경계를 알 수 없으므로 외력이 임계 아래로 내려오면 다시 판정한다.
             # 이렇게 하지 않으면 motion_id 가 0 으로만 오는 동안 첫 접촉 뒤로 이벤트가 영영 나가지 않는다
@@ -359,7 +370,7 @@ class ContactDetector:
         if self._contact_latched or count < self.config.debounce_n:
             return None
         self._contact_latched = True
-        return Detection(TYPE_CONTACT, sample, self._contact_run.first, delta, count)
+        return Detection(TYPE_CONTACT, sample, self._contact_run.first, delta, count, hold=hold)
 
     def _update_edge(self, sample: Sample) -> Optional[Detection]:
         cfg = self.edge_config
@@ -454,7 +465,10 @@ class DescendTareConfig:
     delay_s: float                # DESCEND 가 시작되고 이만큼 지난 뒤 모으기 시작한다(출발 약 4 s 뒤 치우침이 계단식으로 생긴다)
     duration_s: float             # 모으는 길이
     tare: TareConfig              # 샘플 수 · 불안정 · 툴 등록 판정은 /contact/tare 와 같은 기준을 쓴다
-    max_attempts: int = 1         # 실패하면 바로 다음 duration_s 구간으로 다시 모은다. 이 횟수까지. CONTACT 보류는 그만큼 길어진다
+    max_attempts: int = 1         # 실패하면 바로 다음 duration_s 구간으로 다시 모은다. 이 횟수까지
+    hold_threshold_n: float = 6.0 # 이동 중 F0 가 없는 동안(모으는 중 · 전부 실패) CONTACT 를 끄지 않고 이 임계로 둔하게 본다.
+                                  # 기준은 /contact/tare 의 F0, 없으면 이번 DESCEND 첫 샘플의 F. 관측된 이동 치우침
+                                  # (최대 3.04 N, 9/21 5-2)보다 높아 거짓 접촉은 없고, 닿으면 과대 외력이 아니라 이 힘에서 멈춘다
 
     def __post_init__(self):
         if not (math.isfinite(self.delay_s) and self.delay_s >= 0
@@ -462,10 +476,13 @@ class DescendTareConfig:
             raise ValueError('delay_s 는 0 이상, duration_s 는 0 보다 커야 한다')
         if self.max_attempts < 1:
             raise ValueError('max_attempts 는 1 이상이어야 한다')
+        if not (math.isfinite(self.hold_threshold_n) and self.hold_threshold_n > 0):
+            raise ValueError('hold_threshold_n 은 0 보다 커야 한다')
 
     @property
-    def withheld_s(self) -> float:
-        """CONTACT 를 보류할 수 있는 가장 긴 시간. 이 동안 내려가는 거리보다 부재 윗면이 아래에 있어야 한다."""
+    def hold_s(self) -> float:
+        """둔한 판정(hold_threshold_n)이 가장 오래 이어지는 시간(모든 구간 실패 전까지). 측정 품질 조건:
+        이 동안 내려가는 거리보다 부재 윗면이 아래에 있어야 원래 임계로 잰다. 안전 조건은 아니다."""
         return self.delay_s + self.max_attempts * self.duration_s
 
 

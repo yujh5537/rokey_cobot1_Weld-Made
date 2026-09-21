@@ -43,6 +43,7 @@ from contact_detector.detector_core import (
     TARE_UNSTABLE,
     TareAccumulator,
     TareConfig,
+    TYPE_CONTACT,
     TYPE_EDGE,
 )
 
@@ -69,6 +70,7 @@ PARAMS = {
     'descend_tare_enabled': Parameter.Type.BOOL,       # DESCEND 중 이동 중 F0 를 자동으로 다시 잡는다
     'descend_tare_delay_s': Parameter.Type.DOUBLE,     # DESCEND 시작 뒤 이만큼 지나서 모은다. 길이는 tare_duration_s
     'descend_tare_max_attempts': Parameter.Type.INTEGER,   # 실패하면 다음 tare_duration_s 구간으로 다시 모은다. 이 횟수까지
+    'descend_hold_threshold_n': Parameter.Type.DOUBLE,     # 이동 중 F0 가 없는 동안(모으는 중 · 전부 실패) CONTACT 임계
     'edge_arm_still_window_s': Parameter.Type.DOUBLE,  # > 0 이면 EDGE 판정을 z 로 켠다(edge_arm_force_n 대신)
     'edge_arm_still_m': Parameter.Type.DOUBLE,
     'edge_arm_travel_m': Parameter.Type.DOUBLE,
@@ -171,7 +173,8 @@ class ContactDetectorNode(Node):
                        arm_still_m=v['edge_arm_still_m'] if by_z else None,
                        arm_travel_m=v['edge_arm_travel_m'] if by_z else None),
             DescendTareConfig(v['descend_tare_delay_s'], v['tare_duration_s'], tare,
-                              max_attempts=v['descend_tare_max_attempts'])
+                              max_attempts=v['descend_tare_max_attempts'],
+                              hold_threshold_n=v['descend_hold_threshold_n'])
             if v['descend_tare_enabled'] else None,
         )
 
@@ -191,8 +194,9 @@ class ContactDetectorNode(Node):
             return SetParametersResult(successful=False, reason=str(e))
         with self.lock:
             baseline = self.detector.baseline
-            # 하강 중 자동 영점 상태는 옮기지 않는다. 다음 샘플에서 하강이 새로 시작된 것으로 보고 다시 모은다
-            # (그동안 CONTACT 를 보류한다 — 안전한 쪽)
+            # 하강 중 자동 영점 상태는 옮기지 않는다. 다음 샘플에서 하강이 새로 시작된 것으로 보고 다시 모은다.
+            # 그동안 CONTACT 는 끄지 않고 descend_hold_threshold_n 으로 본다(/contact/tare 의 F0 는 넘겨준다).
+            # 이미 닿아 있는 채로 바꾸면 그 순간의 F 가 기준이 될 수 있으니 하강 중에는 바꾸지 않는다
             self.detector = ContactDetector(config, edge_config, descend_tare)
             self.detector.set_baseline(baseline)
             self.values = changed
@@ -249,8 +253,8 @@ class ContactDetectorNode(Node):
             no_baseline = msg.valid and self.detector.active_baseline is None
             if no_baseline and msg.operation == OP_SLIDE:
                 self.warn('no_tare', 'SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다')
-            if no_baseline and msg.operation == OP_DESCEND and not self.detector.contact_withheld:
-                self.warn('no_tare_descend', 'DESCEND 인데 기준값 F0 가 없다(tare 전 · 자동 영점 실패). '
+            if no_baseline and msg.operation == OP_DESCEND:
+                self.warn('no_tare_descend', 'DESCEND 인데 기준값 F0 가 없다(tare 전). '
                                              'CONTACT 를 판정하지 않는다 — 과대 외력만 멈춘다')
             events = [self.to_event(d) for d in detections]
             gap = self.detector.trend_gap
@@ -262,11 +266,16 @@ class ContactDetectorNode(Node):
             elif dt_state == 'collecting':
                 self.get_logger().warn(
                     f'하강 중 자동 영점 실패({descend_tare.error}, |F-F0| rms {rms_text(descend_tare)}). '
-                    f'다음 구간을 다시 모은다 ({dt_attempt}번째). 그동안 CONTACT 보류')
+                    f'다음 구간을 다시 모은다 ({dt_attempt}번째). 그동안 CONTACT 는 올린 임계로 본다')
             else:
                 self.get_logger().error(
                     f'하강 중 자동 영점이 {dt_attempt}번 모두 실패했다({descend_tare.error}, |F-F0| rms '
-                    f'{rms_text(descend_tare)}). /contact/tare 의 F0 로 판정한다 — 거짓 접촉 가능(#109)')
+                    f'{rms_text(descend_tare)}). 하강 끝까지 올린 임계로 본다')
+        for detection in detections:
+            if detection.type == TYPE_CONTACT and detection.hold:
+                self.get_logger().warn(
+                    f'CONTACT 를 올린 임계 {self.values["descend_hold_threshold_n"]} N 으로 확정했다(이동 중 F0 없음, '
+                    f'|F-F0| {detection.force_delta_n:.2f} N). 측정 품질이 낮다 — 윗면이 자동 영점 구간 안에 있었다')
         if gap:
             self.warn('trend_gap', '샘플 공백으로 EDGE 추세선을 버리고 다시 쌓는다. '
                                    '그동안 접촉 소실을 볼 수 없다')

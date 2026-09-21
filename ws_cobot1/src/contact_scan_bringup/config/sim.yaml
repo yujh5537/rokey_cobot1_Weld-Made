@@ -40,17 +40,18 @@ contact_detector:
     tare_min_samples: 30             # 구간 안의 유효 샘플이 이보다 적으면 TARE_TIMEOUT
     tare_max_std_n: 0.3              # |F - F0| 의 RMS 가 넘으면 TARE_UNSTABLE. 설계 출발값. 실기 정지 상태 실측 0.035 N (2026-09-20)
     tare_max_force_n: 6.0            # |F0| 가 넘으면 TOOL_REG_SUSPECT (BRD 4.1.5 툴 등록 점검). 병후 제안값 (PR #57 코멘트)
-    # --- 하강 · 밀기 기준 분리 (#109). 값의 근거는 real.yaml ---
-    descend_tare_enabled: true       # sim 도 같은 경로를 탄다. sim 외력은 무접촉이면 0 이라 자동 영점은 0 근처로 잡힌다
-    descend_tare_delay_s: 1.0        # sim 에는 이동 치우침이 없어 짧게 둔다
-    descend_tare_max_attempts: 3     # 보류 거리 최대 5 mm/s x (1.0 + 3 x 1.5) s = 27.5 mm < 기준점 → 박스 윗면 60 mm
-    edge_arm_still_window_s: 0.2     # z 로 EDGE 판정 켜기. sim 은 틈을 sim_fall_speed_mps 로 메운 뒤 윗면을 따라간다
-    edge_arm_still_m: 0.0001
-    edge_arm_travel_m: 0.0005
                                      #   실측 |F0|: 툴 등록 1.81 N (2026-09-20 홈 자세) · 2.1~2.9 N, 최대 3.7 N (2026-09-19 3자세)
                                      #             툴 미등록 11~12.5 N. 두 구간 사이가 벌어져 있어 6 N 으로 가른다
                                      #   낮게 잡으면 안 되는 이유: 탐침이 홀더 안으로 밀리는 중이면 |F0| 가 올라갈 수 있고(PR #80),
                                      #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
+    # --- 하강 · 밀기 기준 분리 (#109). 값의 근거는 real.yaml ---
+    descend_tare_enabled: true       # sim 도 같은 경로를 탄다. sim 외력은 무접촉이면 0 이라 자동 영점은 0 근처로 잡힌다
+    descend_tare_delay_s: 1.0        # sim 에는 이동 치우침이 없어 짧게 둔다
+    descend_tare_max_attempts: 3     # 둔한 판정 거리 최대 5 mm/s x (1.0 + 3 x 1.5) s = 27.5 mm < 기준점 → 박스 윗면 60 mm
+    descend_hold_threshold_n: 6.0
+    edge_arm_still_window_s: 0.2     # z 로 EDGE 판정 켜기. sim 은 틈을 sim_fall_speed_mps 로 메운 뒤 윗면을 따라간다
+    edge_arm_still_m: 0.0001
+    edge_arm_travel_m: 0.0005
 
     # --- sim 입력원 전용: 가상 직육면체 (T07). 실제 부재와 무관한 가상값. 이름은 정의서 6.2 ---
     sim_box_frame_id: base_link            # 아래 좌표의 프레임. RobotSample.frame_id 와 다르면 sim 은 판정하지 않는다
