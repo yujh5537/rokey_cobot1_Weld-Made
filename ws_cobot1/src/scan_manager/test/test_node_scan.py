@@ -85,6 +85,8 @@ class Rig:
             self.executor.spin_once(timeout_sec=0.05)
 
     def close(self):
+        if self._stop_spin.is_set():
+            return  # 프로세스 재시작을 흉내 내려고 테스트가 먼저 닫았다
         self.node.close()
         self.node._state_timer.cancel()
         if self.peers is not None:
@@ -241,11 +243,12 @@ def test_missing_required_parameters_refuse_start_and_name_them(make_rig):
     assert rig.peers.goals == []
 
 
-def test_resume_is_not_supported_yet(rig):
+def test_resume_with_nothing_recorded_is_refused_and_changes_nothing(rig):
     _handle, result = rig.send(rig.resume_client, Resume.Goal(request_id='r-1', scan_id=''))
     result = rig._result_of(result).result
-    assert not result.success and result.reason_code == Reason.NOT_SUPPORTED
-    assert rig.node.state_machine.phase is Phase.IDLE
+    assert not result.success and result.reason_code == Reason.NO_RESUMABLE_SCAN
+    assert math.isnan(result.result.z_top) and not result.result.z_top_valid
+    assert rig.node.state_machine.phase is Phase.IDLE and rig.peers.goals == []
 
 
 # ---- 정상 경로 ----
@@ -746,3 +749,520 @@ def test_each_scan_gets_a_fresh_result_stamp(rig):
     stamps = [(r.stamp.sec, r.stamp.nanosec) for r in rig.results]
     assert stamps[0] != stamps[1] and stamps[0] > (0, 0)   # 발행할 때마다 새로 찍는다
     assert stamps == sorted(stamps)
+
+
+# ---- 재시작 (T26) ----
+# 정상 경로의 goal 순번: 1 기준점, 2 하강, 3 +x 밀기, 4~6 방향 전환, 7 -x 밀기, 8~10, 11 +y 밀기, 12~14, 15 -y 밀기, 16 들어 올림, 17 홈
+SLIDE_POS_X, TO_ORIGIN_XY, SLIDE_POS_Y, FINAL_LIFT = 3, 5, 11, 16
+
+
+def stop_at_goal(rig, n, start=None):
+    """n 번째 goal 이 도는 동안 /scan/stop. start: goal 을 보내는 함수(기본은 새 작업)."""
+    rig.peers.hold_goal = n
+    _handle, future = start() if start else rig.send(rig.run_client, RunScan.Goal(request_id='run-1'))
+    assert rig.wait(lambda: len(rig.peers.goals) >= n)
+    assert rig.stop().accepted
+    result = rig._result_of(future).result
+    rig.peers.hold_goal = None
+    assert result.reason_code == Reason.STOP_REQUESTED, (result.reason_code, result.detail)
+    return result
+
+
+def send_resume(rig, scan_id=''):
+    return rig.send(rig.resume_client, Resume.Goal(request_id='resume-1', scan_id=scan_id))
+
+
+def resume(rig, scan_id=''):
+    _handle, future = send_resume(rig, scan_id)
+    return rig._result_of(future).result
+
+
+def slides(goals):
+    return [Direction(g.direction) for g in goals if g.operation == Operation.SLIDE]
+
+
+def assert_box(result_msg):
+    assert result_msg.success and result_msg.box_valid
+    assert (result_msg.width, result_msg.length, result_msg.height) == pytest.approx(BOX_SIZE)
+    assert (result_msg.x_pos, result_msg.x_neg) == pytest.approx((0.05, -0.05))
+    assert (result_msg.y_pos, result_msg.y_neg) == pytest.approx((0.03, -0.03))
+
+
+def test_resume_after_stop_in_pos_x_keeps_z_top_and_finishes(rig):
+    """이슈 #26 완료 조건 4 · BRD TR-08: +x 탐색 중 중지 → 재시작 → 기존 윗면 높이를 유지하고 +x 부터 잇는다."""
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    before = rig.store().load(stopped.scan_id)
+    assert before.top.valid and before.confirmed_edges == ()
+    sent, stop_requests = len(rig.peers.goals), len(rig.peers.stop_requests)
+
+    result = resume(rig)
+
+    assert result.success and result.reason_code == 0
+    assert result.scan_id == stopped.scan_id                    # 새 작업이 아니다
+    assert rig.node.state_machine.phase is Phase.DONE
+    after = rig.store().load(stopped.scan_id)
+    assert after.top == before.top                              # 같은 판정 좌표 · 같은 stamp. 다시 재지 않았다
+    assert rig.operations().count(Operation.DESCEND) == 1
+
+    resumed = rig.peers.goals[sent:]
+    # 올림 → (정지 확인 · tare) → 기준 원점 x · y → 다시 닿기 → +x 를 처음부터
+    assert [Operation(g.operation) for g in resumed[:4]] == [Operation.MOVE_TO] * 3 + [Operation.SLIDE]
+    stop_pose = before.interruptions[0].pose.position_m
+    lift = resumed[0].target.position
+    assert (lift.x, lift.y, lift.z) == pytest.approx(
+        (stop_pose[0], stop_pose[1], stop_pose[2] + VALUES['lift_height_m']))
+    assert slides(resumed) == [Direction.POS_X, Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y]
+    assert len(rig.peers.tare_requests) == 2                    # 떼고 나서 F0 를 다시 잡는다
+    assert [g.motion_id for g in rig.peers.goals] == list(range(1, len(rig.peers.goals) + 1))
+    assert {g.scan_id for g in rig.peers.goals} == {stopped.scan_id}
+    # 재시작은 /robot/stop · 안전복귀를 부르지 않는다. OP_HOME 은 마무리 복귀 하나뿐이다
+    assert len(rig.peers.stop_requests) == stop_requests
+    assert rig.operations().count(Operation.HOME) == 1 and rig.operations()[-1] is Operation.HOME
+    seen = phases(rig)
+    assert seen[seen.index(Phase.STOPPED):] == [
+        Phase.STOPPED, Phase.RESUMING, Phase.EDGE_SEARCH, Phase.GEOMETRY, Phase.HOMING, Phase.DONE]
+
+    # /scan/result: 중지 때 1회(부분), 재시작이 끝나고 1회. stamp 가 다르다(mqtt_bridge 의 중복 제거 키)
+    assert rig.wait(lambda: len(rig.results) == 2)
+    partial, published = rig.results
+    assert not partial.success and partial.z_top_valid and not partial.x_pos_valid
+    assert_box(published)
+    assert published.z_top == pytest.approx(partial.z_top)
+    assert (published.stamp.sec, published.stamp.nanosec) > (partial.stamp.sec, partial.stamp.nanosec)
+    assert (result.result.scan_id, result.result.stamp) == (published.scan_id, published.stamp)
+    assert result.result.vertices == published.vertices
+    assert after.interruptions[0].resumed_at is not None
+    assert after.result_saved and after.result_success and after.failure is None
+    assert rig.error_logs() == []
+
+
+@pytest.mark.parametrize('n, descends, first_slide', [
+    (1, 1, Direction.POS_X),               # PREPARING: 기준점으로 가던 중
+    (2, 2, Direction.POS_X),               # TOP_SEARCH: 하강 중(윗면이 아직 없다 → 하강을 다시 한다)
+    (TO_ORIGIN_XY, 1, Direction.NEG_X),    # 방향 전환의 OP_MOVE_TO 중
+    (SLIDE_POS_Y, 1, Direction.POS_Y),     # 세 번째 방향
+])
+def test_resume_from_each_step(rig, n, descends, first_slide):
+    stopped = stop_at_goal(rig, n)
+    before = rig.store().load(stopped.scan_id)
+    sent = len(rig.peers.goals)
+
+    result = resume(rig)
+
+    assert result.success and result.scan_id == stopped.scan_id
+    assert rig.operations().count(Operation.DESCEND) == descends
+    assert slides(rig.peers.goals[sent:])[0] is first_slide
+    # 확정된 방향에는 모션이 다시 나가지 않는다
+    assert not set(before.confirmed_edges) & set(slides(rig.peers.goals[sent:]))
+    after = rig.store().load(stopped.scan_id)
+    assert all(after.edges[d] == before.edges[d] for d in before.confirmed_edges)
+    assert_box(result.result)
+    assert rig.error_logs() == []
+
+
+def test_stop_after_the_result_was_saved_republishes_it_with_a_new_stamp(rig):
+    """GEOMETRY 에서 원본을 쓰고 발행한 직후 · GEOMETRY_DONE 전의 중지. 다시 계산 · 저장하지 않는다."""
+    publish = rig.node._publish_result
+
+    def stop_right_after_publishing(job, shape):
+        publish(job, shape)
+        rig.node._publish_result = publish
+        assert rig.node._on_stop(
+            StopScan.Request(request_id='stop-1', requester='fake_bridge', reason=200),
+            StopScan.Response()).accepted
+    rig.node._publish_result = stop_right_after_publishing
+
+    stopped = rig.run()
+    assert stopped.reason_code == Reason.STOP_REQUESTED and stopped.result.success
+    record = rig.store().load(stopped.scan_id)
+    assert record.interruptions[0].phase is Phase.GEOMETRY and record.result_saved
+    saved = rig.store().load_result(stopped.scan_id)
+    assert not RETURN_OPS & set(rig.operations())               # 중지된 작업은 복귀하지 않는다
+
+    result = resume(rig)
+
+    assert result.success and rig.node.state_machine.phase is Phase.DONE
+    assert rig.store().load_result(stopped.scan_id) == saved    # 원본은 한 번만 쓴다
+    assert rig.wait(lambda: len(rig.results) == 2)
+    first, again = rig.results
+    assert again.vertices == first.vertices and again.stamp != first.stamp
+    assert rig.operations()[-2:] == [Operation.MOVE_TO, Operation.HOME]
+
+
+def test_stop_resume_stop_resume(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    again = stop_at_goal(rig, len(rig.peers.goals) + 8, start=lambda: send_resume(rig))   # -x 밀기 중
+    assert again.scan_id == stopped.scan_id
+    record = rig.store().load(stopped.scan_id)
+    assert [(i.phase, i.progress) for i in record.interruptions] == [
+        (Phase.EDGE_SEARCH, 0), (Phase.EDGE_SEARCH, 1)]
+    assert record.interruptions[0].resumed_at is not None
+    assert record.interruptions[1].resumed_at is None
+
+    sent = len(rig.peers.goals)
+    result = resume(rig)
+
+    assert result.success
+    assert slides(rig.peers.goals[sent:]) == [Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y]
+    assert [g.motion_id for g in rig.peers.goals] == list(range(1, len(rig.peers.goals) + 1))
+    assert_box(result.result)
+
+
+def test_stop_during_the_resume_preparation_keeps_the_resume_point(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_Y)
+    lifted = stop_at_goal(rig, len(rig.peers.goals) + 1, start=lambda: send_resume(rig))   # 올림 중
+    assert rig.node.state_machine.phase is Phase.STOPPED
+    record = rig.store().load(stopped.scan_id)
+    assert record.interruptions[-1].phase is Phase.RESUMING
+    assert record.resume_point.phase is Phase.EDGE_SEARCH and record.resume_point.progress == 2
+    assert lifted.scan_id == stopped.scan_id
+
+    sent = len(rig.peers.goals)
+    result = resume(rig)
+    assert result.success and slides(rig.peers.goals[sent:]) == [Direction.POS_Y, Direction.NEG_Y]
+
+
+def test_stop_before_the_first_resume_motion_carries_the_stop_position_over(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    client, original = rig.node._motion_client, rig.node._motion_client.wait_for_server
+
+    def stop_while_waiting(timeout_sec=None):
+        client.wait_for_server = original
+        assert rig.node._on_stop(
+            StopScan.Request(request_id='stop-2', requester='fake_bridge', reason=200),
+            StopScan.Response()).accepted
+        return original(timeout_sec=timeout_sec)
+    client.wait_for_server = stop_while_waiting
+
+    again = resume(rig)
+
+    assert again.reason_code == Reason.STOP_REQUESTED and len(rig.peers.goals) == sent
+    first, second = rig.store().load(stopped.scan_id).interruptions
+    assert second.phase is Phase.RESUMING
+    assert second.pose == first.pose                 # 로봇은 움직이지 않았다. 중단 좌표를 잃지 않는다
+    assert resume(rig).success
+
+
+def test_stop_between_motions_records_where_the_robot_is(rig):
+    """보내지 않은 goal 은 로봇을 움직이지 않았다. 중단 좌표는 그 앞 모션의 정지 좌표다."""
+    client, calls = rig.node._motion_client, []
+    original = client.wait_for_server
+
+    def stop_while_waiting(timeout_sec=None):
+        calls.append(1)
+        if len(calls) == 4:  # 첫 방향 전환의 올림을 보내기 직전
+            assert rig.node._on_stop(
+                StopScan.Request(request_id='stop-1', requester='fake_bridge', reason=200),
+                StopScan.Response()).accepted
+        return original(timeout_sec=timeout_sec)
+    client.wait_for_server = stop_while_waiting
+
+    stopped = rig.run()
+    client.wait_for_server = original
+
+    assert stopped.reason_code == Reason.STOP_REQUESTED and len(rig.peers.goals) == 3
+    record = rig.store().load(stopped.scan_id)
+    stop = record.interruptions[0]
+    assert stop.pose == record.edges[Direction.POS_X].stop_pose
+    result = resume(rig)
+    assert result.success and slides(rig.peers.goals[3:])[0] is Direction.NEG_X
+
+
+def test_resume_after_the_safe_return_is_not_supported_and_keeps_the_record(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    before = rig.store().load(stopped.scan_id)
+    assert rig.home().success
+    sent = len(rig.peers.goals)
+
+    result = resume(rig)
+
+    assert not result.success and result.reason_code == Reason.NOT_SUPPORTED
+    assert rig.node.state_machine.phase is Phase.STOPPED and len(rig.peers.goals) == sent
+    after = rig.store().load(stopped.scan_id)
+    assert after.top == before.top and after.interruptions == before.interruptions   # 측정값 · 로그 보존
+    assert after.home_return.completed and after.interruptions[0].resumed_at is None
+    # 안전복귀는 재시작을 부르지 않는다: RESUMING 은 한 번도 없었고, 거절된 재시작은 관제자가 보낸 하나뿐이다
+    assert Phase.RESUMING not in phases(rig)
+    assert len([log for log in rig.logs if '명령 거절' in log.message]) == 1
+
+
+def test_resume_after_an_error_is_not_supported(rig):
+    rig.peers.behavior[F.key(Operation.SLIDE, Direction.NEG_X)] = F.MAX_DISTANCE
+    failed = rig.run()
+    assert failed.reason_code == Reason.NO_EDGE
+    sent = len(rig.peers.goals)
+
+    result = resume(rig, failed.scan_id)
+
+    assert result.reason_code == Reason.NOT_SUPPORTED
+    assert rig.node.state_machine.phase is Phase.ERROR and len(rig.peers.goals) == sent
+
+
+def test_resume_after_a_stop_in_the_final_homing_is_refused(rig):
+    stopped = stop_at_goal(rig, FINAL_LIFT)
+    assert stopped.result.success                                # 측정은 끝났다
+    result = resume(rig)
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN
+    assert rig.node.state_machine.phase is Phase.STOPPED
+
+
+@pytest.mark.parametrize('setup, code', [
+    (lambda peers: setattr(peers, 'latched', True), Reason.SAFETY_LATCHED),
+    (lambda peers: setattr(peers, 'connected', False), Reason.ROBOT_DISCONNECTED),
+])
+def test_resume_is_refused_by_conditions_without_entering_resuming(rig, setup, code):
+    stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    setup(rig.peers)
+    conditions = rig.node.conditions
+    assert rig.wait(lambda: conditions().safety_latched or not conditions().robot_connected)
+
+    result = resume(rig)
+
+    assert not result.success and result.reason_code == code
+    assert Phase.RESUMING not in phases(rig) and rig.node.state_machine.phase is Phase.STOPPED
+    assert len(rig.peers.goals) == sent
+
+
+def test_resume_of_another_scan_id_is_refused(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    result = resume(rig, '20200101-000000-0000')
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN and stopped.scan_id in result.detail
+    assert rig.node.state_machine.phase is Phase.STOPPED
+    assert resume(rig, stopped.scan_id).success                  # 맞는 ID 로는 된다
+
+
+def test_resume_while_busy_is_refused_and_leaves_the_running_command_alone(rig):
+    stop_at_goal(rig, SLIDE_POS_X)
+    rig.peers.hold_goal = len(rig.peers.goals) + 1
+    _handle, running = send_resume(rig)
+    assert rig.wait(lambda: len(rig.peers.goals) >= rig.peers.hold_goal)
+
+    second = resume(rig)
+
+    assert second.reason_code == Reason.BUSY
+    assert rig.node.state_machine.phase is Phase.RESUMING
+    assert rig.stop().accepted
+    assert rig._result_of(running).result.reason_code == Reason.STOP_REQUESTED
+
+
+def test_latch_during_a_resume_blocks_the_next_motion(rig):
+    stop_at_goal(rig, SLIDE_POS_X)
+    rig.peers.latch_during_tare = 400
+    sent = len(rig.peers.goals)
+
+    result = resume(rig)
+
+    assert result.reason_code == 400 and rig.node.state_machine.phase is Phase.ERROR
+    assert len(rig.peers.goals) == sent + 1      # 올림까지만 나갔다. 래치 뒤에는 모션을 보내지 않는다
+    assert not RETURN_OPS & set(rig.operations())
+
+
+def test_resume_uses_the_recorded_settings_not_a_later_set_config(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    config = ScanConfig(slide_speed_mps=0.02, slide_speed_set=True)
+    assert rig.set_config(config).success
+    sent = len(rig.peers.goals)
+
+    result = resume(rig)
+
+    assert result.success
+    speeds = {g.speed for g in rig.peers.goals[sent:] if g.operation == Operation.SLIDE}
+    assert speeds == {VALUES['slide_speed_mps']}                 # 한 작업은 한 벌의 설정으로 끝난다
+    assert result.result.config.slide_speed_mps == VALUES['slide_speed_mps']
+    assert_box(result.result)
+    assert stopped.scan_id == result.scan_id
+
+
+def test_a_failed_safe_return_does_not_overwrite_why_the_scan_failed(rig):
+    rig.peers.behavior[F.key(Operation.SLIDE, Direction.NEG_X)] = F.MAX_DISTANCE
+    failed = rig.run()
+    rig.peers.behavior[F.key(Operation.HOME)] = F.ROBOT_ERROR
+
+    assert not rig.home().success
+
+    record = rig.store().load(failed.scan_id)
+    assert record.failure.reason_code == Reason.NO_EDGE and record.failure.phase is Phase.EDGE_SEARCH
+    assert record.home_return.requested and record.home_return.completed is False
+
+
+# -- 프로세스가 재시작된 뒤 (새 ScanManager 인스턴스 + 같은 result_dir) --
+
+def restart(make_rig, rig):
+    position = rig.peers.position
+    rig.close()
+    fresh = make_rig(result_dir=rig.result_dir)
+    fresh.peers.position = position              # 프로세스가 다시 떠도 로봇은 그 자리에 있다
+    fresh.wait_ready()
+    assert fresh.node.state_machine.phase is Phase.IDLE
+    return fresh
+
+
+def test_a_restarted_node_resumes_from_the_record(make_rig, rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    before = rig.store().load(stopped.scan_id)
+    fresh = restart(make_rig, rig)
+
+    result = resume(fresh)
+
+    assert result.success and result.scan_id == stopped.scan_id
+    after = fresh.store().load(stopped.scan_id)
+    assert after.top == before.top
+    assert fresh.operations().count(Operation.DESCEND) == 0       # 이 프로세스는 하강을 보낸 적이 없다
+    assert fresh.peers.goals[0].motion_id == before.last_motion_id + 1
+    assert slides(fresh.peers.goals) == [
+        Direction.POS_X, Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y]
+    seen = phases(fresh)
+    assert seen[seen.index(Phase.STOPPED):][:3] == [Phase.STOPPED, Phase.RESUMING, Phase.EDGE_SEARCH]
+    assert_box(result.result)
+
+
+def test_a_safe_return_after_a_restart_still_blocks_the_resume(make_rig, rig):
+    """재기동 뒤의 안전복귀가 그 작업의 기록에 남지 않으면, 재시작이 홈에서 중단 좌표로 곧장 움직인다."""
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+
+    assert fresh.home().success
+    assert fresh.node.state_machine.phase is Phase.STOPPED
+    record = fresh.store().load(stopped.scan_id)
+    assert record.home_return.requested and record.home_return_since_resume_point
+    assert fresh.peers.goals[-1].motion_id == record.last_motion_id
+
+    result = resume(fresh)
+    assert result.reason_code == Reason.NOT_SUPPORTED and len(fresh.peers.goals) == 1
+
+
+def test_a_restarted_node_refuses_like_the_one_that_never_died(make_rig, rig):
+    rig.peers.behavior[F.key(Operation.SLIDE, Direction.NEG_X)] = F.MAX_DISTANCE
+    failed = rig.run()
+    assert resume(rig).reason_code == Reason.NOT_SUPPORTED
+
+    fresh = restart(make_rig, rig)
+    result = resume(fresh)
+    assert result.reason_code == Reason.NOT_SUPPORTED and fresh.peers.goals == []
+    assert fresh.node.state_machine.snapshot().scan_id == failed.scan_id
+
+
+def test_a_finished_scan_leaves_nothing_to_resume_after_a_restart(make_rig, rig):
+    assert rig.run().success
+    fresh = restart(make_rig, rig)
+    result = resume(fresh)
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN
+    assert fresh.node.state_machine.phase is Phase.IDLE
+
+
+def test_resume_without_a_result_dir_cannot_look_for_a_record(make_rig, rig):
+    stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+    fresh.node.set_parameters([Parameter('result_dir', value='')])
+
+    result = resume(fresh)
+
+    assert result.reason_code == Reason.INVALID_VALUE and 'result_dir' in result.detail
+    assert fresh.node.state_machine.phase is Phase.IDLE and fresh.peers.goals == []
+
+
+def test_resume_of_a_record_that_cannot_be_read_is_refused(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    (rig.result_dir / stopped.scan_id / 'progress.json').write_text('{ not json', encoding='utf-8')
+
+    result = resume(rig)
+
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN and '읽을 수 없다' in result.detail
+    assert rig.node.state_machine.phase is Phase.STOPPED and len(rig.peers.goals) == sent
+
+
+def test_a_safe_return_that_could_not_be_recorded_blocks_the_resume_until_a_new_start(make_rig, rig):
+    """재기동 뒤 기록을 읽지 못해도 안전복귀는 한다. 그 복귀는 기록에 없으므로, 기록만 믿는 재시작을 받지 않는다."""
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+    store_for, calls = fresh.node._store_for, []
+
+    def fail_once(result_dir):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError('fake: disk not ready')
+        return store_for(result_dir)
+    fresh.node._store_for = fail_once
+
+    assert fresh.home().success                                   # 되돌리지 못해도 복귀는 한다
+    assert fresh.node.state_machine.phase is Phase.IDLE
+    assert not fresh.store().load(stopped.scan_id).home_return.requested
+
+    result = resume(fresh)
+
+    assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
+    assert fresh.node.state_machine.phase is Phase.IDLE
+    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+    assert fresh.run().success                                    # 새 작업은 된다
+    assert fresh.node._unrecorded_home is False
+
+
+def test_motion_id_is_remembered_as_soon_as_it_is_issued(rig):
+    """명령이 끝난 뒤에 남기면, 중지 직후에 접수된 안전복귀가 옛 값으로 번호를 되풀이한다(계약 6.2절)."""
+    rig.peers.hold_goal = SLIDE_POS_X
+    _handle, running = rig.send(rig.run_client, RunScan.Goal(request_id='run-1'))
+    assert rig.wait(lambda: len(rig.peers.goals) >= SLIDE_POS_X)
+    goal = rig.peers.goals[-1]
+
+    assert rig.node._last_motion_id[goal.scan_id] == goal.motion_id == SLIDE_POS_X
+
+    assert rig.stop().accepted
+    rig._result_of(running)
+    assert rig.home().success
+    assert rig.peers.goals[-1].motion_id == SLIDE_POS_X + 1
+
+
+def test_the_unrecorded_safe_return_is_remembered_even_after_a_later_home_adopts_the_scan(make_rig, rig):
+    """HOME #1: 기록을 못 읽어 기록 없이 복귀 → HOME #2: 기록에서 되돌렸지만 거절됨(미연결) → RESUME.
+
+    상태 기계는 이미 STOPPED 라서, 표시를 IDLE 에서만 보면 이 재시작이 접수돼 홈에서 중단 좌표로 곧장 움직인다.
+    """
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    fresh = restart(make_rig, rig)
+    store_for, calls = fresh.node._store_for, []
+
+    def fail_once(result_dir):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError('fake: disk not ready')
+        return store_for(result_dir)
+    fresh.node._store_for = fail_once
+    assert fresh.home().success                                   # #1: 기록 없이 복귀했다
+
+    fresh.peers.connected = False
+    assert fresh.wait(lambda: fresh.node.conditions().robot_connected is False)
+    refused = fresh.home()                                        # #2: 되돌린 뒤에 거절된다
+    assert refused.reason_code == Reason.ROBOT_DISCONNECTED
+    assert fresh.node.state_machine.phase is Phase.STOPPED
+    assert fresh.node.state_machine.snapshot().scan_id == stopped.scan_id
+    fresh.peers.connected = True
+    assert fresh.wait(lambda: fresh.node.conditions().robot_connected)
+
+    result = resume(fresh)
+
+    assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
+    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+
+
+def test_a_safe_return_with_nothing_to_record_does_not_change_the_refusal_code(rig):
+    """새 시스템(기록 없음)의 안전복귀는 기록할 작업이 확실히 없다. 재시작은 계약 5.3절대로 105 다."""
+    assert rig.home().success
+    assert rig.node._unrecorded_home is False
+    result = resume(rig)
+    assert result.reason_code == Reason.NO_RESUMABLE_SCAN and '기록이 없다' in result.detail
+
+
+def test_resume_waits_for_the_previous_command_to_finish_writing_its_record(rig):
+    """직전 명령이 STOPPED 를 발행하고 마지막 상태 기록을 쓰는 사이에 온 재시작. 옛 기록을 읽지 않는다."""
+    stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    rig.node._job = object()                     # 직전 명령이 아직 끝나지 않았다(_end_job 전)
+    result = resume(rig)
+    assert result.reason_code == Reason.BUSY and '마무리' in result.detail
+    assert rig.node.state_machine.phase is Phase.STOPPED and len(rig.peers.goals) == sent
+
+    rig.node._job = None
+    assert resume(rig).success

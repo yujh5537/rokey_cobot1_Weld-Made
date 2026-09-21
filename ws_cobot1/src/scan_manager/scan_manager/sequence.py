@@ -4,7 +4,7 @@
 
 - MotionPlanner: 파라미터 → ExecuteMotion goal 에 실을 값(MotionRequest). 방향 전환 3단계, 마무리 순서.
 - classify(): 모션 하나의 Result → 도달 / 측정 확보 / 중지 경로 / 실패(ReasonCode).
-- ScanRunner · run_home(): 순서를 돈다. 다른 노드와의 통신 · 기록 · 상태 기계는 Ports 뒤에 있다.
+- ScanRunner · ResumeRunner · run_home(): 순서를 돈다. 다른 노드와의 통신 · 기록 · 상태 기계는 Ports 뒤에 있다.
   노드는 Ports 를 구현하고, 테스트는 가짜 Ports 로 ROS 없이 순서를 검증한다.
 
 규칙
@@ -24,6 +24,7 @@ from typing import Optional, Tuple
 from .contract_enums import Direction
 from .contract_enums import MotionReason
 from .contract_enums import Operation
+from .contract_enums import Phase
 from .contract_enums import Reason
 from .result_store import TOP  # 측정 대상 '윗면'(record_attempt_failed 의 target). 모서리는 Direction
 from .state_machine import Signal
@@ -84,9 +85,15 @@ class MotionPlanner:
         재하강(OP_DESCEND)은 하지 않는다. 남은 틈은 다음 SLIDE 의 −z 목표 힘이 메운다.
         """
         lifted_z = stop_position[2] + self._p.lift_height_m
+        return (self.lift(stop_position),) + self.reapproach(lifted_z, first_contact_z)
+
+    def reapproach(self, lifted_z: float, first_contact_z: float):
+        """방향 전환의 ② · ③. 이미 올라가 있는 높이(lifted_z)에서 시작한다.
+
+        재시작은 ① 올림 뒤에 tare 를 하고 여기로 온다(무접촉에서 F₀ 를 다시 잡는다).
+        """
         origin_x, origin_y, _ = self._p.origin_position
         return (
-            self.lift(stop_position),
             self._move_to('to_origin_xy', (origin_x, origin_y, lifted_z), self._p.move_speed_mps),
             self._move_to(
                 'recontact', (origin_x, origin_y, first_contact_z + self._p.recontact_margin_m),
@@ -163,7 +170,7 @@ def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bo
 
     verdict = _classify_ended(request, result)
     if stop_requested and verdict.kind is not VerdictKind.FAILED:
-        # 중지와 동시에 도달 · 측정으로 끝난 모션. 중지가 우선이다(늦게 온 측정값 방침은 T26).
+        # 중지와 동시에 도달 · 측정으로 끝난 모션. 중지가 우선이고, 그 측정값은 기록하지 않는다(_measure).
         # 실패 사유(OVER_FORCE · ROBOT_ERROR · MAX_DISTANCE · TIMEOUT …)로 끝났으면 중지를 접수했어도
         # 실패다. STOPPED 로 보내면 그 사실이 가려지고 재시작 대상이 된다(병후 결정 2026-09-20).
         return MotionVerdict(
@@ -270,6 +277,13 @@ class Ports:
         """형상 계산 → result_store 원본 저장 → /scan/result 발행(7.4절)."""
         raise NotImplementedError
 
+    def republish_result(self) -> StepOutcome:
+        """이미 저장된 원본을 읽어 /scan/result 를 다시 발행한다. 다시 계산 · 저장하지 않는다.
+
+        결과를 쓴 직후 · GEOMETRY_DONE 전에 중지된 작업의 재시작이 쓴다(원본은 한 번만 쓴다).
+        """
+        raise NotImplementedError
+
     def fail(self, reason_code: int, detail: str, position: Optional[Position]):
         """실패를 로그에 남기고 FAILED 를 알린 뒤 기록한다(BRD 4.2.5: 원인 · 단계 · 위치)."""
         raise NotImplementedError
@@ -369,6 +383,8 @@ class _Runner:
                 target, Reason.TIMEOUT,
                 f'{request.label}: event_id={result.event_id} 인 ContactEvent 가 오지 않았다', result)
         if self._ports.stop_requested():
+            # 버린다(T26 결정). 정지 요청 뒤의 판정은 감속 중의 값일 수 있어 편향 보정의 속도 가정과 어긋나고,
+            # 재시작이 그 방향을 기준 원점에서 처음부터 다시 밀기 때문에 잃는 것이 없다.
             self._ports.log_info(
                 f'{request.label}: 중지 접수 뒤에 도착한 측정값은 기록하지 않는다(판정 좌표)',
                 event.position)
@@ -400,12 +416,7 @@ class ScanRunner(_Runner):
 
     def run(self) -> RunOutcome:
         try:
-            self._prepare()
-            first_contact_z = self._find_top()
-            for index, direction in enumerate(self._order):
-                if index:
-                    self._change_direction(first_contact_z)
-                self._find_edge(direction)
+            self._search()
             self._geometry()
         except _Stop:
             return self._finish_stop(during_final_homing=False)
@@ -421,9 +432,26 @@ class ScanRunner(_Runner):
             return self._finish_fail(failure, OutcomeKind.HOMING_FAILED)
         return RunOutcome(OutcomeKind.DONE)
 
+    def _search(self):
+        """윗면 1점 · 모서리 4점."""
+        self._prepare()
+        first_contact_z = self._find_top()
+        self._find_edges(self._order, first_contact_z)
+
+    def _find_edges(self, directions, first_contact_z: float):
+        """첫 방향은 팁이 윗면에 닿아 있는 자리에서 바로 민다. 다음 방향부터 방향 전환을 거친다."""
+        for index, direction in enumerate(directions):
+            if index:
+                self._change_direction(first_contact_z)
+            self._find_edge(direction)
+
     def _prepare(self):
         # tare 는 무접촉 · 정지 상태에서 한다. 그 자리가 측정을 시작할 기준 원점 상공이다.
         self._execute(self._plan.to_origin())
+        self._settle_and_tare()
+        self._notify(Signal.PREPARE_DONE)
+
+    def _settle_and_tare(self):
         self._check_stop()
         if not self._ports.wait_still():
             raise _Fail(Reason.ROBOT_MOVING, 'tare 전에 정지(connected && !moving)를 확인하지 못했다')
@@ -431,7 +459,6 @@ class ScanRunner(_Runner):
         tare = self._ports.tare()
         if not tare.success:
             raise _Fail(tare.reason_code or Reason.TARE_FAILED, f'tare: {tare.detail}')
-        self._notify(Signal.PREPARE_DONE)
 
     def _find_top(self) -> float:
         request = self._plan.descend()
@@ -452,9 +479,12 @@ class ScanRunner(_Runner):
         for request in self._plan.change_direction(self._position, first_contact_z):
             self._execute(request)
 
+    def _shape(self) -> StepOutcome:
+        return self._ports.compute_geometry()
+
     def _geometry(self):
         self._check_stop()
-        outcome = self._ports.compute_geometry()
+        outcome = self._shape()
         if not outcome.success:
             raise _Fail(outcome.reason_code or Reason.INVALID_SHAPE, outcome.detail)
         self._notify(Signal.GEOMETRY_DONE)
@@ -465,6 +495,104 @@ class ScanRunner(_Runner):
         self._execute(self._plan.lift(self._position, label='final_lift'))
         self._execute(self._plan.home())
         self._notify(Signal.HOMING_DONE)
+
+
+@dataclass(frozen=True)
+class ResumePlan:
+    """재시작이 이어 갈 지점. **기록(result_store)의 사실**로 만든다(resume.plan_resume). 메모리 값을 믿지 않는다.
+
+    phase · progress 는 상태 기계가 중지 때 들고 있던 값이고, confirmed · first_contact_z 는 기록의 측정값이다.
+    "기록 직후 · 통지 직전"에 중지되면 둘이 한 칸 어긋난다. 그때는 기록이 기준이다: 다시 재지 않고 통지만 한다.
+    """
+
+    phase: Phase                       # RESUME_READY 가 돌아갈 단계
+    progress: int                      # 상태 기계의 진행도(통지된 모서리 수)
+    confirmed: Tuple[Direction, ...]   # 기록에서 확정된 방향. 탐색 순서의 앞부분이어야 한다
+    first_contact_z: Optional[float]   # 기록의 윗면 판정 좌표 z(7.3절). None = 윗면이 아직 없다
+    position: Optional[Position]       # 중단 좌표 = 가장 최근 중지의 정지 좌표(Base)
+    result_saved: bool = False         # 원본이 이미 저장됐다. 다시 계산하지 않고 재발행한다
+
+    def __post_init__(self):
+        phase, behind = Phase(self.phase), len(self.confirmed) - self.progress
+        if phase not in (Phase.PREPARING, Phase.TOP_SEARCH, Phase.EDGE_SEARCH, Phase.GEOMETRY):
+            raise ValueError(f'{phase.name} 은 재개할 수 있는 단계가 아니다')
+        if self.first_contact_z is None:
+            if phase not in (Phase.PREPARING, Phase.TOP_SEARCH) or self.confirmed or self.progress:
+                raise ValueError(f'윗면이 없는데 {phase.name} {self.progress}/{len(self.confirmed)} 다')
+        elif phase is Phase.PREPARING:
+            raise ValueError('PREPARING 에서 중지됐는데 윗면이 확정돼 있다')
+        elif self.position is None:
+            raise ValueError('팁을 들어 올릴 중단 좌표가 없다')
+        if behind not in (0, 1) or (phase is Phase.TOP_SEARCH and behind):
+            raise ValueError(f'기록의 확정 방향 {len(self.confirmed)}개와 진행도 {self.progress} 가 맞지 않는다')
+        if phase is Phase.GEOMETRY and behind:
+            raise ValueError('GEOMETRY 에서 중지됐는데 통지되지 않은 모서리가 있다')
+        if self.result_saved and phase is not Phase.GEOMETRY:
+            raise ValueError(f'원본이 저장돼 있는데 {phase.name} 에서 중지됐다')
+
+
+class ResumeRunner(ScanRunner):
+    """중단된 작업을 잇는다: RESUMING(준비) → RESUME_READY → 중단됐던 단계 → … → GEOMETRY → HOMING → DONE.
+
+    RESUME 이 접수된 뒤(phase=RESUMING)에 run() 을 부른다. 확정된 윗면 · 방향에는 모션을 보내지 않는다.
+
+    준비는 방향 전환(7.3절)과 같은 절차다. 중지하면 팁이 윗면에 닿은 채 순응만 풀려 있을 수 있고
+    F₀ 는 작업 시작 때의 값이다. 그래서 떼고(올림) → 정지 확인 → tare → 기준 원점에서 다시 닿아 그 방향을 처음부터 민다.
+    중단한 x · y 로 돌아가지 않는다: 모서리를 막 넘은 자리에서 중지됐다면 허공에서 SLIDE 가 시작된다.
+    안전복귀(OP_HOME) · /robot/stop 은 부르지 않는다(마무리 복귀는 스캔의 일부다).
+    """
+
+    def __init__(self, planner, ports, direction_order, plan: ResumePlan, first_motion_id: int = 1):
+        super().__init__(planner, ports, direction_order, first_motion_id)
+        if tuple(plan.confirmed) != self._order[:len(plan.confirmed)]:
+            raise ValueError(f'확정된 방향 {plan.confirmed} 가 탐색 순서 {self._order} 의 앞부분이 아니다')
+        self._resume = plan
+        self._position = plan.position
+
+    def _search(self):
+        plan = self._resume
+        if plan.first_contact_z is None:
+            self._resume_before_top()
+            self._find_edges(self._order, self._find_top())
+            return
+
+        remaining = self._order[len(plan.confirmed):]
+        if remaining:
+            lift = self._plan.lift(plan.position, label='resume_lift')
+            self._execute(lift)
+            self._settle_and_tare()
+        self._notify(Signal.RESUME_READY)
+        self._catch_up()
+        if remaining:
+            # 올린 높이는 Result 가 아니라 보낸 목표에서 읽는다(방향 전환과 같다)
+            for request in self._plan.reapproach(lift.target_position[2], plan.first_contact_z):
+                self._execute(request)
+            self._find_edges(remaining, plan.first_contact_z)
+
+    def _resume_before_top(self):
+        if self._resume.phase is Phase.PREPARING:
+            self._notify(Signal.RESUME_READY)
+            self._prepare()
+            return
+        # 하강 중의 중지. 접촉과 겹쳤다면 팁이 윗면에 닿아 있을 수 있으므로 그 자리에서 tare 하지 않는다
+        self._execute(self._plan.to_origin())
+        self._settle_and_tare()
+        self._notify(Signal.RESUME_READY)
+
+    def _catch_up(self):
+        """기록에는 확정됐는데 상태 기계에 통지되지 않은 측정값. 다시 재지 않고 통지만 한다."""
+        plan = self._resume
+        if plan.phase is Phase.TOP_SEARCH:
+            self._ports.log_info('윗면은 기록에 확정돼 있다. 다시 재지 않는다')
+            self._notify(Signal.TOP_FOUND)
+        for direction in plan.confirmed[plan.progress:]:
+            self._ports.log_info(f'{direction.name} 모서리는 기록에 확정돼 있다. 다시 재지 않는다')
+            self._notify(Signal.EDGE_FOUND)
+
+    def _shape(self) -> StepOutcome:
+        if self._resume.result_saved:
+            return self._ports.republish_result()
+        return self._ports.compute_geometry()
 
 
 def run_home(planner: MotionPlanner, ports: Ports, first_motion_id: int = 1) -> RunOutcome:

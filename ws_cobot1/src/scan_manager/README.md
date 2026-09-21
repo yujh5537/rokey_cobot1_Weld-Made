@@ -8,7 +8,8 @@
 | `scan_manager/contract_enums.py` | `Phase` · `Direction` · `Reason` · `Operation` · `MotionReason`. 계약 3.4절 · 5.4절 · 6.1절 상수의 사본 | 쓰지 않음 |
 | `scan_manager/state_machine.py` | 이벤트 · 전이표 · `ScanStateMachine` | 쓰지 않음 |
 | `scan_manager/params.py` | 파라미터 이름 · 필수 여부 · 범위 검사, `ScanParams`. 모션 · 보정 수치에는 코드 예비값이 없다 | 쓰지 않음 |
-| `scan_manager/sequence.py` | 시퀀스: `MotionPlanner`(goal 값 · 방향 전환 3단계 · 마무리 순서), `classify`(모션 결과 → 도달 · 측정 · 중지 · 실패), `ScanRunner` · `run_home`(순서. 바깥일은 `Ports` 뒤에 둔다) | 쓰지 않음 |
+| `scan_manager/sequence.py` | 시퀀스: `MotionPlanner`(goal 값 · 방향 전환 3단계 · 마무리 순서), `classify`(모션 결과 → 도달 · 측정 · 중지 · 실패), `ScanRunner` · `ResumeRunner` · `run_home`(순서. 바깥일은 `Ports` 뒤에 둔다), `ResumePlan` | 쓰지 않음 |
+| `scan_manager/resume.py` | 재시작의 판단: 기록(result_store) → 상태 기계를 되돌릴 값(`restoration_from`), 이어 갈 계획 또는 거절(`plan_resume`) | 쓰지 않음 |
 | `scan_manager/event_matcher.py` | `ContactEvent` ↔ `ExecuteMotion.Result` 짝 맞추기(`motion_id` 대조, `event_id` 짝, 도착 순서 무관) | 쓰지 않음 |
 | `scan_manager/geometry_adapter.py` | Base → 작업대 좌표 평행 이동, `geometry_estimator` 호출, `BoxEstimate` → `ShapeResult` · `BiasCorrection`, `GEOM_*` → ReasonCode. `geometry_estimator`를 import하는 유일한 곳 | 쓰지 않음 |
 | `scan_manager/result_store/` | 진행 기록 · 결과 원본의 파일 보존(T20). [README](scan_manager/result_store/README.md) | 쓰지 않음 |
@@ -16,7 +17,7 @@
 | `scan_manager/conversions.py` | msg ↔ 순수 자료형: `ContactEvent` → `Detection`, `MotionRequest` → goal, `ShapeResult` → `ScanResult`(None → NaN + `*_valid=false`), `ScanConfig` ↔ 값 | msg 타입만 |
 | `scan_manager/scan_manager.py` | 노드. 서버 5개 · 구독 · 클라이언트 · `Ports` 구현 · 쓰기 스레드 · 종료 처리 | 씀 |
 
-T19a까지 들어 있다: 시퀀스 · 서버 · geometry 연결. **검증은 테스트 안에서 띄운 가짜 상대 노드(`test/fake_peers.py`)로만 했다.** 실제 contact_detector · robot_manager와의 sim 종단 구동과 SetConfig 전파(P01~P03)는 T19b, 재시작 로직은 T26이다.
+T19a(시퀀스 · 서버 · geometry 연결)와 T26(재시작)까지 들어 있다. **검증은 테스트 안에서 띄운 가짜 상대 노드(`test/fake_peers.py`)로만 했다.** 실제 contact_detector · robot_manager와의 sim 종단 구동과 SetConfig 전파(P01~P03)는 T19b다.
 
 ## 시퀀스 (`sequence.py`)
 기준은 계약 5.4 · 7.1 · 7.3 · 7.4절과 BRD 4.2.5 · 4.2.6이다.
@@ -42,7 +43,7 @@ T19a까지 들어 있다: 시퀀스 · 서버 · geometry 연결. **검증은 �
 | 서버 없음 · goal 응답 없음 / goal 거절 | 실패 `ROBOT_DISCONNECTED(104)` / `ROBOT_ERROR(204)` + "goal rejected"(ROS 2의 거절에는 사유가 없어 추측하지 않는다) |
 | `compliance_released=false` | 실패. Result의 코드, 없으면 `ROBOT_ERROR`. 계약 9장 TBD |
 | `REASON_STOP_REQUESTED` · `REASON_CANCELED` | `/scan/stop`을 접수했으면 중지 경로. 아니면(예: safety_monitor의 정지) 실패: 래치 중이면 `SafetyStatus.reason_code`, 아니면 `ROBOT_ERROR` |
-| 중지 접수 뒤에 도달 · 측정으로 끝남 | 중지 경로. 그때 도착한 측정값은 기록하지 않고 로그만 남긴다(방침은 T26) |
+| 중지 접수 뒤에 도달 · 측정으로 끝남 | 중지 경로. 그때 도착한 측정값은 **버린다**(기록하지 않고 INFO 로그만). 정지 요청 뒤의 판정은 감속 중의 값일 수 있어 편향 보정의 속도 가정과 어긋나고, 재시작이 그 방향을 기준 원점에서 처음부터 다시 밀기 때문에 잃는 것이 없다 |
 | 중지 접수 뒤에 **실패 사유**로 끝남(`OVER_FORCE` · `ROBOT_ERROR` · `MAX_DISTANCE` · `TIMEOUT` · 해제 실패 · goal 거절) | **실패(ERROR).** 중지를 접수했어도 사실을 가리지 않는다. STOPPED로 보내면 재시작 대상이 된다 |
 | `REASON_CONTACT`(DESCEND) · `REASON_EDGE`(SLIDE) | `event_id`의 이벤트를 `event_wait_timeout_s`까지 기다린다. 오지 않으면 **측정값 없이 통과시키지 않고** 실패 `TIMEOUT(203)`. `event_id=0`이면 `ROBOT_ERROR` |
 | `REASON_MAX_DISTANCE` | `NO_CONTACT(300)` / `NO_EDGE(301)` |
@@ -50,6 +51,43 @@ T19a까지 들어 있다: 시퀀스 · 서버 · geometry 연결. **검증은 �
 | `REASON_ROBOT_ERROR` · `REASON_REJECTED` | Result의 `reason_code` 그대로(`DROP_LIMIT(205)` 포함) |
 
 중지 경로: 정지 완료 확인(`Ports.wait_still`, 요청보다 뒤에 찍힌 `/robot/status`) → `record_stop` → `STOP_CONFIRMED`. 확인하지 못하면 `ROBOT_STATUS_LOST(404)`로 ERROR.
+중단 위치(`Interruption.pose`)는 **로봇이 마지막으로 멈춘 자리**다: 그 모션의 `Result.pose`, 보내지 않은 goal(중지가 먼저 접수됨)이면 그 앞 모션의 `Result.pose`, 재시작 뒤 모션을 하나도 보내지 않고 다시 중지됐으면 직전 중지의 좌표. `Result.pose`가 채워지지 않았으면 `null`이다(추측하지 않는다).
+
+## 재시작 (`resume.py` · `sequence.ResumeRunner`)
+기준은 계약 5.3 · 7.3 · 7.4절, BRD 4.4.8 · TR-08이다. `scan_id`를 유지하고, 확정된 윗면 · 방향은 **다시 재지 않는다**(모션을 보내지 않는다).
+
+**기록이 기준이다.** 측정값 · 첫 접촉 z · 중단 좌표 · 설정을 메모리에서 가져오지 않고 `progress.json`에서 읽는다. 그래서 같은 프로세스에서 중지한 경우와 프로세스가 재시작된 경우가 같은 길을 간다.
+- 측정값 캐시(형상 계산의 입력): 기록의 `detection`(판정 좌표) + 기록의 `config`에 있는 속도.
+- **설정은 그 작업의 기록(`config` · `node_params`)을 쓴다.** 중지 뒤의 SetConfig · yaml 변경은 다음 새 작업부터 적용된다(한 작업은 한 벌의 설정으로 끝나고 `ScanResult.config`가 실제와 같다). `result_dir`만 현재 파라미터다.
+- `motion_id`는 (메모리의 마지막 값, 기록의 `last_motion_id`) 중 큰 값 + 1부터 잇는다. 같은 `scan_id` 안에서 되풀이되지 않는다.
+- `started_at`은 원래 작업의 값이다. 그래서 `finished_at − started_at`에는 중지해 있던 시간이 들어간다(계약에 정의가 없다).
+
+**준비(`RESUMING`)는 방향 전환(7.3절)과 같은 절차다.** 중지하면 순응이 풀린 채 팁이 윗면에 닿아 있을 수 있고 F₀는 작업 시작 때의 값이다. 그래서 떼고(올림) → 정지 확인 → **tare** → 기준 원점의 x · y에서 첫 접촉 z + `recontact_margin_m`까지 저속 내림 → 그 방향을 **처음부터** 민다. 새 파라미터는 없다.
+중단한 x · y로 돌아가 이어 밀지 않는 이유: 모서리를 막 넘은 자리에서 중지됐다면(늦게 온 EDGE를 버린 경우가 그렇다) 허공에서 SLIDE가 시작돼 `DROP_LIMIT`이나 틀린 모서리가 나온다.
+
+| 기록의 상태 | `RESUMING`에서 | `RESUME_READY` 뒤 |
+|---|---|---|
+| PREPARING에서 중지 | 없음 | 기준점 → 정지 확인 → tare → 하강 → … (새 작업과 같다) |
+| TOP_SEARCH에서 중지, 윗면 미확정 | 기준점으로(`OP_MOVE_TO`) → 정지 확인 → tare. **그 자리에서 tare하지 않는다**(중지가 접촉과 겹쳤다면 팁이 닿아 있다) | 하강 → … |
+| 윗면 확정 · 방향이 남음 (SLIDE 중 · 방향 전환의 `OP_MOVE_TO` 중 · 아래의 "한 칸 어긋남") | 중단 좌표에서 `lift_height_m` 올림 → 정지 확인 → tare | 원점 x · y → 다시 닿기 → **확정되지 않은 첫 방향**부터 SLIDE → 이후 정상 흐름 |
+| 네 방향 확정 / GEOMETRY에서 중지 | 없음 | 원본(`result.json`)이 있으면 `load_result()`로 읽어 **새 `stamp`로 재발행**(다시 계산 · 저장하지 않는다), 없으면 기록의 측정값으로 계산 → 저장 → 발행. 그 뒤 HOMING → DONE |
+| 마무리 HOMING에서 중지 | — | 재시작 대상이 아니다(`NO_RESUMABLE_SCAN`, 7.4절) |
+
+- **한 칸 어긋남**: "측정값 기록 직후 · 상태 기계 통지 직전"에 중지되면 기록은 CONFIRMED인데 progress는 그대로다. 기록이 기준이므로 그 윗면 · 방향은 다시 재지 않고 `TOP_FOUND` · `EDGE_FOUND`만 통지한다(INFO 로그).
+- 재시작 도중의 중지는 새 `Interruption`으로 남고 다시 재시작할 수 있다. `RESUMING` 중의 중지는 재개 지점(단계 · 방향)을 바꾸지 않는다. 들어 올릴 좌표는 **가장 최근 중지**의 좌표다.
+- **올림은 언제나 "가장 최근 중지의 좌표 + `lift_height_m`"다.** 이미 올라가 있는 자리(준비의 tare · 수평 이동 · 다시 닿기 도중)에서 중지됐다면 그 위로 또 올린다. 공중에서의 중지 → 재시작을 되풀이하면 높이가 쌓이고, 끝내는 robot_manager가 목표를 거절해 ERROR가 된다. "이미 충분히 떠 있으면 올리지 않는다" 같은 높이 규칙은 새 판단 기준이라 넣지 않았다(재접근 절차의 팀 안건).
+- 재시작이 준비를 지나 측정 단계로 돌아가면(`RESUME_READY`) 그 재개 지점은 **소비된 것**이다. 그 뒤에 새 중지 없이 STOPPED가 됐다면(재시작 → DONE → 안전복귀 중 중지) 이을 것이 없다(`NO_RESUMABLE_SCAN`). 기록에서는 "`resumed_at`이 찍힌 중지 바로 뒤에 RESUMING 중지가 이어지지 않는다"로 읽는다(`resume.resume_point_consumed`).
+- 재시작의 모든 모션 전에도 안전 래치를 본다. 준비(올림 · tare)가 실패하면 ERROR이고 자동 복귀하지 않는다.
+- 재시작은 `/robot/stop` · 안전복귀를 부르지 않는다. 끝의 `OP_HOME`은 스캔의 마무리 복귀(7.4절)다. 응답 없는 goal에 대한 보호 정지(아래 "추적하지 못하는 모션을 남기지 않는다")는 새 작업과 똑같이 남아 있다.
+- `Resume.Result`는 `RunScan.Result`와 같은 규칙으로 채운다. 재시작이 중지로 끝나면 `/scan/result`(부분)를 다시 발행한다.
+
+**프로세스가 재시작된 뒤.** 노드는 IDLE로 뜬다. `/scan/home` · `/scan/resume`이 IDLE에서 오면, **가장 최근 작업의 기록(그 하나만 읽는다)이 STOPPED · ERROR로 끝나 있을 때** 상태 기계를 그 상태로 되돌린다(`ScanStateMachine.restore`: `scan_id` · progress · 재개 지점 · "중지 뒤 안전복귀 접수 여부" · 실패 사유). 그 뒤는 죽지 않은 프로세스와 같은 경로라서 판정이 갈리지 않는다(`test_resume.py`가 무작위 명령열로 확인한다).
+- 안전복귀도 되돌리는 이유: 재기동 뒤의 복귀가 그 작업의 기록에 남지 않으면 뒤따르는 재시작이 "복귀한 적 없음"으로 읽고 홈에서 중단 좌표로 곧장 움직인다. 되돌리지 못해도(디스크 오류 등) 복귀는 한다.
+- 기록이 **동작 중인 phase로 끝나 있으면**(작업 도중에 프로세스가 죽었다) 되돌리지 않는다. 중지 기록이 없어 로봇이 어디서 멈췄는지 모른다 → `NO_RESUMABLE_SCAN`. 가장 최근 작업이 DONE이거나 **그 기록을 읽을 수 없는 경우**도 같다(더 오래된 중단 작업으로 넘어가지 않는다. detail에 이유가 실린다).
+- **작업의 기록에 남기지 못한 안전복귀**(기록을 읽지 못해 어느 작업의 복귀인지 몰랐다 · `result_dir` 없음 · 쓰기 실패)가 있었으면, 다음 START까지 재시작을 `NOT_SUPPORTED`로 거절한다. 기록은 "복귀한 적 없음"인데 로봇은 홈에 있을 수 있다. IDLE일 때만 보지 않는다: 거절된 HOME도 기록에서 상태를 되돌려 IDLE을 벗어나게 한다. 기록할 작업이 **확실히 없던** 복귀(기록 없음 · 가장 최근 작업이 DONE)는 해당하지 않는다. 이 표시는 메모리에만 있다: 그 뒤에 프로세스가 또 재시작되면 알 수 없다(→ "알려진 한계"와 같은 뿌리다. 현재 좌표를 모른다).
+- 거절된 재시작은 `RESUMING`에 들어가지 않는다(판정 → 기록 읽기 → 계획을 **접수 전에** 끝낸다). 다만 위의 되돌림(IDLE → STOPPED · ERROR)은 거절과 무관하게 일어난다. 전이가 아니라 기록에 있는 사실이다.
+
+**알려진 한계.** scan_manager는 현재 TCP 좌표를 모른다(`/robot/sample`을 구독하지 않는다. 계약 2.1절. `RobotStatus`에는 pose가 없다). 그래서 **중지 뒤에 누가 조그 · 직접 교시로 로봇을 옮겼는지 알 수 없다.** 재시작의 첫 모션은 기록된 중단 좌표 기준의 절대 `OP_MOVE_TO`라서, 옮겨진 자리에서는 그 좌표 위로 직선 이동한다. 중지 뒤에 로봇을 손으로 옮겼다면 재시작하지 말고 안전복귀 → 새 작업으로 한다. 현재 좌표와 중단 좌표의 비교는 계약 변경이 필요해 T19b · 팀 안건으로 넘겼다.
 
 ## 실행 · 테스트
 ```bash
@@ -62,6 +100,7 @@ ros2 run scan_manager scan_manager             # 로봇 · 드라이버 연결 �
 ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽는다. 자체 노드만 뜬다
 ```
 **시뮬레이션 테스트**는 두 단계다. ① `test_node_scan.py`: 노드를 테스트 프로세스 안에 만들어 서버 · 실패 · 중지 경로와 운영 시나리오(설정 → 스캔 중 중지 → 안전복귀 → 새 스캔)를 본다. ② `test_sim_process.py`: **실제 `scan_manager` 프로세스에 bringup의 `sim.yaml`을 `--params-file`로 주고** 전체 스캔을 돌려, `main()`(executor · 종료 처리)과 yaml의 값(기준점 · `max_descend_m` · `max_slide_m` · `base_to_fixture` · `tip_radius_m`)이 가상 직육면체에서 실제로 동작하는지 본다. `sim.yaml`의 `detect_latency_s`는 TBD라 테스트 전용 임의값을 덮어쓴다. 가짜 상대 노드는 상자까지의 거리가 `max_distance`를 넘으면 `REASON_MAX_DISTANCE`로 끝낸다.
+재시작: `test_resume.py`(순수. 실제 `ResultStore` + 가짜 로봇으로 모든 측정 모션에서의 중지 → "프로세스 재시작" → 기록만으로 재개, `plan_resume`의 거절 전부, 죽지 않은 상태 기계와 되돌린 상태 기계의 판정 일치를 무작위 명령열로), `test_sequence.py`(재개 지점 표의 모든 행 · 확정된 방향에 모션이 나가지 않음 · `motion_id` 연속), `test_node_scan.py`(+x 중 중지 → 재시작 → z_top 유지, 단계별 중지, 중지 → 재시작 ×2, 상태 기계의 거절과 기록을 읽을 수 없는 경우 · `result_dir` 없음 · 기록하지 못한 안전복귀, 새 노드 인스턴스로 흉내 낸 재기동. **기록 내용에 따른 거절(중단 좌표 없음 · 설정 · 탐색 순서)과 "GEOMETRY에서 중지 · 원본 없음"은 순수 테스트에만 있다**), `test_sim_process.py`(+x 중 중지 → 같은 프로세스에서 재시작 / **프로세스를 SIGKILL로 죽이고 다시 띄운 뒤** 재시작 → `progress.json` · `result.json` 확인).
 두 테스트 모두 `ROS_DOMAIN_ID`를 따로 잡고 가짜 `/robot/execute_motion` · `/contact/tare` · `/robot/stop` 서버와 가짜 `/contact/event` · `/robot/status` · `/safety/status` 발행기를 같은 프로세스에 띄운다. 로봇 · 드라이버 · Virtual Mode를 쓰지 않는다.
 
 ## 파라미터
@@ -99,8 +138,8 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | 이름 | 처리 |
 |---|---|
 | `/scan/run` | 시작 조건(BUSY → 파라미터 → 래치 → 연결)을 확인하고 시퀀스를 돈다. **기록(`begin_scan`)이 디스크에 만들어진 것을 확인한 뒤에 첫 모션을 보낸다**(못 만들면 로봇을 움직이지 않고 ERROR). `scan_id`가 이미 있는 기록과 겹치면 다시 발급한다. Result는 DONE · ERROR · STOPPED에서 돌려준다. `success`는 명령 전체(마무리 복귀 포함), `result.success`는 측정의 성공 여부다 |
-| `/scan/home` | 휴지 phase에서만. `OP_HOME` 하나를 보낸다(경로 · 순서는 TBD). 안전 래치도, 측정 파라미터 누락도, **기록 실패(디스크 오류 등)도** 복귀를 막지 않는다(기록 실패는 ERROR 로그). 작업 기록이 있으면 `record_home_requested` · `record_home_finished`를 남긴다. `motion_timeout_s`가 없으면 거절된다(`real.yaml`은 TBD라 실기에서 먼저 채워야 한다) |
-| `/scan/resume` | **T26 전까지 `NOT_SUPPORTED(107)`.** 상태 기계에 묻지 않으므로 phase가 바뀌지 않는다 |
+| `/scan/home` | 휴지 phase에서만. `OP_HOME` 하나를 보낸다(경로 · 순서는 TBD). 안전 래치도, 측정 파라미터 누락도, **기록 실패(디스크 오류 등)도** 복귀를 막지 않는다(기록 실패는 ERROR 로그). 작업 기록이 있으면 `record_home_requested` · `record_home_finished`를 남긴다(프로세스가 재시작된 뒤에도. "재시작" 절). 측정값 · 중지 기록은 건드리지 않는다. **복귀가 실패해도 기록의 `failure`(작업이 실패한 원인)는 덮어쓰지 않는다**: 첫 실패가 남고, 복귀의 실패는 `home_return.completed=false`와 `/scan/log`에 남는다. `motion_timeout_s`가 없으면 거절된다(`real.yaml`은 TBD라 실기에서 먼저 채워야 한다) |
+| `/scan/resume` | 중단된 작업을 잇는다("재시작" 절). 판정 순서: `BUSY` → (IDLE이면 기록에서 되돌림) → 상태 기계의 판정(`NO_RESUMABLE_SCAN` · `NOT_SUPPORTED` · `SAFETY_LATCHED` · `ROBOT_DISCONNECTED`) → 기록으로 계획(아래 표). 재시작의 사실(`record_resume`)을 디스크에 남긴 뒤에 첫 모션을 보낸다(못 남기면 로봇을 움직이지 않고 ERROR) |
 | `/scan/stop` | `/robot/stop` 호출과 진행 중 goal cancel을 **함께** 보내고 접수를 바로 돌려준다. 정지 완료 확인 · 중단 위치 기록 · `STOP_CONFIRMED`는 시퀀스 스레드가 한다. **홈 복귀 · 재시작을 부르지 않는다.** 멈출 작업이 없어도 `/robot/stop`은 보낸다(멱등). `/robot/stop`의 응답은 기다리지 않되, 접수되지 않았으면 WARN 로그를 남긴다. START · HOME의 접수와 겹치지 않게 명령 접수 락을 쥐고 처리하고, 시퀀스는 goal을 보내기 직전에 작업 락 안에서 중지를 한 번 더 본다(중지 접수 뒤에 goal이 나가지 않는다) |
 | `/scan/set_config` | 동작 중이면 `BUSY`, 범위 밖이면 `INVALID_VALUE`(같이 온 정상값도 적용하지 않는다). `*_set`인 항목만 적용. 전파는 T19b |
 
@@ -114,7 +153,7 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 | `/scan/result` | 작업 종료 시 1회. 정상이면 GEOMETRY 끝(복귀를 기다리지 않는다, `finished_at`도 그 시각). 실패 · 중단이면 확보한 값만 유효하고 나머지는 `NaN` + `*_valid=false`(좌표는 작업대 프레임). 거절된 명령의 `RunScan.Result.result`도 전부 `NaN`이다. `stamp`는 발행할 때마다 새로 찍는다(mqtt_bridge의 중복 제거 키). 마무리 복귀가 실패해도 다시 발행하지 않는다 |
 | `/scan/log` | 시작 · 측정 확정 · 무시한 이벤트 · 거절 · 실패(원인 · 단계 · 위치) · 중지. 좌표가 판정 좌표인지 정지 좌표인지 message에 적는다. `pose`는 원본(`ContactEvent.pose` · `ExecuteMotion.Result.pose`)을 자세까지 그대로 싣고, `Result.pose`가 채워지지 않았으면(`pose_stamp=0`. 계약에 유효 플래그가 없어 이렇게 읽는다) 정지 좌표로 쓰지 않으며, 관련 좌표가 없으면 위치 · 자세 모두 `NaN` + `pose_valid=false`다 |
 
-`result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작(T26)이 끝까지 간 뒤에 쓸 자리를 남겨 둔다.
+`result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작이 끝까지 간 뒤에 쓸 자리를 남겨 둔다. 원본을 쓴 직후에 중지된 작업의 재시작은 그 파일을 읽어 재발행한다.
 
 ## executor · 스레드
 `MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 넷이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버, 클라이언트(Reentrant). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
@@ -122,6 +161,7 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 시퀀스는 `/scan/run`의 execute 콜백 안에서 돌며 executor 스레드 하나를 차지한다. 교착이 없는 이유:
 - 시퀀스 스레드는 **락을 쥔 채 기다리지 않는다.** 상대 노드의 응답은 `add_done_callback`이 세우는 `threading.Event`로 기다리고, 콜백 안에서 spin하지 않는다. 그 완료 콜백 · 구독 · `/scan/stop`은 다른 그룹이라 남은 스레드에서 돈다.
 - 상태 기계의 `on_change`(락 안)는 발행과 쓰기 큐 투입만 한다. 디스크 쓰기 · 서비스 호출 · 대기가 없어서 `/scan/stop`의 `request(STOP)`이 디스크를 기다리지 않는다.
+- 명령 접수 락 안에서는 쓰기 스레드를 기다리지 않는다. 다만 HOME · RESUME의 접수는 그 락 안에서 **기록 파일 한두 개를 읽는다**(가장 최근 기록 · 이을 작업의 기록). 그동안 온 `/scan/stop`은 읽기가 끝날 때까지 기다린다. 이 구간은 휴지 phase라 scan_manager가 보낸 모션이 없다. 재시작의 쓰기 큐 대기는 락을 잡기 **전에** 한다.
 - 락의 순서는 한 방향이다: (명령 접수 락 →) 작업 락 → 상태 기계 락 → 발행 락. 주기 발행은 상태 기계 락을 놓은 뒤에 발행 락을 잡는다.
 - `/scan/stop` 콜백은 아무것도 기다리지 않는다(`call_async` · `cancel_goal_async`).
 - 상태 전이(`notify`)는 작업 락 안에서 한다. `/scan/stop`이 "접수 직전의 Snapshot"을 뜨고 STOP을 요청하는 사이에 전이가 끼지 않아 중단 기록이 실제와 같다.
@@ -232,11 +272,26 @@ stateDiagram-v2
 | 중지 뒤에 안전복귀(`HOME`)를 접수했다(끝까지 갔는지와 무관, 5.3절) | `NOT_SUPPORTED` |
 | ERROR(이상 상태별 재시작 허용 조건이 TBD, 9장) | `NOT_SUPPORTED` |
 
+상태 기계 밖의 거절. "직전 명령을 마무리하는 중"(`BUSY`) · "기록에 남기지 못한 안전복귀" · (IDLE일 때) `result_dir` 검사는 상태 기계의 판정 **앞**에서, 나머지는 상태 기계가 받을 수 있다고 한 작업의 기록을 읽은 뒤에 한다(`ScanManager._begin_resume` · `resume.plan_resume`):
+
+| 상황 | 사유 |
+|---|---|
+| 팁을 들어 올려야 하는데(윗면 확정 뒤) 중단 좌표가 기록에 없다(`Result.pose` 미기재) | `NO_RESUMABLE_SCAN` |
+| 그 작업의 기록이 없다 · 읽을 수 없다 · STOPPED가 아니다 · 이미 재시작한 중지뿐이다 · 재개 지점이 소비됐다 · 확정 방향이 탐색 순서의 앞부분이 아니다 · 기록된 좌표의 `frame_id`가 `motion_frame_id`와 다르다 | `NO_RESUMABLE_SCAN` |
+| 기록에 남기지 못한 안전복귀가 있었다(다음 START까지) | `NOT_SUPPORTED` |
+| 직전 명령이 휴지 phase를 발행했지만 아직 끝나지 않았다(마지막 상태 기록을 쓰는 중) | `BUSY` |
+| 기록의 설정(`config` · `node_params`)이 지금의 파라미터 검사를 통과하지 못한다 · 기록의 탐색 순서가 이 노드의 `direction_order`와 다르다 · (IDLE인데) `result_dir`이 없다 | `INVALID_VALUE`(102) |
+
+프로세스가 재시작된 뒤에는 `restore()`로 되돌린 상태 기계가 위의 105 · 107을 그대로 낸다. 되돌리지 않은 경우(기록 없음 · 더 새 작업 · 동작 중인 phase로 끝난 기록)는 IDLE이므로 `NO_RESUMABLE_SCAN`이고 detail에 이유가 실린다.
+
+`sm.check(Command.X, ...)`는 `request()`가 내릴 판정만 돌려주고 상태를 바꾸지 않는다. `sm.restore(...)`는 입력(Command · Signal)이 아니다. IDLE에서만, STOPPED · ERROR로만 되돌리며 전이표를 거치지 않는다.
+
 ### 세 명령은 독립이다
 - `STOP`은 STOPPING으로만 간다. STOPPING에서 갈 수 있는 곳은 STOPPED(`STOP_CONFIRMED`)와 ERROR(`FAILED`)뿐이다.
 - STOPPED를 떠나는 Signal은 없다. 관제자의 `START` · `HOME` · `RESUME`만 STOPPED를 떠나게 한다.
 - 실패(ERROR)도 자동으로 홈 복귀하지 않는다.
 - 이 세 가지는 `test/test_commands.py`가 전이표 수준에서 고정한다.
+- 재시작은 STOP · HOME을 부르지 않고, STOP · HOME은 재시작을 부르지 않는다(`test_node_scan.py`). 재시작 **안의** 마무리 HOMING은 스캔의 일부다(7.4절).
 
 ### 상태 필드
 | 필드 | 규칙 |

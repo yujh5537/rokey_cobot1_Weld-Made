@@ -14,6 +14,8 @@ from scan_manager.sequence import MotionPlanner
 from scan_manager.sequence import MotionRequest
 from scan_manager.sequence import MotionResult
 from scan_manager.sequence import OutcomeKind
+from scan_manager.sequence import ResumePlan
+from scan_manager.sequence import ResumeRunner
 from scan_manager.sequence import run_home
 from scan_manager.sequence import ScanRunner
 from scan_manager.sequence import StepOutcome
@@ -455,3 +457,259 @@ def test_planner_uses_parameters_only(params):
 def test_motion_id_must_start_at_one_or_above(ports, params):
     with pytest.raises(ValueError):
         ScanRunner(MotionPlanner(params), ports, params.direction_order, first_motion_id=0)
+
+
+# ---- 재시작 (T26) ----
+# 준비는 방향 전환(7.3절)과 같은 절차다: 올림 → 정지 확인 → tare → 기준 원점에서 다시 닿기 → 그 방향을 처음부터.
+
+NORMAL_LABELS = ['to_origin', 'descend', 'slide_POS_X']
+for _direction in ORDER[1:]:
+    NORMAL_LABELS += CHANGE + [f'slide_{_direction.name}']
+MEASURING = len(NORMAL_LABELS)            # 여기까지가 측정. 그 뒤는 마무리 복귀
+NORMAL_LABELS += ['final_lift', 'home']
+RESUME_APPROACH = ['resume_lift', 'to_origin_xy', 'recontact']
+
+
+def resume(ports, params):
+    plan = ports.resume()
+    first = max(motion_id for motion_id, _ in ports.requests) + 1 if ports.requests else 1
+    return ResumeRunner(
+        MotionPlanner(params), ports, params.direction_order, plan, first_motion_id=first).run()
+
+
+def stopped_at(ports, params, n):
+    ports.stop_at_request = n
+    assert run(ports, params).kind is OutcomeKind.STOPPED
+    assert ports.sm.phase is Phase.STOPPED
+
+
+def assert_box_recovered(ports):
+    shape = ports.geometry.shape
+    assert shape.success
+    assert (shape.width, shape.length, shape.height) == pytest.approx(BOX_SIZE, abs=1e-9)
+
+
+def test_resume_after_stop_in_the_first_slide_keeps_the_top_and_continues(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    top_before, stop_position = ports.top, ports.stop_record[0]
+
+    outcome = resume(ports, params)
+
+    assert outcome.kind is OutcomeKind.DONE and ports.sm.phase is Phase.DONE
+    assert ports.top is top_before                        # 윗면은 다시 재지 않는다(BRD TR-08)
+    assert ports.labels_since_resume() == (
+        RESUME_APPROACH + NORMAL_LABELS[NORMAL_LABELS.index('slide_POS_X'):])
+    lift = ports.requests[ports.resumed_at_request][1]
+    assert lift.target_position == pytest.approx(
+        (stop_position[0], stop_position[1], stop_position[2] + params.lift_height_m))
+    assert_box_recovered(ports)
+
+
+def test_resume_preparation_lifts_then_confirms_still_then_tares_before_it_is_ready(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    mark = len(ports.trace)
+    resume(ports, params)
+    head = ports.trace[mark:mark + 5]
+    assert head == [
+        ('execute', 'resume_lift'), ('wait_still',), ('tare',),
+        ('notify', Signal.RESUME_READY), ('execute', 'to_origin_xy')]
+
+
+@pytest.mark.parametrize('n', range(1, MEASURING + 1))
+def test_resume_from_every_measuring_motion_finishes_without_measuring_twice(ports, params, n):
+    stopped_at(ports, params, n)
+    top_before, edges_before = ports.top, dict(ports.edges)
+
+    outcome = resume(ports, params)
+
+    assert outcome.kind is OutcomeKind.DONE
+    since = ports.labels_since_resume()
+    assert ('descend' in since) == (top_before is None)
+    for direction in ORDER:                               # 확정된 방향에는 모션이 한 번도 나가지 않는다
+        assert (f'slide_{direction.name}' in since) == (direction not in edges_before)
+    assert ports.top is top_before or top_before is None
+    assert all(ports.edges[d] is edges_before[d] for d in edges_before)
+    assert since[-2:] == ['final_lift', 'home'] and 'home' not in since[:-1]
+    ids = [motion_id for motion_id, _ in ports.requests]
+    assert ids == list(range(1, len(ids) + 1))            # 같은 scan 안에서 되풀이되지 않는다
+    assert_box_recovered(ports)
+
+
+def test_resume_from_preparing_starts_over_from_the_origin(ports, params):
+    stopped_at(ports, params, 1)
+    mark = len(ports.trace)
+    resume(ports, params)
+    assert ports.trace[mark] == ('notify', Signal.RESUME_READY)   # 준비할 것이 없다. PREPARING 이 기준점 · tare 를 한다
+    assert ports.labels_since_resume()[:2] == ['to_origin', 'descend']
+
+
+def test_resume_from_the_descent_goes_back_up_and_tares_in_the_air(ports, params):
+    stopped_at(ports, params, 2)
+    mark = len(ports.trace)
+    resume(ports, params)
+    assert ports.trace[mark:mark + 5] == [
+        ('execute', 'to_origin'), ('wait_still',), ('tare',),
+        ('notify', Signal.RESUME_READY), ('execute', 'descend')]
+
+
+@pytest.mark.parametrize('label', CHANGE)
+def test_resume_from_a_direction_change_redoes_it_from_where_the_robot_is(ports, params, label):
+    stopped_at(ports, params, NORMAL_LABELS.index(label) + 1)
+    assert set(ports.edges) == {Direction.POS_X}
+    resume(ports, params)
+    assert ports.labels_since_resume()[:4] == RESUME_APPROACH + ['slide_NEG_X']
+
+
+@pytest.mark.parametrize('signal, n, phase, progress', [
+    (Signal.TOP_FOUND, 1, Phase.TOP_SEARCH, 0),
+    (Signal.EDGE_FOUND, 1, Phase.EDGE_SEARCH, 0),
+    (Signal.EDGE_FOUND, 3, Phase.EDGE_SEARCH, 2),
+])
+def test_measurement_recorded_but_not_notified_is_not_measured_again(
+        ports, params, signal, n, phase, progress):
+    ports.stop_before_notify = (signal, n)
+    assert run(ports, params).kind is OutcomeKind.STOPPED
+    assert (ports.resume_point.phase, ports.resume_point.progress) == (phase, progress)
+    top_before, edges_before = ports.top, dict(ports.edges)
+    assert len(edges_before) == (0 if signal is Signal.TOP_FOUND else progress + 1)   # 기록이 한 칸 앞서 있다
+
+    assert resume(ports, params).kind is OutcomeKind.DONE
+
+    since = ports.labels_since_resume()
+    assert 'descend' not in since and ports.top is top_before
+    assert all(f'slide_{d.name}' not in since for d in edges_before)
+    assert all(ports.edges[d] is edges_before[d] for d in edges_before)
+    assert any('기록에 확정돼 있다' in message for message in ports.infos)
+    assert_box_recovered(ports)
+
+
+def test_last_edge_recorded_but_not_notified_goes_straight_to_geometry(ports, params):
+    ports.stop_before_notify = (Signal.EDGE_FOUND, 4)
+    run(ports, params)
+    assert resume(ports, params).kind is OutcomeKind.DONE
+    assert ports.labels_since_resume() == ['final_lift', 'home']
+    assert_box_recovered(ports)
+
+
+def test_result_saved_before_the_stop_is_republished_not_recomputed(ports, params):
+    ports.stop_before_notify = Signal.GEOMETRY_DONE
+    run(ports, params)
+    assert ports.resume_point.phase is Phase.GEOMETRY and ports.geometry is not None
+    computed = ports.trace.count(('compute_geometry',))
+
+    assert resume(ports, params).kind is OutcomeKind.DONE
+
+    assert ports.republished == 1 and ports.trace.count(('compute_geometry',)) == computed
+    assert ports.labels_since_resume() == ['final_lift', 'home']
+
+
+def test_stop_in_geometry_before_the_result_exists_computes_it_from_the_kept_measurements(ports, params):
+    ports.stop_after_notify = (Signal.EDGE_FOUND, 4)          # GEOMETRY 에 들어선 직후 · 계산 전
+    assert run(ports, params).kind is OutcomeKind.STOPPED
+    assert ports.resume_point.phase is Phase.GEOMETRY and ports.geometry is None
+    edges_before = dict(ports.edges)
+
+    assert resume(ports, params).kind is OutcomeKind.DONE
+
+    assert ports.trace.count(('compute_geometry',)) == 1 and ports.republished == 0
+    assert ports.labels_since_resume() == ['final_lift', 'home']
+    assert all(ports.edges[d] is edges_before[d] for d in edges_before)
+    assert_box_recovered(ports)
+
+
+def test_stop_during_resume_preparation_can_be_resumed_again(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_NEG_X') + 1)
+    plan = ports.resume()
+    ports.stop_during = 'resume_lift'
+    first = len(ports.requests) + 1
+    outcome = ResumeRunner(
+        MotionPlanner(params), ports, params.direction_order, plan, first_motion_id=first).run()
+    assert outcome.kind is OutcomeKind.STOPPED and ports.sm.phase is Phase.STOPPED
+    assert ports.resume_point.phase is Phase.EDGE_SEARCH      # RESUMING 중의 중지는 재개 지점을 바꾸지 않는다
+    assert ports.labels()[-1] == 'resume_lift'                # 중지 뒤에 모션을 보내지 않는다
+
+    assert resume(ports, params).kind is OutcomeKind.DONE
+    assert 'slide_POS_X' not in ports.labels_since_resume()
+    assert_box_recovered(ports)
+
+
+def test_stop_before_the_first_resume_motion_keeps_the_known_stop_position(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    stop_position = ports.stop_record[0]
+    plan = ports.resume()
+    ports.request_stop()
+    sent = len(ports.requests)
+
+    outcome = ResumeRunner(
+        MotionPlanner(params), ports, params.direction_order, plan, first_motion_id=sent + 1).run()
+
+    assert outcome.kind is OutcomeKind.STOPPED and len(ports.requests) == sent
+    assert ports.stop_record[0] == stop_position              # 로봇은 움직이지 않았다
+
+
+def test_stop_then_resume_twice_in_different_directions(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    ports.stop_at_request = None
+    plan = ports.resume()
+    ports.stop_during = 'slide_POS_Y'
+    first = len(ports.requests) + 1
+    outcome = ResumeRunner(
+        MotionPlanner(params), ports, params.direction_order, plan, first_motion_id=first).run()
+    assert outcome.kind is OutcomeKind.STOPPED
+    assert (ports.resume_point.phase, ports.resume_point.progress) == (Phase.EDGE_SEARCH, 2)
+
+    assert resume(ports, params).kind is OutcomeKind.DONE
+    assert ports.labels_since_resume()[:4] == RESUME_APPROACH + ['slide_POS_Y']
+    assert_box_recovered(ports)
+
+
+def test_latch_blocks_the_first_resume_motion(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    plan = ports.resume()
+    ports.safety_code = 400
+    sent = len(ports.requests)
+    outcome = ResumeRunner(
+        MotionPlanner(params), ports, params.direction_order, plan, first_motion_id=sent + 1).run()
+    assert (outcome.kind, outcome.reason_code) == (OutcomeKind.FAILED, 400)
+    assert len(ports.requests) == sent and ports.sm.phase is Phase.ERROR
+
+
+def test_resume_preparation_failure_is_an_error_and_never_returns_home(ports, params):
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    ports.tare_outcome = StepOutcome(False, int(Reason.TARE_UNSTABLE), 'fake')
+    outcome = resume(ports, params)
+    assert (outcome.kind, outcome.reason_code) == (OutcomeKind.FAILED, Reason.TARE_UNSTABLE)
+    assert ports.sm.phase is Phase.ERROR and ports.labels_since_resume() == ['resume_lift']
+
+
+def test_stop_during_final_homing_is_not_resumable(ports, params):
+    stopped_at(ports, params, MEASURING + 1)
+    assert ports.stop_record[2] is True
+    outcome = ports.sm.request(Command.RESUME, conditions=READY)
+    assert not outcome.accepted and outcome.reason is Reason.NO_RESUMABLE_SCAN
+
+
+@pytest.mark.parametrize('fields', [
+    {'phase': Phase.HOMING},
+    {'phase': Phase.EDGE_SEARCH, 'first_contact_z': None},
+    {'phase': Phase.PREPARING, 'first_contact_z': 0.04, 'position': (0.4, 0.0, 0.04)},
+    {'first_contact_z': 0.04, 'position': None},
+    {'first_contact_z': 0.04, 'confirmed': ORDER[:3], 'progress': 1},
+    {'first_contact_z': 0.04, 'confirmed': (), 'progress': 1},
+    {'phase': Phase.GEOMETRY, 'first_contact_z': 0.04, 'confirmed': ORDER, 'progress': 3},
+    {'first_contact_z': 0.04, 'result_saved': True},
+])
+def test_resume_plan_rejects_facts_that_contradict_each_other(fields):
+    base = {
+        'phase': Phase.EDGE_SEARCH, 'progress': 0, 'confirmed': (), 'first_contact_z': None,
+        'position': (0.41, 0.0, 0.04)}
+    with pytest.raises(ValueError):
+        ResumePlan(**{**base, **fields})
+
+
+def test_confirmed_directions_must_be_the_head_of_the_search_order(ports, params):
+    plan = ResumePlan(
+        phase=Phase.EDGE_SEARCH, progress=1, confirmed=(Direction.NEG_X,), first_contact_z=0.04,
+        position=(0.41, 0.0, 0.04))
+    with pytest.raises(ValueError):
+        ResumeRunner(MotionPlanner(params), ports, params.direction_order, plan)

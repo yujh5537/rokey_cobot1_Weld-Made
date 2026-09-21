@@ -672,7 +672,7 @@ class FailureRecord:
 
 @dataclass
 class ScanRecord:
-    """작업 1건의 진행 기록. 판단은 담지 않고 사실만 담는다(재시작 허용 판단은 T26)."""
+    """작업 1건의 진행 기록. 판단은 담지 않고 사실만 담는다(재시작 허용 판단은 scan_manager/resume.py)."""
 
     scan_id: str
     started_at: Stamp

@@ -70,6 +70,7 @@ class FakePeers(Node):
         self.model = {name: (model or VALUES)[name] for name in MODEL_KEYS}
         group = ReentrantCallbackGroup()
         self.behavior = {}             # key(op, dir) → 위의 상수
+        self.hold_goal = None          # n 번째로 수락한 goal 을 HOLD 로 돌린다(같은 operation 이 여러 번 나올 때)
         self.connected = True
         self.latched = False
         self.safety_code = 0
@@ -199,6 +200,8 @@ class FakePeers(Node):
     def _run(self, goal):
         R = ExecuteMotion.Result
         behavior = self.behavior.get(key(goal.operation, goal.direction), NORMAL)
+        if self.hold_goal == len(self.goals):
+            behavior = HOLD
         if behavior == NO_POSE:
             result = self._result(R.REASON_ROBOT_ERROR, 204, detail='fake: pose unknown')
             result.pose, result.frame_id = type(result.pose)(), ''
