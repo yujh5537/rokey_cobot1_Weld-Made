@@ -67,6 +67,7 @@ class Motion:
         self.compliance_on = False
         self.force_on = False
         self.event = None               # 정지 사유가 된 ContactEvent
+        self.stop_at_accept = None      # 수락 시점에 남아 있던 /robot/stop 요청 (OP_HOME 전용, #115)
 
 
 class RobotManager(Node):
@@ -377,13 +378,18 @@ class RobotManager(Node):
                 self.get_logger().warn(f'goal 거절 ({problem}): motion_id={goal_request.motion_id}')
                 return GoalResponse.REJECT
             self.motion = Motion(goal_request, self.now_s())
+            # 수락 시점에 남아 있던 정지 요청. OP_HOME 은 이것만 정리하고 출발한다(run_motion).
+            # 수락 뒤에 새로 온 요청은 여기 없으므로 watch 가 HOME 을 멈춘다
+            self.motion.stop_at_accept = self.stop_requested
         return GoalResponse.ACCEPT
 
     def reject_reason(self, goal):
         op = goal.operation
-        if self.stop_requested is not None:
+        if self.stop_requested is not None and op != RobotSample.OP_HOME:
             # robot_manager 가 마지막 방어선이다. 래치는 SafetyStatus 로 늦게 전달돼 scan_manager 에만
-            # 기대기 어렵다. 요청은 정지가 확인되면 지워지므로 영구 거절이 되지 않는다
+            # 기대기 어렵다. 요청은 정지가 확인되면 지워지므로 영구 거절이 되지 않는다.
+            # 안전복귀(OP_HOME)는 거절하지 않는다. 관제자가 직접 누른 명령이고, 시연 중 안전복귀가
+            # 막히면 안 된다(#115). 출발 전에 정지를 한 번 더 시도한다(run_motion)
             return 'STOP_REQUESTED: 처리되지 않은 정지 요청이 있다. 정지를 먼저 확인한다'
         if op == RobotSample.OP_NONE or op > RobotSample.OP_HOME:
             return f'INVALID_VALUE: operation={op}'
@@ -450,6 +456,18 @@ class RobotManager(Node):
     def run_motion(self, goal_handle, motion):
         """명령을 보내고 끝날 때까지 지켜본다. (reason, reason_code, detail)."""
         goal = motion.goal
+        leftover = motion.stop_at_accept
+        if goal.operation == RobotSample.OP_HOME and leftover is not None:
+            # 정지 확인에 실패해 남은 요청이 있는 채로 안전복귀를 받았다(#115). 안 비우면 watch 의
+            # 첫 확인에서 HOME 이 곧바로 멈춘다. 정지를 한 번 더 시도하고, 수락 시점의 그 요청만
+            # 지운다(그 뒤에 온 새 요청은 남겨 watch 가 HOME 을 멈추게 한다)
+            stopped, why = self.stop_robot(f'안전복귀 전 정지 재확인 ({leftover[1]})')
+            if stopped:
+                self.get_logger().info('안전복귀 전 정지를 확인했다. 남은 정지 요청을 지우고 출발한다')
+            else:
+                self.get_logger().error(
+                    f'안전복귀 전에도 정지를 확인하지 못했다({why}). 관제자 명령이므로 그대로 출발한다')
+            self.clear_stop_request(leftover)
         if goal.operation == RobotSample.OP_SLIDE and motion.start_z is None:
             # 기준 z 를 모르면 1차 하강 제한(계약 7.2)이 감시 없이 도는 것과 같다. reject_reason
             # 에서 한 번 걸리지만 수락과 실행 사이에 샘플이 끊길 수 있어 여기서도 막는다.
@@ -548,9 +566,9 @@ class RobotManager(Node):
                 stopped, why = self.stop_robot(f'정지 요청 ({detail})')
                 if not stopped:   # 접수했다고 멈춘 것이 아니다 (계약 4.1)
                     # 확인 못 했으니 되돌려 놓는다. 동작 없음 경로(stop_idle)와 같은 약속이다:
-                    # 멈췄는지 모르는 로봇에 다음 goal(HOME 포함)을 보내지 않는다 (#113).
-                    # finally 의 settle_leftover_stop_request 가 한 번 더 확인하고, 그래도 안 되면
-                    # /robot/stop 을 다시 불러야 풀린다(README)
+                    # 멈췄는지 모르는 로봇에 다음 goal 을 보내지 않는다 (#113). 안전복귀(OP_HOME)만은
+                    # 받는다(#115). finally 의 settle_leftover_stop_request 가 한 번 더 확인하고, 그래도
+                    # 안 되면 안전복귀 또는 /robot/stop 재호출로 풀린다(README)
                     self.restore_stop_request(request)
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'정지 요청 ({detail}). {why}')
