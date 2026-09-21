@@ -591,3 +591,152 @@ def test_stop_request_arriving_during_home_still_stops_it(ros, monkeypatch):
         assert handle.state == 'aborted'
     finally:
         node.destroy_node()
+
+
+# ---- T14: 순응 · 힘 제어는 모든 종료 경로에서 해제된다 (BRD 4.5.2, CLAUDE.md 규칙 2) ----
+
+def _slide_goal():
+    from contact_scan_interfaces.action import ExecuteMotion
+    return ExecuteMotion.Goal(motion_id=9, operation=RobotSample.OP_SLIDE,
+                              direction=ExecuteMotion.Goal.DIR_POS_X, max_distance=0.06, speed=0.005)
+
+
+def _slide_rig(monkeypatch, fail=()):
+    """SLIDE 를 드라이버 없이 돌린다. 불린 두산 서비스 이름을 순서대로 남긴다.
+
+    fail: 실패(또는 응답 시간 초과)로 돌려줄 호출 이름. call_sync 는 둘을 구분하지 않는다.
+    """
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    node.connected = True
+    node.last_pose = (None, None, (0.42, -0.19, 0.18))
+    node.last_force = (0.0, 0.0, 2.0)
+    calls = []
+
+    def fake_call_sync(client, request, label):
+        calls.append(label)
+        return label not in fail
+    monkeypatch.setattr(node, 'call_sync', fake_call_sync)
+    monkeypatch.setattr(node, 'send_move', lambda motion: calls.append('move_line') or True)
+    goal = _slide_goal()
+    node.motion = Motion(goal, node.now_s())
+    return node, goal, calls
+
+
+def _released(calls):
+    return 'release_force' in calls and 'release_compliance_ctrl' in calls
+
+
+def _raise(exc):
+    raise exc
+
+
+@pytest.mark.parametrize('ending', [
+    'exception', 'cancel', 'stop_request', 'event', 'timeout', 'drop_limit', 'edge'])
+def test_force_control_is_released_on_every_exit_path(ros, monkeypatch, ending):
+    """켠 순응 · 힘 제어는 끝나는 방식과 무관하게 해제한다. 예외 주입을 포함한다 (BRD 4.5.2)."""
+    from contact_scan_interfaces.action import ExecuteMotion
+    from contact_scan_interfaces.msg import ContactEvent
+
+    node, goal, calls = _slide_rig(monkeypatch)
+    try:
+        monkeypatch.setattr(node, 'stop_robot', lambda why: (True, ''))
+        handle = FakeGoalHandle(goal)
+        if ending == 'exception':
+            monkeypatch.setattr(node, 'watch', lambda gh, m: _raise(RuntimeError('주입한 예외')))
+        elif ending == 'cancel':
+            handle.is_cancel_requested = True
+        elif ending == 'stop_request':
+            _stop(node, '안전 이상')
+        elif ending == 'event':
+            event = ContactEvent()
+            event.type = ContactEvent.TYPE_EDGE
+            node.motion.event = event
+        elif ending == 'timeout':
+            node.motion.started_s -= 1000.0
+        elif ending == 'drop_limit':
+            def move_then_drop(motion):                         # 기준 z(0.18)는 시작 때 잡힌다
+                calls.append('move_line')
+                node.last_pose = (None, None, (0.42, -0.19, 0.17))  # 밀기 중 10 mm 내려감
+                return True
+            monkeypatch.setattr(node, 'send_move', move_then_drop)
+        elif ending == 'edge':
+            monkeypatch.setattr(node, 'watch', lambda gh, m: (
+                ExecuteMotion.Result.REASON_EDGE, ReasonCode.OK, ''))
+
+        result = node.execute_motion(handle)
+
+        R = ExecuteMotion.Result
+        expected = {'exception': R.REASON_ROBOT_ERROR, 'cancel': R.REASON_CANCELED,
+                    'stop_request': R.REASON_STOP_REQUESTED, 'event': R.REASON_EDGE,
+                    'timeout': R.REASON_TIMEOUT, 'drop_limit': R.REASON_ROBOT_ERROR,
+                    'edge': R.REASON_EDGE}[ending]
+        assert result.reason == expected, f'{ending}: 다른 경로로 끝났다 reason={result.reason}'
+        if ending == 'drop_limit':
+            assert result.reason_code == ReasonCode.DROP_LIMIT
+        assert _released(calls), f'{ending}: 해제를 부르지 않았다 {calls}'
+        assert calls.index('release_force') < calls.index('release_compliance_ctrl')   # 힘 먼저
+        assert result.compliance_released is True
+        assert node.motion is None                                 # 다음 goal 을 받을 수 있다
+        assert not node.compliance_active and not node.force_ctrl_active
+    finally:
+        node.destroy_node()
+
+
+@pytest.mark.parametrize('timed_out', ['task_compliance_ctrl', 'set_desired_force'])
+def test_enable_that_times_out_is_still_released(ros, monkeypatch, timed_out):
+    """켜는 호출이 시간 초과여도 컨트롤러는 켰을 수 있다. 해제를 부른다.
+
+    이전에는 성공 응답을 받은 뒤에만 해제 대상으로 표시해, 응답이 늦으면 켜진 채 남았다.
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node, goal, calls = _slide_rig(monkeypatch, fail=(timed_out,))
+    try:
+        result = node.execute_motion(FakeGoalHandle(goal))
+        assert result.reason == ExecuteMotion.Result.REASON_ROBOT_ERROR
+        assert 'release_compliance_ctrl' in calls
+        if timed_out == 'set_desired_force':
+            assert 'release_force' in calls
+        assert 'move_line' not in calls                      # 켜지 못했으면 움직이지 않는다
+    finally:
+        node.destroy_node()
+
+
+def test_release_that_fails_is_reported_not_hidden(ros, monkeypatch):
+    """해제 호출이 실패하면 compliance_released=false 로 사실대로 알린다. 성공으로 적지 않는다."""
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node, goal, calls = _slide_rig(monkeypatch, fail=('release_compliance_ctrl',))
+    try:
+        monkeypatch.setattr(node, 'watch', lambda gh, m: (
+            ExecuteMotion.Result.REASON_EDGE, ReasonCode.OK, ''))
+        result = node.execute_motion(FakeGoalHandle(goal))
+        assert result.compliance_released is False
+        assert node.compliance_active is True              # 해제됐다고 기록하지 않는다
+        assert node.motion is None
+    finally:
+        node.destroy_node()
+
+
+def test_descend_never_touches_force_control(ros, monkeypatch):
+    """힘 제어를 켜지 않는 동작에서 해제를 부르지 않는다. 불필요한 호출이 줄을 막지 않게 한다."""
+    from contact_scan_interfaces.action import ExecuteMotion
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        node.connected = True
+        calls = []
+        monkeypatch.setattr(node, 'call_sync', lambda c, r, label: calls.append(label) or True)
+        monkeypatch.setattr(node, 'send_move', lambda motion: True)
+        monkeypatch.setattr(node, 'watch', lambda gh, m: (
+            ExecuteMotion.Result.REASON_CONTACT, ReasonCode.OK, ''))
+        goal = _descend_goal()
+        node.motion = Motion(goal, node.now_s())
+        result = node.execute_motion(FakeGoalHandle(goal))
+        assert result.compliance_released is True
+        assert not any(label.startswith(('release', 'task_compliance', 'set_desired')) for label in calls)
+    finally:
+        node.destroy_node()

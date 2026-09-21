@@ -523,17 +523,21 @@ class RobotManager(Node):
                 f'SLIDE 시작: DR_FC_MOD_REL 기준선 Fz={fz:.2f} N '
                 f'(|F|={math.dist(baseline, (0.0, 0.0, 0.0)):.2f} N). '
                 f'목표 {float(self.param("slide_target_force_n")):.2f} N 은 여기에 더해진다')
+        # 켜는 호출을 보내기 **전에** 해제 대상으로 표시한다. call_sync 는 응답 시간 초과도 False 로
+        # 돌려주는데, 그때 컨트롤러는 이미 켰을 수 있다. 성공 응답을 받은 뒤에만 표시하면 release_all 이
+        # 해제를 부르지 않아 순응 · 힘 제어가 켜진 채 남는다(CLAUDE.md 규칙 2, T14). 켜지지 않았는데
+        # 해제를 부르다 실패하면 compliance_released=false 로 보고된다 — 모르면 해제됐다고 하지 않는다
+        motion.compliance_on = self.compliance_active = True
         if not self.call_sync(
                 self.srv_clients['compliance_on'],
                 dsr_client.compliance_on_request(list(self.param('compliance_stiffness'))),
                 'task_compliance_ctrl'):
             return False
-        motion.compliance_on = self.compliance_active = True
+        motion.force_on = self.force_ctrl_active = True
         if not self.call_sync(self.srv_clients['force_on'],
                               dsr_client.force_on_request(float(self.param('slide_target_force_n'))),
                               'set_desired_force'):
             return False
-        motion.force_on = self.force_ctrl_active = True
         return True
 
     def watch(self, goal_handle, motion):

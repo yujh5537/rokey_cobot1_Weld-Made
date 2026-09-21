@@ -60,6 +60,9 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 - **취소**: 취소 접수와 실제 정지 완료는 다르다. `move_stop` 뒤 `moving` 이 false 가 될 때까지 기다린 다음 결과를 돌려준다.
 - **SLIDE 하강 제한**: 첫 샘플 z 기준으로 `drop_limit_m` 를 넘으면 정지하고 `DROP_LIMIT`(205) 로 끝낸다(계약 7.2 1차 감시).
 - **순응 · 힘 제어는 `finally` 에서 해제**한다. 해제 호출이 실패하면 `compliance_released=false` 로 사실대로 보고한다
+  - **켜는 호출을 보내기 전에** 해제 대상으로 표시한다. 켜는 호출이 응답 시간 초과여도 컨트롤러는 이미 켰을 수 있어서다. 켜지 않은 것을 해제하다 실패하면 `compliance_released=false` 가 된다(모르면 해제됐다고 하지 않는다)
+  - 해제 순서는 힘 제어(`release_force`) → 순응 제어(`release_compliance_ctrl`)
+  - 시험(`test_node.py`, T14): 예외 주입 · 취소 · 정지 요청 · 이벤트 · 시간 초과 · 하강 제한 · 정상 종료 7경로에서 해제, 켜기 시간 초과 2경우, 해제 실패 보고, 힘 제어를 안 쓰는 동작은 해제 호출 없음
   (실패 경로는 계약에서 TBD다. 성공한 것으로 적지 않는다).
 - `OP_HOME` 의 목적지는 관절각(`home_joint_deg`)이다. 계약 5.4 는 `home_pose` 라고 적었지만, T03 이 홈을
   관절각으로 확정했고 `OP_HOME` 은 movej 로 간다(`units-frames.md`). 계약 이름이 아닌 파라미터라 바꿔도 된다.
