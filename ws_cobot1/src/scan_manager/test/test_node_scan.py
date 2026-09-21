@@ -450,8 +450,16 @@ def test_coordinates_in_another_frame_are_not_used(rig, behavior, code):
         assert 'frame_id' in result.detail and rig.operations() == [Operation.MOVE_TO]
 
 
-def test_goal_accepted_too_late_is_stopped_not_left_running(rig):
-    rig.peers.slow_accept[int(Operation.DESCEND)] = 3 * VALUES['server_wait_timeout_s']
+# 이 시험만 server_wait_timeout_s 가 지나는 것 자체를 본다. 기본값(2.0 s)으로는 가짜의 지연도 그만큼
+# 길어져 시험이 느려지므로 이 rig 만 짧게 둔다. 부하가 걸려도 둘이 뒤집히지 않게 지연을 한도의 5 배로 준다.
+LATE_ACCEPT_TIMEOUT_S = 0.5
+LATE_ACCEPT_DELAY_S = 5 * LATE_ACCEPT_TIMEOUT_S
+
+
+def test_goal_accepted_too_late_is_stopped_not_left_running(make_rig):
+    rig = make_rig(server_wait_timeout_s=LATE_ACCEPT_TIMEOUT_S)
+    rig.wait_ready()
+    rig.peers.slow_accept[int(Operation.DESCEND)] = LATE_ACCEPT_DELAY_S
     rig.peers.behavior[F.key(Operation.DESCEND)] = F.HOLD      # 늦게 수락된 하강은 누가 멈추기 전까지 돈다
 
     result = rig.run()
