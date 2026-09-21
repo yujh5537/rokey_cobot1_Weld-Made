@@ -8,7 +8,8 @@
 - 상태 기계의 on_change(락 안)에서는 /scan/state 발행과 쓰기 큐 투입만 한다. 디스크 쓰기는 전용 스레드 1개가 한다.
 - 재시작(/scan/resume)은 기록(result_store)을 읽어 중단됐던 단계부터 잇는다. 판단은 resume.py, 순서는 sequence.ResumeRunner.
   프로세스가 재시작된 뒤에는 HOME · RESUME 이 올 때 기록의 휴지 상태(STOPPED · ERROR)를 상태 기계에 되돌린다.
-- SetConfig 전파(P01~P03)는 여기 없다(T19b).
+- SetConfig 를 수락하면 다른 노드의 파라미터를 이름으로 갱신한다(계약 2.4 P01~P03). 무엇을 어디로 보내고
+  부분 실패를 어떻게 알리는지는 propagation.py, 서비스 호출만 이 파일이 한다.
 
 executor 구성과 교착이 없는 이유는 README.md 에 있다.
 """
@@ -38,6 +39,11 @@ from contact_scan_interfaces.srv import TareForce
 from contact_scan_qos import QOS_EVENT
 from contact_scan_qos import QOS_LOG
 from contact_scan_qos import QOS_STATE
+from rcl_interfaces.msg import Parameter as ParameterMsg
+from rcl_interfaces.msg import ParameterType
+from rcl_interfaces.msg import ParameterValue
+from rcl_interfaces.srv import GetParameters
+from rcl_interfaces.srv import SetParameters
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.action import ActionServer
@@ -52,6 +58,7 @@ from rclpy.parameter import Parameter
 
 from . import conversions
 from . import params as scan_params
+from . import propagation
 from . import resume as scan_resume
 from .contract_enums import Direction
 from .contract_enums import MotionReason
@@ -90,11 +97,18 @@ from .state_machine import Snapshot
 # 설계 출발값. 실제 값은 contact_scan_bringup/config/*.yaml 에 둔다.
 DEFAULT_STATE_PUBLISH_PERIOD_S = 1.0
 
-# 아래 둘은 구조에서 나오는 값이지 튜닝 값이 아니다.
-# 동시에 막힐 수 있는 콜백: 시퀀스(execute) 1 + 거절로 바로 끝나는 goal 1 + 구독 1 + Service 1.
-MIN_EXECUTOR_THREADS = 4
+# 아래 셋은 구조에서 나오는 값이지 튜닝 값이 아니다.
+# 동시에 막힐 수 있는 콜백: 시퀀스(execute) 1 + 거절로 바로 끝나는 goal 1 + 구독 1 + /scan/stop 1
+#   + 전파를 기다리는 /scan/set_config 1 + 기동 뒤 되읽기 타이머 1. 상대가 꺼져 있을 때 뒤의 둘이
+#   몇 초씩 스레드를 차지하므로, 그동안에도 응답을 받을 스레드가 남아야 한다.
+MIN_EXECUTOR_THREADS = 6
+# 기동 뒤 되읽기를 **executor 가 돌기 시작한 다음에** 한 번 돌리기 위한 타이머 주기.
+# 상대 노드를 찾을 때까지 기다리는 것은 이 값이 아니라 server_wait_timeout_s 다(_read_peers).
+STARTUP_READ_DELAY_S = 0.5
 # 기다리는 동안 종료 요청을 들여다보는 간격(s). 기다림의 한도는 전부 파라미터다.
 _WAIT_SLICE_S = 0.1
+# ScanConfig.debounce_n 이 uint8 이라는 사실. 메시지 정의에서 나오는 값이다.
+_UINT8_MAX = 255
 # 종료할 때 실행 중인 콜백이 빠져나오기를 기다리는 한도(s). 넘으면 그대로 끝낸다.
 _SHUTDOWN_GRACE_S = 5.0
 
@@ -117,6 +131,22 @@ def to_msg(snapshot: Snapshot, stamp) -> ScanState:
 def new_scan_id() -> str:
     """계약 6.2절. **벽시계**로 발급한다(result_store 가 사전순을 "가장 최근"으로 쓴다)."""
     return f'{datetime.now():%Y%m%d-%H%M%S}-{random.randrange(10000):04d}'
+
+
+def _parameter_value(item) -> ParameterValue:
+    """propagation.Item → rcl_interfaces ParameterValue. 상대 노드가 선언한 형과 맞아야 수락된다."""
+    if item.integer:
+        return ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=int(item.value))
+    return ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=float(item.value))
+
+
+def _plain_value(value: ParameterValue):
+    """GetParameters 의 한 칸 → 파이썬 값. 선언만 되고 값이 없는 칸(NOT_SET)은 None 이다."""
+    if value.type == ParameterType.PARAMETER_DOUBLE:
+        return value.double_value
+    if value.type == ParameterType.PARAMETER_INTEGER:
+        return value.integer_value
+    return None
 
 
 class _Closing(Exception):
@@ -162,7 +192,13 @@ class ScanManager(Node):
         self._closing = threading.Event()
         self._job = None
         self._job_lock = threading.Lock()
+        # 설정 락. SetConfig 의 접수 · 전파 · 되읽기 전체와 START 의 설정 확정을 서로 배제한다.
+        # 락 순서는 _config_lock → _job_lock 이다. /scan/stop 은 _job_lock 만 잡으므로
+        # 전파가 몇 초 걸려도 정지 요청은 기다리지 않는다(규칙 3: 정지는 독립된 명령이다).
+        self._config_lock = threading.Lock()
         self._config = {name: None for name, _flag in CONFIG_FIELDS}  # SetConfig 로 받은 값
+        # 다른 노드에서 **읽어 온** 실제 값. {노드: {파라미터 이름: 값}}. 읽지 못한 칸은 없다(0 을 넣지 않는다).
+        self._peer_config = {}
         self._last_motion_id = {}                                     # scan_id → 마지막 motion_id
         # 작업의 기록에 남기지 못한 안전복귀가 있었다(기록을 읽지 못해 어느 작업인지 몰랐다 · 쓰기 실패).
         # 다음 START 까지 재시작을 받지 않는다: 기록은 "복귀한 적 없음"인데 로봇은 홈에 있을 수 있다.
@@ -203,6 +239,18 @@ class ScanManager(Node):
         self._tare_client = self.create_client(TareForce, '/contact/tare', callback_group=clients)
         self._robot_stop_client = self.create_client(
             StopRobot, '/robot/stop', callback_group=clients)
+        # 전파(계약 2.4 P01~P03). 표준 인터페이스라 자체 정의가 없다. clients 그룹에 둔다 —
+        # 서비스 콜백(services, MutuallyExclusive)이 응답을 기다려도 다른 스레드가 응답을 처리한다.
+        self._param_clients = {
+            node: (
+                self.create_client(
+                    SetParameters, f'/{node}/set_parameters', callback_group=clients),
+                self.create_client(
+                    GetParameters, f'/{node}/get_parameters', callback_group=clients))
+            for node, _items in propagation.TARGETS}
+        # 기동 뒤 1회 되읽기용. 기다리는 동안 상태 발행 타이머가 멈추지 않게 전용 그룹에 둔다.
+        self._startup_group = MutuallyExclusiveCallbackGroup()
+        self._startup_read_timer = None
         self._action_servers = [
             ActionServer(
                 self, action_type, name, execute_callback=execute, callback_group=actions,
@@ -215,8 +263,11 @@ class ScanManager(Node):
                 (Resume, '/scan/resume', self._execute_resume),
             )]
         self.create_service(StopScan, '/scan/stop', self._on_stop, callback_group=services)
+        # 전파(P01~P03)는 상대 노드의 응답을 기다린다. services 와 같은 그룹에 두면 그동안
+        # /scan/stop 이 아예 돌지 못한다. 그래서 SetConfig 만 따로 둔다.
         self.create_service(
-            SetConfig, '/scan/set_config', self._on_set_config, callback_group=services)
+            SetConfig, '/scan/set_config', self._on_set_config,
+            callback_group=MutuallyExclusiveCallbackGroup())
 
         self._state_timer = self.create_timer(period, self._publish_state_periodic)
         self._on_change(self.state_machine.snapshot())
@@ -227,6 +278,21 @@ class ScanManager(Node):
         self.get_logger().info(
             'scan_manager 준비: /scan/run · /scan/home · /scan/resume · /scan/stop · /scan/set_config'
             + (f' (지금 값으로는 START 를 거절한다. {missing})' if missing else ''))
+        # 다른 노드의 계약 파라미터를 1회 읽어 둔다. 기다리면 executor 가 아직 안 도니 응답이 오지 않는다 —
+        # 한 번만 도는 타이머에 맡긴다. 못 읽어도 START 는 막지 않는다(그때 다시 읽는다).
+        self._startup_read_timer = self.create_timer(
+            STARTUP_READ_DELAY_S, self._read_peers_once, callback_group=self._startup_group)
+
+    def _read_peers_once(self):
+        if self._startup_read_timer is not None:
+            self._startup_read_timer.cancel()
+        try:
+            with self._config_lock:   # SetConfig 의 되읽기가 쓴 값을 옛 값으로 되덮지 않는다
+                self._refresh_peers('기동 뒤 되읽기')
+        except _Closing:
+            pass                      # 종료 중이다. 알릴 것이 없다
+        except Exception as exc:      # 되읽기 실패로 노드가 죽지 않게 한다. START 직전에 다시 읽는다
+            self.get_logger().warn(f'기동 뒤 되읽기 실패: {exc!r}')
 
     # ---- 발행 ----
 
@@ -399,21 +465,117 @@ class ScanManager(Node):
         return values
 
     def _effective_config(self, override=None) -> dict:
-        """ScanConfig 12개의 현재 값: yaml ← SetConfig ← override. 모르는 값은 None 이다.
+        """ScanConfig 12개의 현재 값. 모르는 값은 None 이다(0 을 채우지 않는다. 규칙 4).
 
-        scan_manager 가 아는 것은 자기 모션 6개뿐이다. 다른 노드의 6개는 SetConfig 로 받은 것만 안다
-        (전파 P01~P03 은 T19b). 모르는 값을 0 으로 채우지 않는다.
+        - 자기 모션 6개: yaml ← SetConfig ← override.
+        - 다른 노드 6개: **그 노드에서 읽어 온 실제 값**(`_peer_config`). 요청값이 아니다 — 전파가 거절됐거나
+          읽지 못했으면 None 으로 둔다. 같은 값이어야 하는 쌍이 어긋나 있으면 대표값이 없으므로 None 이다
+          (propagation.applied_from_readback).
         """
         config = {name: None for name, _flag in CONFIG_FIELDS}
+        config.update(propagation.applied_from_readback(self._peer_config))
         for name in scan_params.MOTION_CONFIG_NAMES:
             config[name] = self.get_parameter_or(name).value
         for source in (self._config, override or {}):
-            # 다른 노드 몫 6개는 받아서 보관만 한다(self._config). 그 노드에 전파하기 전에는 실제로 적용된 값이
-            # 아니므로 applied · ScanResult.config · 기록에 싣지 않는다(웹이 안전 임계값이 바뀐 것으로 읽는다).
             config.update({
                 k: v for k, v in source.items()
                 if v is not None and k in scan_params.MOTION_CONFIG_NAMES})
         return config
+
+    # ---- 전파 (계약 2.4 P01~P03) ----
+
+    def _peer_timeout(self):
+        """상대 노드를 기다리는 한도. 없으면 None 이다(기다리지 않는다. CLAUDE.md 규칙 7: 예비값 없음)."""
+        value = self.get_parameter_or('server_wait_timeout_s').value
+        return value if isinstance(value, (int, float)) and value > 0 else None
+
+    def _wait_for_peer(self, client, timeout_s) -> bool:
+        """서버가 뜰 때까지 기다린다. rclpy 의 wait_for_service 와 달리 **종료 요청을 본다.**"""
+        return self._wait(client.service_is_ready, timeout_s, time.sleep)
+
+    def _propagate(self, plans) -> dict:
+        """계획을 순서대로 보낸다. {노드: propagation.NodeResult}.
+
+        보내는 순서는 propagation.TARGETS 가 정한다(감시 쪽 먼저). 실패한 노드가 있어도 **되돌리지 않고**
+        남은 노드를 계속 보낸다 — 중간에 멈추면 어긋난 조합이 더 늘어난다.
+        한 노드를 기다리는 한도는 server_wait_timeout_s 다. 응답을 받는 것은 clients 그룹의 다른 스레드다.
+        """
+        timeout_s = self._peer_timeout()
+        if timeout_s is None:
+            return {
+                node_plan.node: propagation.NodeResult(
+                    node_plan.node, False,
+                    'server_wait_timeout_s 가 없어 상대를 기다릴 한도를 모른다. yaml 을 확인한다')
+                for node_plan in plans}
+        results = {}
+        for node_plan in plans:
+            client = self._param_clients[node_plan.node][0]
+            if not self._wait_for_peer(client, timeout_s):
+                results[node_plan.node] = propagation.NodeResult(
+                    node_plan.node, False, f'/{node_plan.node}/set_parameters 가 없다(미기동)')
+                continue
+            request = SetParameters.Request(parameters=[
+                ParameterMsg(name=item.param_name, value=_parameter_value(item))
+                for item in node_plan.items])
+            future = client.call_async(request)
+            if not self.wait_future(future, timeout_s):
+                results[node_plan.node] = propagation.NodeResult(
+                    node_plan.node, False, f'{timeout_s:.1f} s 안에 응답이 없다')
+                continue
+            refused = [
+                f'{item.param_name}: {result.reason or "거절"}'
+                for item, result in zip(node_plan.items, future.result().results)
+                if not result.successful]
+            results[node_plan.node] = propagation.NodeResult(
+                node_plan.node, not refused, '; '.join(refused))
+        return results
+
+    def _read_peers(self) -> dict:
+        """세 노드에서 계약 파라미터를 읽어 {노드: {이름: 값}} 으로. 읽지 못한 칸은 넣지 않는다.
+
+        전파한 적이 없어도 그 노드의 yaml 값이 **실제 값**이다. 그것을 읽어야 applied · ScanResult.config 의
+        빈칸이 사실로 찬다. 읽지 못하면 그 칸은 NaN + *_set=false 로 남는다(측정은 그 값 없이도 된다).
+        """
+        timeout_s = self._peer_timeout()
+        if timeout_s is None:
+            return {}   # 기다릴 한도를 모른다. 못 읽은 것으로 둔다(START 는 필수값 검사에서 걸린다)
+        readback = {}
+        for node, _items in propagation.TARGETS:
+            names = propagation.read_names(node)
+            client = self._param_clients[node][1]
+            if not self._wait_for_peer(client, timeout_s):
+                continue
+            future = client.call_async(GetParameters.Request(names=list(names)))
+            if not self.wait_future(future, timeout_s):
+                continue
+            values = future.result().values
+            readback[node] = {
+                name: value
+                for name, value in zip(names, (_plain_value(v) for v in values))
+                if value is not None and self._reportable(node, name, value)}
+        return readback
+
+    def _reportable(self, node, name, value) -> bool:
+        """ScanConfig 에 실을 수 있는 값인가. 실을 수 없으면 "못 읽음"으로 두고 알린다.
+
+        debounce_n 은 uint8 이라 0~255 밖의 값은 메시지에 담기지 않는다(담으려 하면 예외가 난다).
+        그 노드에 그런 값이 들어가 있으면 응답을 잃는 대신 그 칸만 비운다.
+        """
+        if name not in propagation.INTEGER_CONFIG or 0 <= value <= _UINT8_MAX:
+            return True
+        self.get_logger().warn(
+            f'{node}.{name} = {value} 는 ScanConfig 의 uint8 범위 밖이다. 그 칸을 비운다')
+        return False
+
+    def _refresh_peers(self, why) -> dict:
+        """_read_peers 를 돌려 _peer_config 를 갱신한다. 못 읽은 칸은 WARN 으로만 알린다."""
+        self._peer_config = self._read_peers()
+        missing = propagation.unread_names(self._peer_config)
+        if missing:
+            self.get_logger().warn(
+                f'{why}: 다른 노드의 값을 읽지 못했다 ({", ".join(missing)}). '
+                'ScanConfig 의 그 칸은 NaN + *_set=false 로 남는다')
+        return self._peer_config
 
     def _store_for(self, result_dir) -> ResultStore:
         if self._store is None or self._store_dir != result_dir:
@@ -498,7 +660,29 @@ class ScanManager(Node):
         return result
 
     def _begin_run(self, request):
-        """START 를 접수한다. 거절이면 (reason_code, detail), 접수면 _Job."""
+        """START 를 접수한다. 거절이면 (reason_code, detail), 접수면 _Job.
+
+        _config_lock 을 먼저 잡는다: 전파가 도는 중이면 끝난 값으로 시작한다(반쯤 전파된 값으로 재지 않는다).
+        락 순서는 _config_lock → _job_lock 으로 고정이다(SetConfig 와 같다).
+
+        **다른 노드를 기다리는 되읽기는 _job_lock 을 잡기 전에 끝낸다.** /scan/stop 은 _job_lock 만
+        잡으므로, 상대 노드가 꺼져 있어 되읽기가 몇 초 걸려도 정지는 그동안 계속 받는다(규칙 3).
+        """
+        if self.state_machine.is_busy:
+            # 값싼 거절을 되읽기보다 앞에 둔다(락 없이 본다. 접수는 _accept_run 이 락 안에서 다시 판정한다)
+            return Reason.BUSY, f'phase={self.state_machine.phase.name}'
+        with self._config_lock:
+            # 전파한 적이 없어도 그 노드의 yaml 값이 실제 값이다. 기록의 config 를 사실로 채운다.
+            self._refresh_peers('START 직전 되읽기')
+            mismatches = propagation.pair_mismatches(self._peer_config)
+            if mismatches:
+                # 1차 감시와 2차 감시가 다른 값을 들고 있다(계약 7.2). 이 상태로 시작하면 2차가 먼저
+                # 걸려 래치부터 난다. 읽지 못한 칸은 어긋남으로 보지 않는다(모른다고 막지 않는다).
+                return Reason.PARAM_SET_FAILED, propagation.mismatch_detail(mismatches)
+            return self._accept_run(request)
+
+    def _accept_run(self, request):
+        """_begin_run 의 뒷부분. _config_lock 을 쥔 채 부른다. 여기서는 아무것도 기다리지 않는다."""
         with self._job_lock:
             if self.state_machine.is_busy:
                 return Reason.BUSY, f'phase={self.state_machine.phase.name}'
@@ -693,6 +877,20 @@ class ScanManager(Node):
             self._write(lambda: None)
         except _Closing:
             return scan_resume.Refusal(Reason.CANCELED, 'scan_manager 종료')
+        if machine.is_busy:
+            return scan_resume.Refusal(Reason.BUSY, f'phase={machine.phase.name}')
+        with self._config_lock:
+            # 재시작도 로봇을 다시 움직인다. 1차 감시와 2차 감시가 다른 값을 들고 있으면 시작하지 않는다
+            # (계약 7.2). START 와 같은 규칙이다. 되읽기는 _job_lock 을 잡기 전에 끝낸다(규칙 3).
+            self._refresh_peers('RESUME 직전 되읽기')
+            mismatches = propagation.pair_mismatches(self._peer_config)
+            if mismatches:
+                return scan_resume.Refusal(
+                    Reason.PARAM_SET_FAILED, propagation.mismatch_detail(mismatches))
+            return self._accept_resume(request, machine)
+
+    def _accept_resume(self, request, machine):
+        """_begin_resume 의 뒷부분. _config_lock 을 쥔 채 부른다. 여기서는 아무것도 기다리지 않는다."""
         with self._job_lock:
             if machine.is_busy:
                 return scan_resume.Refusal(Reason.BUSY, f'phase={machine.phase.name}')
@@ -853,24 +1051,60 @@ class ScanManager(Node):
     # ---- /scan/set_config ----
 
     def _on_set_config(self, request, response):
+        """자기 값 6개를 적용하고, 나머지 6개를 세 노드에 전파한다(계약 2.4 · 4.3).
+
+        락: 전체를 _config_lock 으로 감싼다(START 의 설정 확정과 서로 배제). 작업 락(_job_lock)은
+        접수 판정과 자기 값 반영에만 짧게 잡는다 — 전파를 기다리는 동안 /scan/stop 이 막히지 않게 한다.
+        상대 노드가 꺼져 있으면 START 가 server_wait_timeout_s x 노드 수만큼 늦어진다(정지는 아니다).
+
+        **교착은 없다.** 이 콜백은 자기 전용 MutuallyExclusive 그룹에서 돌고, set_parameters ·
+        get_parameters 의 응답은 clients(Reentrant) 의 다른 스레드가 처리한다. 콜백 안에서 spin 하지
+        않는다(wait_future 는 done_callback + Event 로 기다린다).
+        """
         values = conversions.config_values_from_msg(request.config)
-        with self._job_lock:  # 접수 판정과 반영 사이에 START 가 끼면 "성공"한 값이 그 작업에 안 실린다
-            outcome = self.state_machine.request(Command.SET_CONFIG)
-            problems = () if not outcome.accepted else scan_params.check_values(values)
+        with self._config_lock:
+            with self._job_lock:   # 접수 판정과 자기 값 반영 사이에 START 가 끼지 않게 한다
+                outcome = self.state_machine.request(Command.SET_CONFIG)
+                problems = () if not outcome.accepted else scan_params.check_values(values)
+                if outcome.accepted and not problems:
+                    # 자기 몫만 들고 있는다. 다른 노드 몫은 그 노드가 실제 값이고, 여기서 읽는 곳이 없다.
+                    self._config.update({
+                        k: v for k, v in values.items()
+                        if k in scan_params.MOTION_CONFIG_NAMES})
             if not outcome.accepted:
                 response.reason_code, response.detail = int(outcome.reason), outcome.detail
             elif problems:
+                # 범위 밖이면 같이 온 정상값도 적용하지 않는다(T19a). 전파도 하지 않는다.
                 response.reason_code = int(Reason.INVALID_VALUE)
                 response.detail = '; '.join(problems)
             else:
-                self._config.update(values)  # *_set 인 항목만
-                applied = sorted(set(values) & set(scan_params.MOTION_CONFIG_NAMES))
-                kept = sorted(set(values) - set(scan_params.MOTION_CONFIG_NAMES))
-                response.success = True
-                response.detail = '적용: ' + (', '.join(applied) or '없음')
-                if kept:
-                    # 다른 노드의 값이다. 전파(P01~P03)는 T19b 라서 그 노드는 아직 yaml 값으로 돈다
-                    response.detail += ' / 보관만(미전파, T19b): ' + ', '.join(kept)
+                try:
+                    plans = propagation.plan(values)
+                    results = self._propagate(plans)
+                    own = sorted(set(values) & set(scan_params.MOTION_CONFIG_NAMES))
+                    summary = propagation.summarize(plans, results, own)
+                    response.success = summary.success
+                    response.detail = summary.detail
+                    if not summary.success:
+                        response.reason_code = int(Reason.PARAM_SET_FAILED)
+                    # applied 에 실을 값은 요청값이 아니라 그 노드에서 읽은 실제 값이다
+                    self._refresh_peers('SetConfig 뒤 되읽기')
+                    mismatches = propagation.pair_mismatches(self._peer_config)
+                    if mismatches:
+                        response.success = False
+                        response.reason_code = int(Reason.PARAM_SET_FAILED)
+                        response.detail += ' / ' + propagation.mismatch_detail(mismatches)
+                except _Closing:
+                    # 기다리는 도중에 노드가 내려간다. 예외를 서비스 콜백 밖으로 내보내지 않는다
+                    response.success = False
+                    response.reason_code = int(Reason.PARAM_SET_FAILED)
+                    response.detail = '전파 도중 scan_manager 가 종료됐다. 어디까지 갔는지 알 수 없다'
+                except Exception as exc:
+                    # 응답 없이 끝내지 않는다. mqtt_bridge 는 SetConfig 응답을 기다릴 뿐 한도가 없다
+                    self.get_logger().error(f'전파 중 예상 밖 오류: {exc!r}')
+                    response.success = False
+                    response.reason_code = int(Reason.PARAM_SET_FAILED)
+                    response.detail = f'전파 중 오류: {exc!r}'
         # applied 는 "적용 후 전체 값"이다. 모르는 값은 NaN + *_set=false 로 둔다(0 금지)
         response.applied = conversions.config_to_msg(self._effective_config())
         self.log(

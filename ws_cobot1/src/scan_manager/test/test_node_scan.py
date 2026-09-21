@@ -59,10 +59,14 @@ def overrides(result_dir, **changes):
 class Rig:
     """scan_manager + 가짜 상대 노드 + 관제 클라이언트(mqtt_bridge 자리)를 한 executor 에서 돌린다."""
 
-    def __init__(self, result_dir, start_peers=True, **changes):
+    def __init__(self, result_dir, start_peers=True, param_peer_names=None, **changes):
         self.result_dir = result_dir
         self.node = ScanManager(parameter_overrides=overrides(result_dir, **changes))
         self.peers = F.FakePeers() if start_peers else None
+        # 전파 대상 3개(계약 2.4). 이 파일은 전파 자체를 보지 않지만, 없으면 START · SetConfig 마다
+        # scan_manager 가 없는 서버를 server_wait_timeout_s 만큼 기다린다. 전파 시험은 test_node_config.py.
+        self.param_peers = {} if not start_peers else F.param_peers(
+            **({'names': param_peer_names} if param_peer_names is not None else {}))
         self.client = rclpy.create_node('fake_bridge')
         self.states, self.results, self.logs = [], [], []
         self.client.create_subscription(ScanState, '/scan/state', self.states.append, QOS_STATE)
@@ -74,7 +78,8 @@ class Rig:
         self.stop_client = self.client.create_client(StopScan, '/scan/stop')
         self.config_client = self.client.create_client(SetConfig, '/scan/set_config')
         self.executor = MultiThreadedExecutor(num_threads=8)
-        for node in filter(None, (self.node, self.peers, self.client)):
+        for node in filter(None, (self.node, self.peers, self.client,
+                                  *self.param_peers.values())):
             self.executor.add_node(node)
         self._stop_spin = threading.Event()
         self._thread = threading.Thread(target=self._spin, daemon=True)
@@ -95,7 +100,8 @@ class Rig:
         self._stop_spin.set()
         self._thread.join(timeout=10.0)
         self.executor.shutdown(timeout_sec=5.0)
-        for node in filter(None, (self.client, self.peers, self.node)):
+        for node in filter(None, (self.client, self.peers, *self.param_peers.values(),
+                                  self.node)):
             node.destroy_node()
 
     # -- 기다림 --
@@ -303,14 +309,22 @@ def test_full_scan_recovers_the_box_and_publishes_before_homing(rig):
     assert rig.error_logs() == []
 
 
-def test_unknown_config_values_are_nan_with_set_false_never_zero(rig):
+def test_unknown_config_values_are_nan_with_set_false_never_zero(make_rig):
+    """읽은 값은 싣고, 읽지 못한 값은 NaN + *_set=false 다. 0 을 채우지 않는다(규칙 4).
+
+    contact_detector 만 띄운다. robot_manager · safety_monitor 의 값은 읽을 수 없고,
+    over_force_n 은 쌍의 한쪽(safety_monitor)을 못 읽어 "같은지 확인할 수 없다" → 모름이다.
+    """
+    rig = make_rig(param_peer_names=('contact_detector',))
+    rig.wait_ready()
     result = rig.run()
     config = result.result.config
     assert config.descend_speed_set and config.descend_speed_mps == VALUES['descend_speed_mps']
-    for name, flag in (('contact_threshold_n', 'contact_threshold_set'),
+    assert (config.contact_threshold_n, config.contact_threshold_set) == (3.0, True)
+    assert (config.debounce_n, config.debounce_set) == (3, True)
+    for name, flag in (('target_force_n', 'target_force_set'),
                        ('over_force_n', 'over_force_set'), ('drop_limit_m', 'drop_limit_set')):
         assert getattr(config, flag) is False and math.isnan(getattr(config, name))
-    assert config.debounce_set is False  # uint8 은 NaN 을 실을 수 없다. *_set 으로만 판단한다
 
 
 @pytest.mark.parametrize('behavior', [F.EVENT_AFTER, F.STRAY_EVENT])
@@ -701,21 +715,22 @@ def test_operator_session_set_config_stop_home_then_full_scan(rig):
 # ---- 설정 ----
 
 def test_set_config_applies_only_flagged_fields_and_reports_unknowns_as_nan(rig):
+    """자기 몫(모션 6개)만 이 파일이 본다. 전파(P01~P03)의 자세한 것은 test_node_config.py 다."""
     config = ScanConfig(
         slide_speed_mps=0.02, slide_speed_set=True, over_force_n=25.0, over_force_set=True,
         descend_speed_mps=9.9)  # descend_speed_set=false 라 적용되지 않는다
 
     response = rig.set_config(config)
 
-    assert response.success and response.reason_code == 0
+    assert response.success and response.reason_code == 0, response.detail
     applied = response.applied
     assert (applied.slide_speed_mps, applied.slide_speed_set) == (0.02, True)
-    # 다른 노드의 값은 보관만 한다. 전파(T19b) 전에는 "적용된 값"으로 내보내지 않는다
-    assert math.isnan(applied.over_force_n) and not applied.over_force_set
-    assert '미전파' in response.detail and 'over_force_n' in response.detail
-    assert rig.node._config['over_force_n'] == 25.0
+    # 다른 노드 몫은 전파된 뒤 **그 노드에서 읽은 값**이다
+    assert (applied.over_force_n, applied.over_force_set) == (25.0, True)
+    assert rig.node._config['over_force_n'] is None, '다른 노드 몫은 보관하지 않는다(그 노드가 실제 값이다)'
     assert applied.descend_speed_mps == VALUES['descend_speed_mps'] and applied.descend_speed_set
-    assert math.isnan(applied.contact_threshold_n) and not applied.contact_threshold_set
+    # 보내지 않은 항목도 그 노드의 값으로 찬다
+    assert (applied.contact_threshold_n, applied.contact_threshold_set) == (3.0, True)
 
     rig.run()
     assert {g.speed for g in rig.peers.goals if g.operation == Operation.SLIDE} == {0.02}
