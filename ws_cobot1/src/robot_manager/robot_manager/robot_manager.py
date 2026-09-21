@@ -534,11 +534,15 @@ class RobotManager(Node):
                 self.srv_clients['compliance_on'],
                 dsr_client.compliance_on_request(list(self.param('compliance_stiffness'))),
                 'task_compliance_ctrl'):
+            self.get_logger().error('task_compliance_ctrl 응답 없음 또는 거절. 켜졌을 수 있어 해제를 부른다'
+                                    '(켜기 시간 초과 뒤 해제 — 해제 실패면 compliance_released=false)')
             return False
         motion.force_on = self.force_ctrl_active = True
         if not self.call_sync(self.srv_clients['force_on'],
                               dsr_client.force_on_request(float(self.param('slide_target_force_n'))),
                               'set_desired_force'):
+            self.get_logger().error('set_desired_force 응답 없음 또는 거절. 켜졌을 수 있어 해제를 부른다'
+                                    '(켜기 시간 초과 뒤 해제 — 해제 실패면 compliance_released=false)')
             return False
         return True
 
@@ -783,15 +787,17 @@ class RobotManager(Node):
             if self.call_sync(self.srv_clients['force_off'], dsr_client.force_off_request(ramp_s),
                               'release_force'):
                 self.force_ctrl_active = False
-                # 힘 제어가 강성 제어로 넘어가는 시간(ramp_s)이 끝난 뒤 순응을 푼다. ReleaseForce 응답은
-                # success 하나뿐이라 램프가 끝난 뒤 돌아오는지 알 수 없다. 먼저 돌아오면 바로 순응을 풀어
-                # 램프가 무의미해진다. 매뉴얼 5.1.4 예제도 release_force() → wait → release_compliance_ctrl()
-                # 이다 (yujh5537 리뷰, PR #121)
-                if motion.compliance_on:
-                    time.sleep(ramp_s)
             else:
                 released = False
-                self.get_logger().error('release_force 실패')
+                self.get_logger().error('release_force 실패(응답 없음 또는 거절)')
+            # 힘 제어가 순응 제어로 넘어가는 시간(ramp_s)이 끝난 뒤 순응을 푼다. **성공이든 시간 초과든**
+            # 해제 요청은 보냈으므로 램프가 진행 중일 수 있다. ReleaseForce 응답은 success 하나뿐이라
+            # 램프가 끝난 뒤 돌아오는지 알 수 없다. 매뉴얼도 엇갈린다: 5.1.4 예제는 release_force() →
+            # wait(0.5) → release_compliance_ctrl() 이고, 5.1.5 예제는 기다림 없이 바로 부른다(DRL 에서는
+            # 블로킹일 수 있다는 뜻). ROS 서비스 동작을 모르니 **안전한 쪽으로 기다린다** (PR #121 리뷰).
+            # 이 대기는 어떤 락도 잡지 않은 채 Action 스레드에서만 돈다. 샘플 타이머는 따로 돈다
+            if motion.compliance_on:
+                time.sleep(ramp_s)
         if motion is not None and motion.compliance_on:
             if self.call_sync(self.srv_clients['compliance_off'], dsr_client.compliance_off_request(),
                               'release_compliance_ctrl'):

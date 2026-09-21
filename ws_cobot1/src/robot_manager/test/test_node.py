@@ -681,9 +681,10 @@ def test_force_control_is_released_on_every_exit_path(ros, monkeypatch, ending):
             assert result.reason_code == ReasonCode.DROP_LIMIT
         assert _released(calls), f'{ending}: 해제를 부르지 않았다 {calls}'
         assert calls.index('release_force') < calls.index('release_compliance_ctrl')   # 힘 먼저
-        # 힘 제어 램프(release_force_time_s, 기본 0.3 s)가 끝난 뒤 순응을 푼다(매뉴얼 5.1.4)
+        # 힘 제어 램프(release_force_time_s)가 끝난 뒤 순응을 푼다. 파라미터 값과 비교한다
+        ramp_s = float(node.param('release_force_time_s'))
         gap = node.release_stamps['release_compliance_ctrl'] - node.release_stamps['release_force']
-        assert gap >= 0.3 - 0.02, f'{ending}: 램프를 기다리지 않았다 ({gap:.3f} s)'
+        assert gap >= ramp_s - 0.02, f'{ending}: 램프를 기다리지 않았다 ({gap:.3f} s < {ramp_s})'
         assert result.compliance_released is True
         assert node.motion is None                                 # 다음 goal 을 받을 수 있다
         assert not node.compliance_active and not node.force_ctrl_active
@@ -745,5 +746,26 @@ def test_descend_never_touches_force_control(ros, monkeypatch):
         result = node.execute_motion(FakeGoalHandle(goal))
         assert result.compliance_released is True
         assert not any(label.startswith(('release', 'task_compliance', 'set_desired')) for label in calls)
+    finally:
+        node.destroy_node()
+
+
+def test_release_force_that_times_out_still_waits_for_the_ramp(ros, monkeypatch):
+    """release_force 가 시간 초과여도 컨트롤러는 램프를 시작했을 수 있다. 기다린 뒤 순응을 푼다.
+
+    이 PR 의 전제("시간 초과여도 실행됐을 수 있다")를 해제 쪽에도 적용한다 (PR #121 리뷰).
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+
+    node, goal, calls = _slide_rig(monkeypatch, fail=('release_force',))
+    try:
+        monkeypatch.setattr(node, 'watch', lambda gh, m: (
+            ExecuteMotion.Result.REASON_EDGE, ReasonCode.OK, ''))
+        result = node.execute_motion(FakeGoalHandle(goal))
+        ramp_s = float(node.param('release_force_time_s'))
+        gap = node.release_stamps['release_compliance_ctrl'] - node.release_stamps['release_force']
+        assert gap >= ramp_s - 0.02, f'시간 초과 뒤 램프를 기다리지 않았다 ({gap:.3f} s)'
+        assert result.compliance_released is False           # release_force 가 실패했으니 사실대로
+        assert node.force_ctrl_active is True
     finally:
         node.destroy_node()
