@@ -22,7 +22,10 @@ bool    motion_timeout_set
 float64 lift_height_m
 bool    lift_height_set
 # 힘/순응 → robot_manager (drop_limit_m 은 safety_monitor 에도)
-float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 같은 값, 이름만 다르다
+float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 숫자는 그대로 전달된다
+                           #   기준은 DR_FC_MOD_REL: set_desired_force 호출 시점의 힘에 더해지는 값이다.
+                           #   tare 대비 절대 누름 힘이 아니다. SLIDE 는 DESCEND 가 접촉으로 끝난 직후에 오므로
+                           #   실제 누름 = 접촉력 + 이 값. REL 유지 여부는 실기 뒤에 정한다 (#73)
 bool    target_force_set
 float64 drop_limit_m
 bool    drop_limit_set

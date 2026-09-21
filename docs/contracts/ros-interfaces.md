@@ -1,6 +1,6 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
@@ -64,7 +64,9 @@ SetConfig를 수락하면 scan_manager가 `rcl_interfaces/srv/SetParameters`로 
 | P02 | scan_manager → `/contact_detector/set_parameters` | `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` |
 | P03 **[v0.1 변경 · 신설]** | scan_manager → `/safety_monitor/set_parameters` | `over_force_n` · `drop_limit_m` |
 
-`ScanConfig.target_force_n`(메시지 필드)은 P01에서 robot_manager 파라미터 **`slide_target_force_n`**으로 전파된다. 같은 값이고 이름만 다르다 — 필드는 "누름 목표 힘", 파라미터는 "SLIDE의 −z 목표 힘"이다. 나머지 항목은 필드 이름과 파라미터 이름이 같다(`drop_limit_m` 등).
+`ScanConfig.target_force_n`(메시지 필드)은 P01에서 robot_manager 파라미터 **`slide_target_force_n`**으로 전파된다. 숫자는 그대로 전달된다. 나머지 항목은 필드 이름과 파라미터 이름이 같다(`drop_limit_m` 등).
+
+**이 값의 기준 [v0.1.9].** robot_manager는 이 값을 `set_desired_force`에 **`DR_FC_MOD_REL`**로 싣는다(#73). 두산 매뉴얼 5.1.4의 정의가 "힘제어 초기의 센서값을 기준으로 상대적인 외력만 참조"이므로 **기준점은 호출 시점의 힘이고, tare 대비 절대 누름 힘이 아니다.** SLIDE는 DESCEND가 접촉으로 끝난 직후에 오므로 **실제 누름 = SLIDE 시작 시 이미 실려 있는 접촉력 + 이 값**이다. 계약이 이 필드를 "누름 목표 힘"이라 부르므로 웹 표시 문구도 이 기준에 맞춘다(절대값으로 읽히면 안 된다). REL을 유지할지 ABS로 바꿀지는 실기 결과를 보고 정한다(#73. **TBD**).
 
 ### 2.5 외부 (정의하지 않음)
 두산 `dsr_msgs2`(네임스페이스 `/dsr01`)와 OnRobot RG2 드라이버는 **robot_manager만** 호출한다. 실제 서비스 이름 · 동작 여부는 `docs/env/api-check-log.md`. MQTT는 `mqtt-schema.md`.
@@ -314,7 +316,10 @@ bool    motion_timeout_set
 float64 lift_height_m
 bool    lift_height_set
 # 힘/순응 → robot_manager (drop_limit_m 은 safety_monitor 에도)
-float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 같은 값, 이름만 다르다
+float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 숫자는 그대로 전달된다
+                           #   기준은 DR_FC_MOD_REL: set_desired_force 호출 시점의 힘에 더해지는 값이다.
+                           #   tare 대비 절대 누름 힘이 아니다. SLIDE 는 DESCEND 가 접촉으로 끝난 직후에 오므로
+                           #   실제 누름 = 접촉력 + 이 값. REL 유지 여부는 실기 뒤에 정한다 (#73)
 bool    target_force_set
 float64 drop_limit_m
 bool    drop_limit_set

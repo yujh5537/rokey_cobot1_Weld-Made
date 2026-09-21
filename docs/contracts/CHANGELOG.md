@@ -13,14 +13,14 @@
 
 ## v0.1.9 (2026-09-20, #51 · #54, PR #91)
 타입 변경 없음. 계약의 빈틈 7건을 문서에 채웠다. 필드 이름 · 타입 · 순서 · 상수값은 그대로다. 영향: scan_manager(파라미터 선언 · 결과 발행) · robot_manager(P01) · mqtt_bridge · 웹.
-- **#51** `ScanConfig.target_force_n` ↔ robot_manager 파라미터 `slide_target_force_n` 대응을 2.4절과 3.9절 주석에 적었다. 같은 값이고 이름만 다르다
+- **#51** `ScanConfig.target_force_n` ↔ robot_manager 파라미터 `slide_target_force_n` 대응을 2.4절과 3.9절 주석에 적었다. 숫자는 그대로 전달되지만 **기준이 `DR_FC_MOD_REL`(호출 시점의 힘에 더해지는 값)이라 tare 대비 절대 누름 힘이 아니다** — 실제 누름 = 접촉력 + 이 값(#91 리뷰: 학민 · 현지). REL 유지 여부는 실기 뒤 확정(TBD). 머리말 상태 줄에도 v0.1.9 구절을 적었다
 - **#54** `recontact_margin_m` · `recontact_speed_mps` · `move_speed_mps`가 **SetConfig 전파 대상이 아닌 scan_manager 파라미터**임을 6.4절에 적었다. 7.3절 · 9장 TBD의 "내림 속도"도 이름으로 바꿨다. 값은 여전히 TBD다
 - **#54** `mqtt-schema.md` 5장 TBD 2건: `hb/ros` · `conn/ros`의 만료 판정 기준 필드(두 메시지에 `stamp_ms`가 없다. LWT는 `published_at_ms`가 접속 시각이라 그대로 못 쓴다), retain 상태의 "오래된 값" 기준 시간
 - 7.4절 **결과 중복 키를 `scan_id` → `(scan_id, stamp)`** 로 고쳤다. 재시작이 `scan_id`를 유지하므로(5.3절) 부분 결과와 최종 결과가 같은 `scan_id`로 두 번 나간다. main의 mqtt_bridge가 이미 이 키로 구현돼 있다(`_scan_result_dedup_key`)
 - `contact/event` 예시에 필드별 출처(판정 샘플 / 확정 샘플)를 한 줄 달아 v0.1.5(#79)와 연결했다
 - `ScanConfig`에서 **scan_manager가 모르는 값(`*_set=false`)은 `null`** 로 나간다고 2장 변환표에 적었다. 구현이 이미 그렇다(`encode_scan_config`의 `non_finite_to_none`). 0을 넣지 않는다는 1장 무효 값 규칙과 같은 취지다
 - `mqtt-schema.md` 머리말의 mqtt_bridge 담당을 병후 → **의석**으로 고쳤다(2026-09-19 T21 이전, PR #63). T27 접점은 병후 · 의석 공동이다
-- 번호: PR #80(T03 후속)이 v0.1.7 · v0.1.8로 머지된 main 위로 rebase했다
+- 번호: PR #98(v0.1.10)이 먼저 머지됐다. #98이 v0.1.9를 비워 두어 이 PR이 그 자리에 들어간다(파일에서는 v0.1.10 아래)
 
 ## v0.1.8 (2026-09-20, T03 후속 실기, PR #80)
 타입 변경 없음. 축 평행을 **실측값 2.1°**로 채웠다. 영향: scan_manager(결과 변환) · geometry_estimator(꼭짓점 · 경로 후보) · T30.
