@@ -51,11 +51,19 @@ DISCOVERY_SETTLE_S = 1.0
 class SimProcess:
 
     def __init__(self, result_dir, with_latency=True):
-        params = yaml.safe_load(SIM_YAML.read_text(encoding='utf-8'))['scan_manager']['ros__parameters']
+        data = yaml.safe_load(SIM_YAML.read_text(encoding='utf-8'))
+        params = data['scan_manager']['ros__parameters']
         self.yaml_params = params
+        params_file = SIM_YAML
+        if not with_latency:
+            # sim.yaml 의 detect_latency_s 가 채워진 뒤(T07)로는, '없는 필수 값' 경로를 보려면
+            # 그 키를 뺀 사본으로 띄워야 한다. ROS 파라미터는 '없음'으로 덮어쓸 수 없다
+            params.pop('detect_latency_s', None)
+            params_file = Path(result_dir).parent / 'sim_without_latency.yaml'
+            params_file.write_text(yaml.safe_dump(data, allow_unicode=True), encoding='utf-8')
         command = [
             sys.executable, '-c', 'from scan_manager.scan_manager import main; main()',
-            '--ros-args', '--params-file', str(SIM_YAML), '-p', f'result_dir:={result_dir}']
+            '--ros-args', '--params-file', str(params_file), '-p', f'result_dir:={result_dir}']
         if with_latency:
             command += ['-p', f'detect_latency_s:={TEST_LATENCY_S}']
         self.process = subprocess.Popen(
@@ -202,7 +210,10 @@ def test_full_scan_with_sim_yaml_in_a_real_process(sim, tmp_path):
 
 
 def test_sim_yaml_as_is_refuses_start_and_names_the_missing_value(sim):
-    """sim.yaml 의 detect_latency_s 는 TBD 다. 값을 받기 전에는 sim 에서도 START 가 거절된다."""
+    """필수 파라미터가 하나라도 없으면 sim 에서도 START 가 거절되고 빠진 이름이 나온다.
+
+    sim.yaml 은 T07 에서 detect_latency_s 까지 채워졌으므로, 이 경로를 보려면 그 키를 뺀 사본으로 띄운다.
+    """
     rig = sim(with_latency=False)
     result = rig.run_scan()
     assert not result.success and result.reason_code == Reason.INVALID_VALUE

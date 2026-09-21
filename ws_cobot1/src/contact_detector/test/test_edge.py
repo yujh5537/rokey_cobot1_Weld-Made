@@ -24,7 +24,8 @@ FALL_V = 10 * MM             # 모서리를 벗어난 뒤 내려앉는 속도 (�
 PRESS = 4.0                  # 누르는 힘 [N] (테스트용)
 
 CONFIG = DetectorConfig(contact_threshold_n=3.0, debounce_n=3, over_force_n=30.0, over_force_debounce_n=1)
-EDGE = EdgeConfig(edge_drop_m=0.5 * MM, debounce_n=3, arm_force_n=1.5, trend_window_s=0.5, trend_min_samples=10)
+EDGE = EdgeConfig(edge_drop_m=0.5 * MM, debounce_n=3, arm_force_n=1.5, trend_window_s=0.5,
+                  trend_min_samples=10, max_gap_s=0.2)
 
 
 def detector(edge=EDGE, tared=True):
@@ -135,12 +136,18 @@ def test_drop_shorter_than_debounce_is_ignored():
 def test_trend_survives_a_long_debounce():
     # 기준선을 얼린 동안 창이 비면 안 된다: 디바운스 10 회(0.23 s)가 창 0.25 s 에 가까워도 확정돼야 한다
     long_debounce = EdgeConfig(edge_drop_m=0.5 * MM, debounce_n=10, arm_force_n=1.5,
-                               trend_window_s=0.25, trend_min_samples=5)
+                               trend_window_s=0.25, trend_min_samples=5, max_gap_s=0.2)
     step = lambda t: 0.080 - (0.8 * MM if t > 3.0 else 0.0)                 # noqa: E731
     detections = run(detector(edge=long_debounce), slide(step))
     assert [x.type for x in detections] == [TYPE_EDGE]
     assert detections[0].debounce_count == 10
     assert detections[0].z_drop_m == pytest.approx(0.8 * MM, abs=1e-6)
+
+
+def test_edge_config_requires_max_gap():
+    with pytest.raises(ValueError):
+        EdgeConfig(edge_drop_m=0.5 * MM, debounce_n=3, arm_force_n=1.5,
+                   trend_window_s=0.5, trend_min_samples=10, max_gap_s=0.0)
 
 
 def test_no_edge_without_tare_or_outside_slide_or_when_disabled():
@@ -171,6 +178,8 @@ def test_once_per_motion_and_state_does_not_leak_into_next_motion():
 
 def test_edge_config_rejects_bad_values():
     with pytest.raises(ValueError):
-        EdgeConfig(edge_drop_m=0.0, debounce_n=3, arm_force_n=1.5, trend_window_s=0.5, trend_min_samples=10)
+        EdgeConfig(edge_drop_m=0.0, debounce_n=3, arm_force_n=1.5, trend_window_s=0.5,
+                   trend_min_samples=10, max_gap_s=0.2)
     with pytest.raises(ValueError):
-        EdgeConfig(edge_drop_m=0.0005, debounce_n=3, arm_force_n=1.5, trend_window_s=0.5, trend_min_samples=1)
+        EdgeConfig(edge_drop_m=0.0005, debounce_n=3, arm_force_n=1.5, trend_window_s=0.5,
+                   trend_min_samples=1, max_gap_s=0.2)
