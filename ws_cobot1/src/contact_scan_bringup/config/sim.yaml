@@ -128,6 +128,7 @@ robot_manager:
     sample_rate_hz: 50.0             # 설정값. 실측은 Virtual 37.6 Hz, 실기 42.8 Hz
     status_rate_hz: 10.0
     service_timeout_s: 0.5
+    slow_call_warn_s: 0.15           # 이보다 늦은 두산 서비스 응답을 이름 · 시간과 함께 남긴다(#130). 0 이면 끈다
     moving_eps_m: 0.0002             # 이 창 안에서 이만큼 움직이면 이동 중
     moving_window_s: 0.3
 
