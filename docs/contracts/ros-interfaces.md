@@ -66,7 +66,7 @@ SetConfig를 수락하면 scan_manager가 `rcl_interfaces/srv/SetParameters`로 
 
 `ScanConfig.target_force_n`(메시지 필드)은 P01에서 robot_manager 파라미터 **`slide_target_force_n`**으로 전파된다. 숫자는 그대로 전달된다. 나머지 항목은 필드 이름과 파라미터 이름이 같다(`drop_limit_m` 등).
 
-**이 값의 기준 [v0.1.9].** robot_manager는 이 값을 `set_desired_force`에 **`DR_FC_MOD_REL`**로 싣는다(#73). 두산 매뉴얼 5.1.4의 정의가 "힘제어 초기의 센서값을 기준으로 상대적인 외력만 참조"이므로 **기준점은 호출 시점의 힘이고, tare 대비 절대 누름 힘이 아니다.** SLIDE는 DESCEND가 접촉으로 끝난 직후에 오므로 **실제 누름 = SLIDE 시작 시 이미 실려 있는 접촉력 + 이 값**이다. 계약이 이 필드를 "누름 목표 힘"이라 부르므로 웹 표시 문구도 이 기준에 맞춘다(절대값으로 읽히면 안 된다). REL을 유지할지 ABS로 바꿀지는 실기 결과를 보고 정한다(#73. **TBD**).
+**이 값의 기준 [v0.1.9].** robot_manager는 이 값을 `set_desired_force`에 **`DR_FC_MOD_REL`**로 싣는다(#73). 두산 매뉴얼 5.1.4의 정의가 "힘제어 초기의 센서값을 기준으로 상대적인 외력만 참조"이므로 **기준점은 호출 시점의 힘이고, tare 대비 절대 누름 힘이 아니다.** **SLIDE가 어디서 시작하느냐에 따라 실제 누름이 다르다.** 첫 방향은 DESCEND 접촉 자리에서 바로 밀므로 **접촉력 + 이 값**이고, 2~4 방향과 재시작은 방향 전환(7.3절)으로 윗면 `recontact_margin_m` 위에서 시작하므로 **≈ 이 값**이다. 계약이 이 필드를 "누름 목표 힘"이라 부르므로 웹 표시 문구도 이 기준에 맞춘다(절대값으로 읽히면 안 된다). REL을 유지할지 ABS로 바꿀지는 실기 결과를 보고 정한다(#73. **TBD**).
 
 ### 2.5 외부 (정의하지 않음)
 두산 `dsr_msgs2`(네임스페이스 `/dsr01`)와 OnRobot RG2 드라이버는 **robot_manager만** 호출한다. 실제 서비스 이름 · 동작 여부는 `docs/env/api-check-log.md`. MQTT는 `mqtt-schema.md`.
@@ -318,8 +318,10 @@ bool    lift_height_set
 # 힘/순응 → robot_manager (drop_limit_m 은 safety_monitor 에도)
 float64 target_force_n     # robot_manager 파라미터 slide_target_force_n 으로 전파 (P01). 숫자는 그대로 전달된다
                            #   기준은 DR_FC_MOD_REL: set_desired_force 호출 시점의 힘에 더해지는 값이다.
-                           #   tare 대비 절대 누름 힘이 아니다. SLIDE 는 DESCEND 가 접촉으로 끝난 직후에 오므로
-                           #   실제 누름 = 접촉력 + 이 값. REL 유지 여부는 실기 뒤에 정한다 (#73)
+                           #   tare 대비 절대 누름 힘이 아니다. SLIDE 가 어디서 시작하느냐에 따라 실제 누름이 다르다:
+                           #   첫 방향은 DESCEND 접촉 자리에서 바로 밀므로 접촉력 + 이 값,
+                           #   2~4 방향과 재시작은 방향 전환(7.3)으로 윗면 recontact_margin_m 위에서 시작하므로 ~ 이 값.
+                           #   REL 유지 여부는 실기 뒤에 정한다 (#73)
 bool    target_force_set
 float64 drop_limit_m
 bool    drop_limit_set

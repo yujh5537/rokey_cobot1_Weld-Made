@@ -13,7 +13,7 @@
 
 ## v0.1.9 (2026-09-20, #51 · #54, PR #91)
 타입 변경 없음. 계약의 빈틈 7건을 문서에 채웠다. 필드 이름 · 타입 · 순서 · 상수값은 그대로다. 영향: scan_manager(파라미터 선언 · 결과 발행) · robot_manager(P01) · mqtt_bridge · 웹.
-- **#51** `ScanConfig.target_force_n` ↔ robot_manager 파라미터 `slide_target_force_n` 대응을 2.4절과 3.9절 주석에 적었다. 숫자는 그대로 전달되지만 **기준이 `DR_FC_MOD_REL`(호출 시점의 힘에 더해지는 값)이라 tare 대비 절대 누름 힘이 아니다** — 실제 누름 = 접촉력 + 이 값(#91 리뷰: 학민 · 현지). REL 유지 여부는 실기 뒤 확정(TBD). 머리말 상태 줄에도 v0.1.9 구절을 적었다
+- **#51** `ScanConfig.target_force_n` ↔ robot_manager 파라미터 `slide_target_force_n` 대응을 2.4절과 3.9절 주석에 적었다. 숫자는 그대로 전달되지만 **기준이 `DR_FC_MOD_REL`(호출 시점의 힘에 더해지는 값)이라 tare 대비 절대 누름 힘이 아니다** — 실제 누름은 SLIDE 시작 위치에 달렸다(첫 방향 = 접촉력 + 이 값, 2~4 방향 · 재시작 = ≈ 이 값)(#91 리뷰: 학민 · 현지). REL 유지 여부는 실기 뒤 확정(TBD). 머리말 상태 줄에도 v0.1.9 구절을 적었다
 - **#54** `recontact_margin_m` · `recontact_speed_mps` · `move_speed_mps`가 **SetConfig 전파 대상이 아닌 scan_manager 파라미터**임을 6.4절에 적었다. 7.3절 · 9장 TBD의 "내림 속도"도 이름으로 바꿨다. 값은 여전히 TBD다
 - **#54** `mqtt-schema.md` 5장 TBD 2건: `hb/ros` · `conn/ros`의 만료 판정 기준 필드(두 메시지에 `stamp_ms`가 없다. LWT는 `published_at_ms`가 접속 시각이라 그대로 못 쓴다), retain 상태의 "오래된 값" 기준 시간
 - 7.4절 **결과 중복 키를 `scan_id` → `(scan_id, stamp)`** 로 고쳤다. 재시작이 `scan_id`를 유지하므로(5.3절) 부분 결과와 최종 결과가 같은 `scan_id`로 두 번 나간다. main의 mqtt_bridge가 이미 이 키로 구현돼 있다(`_scan_result_dedup_key`)
