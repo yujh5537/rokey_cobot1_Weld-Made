@@ -61,7 +61,8 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 - **SLIDE 하강 제한**: 첫 샘플 z 기준으로 `drop_limit_m` 를 넘으면 정지하고 `DROP_LIMIT`(205) 로 끝낸다(계약 7.2 1차 감시).
 - **순응 · 힘 제어는 `finally` 에서 해제**한다. 해제 호출이 실패하면 `compliance_released=false` 로 사실대로 보고한다
   - **켜는 호출을 보내기 전에** 해제 대상으로 표시한다. 켜는 호출이 응답 시간 초과여도 컨트롤러는 이미 켰을 수 있어서다. 켜지 않은 것을 해제하다 실패하면 `compliance_released=false` 가 된다(모르면 해제됐다고 하지 않는다)
-  - 해제 순서는 힘 제어(`release_force`) → 순응 제어(`release_compliance_ctrl`)
+  - 해제 순서는 힘 제어(`release_force`) → **`release_force_time_s` 대기** → 순응 제어(`release_compliance_ctrl`). 응답이 램프보다 먼저 올 수 있어 기다린다(매뉴얼 5.1.4 예제)
+  - `compliance_released=true` 는 **해제 호출이 성공했다**는 뜻이다. 실제로 위치 제어로 돌아왔는지 조회로 확인하는 것은 후속(`GetControlMode`, 실기 확인 필요)
   - 시험(`test_node.py`, T14): 예외 주입 · 취소 · 정지 요청 · 이벤트 · 시간 초과 · 하강 제한 · 정상 종료 7경로에서 해제, 켜기 시간 초과 2경우, 해제 실패 보고, 힘 제어를 안 쓰는 동작은 해제 호출 없음
   (실패 경로는 계약에서 TBD다. 성공한 것으로 적지 않는다).
 - `OP_HOME` 의 목적지는 관절각(`home_joint_deg`)이다. 계약 5.4 는 `home_pose` 라고 적었지만, T03 이 홈을

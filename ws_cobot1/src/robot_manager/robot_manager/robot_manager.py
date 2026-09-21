@@ -508,10 +508,12 @@ class RobotManager(Node):
 
         **`slide_target_force_n` 은 `DR_FC_MOD_REL` 이라 "더 누르는 힘"이다.** 드라이버 정의는
         "relative value to initial state (the instance when this function is called)" 이므로,
-        기준선은 이 호출 시점에 이미 실려 있는 힘이다. SLIDE 는 보통 DESCEND 가 접촉으로 끝난
-        직후에 오므로 그 접촉력이 기준선이 되고, **실제 누름 = 접촉력 + slide_target_force_n**
-        이 된다. 기준선을 로그로 남겨 실기에서 한 번에 확인할 수 있게 한다
-        (병후 · 현지 지적, PR #73).
+        기준선은 이 호출 시점에 이미 실려 있는 힘이다. **SLIDE 가 어디서 시작하느냐에 따라 실제
+        누름이 다르다**(계약 2.4, v0.1.9): 첫 방향은 DESCEND 접촉 자리에서 바로 밀므로
+        **접촉력 + slide_target_force_n**, 2~4 방향과 재시작은 방향 전환(7.3)으로 윗면
+        recontact_margin_m 위에서 시작하므로 **≈ slide_target_force_n** 이다. 기준선을 로그로
+        남겨 실기에서 한 번에 확인할 수 있게 한다(병후 · 현지 지적, PR #73 · #105). 매뉴얼 5.1.4 는
+        "접촉할 대상물에 근접하여 DR_FC_MOD_REL 로 힘제어를 시작"하라고 권한다(REL 유지 여부는 TBD).
         """
         baseline = self.last_force
         if baseline is None:
@@ -777,11 +779,16 @@ class RobotManager(Node):
         """
         released = True
         if motion is not None and motion.force_on:
-            if self.call_sync(self.srv_clients['force_off'],
-                              dsr_client.force_off_request(
-                                  float(self.param('release_force_time_s'))),
+            ramp_s = float(self.param('release_force_time_s'))
+            if self.call_sync(self.srv_clients['force_off'], dsr_client.force_off_request(ramp_s),
                               'release_force'):
                 self.force_ctrl_active = False
+                # 힘 제어가 강성 제어로 넘어가는 시간(ramp_s)이 끝난 뒤 순응을 푼다. ReleaseForce 응답은
+                # success 하나뿐이라 램프가 끝난 뒤 돌아오는지 알 수 없다. 먼저 돌아오면 바로 순응을 풀어
+                # 램프가 무의미해진다. 매뉴얼 5.1.4 예제도 release_force() → wait → release_compliance_ctrl()
+                # 이다 (yujh5537 리뷰, PR #121)
+                if motion.compliance_on:
+                    time.sleep(ramp_s)
             else:
                 released = False
                 self.get_logger().error('release_force 실패')

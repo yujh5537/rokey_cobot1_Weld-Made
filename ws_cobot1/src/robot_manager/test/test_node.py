@@ -7,6 +7,8 @@
 import importlib.util
 import os
 
+import time
+
 import pytest
 
 # CI 에는 dsr_msgs2 를 고정 커밋으로 빌드해 넣는다(.github/workflows/ci.yml). 없는데 조용히
@@ -613,9 +615,11 @@ def _slide_rig(monkeypatch, fail=()):
     node.last_pose = (None, None, (0.42, -0.19, 0.18))
     node.last_force = (0.0, 0.0, 2.0)
     calls = []
+    stamps = node.release_stamps = {}
 
     def fake_call_sync(client, request, label):
         calls.append(label)
+        stamps[label] = time.monotonic()
         return label not in fail
     monkeypatch.setattr(node, 'call_sync', fake_call_sync)
     monkeypatch.setattr(node, 'send_move', lambda motion: calls.append('move_line') or True)
@@ -677,6 +681,9 @@ def test_force_control_is_released_on_every_exit_path(ros, monkeypatch, ending):
             assert result.reason_code == ReasonCode.DROP_LIMIT
         assert _released(calls), f'{ending}: 해제를 부르지 않았다 {calls}'
         assert calls.index('release_force') < calls.index('release_compliance_ctrl')   # 힘 먼저
+        # 힘 제어 램프(release_force_time_s, 기본 0.3 s)가 끝난 뒤 순응을 푼다(매뉴얼 5.1.4)
+        gap = node.release_stamps['release_compliance_ctrl'] - node.release_stamps['release_force']
+        assert gap >= 0.3 - 0.02, f'{ending}: 램프를 기다리지 않았다 ({gap:.3f} s)'
         assert result.compliance_released is True
         assert node.motion is None                                 # 다음 goal 을 받을 수 있다
         assert not node.compliance_active and not node.force_ctrl_active
