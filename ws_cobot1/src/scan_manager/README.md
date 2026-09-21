@@ -35,6 +35,7 @@ T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig
 - 정의서 1.1절은 tare → 기준점 이동 순서다. 여기서는 기준점으로 간 뒤 그 자리에서 tare를 한다(측정을 시작할 자세 · 위치에서 F₀를 잡는다). 계약 4.2절은 "`moving=false`를 확인하고 호출한다"만 정한다.
 - **스캔의 모든 모션(마무리 복귀 포함)은 보내기 전에 안전 래치를 본다.** 모션 사이(tare · 기록 · 형상 계산 중)에 래치가 걸렸으면 `SafetyStatus.reason_code`로 실패한다. 모션 중의 래치는 로봇 정지의 Result로 잡힌다. 관제자의 안전복귀(`/scan/home`)는 래치가 막지 않는다.
 - **실패 · 중지 · 형상 계산 실패에서는 모션을 더 보내지 않는다.** 자동 홈 복귀는 없다(계약 7.4절). `test/test_sequence.py`가 고정한다.
+- **실패는 원인 · 단계 · 위치를 함께 남긴다**(BRD 4.2.5). `/scan/log`와 기록(`progress.json`의 `failure`: `reason_code` · `detail` · `phase` · `pose`)에 같이 적는다. `pose`는 실패한 `ExecuteMotion`의 정지 좌표이고, 중단 위치와 같은 규칙이다 — Result를 하나도 받지 못했으면 직전 중지의 좌표(재시작으로 이어받은 것), Result의 `pose`가 비었으면(`pose_stamp=0`) **앞 모션의 좌표를 대신 적지 않고** `null` + `pose_valid=false`다.
 
 모션 결과의 판정(`classify`):
 

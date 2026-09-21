@@ -264,10 +264,16 @@ class ResultStore:
                 completed=completed, completed_at=now, final_pose=final_pose)
         return self._mutate(scan_id, apply)
 
-    def record_failure(self, scan_id: str, failure) -> ScanRecord:
-        """실패 사유를 기록한다. reason_code · detail · phase 속성이 있는 객체(T10 의 Failure)면 된다."""
+    def record_failure(
+        self, scan_id: str, failure, pose: Optional[PoseRecord] = None,
+    ) -> ScanRecord:
+        """실패 사유 · 단계 · 위치를 기록한다(BRD 4.2.5).
+
+        failure 는 reason_code · detail · phase 속성이 있는 객체(T10 의 Failure)면 된다.
+        pose 는 실패한 ExecuteMotion 의 정지 좌표다. 얻지 못했으면 None 이다(0 을 넣지 않는다).
+        """
         def apply(record, now):
-            record.failure = FailureRecord.from_failure(failure, recorded_at=now)
+            record.failure = FailureRecord.from_failure(failure, recorded_at=now, pose=pose)
         return self._mutate(scan_id, apply)
 
     def save_result(self, scan_id: str, shape: ShapeResult, bias_corrections=None) -> ResultRecord:

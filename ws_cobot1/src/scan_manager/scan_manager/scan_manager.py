@@ -1184,6 +1184,18 @@ class _NodePorts(Ports):
             return None, ''
         return raw.pose, raw.frame_id
 
+    def _stop_pose_record(self):
+        """정지 좌표(PoseRecord). 기록에 남길 "로봇이 마지막으로 멈춘 자리"다. 모르면 None.
+
+        record_stop 과 같은 규칙이다. Result 를 하나도 받지 못했으면 로봇은 이 명령에서 움직이지 않았으므로
+        직전 중지의 좌표(재시작으로 이어받은 것)를 쓴다. Result 는 받았는데 pose 가 비었으면(pose_stamp=0)
+        그 모션의 정지 좌표는 모르는 것이다 — 앞 모션의 좌표를 대신 적지 않는다.
+        """
+        raw = self.last_result.raw if self.last_result is not None else None
+        if raw is None:
+            return self._carried_pose
+        return conversions.stop_pose_record(raw)
+
     def stop_requested(self):
         return self._job.stop_event.is_set()
 
@@ -1381,7 +1393,8 @@ class _NodePorts(Ports):
         if self.recorded and job.scan_id:
             try:
                 kept = node._write(
-                    _record_first_failure, node._store, job.scan_id, node.state_machine.failure)
+                    _record_first_failure, node._store, job.scan_id, node.state_machine.failure,
+                    self._stop_pose_record())
                 if kept is not None:
                     node.get_logger().info(
                         f'기록의 실패 사유는 첫 실패({kept.reason_code} {kept.phase.name})를 그대로 둔다')
@@ -1421,16 +1434,16 @@ class _NodePorts(Ports):
         self._node.log(ScanLog.LEVEL_INFO, Reason.OK, message, pose, frame_id)
 
 
-def _record_first_failure(store, scan_id, failure):
-    """실패 사유를 기록한다. 이미 있으면 덮어쓰지 않고 그 기록을 돌려준다(썼으면 None).
+def _record_first_failure(store, scan_id, failure, pose=None):
+    """실패 사유 · 단계 · 위치를 기록한다. 이미 있으면 덮어쓰지 않고 그 기록을 돌려준다(썼으면 None).
 
-    작업이 실패한 뒤의 안전복귀가 또 실패해도 작업의 실패 원인(예: NO_EDGE)이 남아야 한다.
+    작업이 실패한 뒤의 안전복귀가 또 실패해도 작업의 실패 원인(예: NO_EDGE)과 그때 멈춘 자리가 남아야 한다.
     안전복귀의 실패는 home_return.completed=false 와 /scan/log 에 남는다. 쓰기 스레드에서 돈다.
     """
     existing = store.load(scan_id).failure
     if existing is not None:
         return existing
-    store.record_failure(scan_id, failure)
+    store.record_failure(scan_id, failure, pose)
     return None
 
 

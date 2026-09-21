@@ -636,11 +636,16 @@ class HomeReturn:
 
 @dataclass(frozen=True)
 class FailureRecord:
-    """실패 사유. T10 의 Failure 와 필드 이름이 같다(reason_code · detail · phase)."""
+    """실패 사유 · 단계 · 위치 (BRD 4.2.5). reason_code · detail · phase 는 T10 의 Failure 와 이름이 같다.
+
+    pose 는 실패한 ExecuteMotion 의 정지 좌표(Result.pose)다. Interruption.pose 와 같은 규칙으로,
+    Result 를 못 받았거나 Result.pose 가 채워지지 않았으면 None 이다. 모르는 좌표를 0 으로 채우지 않는다.
+    """
 
     reason_code: int
     detail: str
     phase: Phase  # 실패가 난 phase
+    pose: Optional[PoseRecord] = None
     recorded_at: Optional[Stamp] = None
 
     def __post_init__(self):
@@ -648,24 +653,38 @@ class FailureRecord:
             raise ValueError('실패의 reason_code 는 0 일 수 없다')
         _text(self.detail, 'detail')
         _set(self, phase=_phase(self.phase))
+        if self.pose is not None and not isinstance(self.pose, PoseRecord):
+            raise ValueError('pose 는 PoseRecord 여야 한다')
 
     @classmethod
-    def from_failure(cls, failure, recorded_at=None) -> 'FailureRecord':
-        return cls(int(failure.reason_code), failure.detail, failure.phase, recorded_at)
+    def from_failure(cls, failure, recorded_at=None, pose=None) -> 'FailureRecord':
+        return cls(int(failure.reason_code), failure.detail, failure.phase, pose, recorded_at)
 
     def to_dict(self):
         return {
             'reason_code': self.reason_code,
             'detail': self.detail,
             'phase': self.phase.name,
+            'pose': _dump(self.pose),
+            'pose_valid': self.pose is not None,
             'recorded_at': _dump(self.recorded_at),
         }
 
     @classmethod
     def from_dict(cls, data):
-        return cls(
-            data['reason_code'], data['detail'], _text(data['phase'], 'phase'),
-            _load(Stamp, data['recorded_at']))
+        # pose 는 뒤에 더한 필드다. 두 키가 **함께** 없으면 그 좌표를 남기지 않던 옛 기록이다(schema_version 유지,
+        # result_store/README.md 의 "필드를 더할 때"). 한쪽만 있거나 서로 어긋나면 훼손으로 본다.
+        item = cls(
+            reason_code=data['reason_code'],
+            detail=data['detail'],
+            phase=_text(data['phase'], 'phase'),
+            pose=_load(PoseRecord, data.get('pose')),
+            recorded_at=_load(Stamp, data['recorded_at']),
+        )
+        if 'pose' in data or 'pose_valid' in data:
+            if _bool(data.get('pose_valid'), 'pose_valid') != (item.pose is not None):
+                raise ValueError('pose_valid 가 pose 와 어긋난다')
+        return item
 
 
 # ---- 진행 기록 (progress.json) ----

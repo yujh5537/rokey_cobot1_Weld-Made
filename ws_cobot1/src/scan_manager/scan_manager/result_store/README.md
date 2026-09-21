@@ -27,6 +27,7 @@
 | 항목 | 규칙 |
 |---|---|
 | 헤더 | `schema_version`(현재 1) · `kind`(`contact_scan.progress` / `contact_scan.result`) · `units` |
+| 필드를 더할 때 | **`schema_version`을 올리지 않는다.** 읽는 쪽이 그 키가 없는 옛 파일을 "없음"으로 읽고, 모르는 키는 그냥 넘긴다. `_parse`는 `schema_version`이 다르면 읽지도 않으므로, 올리면 옛 기록이 통째로 `UnsupportedSchemaError`가 된다. 값의 **뜻이 바뀌거나** 없으면 안 되는 필드가 생길 때만 올린다 |
 | 미측정 · 실패 값 | 파일에서 `null` + 짝이 되는 `*_valid=false`. **0을 쓰지 않는다.** NaN · Infinity는 파일에 나오지 않는다(`allow_nan=False`) |
 | 시각 | `{"sec", "nanosec"}` 정수 쌍. float로 바꾸지 않는다 |
 | phase · direction | 이름 문자열(`"EDGE_SEARCH"` · `"POS_X"`). `reason_code`는 정수 |
@@ -46,7 +47,7 @@
 | `measurements.top` · `measurements.edges.{POS_X,NEG_X,POS_Y,NEG_Y}` | 아래 "측정값 한 칸" |
 | `interruptions[]` | 작업 중지 목록. 중지를 접수한 시점의 `phase` · `direction` · `progress`, 중단 위치 `pose`(+`pose_valid`), `during_final_homing`, `stopped_at`, `resumed_at`(`null` = 아직 재시작하지 않음) |
 | `home_return` | 홈 안전복귀의 사실. `requested` · `request_count` · `requested_at` · `interruptions_at_request`(접수 때까지 기록돼 있던 중지의 수. "어느 중지 뒤의 복귀인가"를 시계에 기대지 않고 남긴다) · `origin_phase` · `completed`(`null` = 끝을 모름) · `completed_at` · `final_pose` |
-| `failure` | `reason_code` · `detail` · `phase`(실패가 난 phase) · `recorded_at`. 없으면 `null` |
+| `failure` | `reason_code` · `detail` · `phase`(실패가 난 phase) · 정지 좌표 `pose`(+`pose_valid`) · `recorded_at`. 없으면 `null`. 원인 · 단계 · 위치를 한자리에 남긴다(BRD 4.2.5). `pose`는 실패한 `ExecuteMotion`의 `Result.pose`이고, 얻지 못했으면 `null` + `pose_valid=false`다 (`pose` · `pose_valid`가 **둘 다** 없으면 좌표를 남기지 않던 옛 기록으로 읽는다) |
 | `result_saved` · `result_success` | `result.json`을 썼는지, 그 형상이 성공인지(`null` = 아직 없음) |
 
 **측정값 한 칸**
@@ -113,7 +114,7 @@ store = ResultStore(result_dir, now_fn=lambda: Stamp(*node.get_clock().now().sec
 | `record_top(scan_id, Measurement)` | 윗면 확정. **그 뒤에** `notify(TOP_FOUND)` | `detection.event_type`은 `CONTACT` |
 | `record_edge(scan_id, direction, Measurement)` | 모서리 확정. **그 뒤에** `notify(EDGE_FOUND)` | `EDGE` |
 | `record_attempt_failed(scan_id, target, reason_code, detail='', stop_pose=None)` | 한 점의 탐색 실패(`NO_CONTACT` · `NO_EDGE` …) | `target`은 `TOP` 또는 `Direction` |
-| `record_failure(scan_id, failure)` | `notify(FAILED)` 뒤 | T10의 `sm.failure`를 그대로 넣는다(`reason_code` · `detail` · `phase`) |
+| `record_failure(scan_id, failure, pose=None)` | `notify(FAILED)` 뒤 | T10의 `sm.failure`를 그대로 넣는다(`reason_code` · `detail` · `phase`). `pose`는 그때 로봇이 멈춰 있던 자리(`ExecuteMotion.Result.pose`). 모르면 `None` — **0을 넣지 않는다** |
 | `record_stop(scan_id, Interruption(phase, direction, progress, pose, during_final_homing))` | 정지 완료를 확인하고 중단 위치를 얻은 뒤, **`notify(STOP_CONFIRMED)` 전에**. STOPPED가 된 뒤에야 안전복귀가 접수되므로 그래야 "중지 → 안전복귀"의 순서가 기록에서도 같다 | `phase` 등은 STOP 접수 **직전**의 Snapshot 값. 마무리 HOMING 중이었는지는 호출 측이 밝힌다(store는 추론하지 않는다) |
 | `record_resume(scan_id)` | RESUME이 접수된 뒤 | 가장 최근 중지에 `resumed_at`을 채운다 |
 | `record_home_requested(scan_id, origin_phase=None)` | 안전복귀(HOME)가 접수된 뒤 | 마무리 복귀(7.4절)에는 쓰지 않는다 |
@@ -141,7 +142,7 @@ record = candidate.record                                # 없으면 None → NO
 | `record.top` · `record.edges` · `record.confirmed_edges` | 유지할 기존 측정값 |
 | `record.home_return_since_resume_point` | 재개 지점 뒤에 안전복귀를 접수했다 → `NOT_SUPPORTED`(5.3절). 끝까지 갔는지와 무관하고, **복귀 도중에 다시 중지된 경우에도 참**이다. 순서는 시각이 아니라 `interruptions_at_request`로 본다. `record.home_return_requested`는 "이 작업에서 한 번이라도" |
 | `record.stopped_during_final_homing` · `record.result_saved` · `candidate.result_file_exists` | 측정이 이미 끝난 작업이다 → `NO_RESUMABLE_SCAN`(7.4절). 예외: 재개 지점이 GEOMETRY이고 `result_saved`가 참이면(결과를 쓴 직후 · `GEOMETRY_DONE` 전에 중지) 상태 기계는 재시작을 받는다. 그때는 다시 계산하지 말고 `load_result()`로 읽어 재발행한다 |
-| `record.failure` | 실패로 끝난 작업(재시작 허용 조건은 TBD, #26) |
+| `record.failure` | 실패로 끝난 작업(재시작 허용 조건은 TBD, #26). `failure.pose` = 실패했을 때 멈춰 있던 자리 |
 | `record.last_motion_id` | 재시작 뒤에 `motion_id`를 이어서 발급한다 |
 | `candidate.is_latest` · `candidate.newer_scan_ids` | 더 나중에 시작된 작업이 있는가 |
 | `candidate.skipped_errors` | 후보보다 최신인데 읽지 못한 기록. 조용히 건너뛰지 않으려고 같이 준다 |
