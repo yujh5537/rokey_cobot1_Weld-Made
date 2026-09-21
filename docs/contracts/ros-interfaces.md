@@ -139,7 +139,7 @@ uint8 debounce_count        # 판정을 확정한 연속 횟수
 ```
 - **판정 모드는 샘플의 `operation`에서 얻는다**: `OP_DESCEND` → CONTACT만, `OP_SLIDE` → EDGE만, 그 밖(`OP_NONE` · `OP_MOVE_TO` · `OP_HOME`) → CONTACT/EDGE 판정 안 함. **OVER_FORCE는 모든 모드에서** 원시 외력 크기로 판정한다(영점에 의존하지 않음).
 - **하강 기준과 밀기 기준을 나눈다 [v0.1.12, #109]** — 외력 추정값은 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다(2026-09-21 실기). 그래서 F₀ 하나를 하강과 밀기에 같이 쓰지 않는다.
-  - **CONTACT(하강)**: contact_detector 가 DESCEND 가 시작될 때마다 `descend_tare_delay_s` 뒤 `tare_duration_s` 동안 **이동 중 F₀ 를 자동으로 다시 잡고** 그것으로 판정한다. **모으는 동안 CONTACT 는 보류**한다(OVER_FORCE 는 감시). 잡지 못하면 `/contact/tare` 의 F₀ 로 판정한다. 조건: 보류 구간에 하강하는 거리(하강 속도 × (`descend_tare_delay_s` + `tare_duration_s`))가 탐색 기준점 → 부재 윗면 거리보다 짧아야 한다(`units-frames.md` 탐색 기준점 행).
+  - **CONTACT(하강)**: contact_detector 가 DESCEND 가 시작될 때마다 `descend_tare_delay_s` 뒤 `tare_duration_s` 동안 **이동 중 F₀ 를 자동으로 다시 잡고** 그것으로 판정한다. **모으는 동안 CONTACT 는 보류**한다(OVER_FORCE 는 감시). 잡지 못하면 **다음 `tare_duration_s` 구간을 다시 모으고**(`descend_tare_max_attempts` 회까지, 그동안도 보류), 모두 실패해야 `/contact/tare` 의 F₀ 로 판정한다. 조건: 보류 구간에 하강하는 거리(하강 속도 × (`descend_tare_delay_s` + `descend_tare_max_attempts` × `tare_duration_s`))가 탐색 기준점 → 부재 윗면 거리보다 짧아야 한다(`units-frames.md` 탐색 기준점 행).
   - **EDGE(밀기)**: 판정을 켜는 "누르고 있다" 확인을 F₀ 로 하지 않는다. **z 가 멈췄고(틈을 다 메움) x · y 가 움직이는 중**이면 켠다(`edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`). EDGE 판정 자체는 전과 같이 z 추세선이다.
   - scan_manager 절차는 바뀌지 않는다. 준비 단계의 `/contact/tare`(정지)는 툴 등록 점검으로 그대로 부른다.
 - `/scan/state`는 `scan_id` 태깅에만 쓴다.

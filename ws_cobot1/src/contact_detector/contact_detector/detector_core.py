@@ -205,6 +205,7 @@ class ContactDetector:
         self._dt_state = 'idle'                      # idle · waiting · collecting · done · failed
         self._dt_start: Optional[float] = None
         self._dt_acc: Optional['TareAccumulator'] = None
+        self.descend_tare_attempt = 0                 # 이번 하강에서 몇 번째 구간을 모으는 중인가 (0 = 아직)
         self._prev_operation = OP_NONE
         self._arm_points: Deque[Tuple[float, Vector3]] = deque()   # z 로 켜기: 최근 (시각, 위치)
         self._contact_run = _Run()
@@ -275,20 +276,29 @@ class ContactDetector:
             self._dt_state, self._dt_start = 'waiting', t
             self._dt_acc = TareAccumulator(cfg.tare)
             self.descend_baseline = None
+            self.descend_tare_attempt = 0
         if self._dt_state not in ('waiting', 'collecting'):
             return
         elapsed = t - self._dt_start
         if self._dt_state == 'waiting' and elapsed >= cfg.delay_s:
             self._dt_state = 'collecting'
+            self.descend_tare_attempt = 1
         if self._dt_state == 'collecting':
             self._dt_acc.add(sample)
-            if elapsed >= cfg.delay_s + cfg.duration_s:
+            if elapsed >= cfg.delay_s + self.descend_tare_attempt * cfg.duration_s:
                 result = self._dt_acc.result()
                 self.descend_tare_result = result
                 if result.success:
                     self.descend_baseline, self._dt_state = result.baseline, 'done'
+                elif self.descend_tare_attempt < cfg.max_attempts:
+                    # 정지 F0 로 돌아가지 않고 다음 구간을 다시 모은다. 9/21 실기에서 한 번 실패(모으는 동안 Fz 가
+                    # 2.6 → 1.5 N 으로 흘렀다)한 하강이 정지 F0 로 판정해 윗면 3.8 mm 위에서 거짓 접촉을 냈다.
+                    # 같은 하강의 다음 구간은 성공했다
+                    self.descend_tare_attempt += 1
+                    self._dt_acc = TareAccumulator(cfg.tare)
                 else:
-                    self._dt_state = 'failed'        # /contact/tare 의 F0 로 판정한다(이전 동작)
+                    # 모두 실패하면 /contact/tare 의 F0 로 판정한다. 판정하지 않으면 과대 외력까지 눌러 버린다
+                    self._dt_state = 'failed'
                 self._contact_run.reset()
 
     def update(self, sample: Sample) -> List[Detection]:
@@ -444,11 +454,19 @@ class DescendTareConfig:
     delay_s: float                # DESCEND 가 시작되고 이만큼 지난 뒤 모으기 시작한다(출발 약 4 s 뒤 치우침이 계단식으로 생긴다)
     duration_s: float             # 모으는 길이
     tare: TareConfig              # 샘플 수 · 불안정 · 툴 등록 판정은 /contact/tare 와 같은 기준을 쓴다
+    max_attempts: int = 1         # 실패하면 바로 다음 duration_s 구간으로 다시 모은다. 이 횟수까지. CONTACT 보류는 그만큼 길어진다
 
     def __post_init__(self):
         if not (math.isfinite(self.delay_s) and self.delay_s >= 0
                 and math.isfinite(self.duration_s) and self.duration_s > 0):
             raise ValueError('delay_s 는 0 이상, duration_s 는 0 보다 커야 한다')
+        if self.max_attempts < 1:
+            raise ValueError('max_attempts 는 1 이상이어야 한다')
+
+    @property
+    def withheld_s(self) -> float:
+        """CONTACT 를 보류할 수 있는 가장 긴 시간. 이 동안 내려가는 거리보다 부재 윗면이 아래에 있어야 한다."""
+        return self.delay_s + self.max_attempts * self.duration_s
 
 
 @dataclass(frozen=True)

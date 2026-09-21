@@ -143,6 +143,62 @@ def test_config_rejects_bad_descend_tare_values():
         DescendTareConfig(delay_s=-1.0, duration_s=1.5, tare=DESCEND_TARE.tare)
     with pytest.raises(ValueError):
         DescendTareConfig(delay_s=6.0, duration_s=0.0, tare=DESCEND_TARE.tare)
+    with pytest.raises(ValueError):
+        DescendTareConfig(delay_s=6.0, duration_s=1.5, tare=DESCEND_TARE.tare, max_attempts=0)
+
+
+# ---------------------------------------------------------------- 하강: 자동 영점 재시도
+# 2026-09-21 17 시 실기(#127 시험): 7 회 중 1 회가 첫 구간에서 TARE_UNSTABLE(rms 0.494 N, 모으는 동안
+# Fz 2.6 → 1.5 N). 정지 F0 로 판정해 윗면 3.8 mm 위(185.12)에서 거짓 CONTACT. 같은 하강의 다음 구간은 성공했다
+
+RETRY_TARE = DescendTareConfig(delay_s=6.0, duration_s=1.5, tare=DESCEND_TARE.tare, max_attempts=3)
+
+
+def drift_in(start_s, end_s):
+    """[start_s, end_s) 동안 Fz 가 +0.55 N 에서 -0.55 N 으로 흐른다(rms 약 0.32 N > 0.3)."""
+    return lambda i, t: 0.55 - 1.1 * (t - start_s) / (end_s - start_s) if start_s <= t < end_s else 0.0  # noqa: E731
+
+
+def test_failed_first_window_retries_instead_of_using_the_static_baseline():
+    d = detector(descend_tare=RETRY_TARE)
+    detections = run(d, descent(noise=drift_in(6.0, 7.5)))
+    assert d.descend_tare_state == 'done' and d.descend_tare_attempt == 2
+    contacts = [x for x in detections if x.type == TYPE_CONTACT]
+    assert len(contacts) == 1
+    assert abs(contacts[0].first_sample.position[2] - Z_TOP) < 0.2 * MM   # 공중이 아니라 윗면
+
+
+def test_the_same_drift_without_retry_gives_the_false_contact_in_the_air():
+    """재시도가 없으면(이전 동작) 정지 F0 로 돌아가 공중에서 CONTACT 가 난다. 위 시험이 무엇을 막는지 보인다."""
+    d = detector()
+    contacts = [x for x in run(d, descent(noise=drift_in(6.0, 7.5))) if x.type == TYPE_CONTACT]
+    assert d.descend_tare_state == 'failed'
+    assert contacts and contacts[0].first_sample.position[2] > Z_TOP + 10 * MM
+
+
+def test_contact_is_withheld_while_retrying():
+    d = detector(descend_tare=RETRY_TARE)
+    run(d, descent(seconds=8.0, noise=drift_in(6.0, 7.5)))
+    assert d.descend_tare_state == 'collecting' and d.descend_tare_attempt == 2
+    assert d.contact_withheld
+
+
+def test_all_attempts_failing_falls_back_to_the_static_baseline():
+    """모두 실패하면 정지 F0 로 판정한다. 판정하지 않으면 과대 외력(실기 30 N)까지 눌러 버린다."""
+    d = detector(descend_tare=RETRY_TARE)
+    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t < 10.6 else 0.0   # noqa: E731
+    run(d, descent(seconds=11.0, noise=wobble))
+    assert d.descend_tare_state == 'failed' and d.descend_tare_attempt == 3
+    assert d._judge_baseline() == STATIC_F0
+
+
+def test_withheld_time_covers_every_attempt():
+    assert RETRY_TARE.withheld_s == pytest.approx(6.0 + 3 * 1.5)
+    near_top = Z0 - V_DOWN * (RETRY_TARE.withheld_s - 0.5)          # 마지막 구간 안에서 윗면에 닿는다
+    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t < 9.0 else 0.0   # noqa: E731
+    detections = run(detector(descend_tare=RETRY_TARE),
+                     descent(z_top=near_top, seconds=RETRY_TARE.withheld_s - 0.1, noise=wobble))
+    assert not [x for x in detections if x.type == TYPE_CONTACT]
 
 
 # ---------------------------------------------------------------- 밀기: z 로 판정 켜기

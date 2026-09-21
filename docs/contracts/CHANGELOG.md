@@ -3,12 +3,12 @@
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
 ## v0.1.12 (2026-09-21, 하강 · 밀기 기준 분리, #109)
-타입 변경 없음. `ros-interfaces.md`의 **`/contact/tare` 설명(2장)과 판정 규칙(3.3)**을 고쳤다. 영향: contact_detector(판정 · 파라미터 5개 추가) · scan_manager(절차 변경 없음) · 실기 절차.
+타입 변경 없음. `ros-interfaces.md`의 **`/contact/tare` 설명(2장)과 판정 규칙(3.3)**을 고쳤다. 영향: contact_detector(판정 · 파라미터 6개 추가) · scan_manager(절차 변경 없음) · 실기 절차.
 - 2026-09-21 실기: 외력 추정값이 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다. 정지 F₀ 로 하강하면 큐브 45 mm 위에서 거짓 CONTACT(5-2), 이동 중 F₀ 는 판정 오차 0.016 mm(5-5 · 5-8), 다른 자세의 F₀ 는 1.4 mm 만에 거짓 접촉(5-11). 밀기 중에는 허공에서도 Fx −5 N(5-1)
-- **하강**: contact_detector 가 DESCEND 마다 `descend_tare_delay_s`(실기 6.0 s) 뒤 `tare_duration_s` 동안 이동 중 F₀ 를 자동으로 다시 잡는다. 모으는 동안 CONTACT 보류(OVER_FORCE 는 감시), 실패하면 `/contact/tare` 의 F₀. 보류 구간 하강 거리 < 기준점 → 윗면 거리가 조건(실기 22.5 mm < 107 mm)
+- **하강**: contact_detector 가 DESCEND 마다 `descend_tare_delay_s`(실기 6.0 s) 뒤 `tare_duration_s` 동안 이동 중 F₀ 를 자동으로 다시 잡는다. 모으는 동안 CONTACT 보류(OVER_FORCE 는 감시). 실패하면 다음 구간을 다시 모으고(`descend_tare_max_attempts`, 실기 3), 모두 실패해야 `/contact/tare` 의 F₀. 보류 구간 하강 거리 < 기준점 → 윗면 거리가 조건(실기 31.5 mm < 107 mm). 재시도 근거: 9/21 17 시 실기 시험 7 회 중 1 회가 첫 구간에서 실패했고, 정지 F₀ 로 판정해 윗면 3.8 mm 위에서 거짓 CONTACT. 같은 하강의 다음 구간은 성공
 - **밀기**: EDGE 판정을 켜는 조건을 `|F − F₀| > edge_arm_force_n` 에서 **z 멈춤 + x · y 이동**으로 바꿨다. 하강용 F₀ 를 밀기에 쓰면 옆 이동 이력 때문에 닿기 전에 켜져, 2~4 방향의 틈을 메우는 동안 판정을 쉬게 하는 보호가 사라졌다
 - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 예비 기준으로 남는다. scan_manager 절차는 바뀌지 않는다
-- 새 contact_detector 파라미터(계약 이름 아님): `descend_tare_enabled` · `descend_tare_delay_s` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`. 값은 설계 출발값이며 실기에서 조정한다
+- 새 contact_detector 파라미터(계약 이름 아님): `descend_tare_enabled` · `descend_tare_delay_s` · `descend_tare_max_attempts` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`. 값은 설계 출발값이며 실기에서 조정한다
 
 ## v0.1.11 (2026-09-21, 배치 원칙 · 탐침 전제조건, #108)
 타입 변경 없음. `units-frames.md`에 **배치 원칙**과 **탐침 상태 전제조건** 절을 새로 두고, 2026-09-21 탐침 교체 뒤의 실측으로 z 계열 값을 확정했다. 영향: scan_manager(`search_origin_pose` · `base_to_fixture` · `max_descend_m` 범위) · geometry_estimator(`edge_bias_offset_m`) · T24 · T25 · T30 · 실기 세션 절차. (v0.1.9는 #91에 예약돼 있어 번호가 머지 순서와 다를 수 있다.)

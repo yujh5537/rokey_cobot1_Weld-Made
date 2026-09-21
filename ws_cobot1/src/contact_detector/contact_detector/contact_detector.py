@@ -68,6 +68,7 @@ PARAMS = {
     # 하강 · 밀기 기준 분리 (#109)
     'descend_tare_enabled': Parameter.Type.BOOL,       # DESCEND 중 이동 중 F0 를 자동으로 다시 잡는다
     'descend_tare_delay_s': Parameter.Type.DOUBLE,     # DESCEND 시작 뒤 이만큼 지나서 모은다. 길이는 tare_duration_s
+    'descend_tare_max_attempts': Parameter.Type.INTEGER,   # 실패하면 다음 tare_duration_s 구간으로 다시 모은다. 이 횟수까지
     'edge_arm_still_window_s': Parameter.Type.DOUBLE,  # > 0 이면 EDGE 판정을 z 로 켠다(edge_arm_force_n 대신)
     'edge_arm_still_m': Parameter.Type.DOUBLE,
     'edge_arm_travel_m': Parameter.Type.DOUBLE,
@@ -98,6 +99,10 @@ def stamp_s(stamp) -> float:
 
 def _nan_if_none(value) -> float:
     return math.nan if value is None else float(value)
+
+
+def rms_text(result):
+    return '-' if result.std_vector_n is None else f'{result.std_vector_n:.3f} N'
 
 
 class ContactDetectorNode(Node):
@@ -165,7 +170,8 @@ class ContactDetectorNode(Node):
                        arm_still_window_s=v['edge_arm_still_window_s'] if by_z else None,
                        arm_still_m=v['edge_arm_still_m'] if by_z else None,
                        arm_travel_m=v['edge_arm_travel_m'] if by_z else None),
-            DescendTareConfig(v['descend_tare_delay_s'], v['tare_duration_s'], tare)
+            DescendTareConfig(v['descend_tare_delay_s'], v['tare_duration_s'], tare,
+                              max_attempts=v['descend_tare_max_attempts'])
             if v['descend_tare_enabled'] else None,
         )
 
@@ -238,6 +244,8 @@ class ContactDetectorNode(Node):
             detections = self.detector.update(sample)
             descend_tare = self.detector.descend_tare_result
             self.detector.descend_tare_result = None
+            dt_state = self.detector.descend_tare_state
+            dt_attempt = self.detector.descend_tare_attempt
             no_baseline = msg.valid and self.detector.active_baseline is None
             if no_baseline and msg.operation == OP_SLIDE:
                 self.warn('no_tare', 'SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다')
@@ -251,9 +259,14 @@ class ContactDetectorNode(Node):
                 self.get_logger().info(
                     f'하강 중 자동 영점: {descend_tare.sample_count} samples, |F0| {descend_tare.baseline_norm_n:.2f} N, '
                     f'|F-F0| rms {descend_tare.std_vector_n:.3f} N')
-            else:
+            elif dt_state == 'collecting':
                 self.get_logger().warn(
-                    f'하강 중 자동 영점 실패({descend_tare.error}). /contact/tare 의 F0 로 판정한다')
+                    f'하강 중 자동 영점 실패({descend_tare.error}, |F-F0| rms {rms_text(descend_tare)}). '
+                    f'다음 구간을 다시 모은다 ({dt_attempt}번째). 그동안 CONTACT 보류')
+            else:
+                self.get_logger().error(
+                    f'하강 중 자동 영점이 {dt_attempt}번 모두 실패했다({descend_tare.error}, |F-F0| rms '
+                    f'{rms_text(descend_tare)}). /contact/tare 의 F0 로 판정한다 — 거짓 접촉 가능(#109)')
         if gap:
             self.warn('trend_gap', '샘플 공백으로 EDGE 추세선을 버리고 다시 쌓는다. '
                                    '그동안 접촉 소실을 볼 수 없다')

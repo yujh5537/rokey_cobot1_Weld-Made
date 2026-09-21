@@ -45,7 +45,9 @@ contact_detector:
     descend_tare_enabled: true       # DESCEND 중 이동 중 F0 를 자동으로 다시 잡는다. /contact/tare(정지)는 툴 등록 점검으로 남는다
     descend_tare_delay_s: 6.0        # DESCEND 시작 뒤 이만큼 지나서 tare_duration_s 동안 모은다. 그동안 CONTACT 보류(과대 외력은 감시)
                                      #   근거: 출발 약 4 s 뒤 치우침이 계단식으로 생겼다(5-2), 8 s 뒤 잡은 것은 판정 오차 0.016 mm(5-5 · 5-8)
-                                     #   보류 거리 = 하강 속도 x (6.0 + 1.5) s = 3 mm/s 면 22.5 mm. 홈 → 80 mm 큐브 윗면 107 mm 보다 짧아야 한다
+    descend_tare_max_attempts: 3     # 실패하면 다음 1.5 s 구간을 다시 모은다. 9/21 17 시 실기 7 회 중 1 회 첫 구간 실패 → 정지 F0 로
+                                     #   판정해 윗면 3.8 mm 위 거짓 접촉. 같은 하강의 다음 구간은 성공(rms 0.288). 모두 실패하면 정지 F0
+                                     #   보류 거리 = 하강 속도 x (6.0 + 3 x 1.5) s = 3 mm/s 면 31.5 mm. 홈 → 80 mm 큐브 윗면 107 mm 보다 짧아야 한다
                                      #   설계 출발값이며 실측으로 조정한다
     edge_arm_still_window_s: 0.2     # > 0 이면 EDGE 판정을 z 로 켠다: 이 구간 동안 z 가 edge_arm_still_m 안에 머물고
     edge_arm_still_m: 0.0001         #   x · y 가 edge_arm_travel_m 넘게 움직였으면 "누르고 있다". edge_arm_force_n 은 쓰지 않는다
