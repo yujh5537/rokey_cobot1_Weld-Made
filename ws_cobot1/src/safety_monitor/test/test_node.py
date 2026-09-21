@@ -248,6 +248,33 @@ def test_no_freshness_alarm_before_first_message(rig):
     assert rig.last.level == SafetyStatus.LEVEL_OK and rig.stop_requests == []
 
 
+def test_warn_then_error_does_not_kill_the_node(rig):
+    """rclpy 는 같은 줄에서 severity 가 바뀌면 ValueError 를 던진다. 그러면 타이머 콜백에서 노드가 죽는다.
+
+    2차 감시가 통째로 사라지는 경로라 회귀 테스트로 고정한다 (이슈 #102).
+    """
+    # 1) 서 있는 동안 샘플이 끊긴다 → WARN
+    rig.status(moving=False)
+    rig.send()
+    rig.pump(0.5)                                                         # sample_stale_ms 300 초과
+    assert rig.last.level == SafetyStatus.LEVEL_WARN
+
+    # 2) 같은 조건이 이번에는 STOP 으로 난다 → 같은 자리에서 severity 가 바뀐다
+    rig.status(moving=True)
+    rig.send()
+    rig.pump(0.5)
+    assert rig.last.level == SafetyStatus.LEVEL_STOP
+    assert rig.last.reason_code == ReasonCode.SAMPLE_STALE
+
+    # 노드가 살아서 계속 판정하고 발행한다
+    before = len(rig.status_msgs)
+    rig.send(fz=-40.0)
+    rig.pump(0.3)
+    assert len(rig.status_msgs) > before
+    assert 'OVER_FORCE' in rig.node.state.watch.active                    # 새 조건도 계속 판정한다
+    assert rig.last.reason_code == ReasonCode.SAMPLE_STALE                # reason_code 는 래치를 건 첫 원인
+
+
 def test_set_parameters_validates(rig):
     assert rig.node.set_parameters([Parameter('drop_limit_m', value=0.003)])[0].successful
     assert rig.node.state.watch.limits.drop_limit_m == 0.003

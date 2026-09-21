@@ -154,14 +154,21 @@ class SafetyMonitorNode(Node):
         self.publish()
 
     def react(self, found):
-        """새로 확정된 조건을 처리한다. 정지가 필요하면 요청하고 래치를 건다."""
+        """새로 확정된 조건을 처리한다. 정지가 필요하면 요청하고 래치를 건다.
+
+        error 와 warn 을 **다른 줄에서** 부른다. rclpy 의 RcutilsLogger 는 호출 위치(파일 · 함수 · 줄)마다
+        severity 를 캐시해서, 같은 줄에서 severity 가 바뀌면 ValueError 를 던진다. 그 예외는 타이머 콜백
+        안에서 나므로 아무도 잡지 않고 rclpy.spin 이 터져 **노드가 죽는다 — 2차 감시가 통째로 사라진다**
+        (이슈 #102, 병후가 실제 노드 4개 + Virtual 에서 발견).
+        """
         for condition in found:
             stops = condition.stops or self.state.moving
-            log = self.get_logger().error if stops else self.get_logger().warn
-            log(f'{condition.code}: {condition.detail}' + ('' if stops else ' (정지 중이라 경고만 남긴다)'))
             if stops:
+                self.get_logger().error(f'{condition.code}: {condition.detail}')
                 self.state.note(condition)
                 self.send_stop(condition)
+            else:
+                self.get_logger().warn(f'{condition.code}: {condition.detail} (정지 중이라 경고만 남긴다)')
         self.publish()
 
     # ---------------------------------------------------------------- 정지 요청
