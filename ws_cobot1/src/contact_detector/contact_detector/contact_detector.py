@@ -31,6 +31,7 @@ from rclpy.task import Future
 from contact_detector.sim_source import SimBox, SimSource
 from contact_detector.detector_core import (
     ContactDetector,
+    DescendRefConfig,
     DetectorConfig,
     EdgeConfig,
     OP_DESCEND,
@@ -42,6 +43,7 @@ from contact_detector.detector_core import (
     TARE_UNSTABLE,
     TareAccumulator,
     TareConfig,
+    TYPE_CONTACT,
     TYPE_EDGE,
 )
 
@@ -64,6 +66,15 @@ PARAMS = {
     'tare_min_samples': Parameter.Type.INTEGER,
     'tare_max_std_n': Parameter.Type.DOUBLE,
     'tare_max_force_n': Parameter.Type.DOUBLE,
+    # 하강 · 밀기 기준 분리 (#109)
+    'descend_ref_window_s': Parameter.Type.DOUBLE,     # > 0 이면 DESCEND 의 F0 를 최근 이 구간의 외력 평균(이동 기준)으로 둔다
+    'descend_ref_lag_s': Parameter.Type.DOUBLE,        # 구간에서 가장 최근 이만큼은 뺀다
+    'descend_ref_min_samples': Parameter.Type.INTEGER, # 구간 안의 샘플이 이보다 적으면 기준이 없다(둔한 판정)
+    'descend_hold_threshold_n': Parameter.Type.DOUBLE, # 이동 기준이 없는 동안(출발 직후 · 공백 뒤)의 CONTACT 임계
+    'descend_ref_settle_s': Parameter.Type.DOUBLE,     # 출발 뒤 이 시간까지는 둔한 판정(계단식 치우침이 구간을 지나갈 때까지)
+    'edge_arm_still_window_s': Parameter.Type.DOUBLE,  # > 0 이면 EDGE 판정을 z 로 켠다(edge_arm_force_n 대신)
+    'edge_arm_still_m': Parameter.Type.DOUBLE,
+    'edge_arm_travel_m': Parameter.Type.DOUBLE,
 }
 
 # source = 'sim' 일 때만 필요한 파라미터
@@ -148,11 +159,19 @@ class ContactDetectorNode(Node):
 
     @staticmethod
     def _configs(v):
+        by_z = v['edge_arm_still_window_s'] > 0
+        tare = TareConfig(v['tare_min_samples'], v['tare_max_std_n'], v['tare_max_force_n'])
         return (
             DetectorConfig(v['contact_threshold_n'], v['debounce_n'], v['over_force_n'], v['over_force_debounce_n']),
             EdgeConfig(v['edge_drop_m'], v['debounce_n'], v['edge_arm_force_n'],
                        v['edge_trend_window_s'], v['edge_trend_min_samples'],
-                       max_gap_s=v['stale_age_ms'] * 1e-3),
+                       max_gap_s=v['stale_age_ms'] * 1e-3,
+                       arm_still_window_s=v['edge_arm_still_window_s'] if by_z else None,
+                       arm_still_m=v['edge_arm_still_m'] if by_z else None,
+                       arm_travel_m=v['edge_arm_travel_m'] if by_z else None),
+            DescendRefConfig(v['descend_ref_window_s'], v['descend_ref_lag_s'], v['descend_ref_min_samples'],
+                             v['descend_hold_threshold_n'], v['descend_ref_settle_s'])
+            if v['descend_ref_window_s'] > 0 else None,
         )
 
     def on_set_parameters(self, params):
@@ -164,14 +183,17 @@ class ContactDetectorNode(Node):
             if p.name in changed:
                 changed[p.name] = p.value
         try:
-            config, edge_config = self._configs(changed)
+            config, edge_config, descend_ref = self._configs(changed)
             if changed['stale_age_ms'] <= 0:
                 raise ValueError('stale_age_ms 는 0 보다 커야 한다')
         except (TypeError, ValueError) as e:
             return SetParametersResult(successful=False, reason=str(e))
         with self.lock:
             baseline = self.detector.baseline
-            self.detector = ContactDetector(config, edge_config)
+            # 이동 기준 구간은 옮기지 않는다. 다음 샘플에서 하강이 새로 시작된 것으로 보고 다시 쌓는다.
+            # 그동안 CONTACT 는 끄지 않고 descend_hold_threshold_n 으로 본다(/contact/tare 의 F0 는 넘겨준다).
+            # 이미 닿아 있는 채로 바꾸면 그 순간의 F 가 기준이 될 수 있으니 하강 중에는 바꾸지 않는다
+            self.detector = ContactDetector(config, edge_config, descend_ref)
             self.detector.set_baseline(baseline)
             self.values = changed
         return SetParametersResult(successful=True)
@@ -220,10 +242,24 @@ class ContactDetectorNode(Node):
             if self.tare is not None:
                 self.tare.add(sample)
             detections = self.detector.update(sample)
-            if msg.valid and msg.operation == OP_SLIDE and self.detector.baseline is None:
+            contact_ref = self.detector.active_baseline
+            no_baseline = msg.valid and self.detector.active_baseline is None
+            if no_baseline and msg.operation == OP_SLIDE:
                 self.warn('no_tare', 'SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다')
+            if no_baseline and msg.operation == OP_DESCEND:
+                self.warn('no_tare_descend', 'DESCEND 인데 기준값 F0 가 없다(tare 전). '
+                                             'CONTACT 를 판정하지 않는다 — 과대 외력만 멈춘다')
             events = [self.to_event(d) for d in detections]
             gap = self.detector.trend_gap
+        for detection in detections:
+            if detection.type == TYPE_CONTACT and detection.hold:
+                self.get_logger().warn(
+                    f'CONTACT 를 올린 임계 {self.values["descend_hold_threshold_n"]} N 으로 확정했다(이동 기준이 아직 없음, '
+                    f'|F-F0| {detection.force_delta_n:.2f} N). 측정 품질이 낮다 — 출발 직후 · 공백 뒤에 닿았다')
+            elif detection.type == TYPE_CONTACT and contact_ref is not None:
+                self.get_logger().info(
+                    f'CONTACT: 기준 |F0| {math.sqrt(sum(c * c for c in contact_ref)):.2f} N, '
+                    f'|F-F0| {detection.force_delta_n:.2f} N, z={detection.first_sample.position[2]:.5f} m')
         if gap:
             self.warn('trend_gap', '샘플 공백으로 EDGE 추세선을 버리고 다시 쌓는다. '
                                    '그동안 접촉 소실을 볼 수 없다')

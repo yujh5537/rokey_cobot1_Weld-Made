@@ -44,6 +44,15 @@ contact_detector:
                                      #             툴 미등록 11~12.5 N. 두 구간 사이가 벌어져 있어 6 N 으로 가른다
                                      #   낮게 잡으면 안 되는 이유: 탐침이 홀더 안으로 밀리는 중이면 |F0| 가 올라갈 수 있고(PR #80),
                                      #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
+    # --- 하강 · 밀기 기준 분리 (#109). 값의 근거는 real.yaml ---
+    descend_ref_window_s: 1.0        # sim 도 같은 경로를 탄다. sim 외력은 무접촉이면 0 이라 이동 기준도 0 근처다
+    descend_ref_lag_s: 0.3
+    descend_ref_min_samples: 10
+    descend_ref_settle_s: 5.5
+    descend_hold_threshold_n: 6.0
+    edge_arm_still_window_s: 0.2     # z 로 EDGE 판정 켜기. sim 은 틈을 sim_fall_speed_mps 로 메운 뒤 윗면을 따라간다
+    edge_arm_still_m: 0.0001
+    edge_arm_travel_m: 0.0005
 
     # --- sim 입력원 전용: 가상 직육면체 (T07). 실제 부재와 무관한 가상값. 이름은 정의서 6.2 ---
     sim_box_frame_id: base_link            # 아래 좌표의 프레임. RobotSample.frame_id 와 다르면 sim 은 판정하지 않는다
