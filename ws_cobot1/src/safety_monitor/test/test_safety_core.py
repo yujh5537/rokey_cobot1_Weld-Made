@@ -20,8 +20,9 @@ from safety_monitor.safety_core import (
 
 MM = 1e-3
 # 테스트용 값이다. 실기 · sim 의 값은 contact_scan_bringup/config/*.yaml 에 있다
+# startup_grace_s=0.0: 기동 유예 없음(유예는 전용 테스트에서 본다)
 LIMITS = SafetyLimits(over_force_n=30.0, drop_limit_m=5 * MM, sample_stale_ms=200,
-                      robot_status_timeout_ms=500, confirm_n=1)
+                      robot_status_timeout_ms=500, confirm_n=1, startup_grace_s=0.0)
 Z0 = 0.080
 
 
@@ -61,11 +62,11 @@ def test_over_force_in_every_operation_without_tare():
 
 
 def test_confirm_n_requires_consecutive_samples():
-    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3))
+    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
     assert w.on_sample(sample(fz=-40.0)) == [] and w.on_sample(sample(fz=-40.0)) == []
     assert [c.code for c in w.on_sample(sample(fz=-40.0))] == [OVER_FORCE]
     # 한 샘플만 튀면 확정되지 않는다
-    w2 = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3))
+    w2 = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
     for fz in (-40.0, -40.0, -10.0, -40.0, -40.0):
         assert w2.on_sample(sample(fz=fz)) == []
 
@@ -116,8 +117,9 @@ def test_both_conditions_in_one_sample():
 
 
 def test_limits_reject_bad_values():
-    for args in ((0.0, 5 * MM, 200, 500, 1), (30.0, 0.0, 200, 500, 1),
-                 (30.0, 5 * MM, 0, 500, 1), (30.0, 5 * MM, 200, 0, 1), (30.0, 5 * MM, 200, 500, 0)):
+    for args in ((0.0, 5 * MM, 200, 500, 1, 0.0), (30.0, 0.0, 200, 500, 1, 0.0),
+                 (30.0, 5 * MM, 0, 500, 1, 0.0), (30.0, 5 * MM, 200, 0, 1, 0.0),
+                 (30.0, 5 * MM, 200, 500, 0, 0.0), (30.0, 5 * MM, 200, 500, 1, -1.0)):
         with pytest.raises(ValueError):
             SafetyLimits(*args)
 
@@ -125,7 +127,7 @@ def test_limits_reject_bad_values():
 def test_set_limits_keeps_reference_z():
     w = watch()
     w.on_sample(sample(z=Z0, operation=OP_SLIDE))
-    w.set_limits(SafetyLimits(30.0, 3 * MM, 200, 500, 1))               # SetConfig 로 더 엄하게
+    w.set_limits(SafetyLimits(30.0, 3 * MM, 200, 500, 1, 0.0))               # SetConfig 로 더 엄하게
     assert [c.code for c in w.on_sample(sample(z=Z0 - 3.5 * MM, operation=OP_SLIDE))] == [DROP_LIMIT]
 
 
@@ -133,18 +135,34 @@ def test_set_limits_keeps_reference_z():
 
 def test_freshness_not_watched_before_first_message():
     # 기동 직후. 아직 한 번도 못 받았으면 감시하지 않는다(그러지 않으면 뜨자마자 래치가 걸린다)
-    assert watch().check_freshness(now_s=100.0, last_sample_s=None, last_status_s=None) == []
+    assert watch().check_freshness(now_s=100.0, last_sample_s=None, last_status_s=None, uptime_s=99.0) == []
 
 
 def test_sample_and_status_timeouts():
     w = watch()
-    assert w.check_freshness(10.0, last_sample_s=9.9, last_status_s=9.9) == []
-    found = w.check_freshness(10.0, last_sample_s=9.7, last_status_s=9.9)
+    assert w.check_freshness(10.0, last_sample_s=9.9, last_status_s=9.9, uptime_s=99.0) == []
+    found = w.check_freshness(10.0, last_sample_s=9.7, last_status_s=9.9, uptime_s=99.0)
     assert [c.code for c in found] == [SAMPLE_STALE] and '300 ms 동안 수신 없음' in found[0].detail
-    assert w.check_freshness(10.0, 9.7, 9.9) == []                      # 되풀이하지 않는다
-    assert [c.code for c in w.check_freshness(10.0, 9.7, 9.4)] == [ROBOT_STATUS_LOST]
-    assert w.check_freshness(10.0, 10.0, 10.0) == []                    # 다시 들어오면 해소
+    assert w.check_freshness(10.0, 9.7, 9.9, uptime_s=99.0) == []                      # 되풀이하지 않는다
+    assert [c.code for c in w.check_freshness(10.0, 9.7, 9.4, uptime_s=99.0)] == [ROBOT_STATUS_LOST]
+    assert w.check_freshness(10.0, 10.0, 10.0, uptime_s=99.0) == []                    # 다시 들어오면 해소
     assert w.active == {}
+
+
+def test_startup_grace_skips_freshness_watch():
+    """기동 직후에는 노드들이 순차로 준비되어 샘플 주기가 불안정하다. 그 공백으로 래치를 걸지 않는다."""
+    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, 1, startup_grace_s=3.0))
+    assert w.check_freshness(10.0, last_sample_s=9.0, last_status_s=9.0, uptime_s=1.0) == []
+    assert w.active == {}
+    # 유예가 지나면 감시한다
+    found = w.check_freshness(10.0, last_sample_s=9.0, last_status_s=9.0, uptime_s=3.1)
+    assert sorted(c.code for c in found) == [ROBOT_STATUS_LOST, SAMPLE_STALE]
+
+
+def test_startup_grace_does_not_delay_force_or_drop():
+    """과대 외력 · 하강 제한은 기동과 무관한 실제 위험이라 유예하지 않는다."""
+    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, 1, startup_grace_s=3.0))
+    assert [c.code for c in w.on_sample(sample(fz=-40.0))] == [OVER_FORCE]
 
 
 # ---------------------------------------------------------------- 정지 요청
@@ -252,7 +270,7 @@ def test_reset_is_idempotent_without_latch():
 def test_freshness_stops_only_while_moving():
     st = state()
     st.moving = False
-    found = st.watch.check_freshness(10.0, last_sample_s=9.0, last_status_s=10.0)
+    found = st.watch.check_freshness(10.0, last_sample_s=9.0, last_status_s=10.0, uptime_s=99.0)
     assert [c.code for c in found] == [SAMPLE_STALE]
     assert not found[0].stops and st.stopping_conditions() == []
     assert st.level() is Level.WARN                                     # 서 있으면 경고만
@@ -276,17 +294,17 @@ def test_issue_53_second_watch_fires_on_the_same_sample_as_the_first():
 
     confirm_n 으로 2차를 늦출 수 있다(값과 기준 z 는 그대로다). 이슈 #53 의 판단 자료다.
     """
-    same = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=1))
+    same = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=1, startup_grace_s=0.0))
     same.on_sample(sample(z=Z0))
     assert [c.code for c in same.on_sample(sample(z=Z0 - 5.1 * MM))] == [DROP_LIMIT]
 
-    delayed = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3))
+    delayed = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
     delayed.on_sample(sample(z=Z0))
     assert delayed.on_sample(sample(z=Z0 - 5.1 * MM)) == []             # 1차가 정지시킬 틈이 생긴다
     assert delayed.on_sample(sample(z=Z0 - 5.2 * MM)) == []
     assert [c.code for c in delayed.on_sample(sample(z=Z0 - 5.3 * MM))] == [DROP_LIMIT]
     # 1차가 제때 멈춰 하강이 멎으면 2차는 걸리지 않는다
-    stopped = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3))
+    stopped = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
     stopped.on_sample(sample(z=Z0))
     assert stopped.on_sample(sample(z=Z0 - 5.1 * MM)) == []
     assert stopped.on_sample(sample(z=Z0 - 4.0 * MM)) == []
