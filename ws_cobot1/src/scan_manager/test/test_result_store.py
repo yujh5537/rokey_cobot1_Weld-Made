@@ -124,7 +124,7 @@ def test_everything_survives_a_new_instance(store):
     store.record_state(snapshot(phase=Phase.EDGE_SEARCH, direction=Direction.POS_X, motion_id=2))
     store.record_edge(SCAN_A, Direction.POS_X, edge_measurement(Direction.POS_X))
     store.record_attempt_failed(SCAN_A, Direction.NEG_X, 301, 'max_distance', stop_pose=pose())
-    store.record_failure(SCAN_A, Failure(301, 'max_distance', Phase.EDGE_SEARCH))
+    store.record_failure(SCAN_A, Failure(301, 'max_distance', Phase.EDGE_SEARCH), pose(0.3))
     written = store.record_state(snapshot(phase=Phase.ERROR, progress=1))
 
     record = reopen(store).load(SCAN_A)
@@ -138,6 +138,7 @@ def test_everything_survives_a_new_instance(store):
     assert record.edges[Direction.POS_Y].status == STATUS_NOT_ATTEMPTED
     assert record.confirmed_edges == (Direction.POS_X,)
     assert record.failure.phase is Phase.EDGE_SEARCH and record.failure.reason_code == 301
+    assert record.failure.pose == pose(0.3)      # 원인 · 단계 · 위치가 같이 남는다(BRD 4.2.5)
     assert record.revision == 8 and record.updated_at.ns > record.started_at.ns
 
 
@@ -606,6 +607,31 @@ def test_zero_in_place_of_null_is_corrupt(store):
     corrupt(store, SCAN_A, text.replace('"z_drop_m": null', '"z_drop_m": 0.0'))
     with pytest.raises(CorruptRecordError, match='0 금지'):
         store.load(SCAN_A)
+
+
+def test_a_failure_without_a_position_is_null_in_the_file(store):
+    """위치를 모르는 실패. 0 · (0, 0, 0) 이 아니라 null + pose_valid=false 다(규칙 4)."""
+    begin(store)
+    store.record_failure(SCAN_A, Failure(300, '접촉이 없다', Phase.TOP_SEARCH))
+    failure = json.loads(progress_path(store).read_text(encoding='utf-8'))['failure']
+    assert failure['pose'] is None and failure['pose_valid'] is False
+    assert reopen(store).load(SCAN_A).failure.pose is None
+
+
+def test_a_failure_recorded_before_the_pose_field_still_loads(store):
+    """pose 를 남기지 않던 옛 기록(같은 schema_version). 그대로 읽히고, 이어서 쓸 수 있다."""
+    begin(store)
+    store.record_failure(SCAN_A, Failure(300, '접촉이 없다', Phase.TOP_SEARCH), pose())
+    data = json.loads(progress_path(store).read_text(encoding='utf-8'))
+    assert data['failure'].pop('pose_valid') is True and data['failure'].pop('pose') is not None
+    corrupt(store, SCAN_A, json.dumps(data))
+
+    record = reopen(store).load(SCAN_A)
+    assert (record.failure.reason_code, record.failure.phase) == (300, Phase.TOP_SEARCH)
+    assert record.failure.pose is None            # 남기지 않은 좌표를 지어내지 않는다
+    store.record_state(snapshot(phase=Phase.ERROR))
+    again = json.loads(progress_path(store).read_text(encoding='utf-8'))['failure']
+    assert again['pose'] is None and again['pose_valid'] is False
 
 
 def test_scan_id_in_file_must_match_directory(store):

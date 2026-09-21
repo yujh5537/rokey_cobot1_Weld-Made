@@ -53,7 +53,7 @@ DISCOVERY_SETTLE_S = 1.0
 
 class SimProcess:
 
-    def __init__(self, result_dir, with_latency=True):
+    def __init__(self, result_dir, with_latency=True, overrides=None):
         data = yaml.safe_load(SIM_YAML.read_text(encoding='utf-8'))
         params = data['scan_manager']['ros__parameters']
         self.yaml_params = params
@@ -70,6 +70,9 @@ class SimProcess:
             '--ros-args', '--params-file', str(params_file), '-p', f'result_dir:={result_dir}']
         if with_latency:
             self._command += ['-p', f'detect_latency_s:={TEST_LATENCY_S}']
+        for name, value in (overrides or {}).items():   # yaml 의 값을 이 실행에서만 바꾼다
+            params[name] = value
+            self._command += ['-p', f'{name}:={value}']
         self.lines = []
         self._closed = False
         self.spawn()
@@ -254,6 +257,32 @@ def test_full_scan_with_sim_yaml_in_a_real_process(sim, tmp_path):
 
     assert rig.close() == 0, rig.log()
     assert 'Traceback' not in rig.log() and '[ERROR]' not in rig.log(), rig.log()
+
+
+def test_a_search_failure_records_the_cause_the_phase_and_the_position(sim, tmp_path):
+    """이슈 #19 완료 조건 3: 최대 이동 거리 안에 접촉이 없으면 원인 · 단계 · **위치**를 남긴다(BRD 4.2.5).
+
+    max_descend_m 을 상자 윗면보다 짧게 줄여 NO_CONTACT(300) 을 만든다. 실기 · Virtual Mode 를 쓰지 않는다.
+    """
+    rig = sim(overrides={'max_descend_m': 0.01})
+    result = rig.run_scan()
+
+    assert not result.success and result.reason_code == Reason.NO_CONTACT, rig.log()
+    progress = _progress(tmp_path, result.scan_id)
+    failure = progress['failure']
+    assert failure['reason_code'] == int(Reason.NO_CONTACT) and failure['phase'] == 'TOP_SEARCH'
+    assert failure['pose_valid'] is True and failure['pose'] is not None
+    stopped = failure['pose']
+    assert stopped['frame_id'] == 'base_link'                     # 판정 · 정지 좌표의 프레임
+    assert (stopped['stamp']['sec'], stopped['stamp']['nanosec']) != (0, 0)
+    origin = rig.yaml_params['search_origin_pose']
+    assert stopped['position_m'][:2] == pytest.approx(origin[:2])          # 기준점에서 내려가기만 했다
+    assert stopped['position_m'][2] == pytest.approx(origin[2] - 0.01)     # 0.01 만큼만 내려가고 멈췄다
+    assert failure['pose'] == progress['measurements']['top']['stop_pose']  # 한 모션의 같은 정지 좌표
+    assert progress['state']['phase'] == 'ERROR' and progress['result_saved'] is False
+
+    assert rig.close() == 0, rig.log()
+    assert 'Traceback' not in rig.log(), rig.log()
 
 
 def test_sim_yaml_as_is_refuses_start_and_names_the_missing_value(sim):

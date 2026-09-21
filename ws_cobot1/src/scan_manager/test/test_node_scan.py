@@ -378,6 +378,11 @@ def test_search_failure_is_recorded_and_never_returns_home(rig, op, direction, b
     target = record.top if op is Operation.DESCEND else record.edges[direction]
     assert target.status == STATUS_FAILED and target.reason_code == code
     assert target.stop_pose is not None and not record.result_saved
+    # 위치: 실패한 모션의 정지 좌표가 실패 기록에도 남는다(BRD 4.2.5)
+    assert record.failure.pose == target.stop_pose
+    assert record.failure.pose.frame_id == 'base_link'
+    logged = errors[0].pose.position                      # /scan/log 에 실은 좌표와 같은 자리다
+    assert record.failure.pose.position_m == (logged.x, logged.y, logged.z)
 
     # 결과는 실패로 1회 발행된다. 얻지 못한 값은 NaN + *_valid=false 이고 0 이 아니다
     assert rig.wait(lambda: rig.results) and len(rig.results) == 1
@@ -402,6 +407,20 @@ def test_rejected_motion_goal_fails_without_guessing_the_reason(rig):
     assert 'goal rejected' in result.detail
     assert rig.node.state_machine.phase is Phase.ERROR
     assert not RETURN_OPS & set(rig.operations())
+
+
+def test_a_failure_before_any_result_records_the_cause_without_a_position(rig):
+    """첫 모션의 goal 이 거절돼 Result 가 하나도 없다. 원인 · 단계는 남고 위치는 null 이다(0 이 아니다)."""
+    rig.peers.reject_operations.add(int(Operation.MOVE_TO))
+
+    result = rig.run()
+
+    assert not result.success and result.reason_code == Reason.ROBOT_ERROR
+    assert rig.peers.goals == [] and rig.peers.rejected
+    record = rig.store().load(result.scan_id)
+    assert record.failure.phase is Phase.PREPARING and 'goal rejected' in record.failure.detail
+    assert record.failure.pose is None
+    assert not rig.error_logs()[0].pose_valid
 
 
 def test_latch_between_motions_blocks_the_next_motion(rig):
@@ -441,6 +460,7 @@ def test_result_without_a_pose_is_not_recorded_as_the_origin(rig):
     assert result.reason_code == Reason.ROBOT_ERROR
     record = rig.store().load(result.scan_id)
     assert record.top.status == STATUS_FAILED and record.top.stop_pose is None   # (0, 0, 0) 을 적지 않는다
+    assert record.failure.reason_code == Reason.ROBOT_ERROR and record.failure.pose is None
     error = rig.error_logs()[0]
     # 이 모션의 정지 좌표는 모른다. 직전 모션의 좌표를 "정지 좌표"라고 싣지도, (0, 0, 0) 을 싣지도 않는다
     assert not error.pose_valid and math.isnan(error.pose.position.z) and '좌표 없음' in error.message
@@ -464,6 +484,20 @@ def test_coordinates_in_another_frame_are_not_used(rig, behavior, code):
         assert 'frame_id' in result.detail and rig.operations() == [Operation.MOVE_TO]
 
 
+def test_a_result_in_another_frame_is_not_a_stop_position_either(rig):
+    """다른 프레임의 Result.pose 는 정지 좌표가 아니다. 그 모션은 로봇을 움직였으므로 앞 좌표로 대신하지 않는다."""
+    rig.peers.behavior[F.key(Operation.DESCEND)] = F.RESULT_WRONG_FRAME
+
+    result = rig.run()
+
+    assert not result.success and result.reason_code == Reason.ROBOT_ERROR
+    assert rig.operations() == [Operation.MOVE_TO, Operation.DESCEND]
+    record = rig.store().load(result.scan_id)
+    assert record.failure.phase is Phase.TOP_SEARCH and record.failure.pose is None
+    assert record.top.status == STATUS_FAILED and record.top.stop_pose is None
+    assert not rig.error_logs()[0].pose_valid          # 로그도 앞 모션의 좌표를 싣지 않는다
+
+
 # 이 시험만 server_wait_timeout_s 가 지나는 것 자체를 본다. 기본값(2.0 s)으로는 가짜의 지연도 그만큼
 # 길어져 시험이 느려지므로 이 rig 만 짧게 둔다. 부하가 걸려도 둘이 뒤집히지 않게 지연을 한도의 5 배로 준다.
 LATE_ACCEPT_TIMEOUT_S = 0.5
@@ -485,6 +519,10 @@ def test_goal_accepted_too_late_is_stopped_not_left_running(make_rig):
     assert rig.peers.stop_requests[0].requester == 'scan_manager'
     assert rig.wait(lambda: not rig.peers._moving)
     assert not RETURN_OPS & set(rig.operations())
+    # 늦게 수락된 하강은 로봇을 움직였다. 어디서 멈췄는지 모르므로 앞 모션(기준점 이동)의 좌표를 적지 않는다
+    record = rig.store().load(result.scan_id)
+    assert record.failure.reason_code == Reason.ROBOT_DISCONNECTED
+    assert record.failure.pose is None
 
 
 def test_tare_failure_code_is_passed_through(rig):
@@ -507,6 +545,7 @@ def test_final_homing_failure_keeps_the_measurement_result(rig):
     record = rig.store().load(result.scan_id)
     assert record.result_saved and record.result_success
     assert record.failure.phase is Phase.HOMING
+    assert record.failure.pose is not None      # 복귀 도중 어디서 멈췄는지도 남는다
 
 
 # ---- 작업 중지 ----
@@ -559,6 +598,9 @@ def test_failure_while_stopping_is_an_error_not_a_stop(rig):
     record = rig.store().load(result.scan_id)
     assert record.interruptions == [] and record.failure.reason_code == Reason.OVER_FORCE
     assert record.edges[Direction.POS_Y].status == STATUS_FAILED
+    # 중지에 가려지지 않은 실패다. 위치도 그 모션이 멈춘 자리로 남는다
+    stop_pose = record.edges[Direction.POS_Y].stop_pose
+    assert stop_pose is not None and record.failure.pose == stop_pose
     assert not RETURN_OPS & set(rig.operations())
 
 
@@ -992,6 +1034,21 @@ def test_stop_between_motions_records_where_the_robot_is(rig):
     assert result.success and slides(rig.peers.goals[3:])[0] is Direction.NEG_X
 
 
+def test_a_resume_that_fails_before_any_motion_keeps_the_stop_position(rig):
+    """재시작의 첫 goal 이 거절돼 Result 가 없다. 로봇은 중단 위치 그대로이므로 그 좌표를 실패에 적는다."""
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    before = rig.store().load(stopped.scan_id)
+    rig.peers.reject_operations.add(int(Operation.MOVE_TO))   # 재시작 준비의 올림
+
+    result = resume(rig)
+
+    assert not result.success and result.reason_code == Reason.ROBOT_ERROR
+    record = rig.store().load(stopped.scan_id)
+    assert record.failure.phase is Phase.RESUMING
+    assert before.interruptions[0].pose is not None
+    assert record.failure.pose == before.interruptions[0].pose
+
+
 def test_resume_after_the_safe_return_is_not_supported_and_keeps_the_record(rig):
     stopped = stop_at_goal(rig, SLIDE_POS_X)
     before = rig.store().load(stopped.scan_id)
@@ -1101,12 +1158,14 @@ def test_resume_uses_the_recorded_settings_not_a_later_set_config(rig):
 def test_a_failed_safe_return_does_not_overwrite_why_the_scan_failed(rig):
     rig.peers.behavior[F.key(Operation.SLIDE, Direction.NEG_X)] = F.MAX_DISTANCE
     failed = rig.run()
+    first = rig.store().load(failed.scan_id).failure
     rig.peers.behavior[F.key(Operation.HOME)] = F.ROBOT_ERROR
 
     assert not rig.home().success
 
     record = rig.store().load(failed.scan_id)
     assert record.failure.reason_code == Reason.NO_EDGE and record.failure.phase is Phase.EDGE_SEARCH
+    assert record.failure.pose == first.pose        # 복귀가 멈춘 자리로 바뀌지 않는다
     assert record.home_return.requested and record.home_return.completed is False
 
 

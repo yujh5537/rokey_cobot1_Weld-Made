@@ -654,7 +654,8 @@ class ScanManager(Node):
         except _Closing:
             outcome = None
         except Exception as exc:  # 기록 실패 등. 모션은 동기로 기다리므로 이 시점에 진행 중인 모션은 없다
-            outcome = self._internal_failure(job, exc)   # 종료가 깨운 예외면 None(= _Closing 과 같다)
+            # 종료가 깨운 예외면 None(= _Closing 과 같다)
+            outcome = self._internal_failure(job, exc, ports=ports)
         finally:
             # 예외로 끝나도 남긴다. 같은 작업의 안전복귀 · 재시작이 motion_id 를 이어서 발급한다(계약 6.2절).
             # 모션 없이 끝난 재시작(last_motion_id = 0)이 앞선 번호를 지우지 않게 큰 쪽을 둔다.
@@ -763,11 +764,12 @@ class ScanManager(Node):
                 self._matcher.end()  # 그 사이에 새 작업이 접수됐으면 그 작업의 matcher 를 지우지 않는다
                 self._job = None
 
-    def _internal_failure(self, job, exc, recorded=True):
+    def _internal_failure(self, job, exc, recorded=True, ports=None):
         """돌던 명령이 예외로 끝났다. 종료 중이면 None 을 돌려준다(_Closing 과 같은 취급).
 
         종료 경로에서 터진 예외(context 가 내려간 뒤의 발행 · 기록)는 작업의 실패가 아니다. 여기서 FAILED 로
         보내면 그 전이가 다시 발행을 부르고(ERROR), 그것도 터져 "실패 처리도 실패" 와 트레이스백이 남는다.
+        ports 를 주면 그 작업이 아는 정지 좌표가 실패 기록에 남는다(BRD 4.2.5 의 "위치").
         """
         if self._shutting_down():
             self.get_logger().info(f'종료 중 예외. 작업의 실패로 남기지 않는다: {exc!r}')
@@ -775,7 +777,9 @@ class ScanManager(Node):
         detail = f'internal: {exc!r}'
         self.get_logger().error(detail)
         try:
-            _NodePorts(self, job, recorded=recorded).fail(int(Reason.ROBOT_ERROR), detail, None)
+            if ports is None:
+                ports = _NodePorts(self, job, recorded=recorded)
+            ports.fail(int(Reason.ROBOT_ERROR), detail, None)
         except Exception as nested:
             self.get_logger().error(f'실패 처리도 실패: {nested!r}')
         if self.state_machine.is_busy:
@@ -851,7 +855,7 @@ class ScanManager(Node):
             outcome, final = None, None
         except Exception as exc:
             # 종료가 깨운 예외면 _internal_failure 가 None 을 준다(= _Closing 과 같다)
-            outcome, final = self._internal_failure(job, exc, recorded), None
+            outcome, final = self._internal_failure(job, exc, recorded, ports), None
         finally:
             if ports.last_motion_id:
                 self._last_motion_id[job.scan_id] = max(
@@ -1176,13 +1180,32 @@ class _NodePorts(Ports):
         self.last_motion_id = 0
         self.last_result = None   # 가장 최근에 받은 Result (정지 좌표의 출처)
         self._last_event = None   # 가장 최근에 짝이 맞은 ContactEvent (판정 좌표의 출처)
+        # 이번 모션에서 로봇이 움직였을 수 있는데 쓸 수 있는 Result.pose 가 없다 → 정지 좌표를 모른다.
+        # 앞 모션의 좌표를 이 모션의 정지 좌표라고 적지 않으려고 따로 둔다(모르는 값을 채우지 않는다).
+        self._stop_pose_unknown = False
 
     def _stop_pose(self):
-        """(정지 좌표의 원본 Pose, frame_id). 받은 Result 가 없거나 pose 가 채워지지 않았으면 (None, '')."""
+        """(정지 좌표의 원본 Pose, frame_id). 이 모션의 정지 좌표를 모르면 (None, '')."""
         raw = self.last_result.raw if self.last_result is not None else None
-        if raw is None or not conversions.has_stop_pose(raw):
+        if self._stop_pose_unknown or raw is None or not conversions.has_stop_pose(raw):
             return None, ''
         return raw.pose, raw.frame_id
+
+    def _stop_pose_record(self):
+        """정지 좌표(PoseRecord). 기록에 남길 "로봇이 마지막으로 멈춘 자리"다. 모르면 None.
+
+        - 이번 모션이 로봇을 움직였을 수 있는데 쓸 수 있는 Result.pose 가 없으면(Result 가 끝내 오지 않음 ·
+          응답 없는 goal 의 늦은 수락 · 다른 프레임의 Result.pose · pose_stamp=0) 모르는 것이다.
+        - 로봇을 움직이지 않은 채 끝난 명령(goal 거절 · 서버 없음 · 보내지 않은 goal)에서는 로봇이 그대로
+          앞 모션의 정지 좌표에 있다. record_stop 과 같은 규칙으로 그 좌표를 쓰고, 그것도 없으면
+          직전 중지의 좌표(재시작으로 이어받은 것)를 쓴다.
+        """
+        if self._stop_pose_unknown:
+            return None
+        raw = self.last_result.raw if self.last_result is not None else None
+        if raw is None:
+            return self._carried_pose
+        return conversions.stop_pose_record(raw)
 
     def stop_requested(self):
         return self._job.stop_event.is_set()
@@ -1193,6 +1216,7 @@ class _NodePorts(Ports):
     def execute(self, motion_id, request):
         node, job, p = self._node, self._job, self._params
         self.last_motion_id = motion_id
+        self._stop_pose_unknown = False
         # 발급하자마자 남긴다. 명령이 끝난 뒤에 남기면, 중지 직후에 접수된 안전복귀가 옛 값으로 번호를 되풀이한다(계약 6.2절)
         node._last_motion_id[job.scan_id] = max(motion_id, node._last_motion_id.get(job.scan_id, 0))
         if not node._motion_client.wait_for_server(timeout_sec=p.server_wait_timeout_s):
@@ -1215,6 +1239,7 @@ class _NodePorts(Ports):
                 # 요청은 이미 나갔다. 늦게 수락되면 아무도 모르는 모션이 돈다 → 늦은 수락은 바로 취소하고 정지도 요청한다
                 sent.add_done_callback(self._cancel_late_goal)
                 self._stop_untracked(f'{request.label}: goal 응답이 오지 않았다')
+                self._stop_pose_unknown = True   # 늦게 수락됐으면 움직였다. 어디서 멈췄는지는 모른다
                 return MotionResult(available=False)
             handle = sent.result()
             if not handle.accepted:
@@ -1230,12 +1255,14 @@ class _NodePorts(Ports):
             if not node.wait_future(done, backstop):
                 handle.cancel_goal_async()
                 self._stop_untracked(f'{request.label}: Result 가 오지 않았다')
+                self._stop_pose_unknown = True   # 돌던 모션이다. 정지 좌표를 주는 Result 가 없다
                 return MotionResult(
                     reason=MotionReason.TIMEOUT, detail=f'{backstop:.1f} s 안에 Result 가 오지 않았다')
             raw = done.result().result
             handle = None  # 끝난 goal 이다
             if conversions.has_stop_pose(raw) and raw.frame_id != p.motion_frame_id:
                 # 좌표를 쓰는 쪽은 frame_id 를 확인한다(계약 1장). 다른 프레임의 좌표로 다음 모션을 만들지 않는다
+                self._stop_pose_unknown = True   # 기록 · 로그에도 쓰지 않는다. 앞 모션의 좌표로 대신하지 않는다
                 return MotionResult(
                     reason=MotionReason.ROBOT_ERROR, reason_code=int(Reason.ROBOT_ERROR),
                     detail=f'Result.frame_id={raw.frame_id!r} 가 {p.motion_frame_id!r} 가 아니다',
@@ -1381,7 +1408,8 @@ class _NodePorts(Ports):
         if self.recorded and job.scan_id:
             try:
                 kept = node._write(
-                    _record_first_failure, node._store, job.scan_id, node.state_machine.failure)
+                    _record_first_failure, node._store, job.scan_id, node.state_machine.failure,
+                    self._stop_pose_record())
                 if kept is not None:
                     node.get_logger().info(
                         f'기록의 실패 사유는 첫 실패({kept.reason_code} {kept.phase.name})를 그대로 둔다')
@@ -1421,16 +1449,16 @@ class _NodePorts(Ports):
         self._node.log(ScanLog.LEVEL_INFO, Reason.OK, message, pose, frame_id)
 
 
-def _record_first_failure(store, scan_id, failure):
-    """실패 사유를 기록한다. 이미 있으면 덮어쓰지 않고 그 기록을 돌려준다(썼으면 None).
+def _record_first_failure(store, scan_id, failure, pose=None):
+    """실패 사유 · 단계 · 위치를 기록한다. 이미 있으면 덮어쓰지 않고 그 기록을 돌려준다(썼으면 None).
 
-    작업이 실패한 뒤의 안전복귀가 또 실패해도 작업의 실패 원인(예: NO_EDGE)이 남아야 한다.
+    작업이 실패한 뒤의 안전복귀가 또 실패해도 작업의 실패 원인(예: NO_EDGE)과 그때 멈춘 자리가 남아야 한다.
     안전복귀의 실패는 home_return.completed=false 와 /scan/log 에 남는다. 쓰기 스레드에서 돈다.
     """
     existing = store.load(scan_id).failure
     if existing is not None:
         return existing
-    store.record_failure(scan_id, failure)
+    store.record_failure(scan_id, failure, pose)
     return None
 
 

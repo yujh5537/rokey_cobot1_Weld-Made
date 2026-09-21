@@ -248,9 +248,62 @@ def test_failure_from_state_machine_failure():
     record = FailureRecord.from_failure(Failure(301, 'max_distance', Phase.EDGE_SEARCH), Stamp(3))
     assert (record.reason_code, record.detail) == (301, 'max_distance')
     assert record.phase is Phase.EDGE_SEARCH
+    assert record.pose is None            # 좌표를 주지 않으면 없는 것이다
     assert roundtrip(record) == record
     with pytest.raises(ValueError):
         FailureRecord(0, '', Phase.ERROR)
+
+
+def test_failure_keeps_where_it_stopped():
+    """원인 · 단계뿐 아니라 위치도 남는다(BRD 4.2.5). Interruption 과 같은 pose 표현이다."""
+    stopped_at = pose(x=0.42, z=0.11, sec=200)
+    record = FailureRecord.from_failure(
+        Failure(300, 'max_descend_m 안에 접촉이 없다', Phase.TOP_SEARCH), Stamp(3), stopped_at)
+    assert record.pose == stopped_at
+    assert roundtrip(record) == record
+
+    data = record.to_dict()
+    assert data['pose_valid'] and data['pose']['position_m'] == [0.42, 0.0, 0.11]
+    assert data['pose']['frame_id'] == 'base_link'
+    assert data['pose']['stamp'] == {'sec': 200, 'nanosec': 5}
+    with pytest.raises(ValueError):
+        FailureRecord(300, '', Phase.TOP_SEARCH, pose=(0.42, 0.0, 0.11))  # 좌표만으로는 안 된다
+
+
+def test_failure_without_a_pose_is_null_not_zero():
+    data = FailureRecord(300, '접촉 없음', Phase.TOP_SEARCH).to_dict()
+    assert data['pose'] is None and data['pose_valid'] is False
+    assert json.dumps(data, allow_nan=False)  # 0 도 NaN 도 끼어들지 않는다
+    assert FailureRecord.from_dict(data).pose is None
+
+
+def test_failure_pose_flag_must_match_the_pose():
+    record = FailureRecord(300, '', Phase.TOP_SEARCH, pose=pose(), recorded_at=Stamp(3))
+    without = {key: value for key, value in record.to_dict().items() if key != 'pose'}
+    for data in (
+            {**record.to_dict(), 'pose_valid': False},
+            {**record.to_dict(), 'pose': None},
+            {**record.to_dict(), 'pose_valid': None},
+            {**FailureRecord(300, '', Phase.TOP_SEARCH).to_dict(), 'pose_valid': True},
+            without,                                        # 한쪽 키만 있다 → 훼손이다
+            {key: value for key, value in record.to_dict().items() if key != 'pose_valid'},
+    ):
+        with pytest.raises(ValueError):
+            FailureRecord.from_dict(data)
+
+
+def test_failure_of_an_older_record_without_the_pose_keys_still_reads():
+    """pose 는 뒤에 더한 필드다. 두 키가 없는 옛 기록은 "좌표를 남기지 않았다"로 읽는다."""
+    data = FailureRecord(301, 'max_distance', Phase.EDGE_SEARCH, recorded_at=Stamp(3)).to_dict()
+    old = {key: value for key, value in data.items() if key not in ('pose', 'pose_valid')}
+
+    record = FailureRecord.from_dict(old)
+    assert record.pose is None
+    assert (record.reason_code, record.phase) == (301, Phase.EDGE_SEARCH)
+    assert record.recorded_at == Stamp(3)
+    for half in ({**old, 'pose': pose().to_dict()}, {**old, 'pose_valid': False}):
+        with pytest.raises(ValueError):      # 한쪽 키만 있는 것은 옛 기록이 아니라 훼손이다
+            FailureRecord.from_dict(half)
 
 
 # ---- 최종 결과 ----
