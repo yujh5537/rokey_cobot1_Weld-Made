@@ -31,9 +31,15 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
   가상 박스 치수(100 × 60 × 40 mm)를 0.4 mm 안에서 복원하는지 본다
 
 ## 판정 규칙
-- **CONTACT**: `operation == OP_DESCEND` 이고 tare 가 끝난 상태에서 `|F − F0| > contact_threshold_n` 인 샘플이 연속 `debounce_n` 회. `motion_id` 마다 1 회
-- **EDGE**: `operation == OP_SLIDE` 이고 tare 가 끝난 상태에서
-  1. `|F − F0| > edge_arm_force_n` 이 연속 `debounce_n` 회 → "누르고 있다" 확인. 그 뒤부터 판정한다
+- **하강 기준과 밀기 기준을 나눈다 (#109).** 외력 추정값은 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다(2026-09-21 실기 1-1 · 5-2 · 5-11). 정지 F0 로 하강하면 허공에서 거짓 CONTACT 가 나고, 하강용 F0 를 밀기에 쓰면 옆 이동 이력(허공에서도 Fx −5 N) 때문에 닿기 전에도 `|F − F0|` 가 수 N 이다
+- **CONTACT**: `operation == OP_DESCEND` 이고 기준값이 있는 상태에서 `|F − F0| > contact_threshold_n` 인 샘플이 연속 `debounce_n` 회. `motion_id` 마다 1 회
+  - `descend_tare_enabled` 이면 **하강마다 이동 중 F0 를 자동으로 다시 잡는다**: DESCEND 시작(새 `motion_id` 또는 다른 동작에서 바뀜) 뒤 `descend_tare_delay_s` 가 지나면 `tare_duration_s` 동안 모은다. 판정 기준은 `/contact/tare` 와 같다(`tare_min_samples` · `tare_max_std_n` · `tare_max_force_n`). **모으는 동안 CONTACT 는 보류**하고, 과대 외력은 원시 `|F|` 라 그대로 감시한다. 실패하면 `/contact/tare` 의 F0 로 판정한다(이전 동작)
+  - 보류 구간 동안 내려가는 거리(하강 속도 × (`descend_tare_delay_s` + `tare_duration_s`))보다 부재 윗면이 아래에 있어야 한다. 실기 3 mm/s · 7.5 s 면 22.5 mm, 홈 → 80 mm 큐브 윗면은 107 mm
+  - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 자동 영점 실패 때의 예비 기준으로 남는다
+- **EDGE**: `operation == OP_SLIDE` 이고 기준값이 있는 상태에서
+  1. "누르고 있다" 확인. 그 뒤부터 판정한다
+     - `edge_arm_still_window_s > 0`(실기 · sim 기본): 최근 그 구간 동안 **z 가 `edge_arm_still_m` 안에 머물고 x · y 가 `edge_arm_travel_m` 넘게 움직였으면** 켠다. F0 를 쓰지 않는다. 틈을 다 메우면 z 가 멈추기 때문이다. x · y 조건이 없으면 힘 제어를 켜는 동안(팁이 떠 있는데 z 도 멈춰 있다) 너무 일찍 켜진다
+     - `edge_arm_still_window_s <= 0`: 이전 방식 `|F − F0| > edge_arm_force_n` 이 연속 `debounce_n` 회
   2. TCP z 가 **최근 `edge_trend_window_s` 구간의 추세선**(직선 맞춤)보다 `edge_drop_m` 넘게 내려간 샘플이 연속 `debounce_n` 회 → 확정. `motion_id` 마다 1 회
   - 밀기 시작 z 대비 누적 하강량으로 재지 않는다. 모서리가 아닌데 z 가 내려가는 경우가 셋 있다: SLIDE 시작 때 틈(`recontact_margin_m`)을 메우는 하강(계약 7.3), 기울어진 윗면(0.87° 면 80 mm 에 1.2 mm), 탐침이 홀더 안으로 서서히 밀리는 것(PR #80). 앞의 것은 1 이, 뒤의 둘은 2 가 거른다
   - **가를 수 없는 것**: 탐침이 한 번에 툭 미끄러져 들어가면 모서리와 같은 모양이다(테스트에 한계로 고정해 두었다). 기구 쪽에서 막아야 한다
@@ -54,7 +60,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 ## 파라미터
 값은 `contact_scan_bringup/config/sim.yaml` · `real.yaml` 에만 둔다. 코드에 기본값이 없어서 값이 빠지면 노드가 기동하지 않는다.
 `source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
-`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n`
+`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_tare_enabled` · `descend_tare_delay_s` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
 
 `source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
 

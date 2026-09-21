@@ -31,6 +31,7 @@ from rclpy.task import Future
 from contact_detector.sim_source import SimBox, SimSource
 from contact_detector.detector_core import (
     ContactDetector,
+    DescendTareConfig,
     DetectorConfig,
     EdgeConfig,
     OP_DESCEND,
@@ -64,6 +65,12 @@ PARAMS = {
     'tare_min_samples': Parameter.Type.INTEGER,
     'tare_max_std_n': Parameter.Type.DOUBLE,
     'tare_max_force_n': Parameter.Type.DOUBLE,
+    # 하강 · 밀기 기준 분리 (#109)
+    'descend_tare_enabled': Parameter.Type.BOOL,       # DESCEND 중 이동 중 F0 를 자동으로 다시 잡는다
+    'descend_tare_delay_s': Parameter.Type.DOUBLE,     # DESCEND 시작 뒤 이만큼 지나서 모은다. 길이는 tare_duration_s
+    'edge_arm_still_window_s': Parameter.Type.DOUBLE,  # > 0 이면 EDGE 판정을 z 로 켠다(edge_arm_force_n 대신)
+    'edge_arm_still_m': Parameter.Type.DOUBLE,
+    'edge_arm_travel_m': Parameter.Type.DOUBLE,
 }
 
 # source = 'sim' 일 때만 필요한 파라미터
@@ -148,11 +155,18 @@ class ContactDetectorNode(Node):
 
     @staticmethod
     def _configs(v):
+        by_z = v['edge_arm_still_window_s'] > 0
+        tare = TareConfig(v['tare_min_samples'], v['tare_max_std_n'], v['tare_max_force_n'])
         return (
             DetectorConfig(v['contact_threshold_n'], v['debounce_n'], v['over_force_n'], v['over_force_debounce_n']),
             EdgeConfig(v['edge_drop_m'], v['debounce_n'], v['edge_arm_force_n'],
                        v['edge_trend_window_s'], v['edge_trend_min_samples'],
-                       max_gap_s=v['stale_age_ms'] * 1e-3),
+                       max_gap_s=v['stale_age_ms'] * 1e-3,
+                       arm_still_window_s=v['edge_arm_still_window_s'] if by_z else None,
+                       arm_still_m=v['edge_arm_still_m'] if by_z else None,
+                       arm_travel_m=v['edge_arm_travel_m'] if by_z else None),
+            DescendTareConfig(v['descend_tare_delay_s'], v['tare_duration_s'], tare)
+            if v['descend_tare_enabled'] else None,
         )
 
     def on_set_parameters(self, params):
@@ -164,14 +178,16 @@ class ContactDetectorNode(Node):
             if p.name in changed:
                 changed[p.name] = p.value
         try:
-            config, edge_config = self._configs(changed)
+            config, edge_config, descend_tare = self._configs(changed)
             if changed['stale_age_ms'] <= 0:
                 raise ValueError('stale_age_ms 는 0 보다 커야 한다')
         except (TypeError, ValueError) as e:
             return SetParametersResult(successful=False, reason=str(e))
         with self.lock:
             baseline = self.detector.baseline
-            self.detector = ContactDetector(config, edge_config)
+            # 하강 중 자동 영점 상태는 옮기지 않는다. 다음 샘플에서 하강이 새로 시작된 것으로 보고 다시 모은다
+            # (그동안 CONTACT 를 보류한다 — 안전한 쪽)
+            self.detector = ContactDetector(config, edge_config, descend_tare)
             self.detector.set_baseline(baseline)
             self.values = changed
         return SetParametersResult(successful=True)
@@ -220,10 +236,24 @@ class ContactDetectorNode(Node):
             if self.tare is not None:
                 self.tare.add(sample)
             detections = self.detector.update(sample)
-            if msg.valid and msg.operation == OP_SLIDE and self.detector.baseline is None:
+            descend_tare = self.detector.descend_tare_result
+            self.detector.descend_tare_result = None
+            no_baseline = msg.valid and self.detector.active_baseline is None
+            if no_baseline and msg.operation == OP_SLIDE:
                 self.warn('no_tare', 'SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다')
+            if no_baseline and msg.operation == OP_DESCEND and not self.detector.contact_withheld:
+                self.warn('no_tare_descend', 'DESCEND 인데 기준값 F0 가 없다(tare 전 · 자동 영점 실패). '
+                                             'CONTACT 를 판정하지 않는다 — 과대 외력만 멈춘다')
             events = [self.to_event(d) for d in detections]
             gap = self.detector.trend_gap
+        if descend_tare is not None:
+            if descend_tare.success:
+                self.get_logger().info(
+                    f'하강 중 자동 영점: {descend_tare.sample_count} samples, |F0| {descend_tare.baseline_norm_n:.2f} N, '
+                    f'|F-F0| rms {descend_tare.std_vector_n:.3f} N')
+            else:
+                self.get_logger().warn(
+                    f'하강 중 자동 영점 실패({descend_tare.error}). /contact/tare 의 F0 로 판정한다')
         if gap:
             self.warn('trend_gap', '샘플 공백으로 EDGE 추세선을 버리고 다시 쌓는다. '
                                    '그동안 접촉 소실을 볼 수 없다')
