@@ -14,9 +14,14 @@ sodreal을 다시 켜면 ROS로 등록한 툴·TCP가 지워진다(2026-09-19 �
 값은 docs/env/tool-tcp-register.md 2·3절과 docs/contracts/units-frames.md의 값이다.
 바뀌면 세 곳을 같이 고친다. robot_manager(T13)에서는 real.yaml 파라미터로 옮긴다.
 """
+import datetime
+import io
 import math
+import os
 import sys
 import time
+
+import argparse
 
 import rclpy
 from dsr_msgs2.srv import (ConfigCreateTcp, ConfigCreateTool, ConfigDeleteTcp, ConfigDeleteTool,
@@ -29,7 +34,20 @@ TOOL_NAME = 'rg2_probe'
 TOOL_WEIGHT_KG = 1.3
 TOOL_COG_MM = [0.0, 31.08, 29.84]
 TCP_NAME = 'rg2_probe_tip'
-TCP_POS = [-1.30, 3.71, 249.99, 0.0, 0.0, 0.0]  # 최하단점: 구 중심 z 249.76 + 팁 반지름 0.225 (지름 0.45)
+TCP_POS = [-1.30, 3.71, 248.52, 0.0, 0.0, 0.0]  # 2026-09-20 잠정. 과압으로 탐침이 1.47 mm
+# 짧아진 상태(구 중심 z 248.29 + 팁 반지름 0.225). z만 확인, x·y 미확인.
+# 밀림이 진행 중일 수 있어 다음 세션 첫 항목이 밀림 확인이다. T03-follow-up_20260920.md 7절
+# 탐침을 새로 물리거나 바꾸면 이 값을 되돌리고 피벗 보정을 다시 한다 (원래 값 249.99)
+
+
+def parse_args(argv):
+    """TCP 를 바꿔서 등록할 때만 인자를 쓴다. 기본값은 T02 피벗 보정값이다."""
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument('--tcp-z', type=float, help='TCP z [mm]. 탐침이 밀리거나 바뀌었을 때만 쓴다')
+    p.add_argument('--tcp-x', type=float, help='TCP x [mm]')
+    p.add_argument('--tcp-y', type=float, help='TCP y [mm]')
+    p.add_argument('--note', default='', help='왜 바꾸는지. 8절 등록 이력에 남는다')
+    return p.parse_args(argv)
 MANUAL, AUTONOMOUS = 0, 1
 
 
@@ -38,6 +56,15 @@ def ok(res):
 
 
 def main():
+    args = parse_args(rclpy.utilities.remove_ros_args(sys.argv)[1:])
+    for i, value in enumerate((args.tcp_x, args.tcp_y, args.tcp_z)):
+        if value is not None:
+            TCP_POS[i] = value
+    changed = any(v is not None for v in (args.tcp_x, args.tcp_y, args.tcp_z))
+    if changed:
+        print(f'TCP 를 기본값이 아닌 {TCP_POS[:3]} 로 등록한다. {args.note}')
+        print('  주의: 피벗 보정을 다시 한 값이 아니면 잠정값이다. x · y 치우침은 이 방법으로 잡히지 않는다')
+
     rclpy.init()
     node = rclpy.create_node('apply_tool_tcp')
     caller = Caller(node, timeout=3.0, retries=2)
@@ -114,9 +141,34 @@ def main():
 
     if names_ok and dist_ok:
         print(f'OK: tool={TOOL_NAME}, tcp={TCP_NAME} {TCP_POS[:3]}')
+        if changed:
+            record_history(TCP_POS[:3], args.note)
         return 0
     print('실패: 현재 툴·TCP가 기대값과 다르다')
     return 1
+
+
+def record_history(tcp_xyz, note):
+    """기본값이 아닌 TCP 등록을 문서에 남긴다.
+
+    화면 출력만 하면 무엇을 왜 바꿨는지가 세션이 끝나면 사라진다. 실기 기록은
+    다시 만들 수 없어서 파일로 남긴다 (현지 리뷰, PR #80).
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tool-tcp-register.md')
+    stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    values = ', '.join(f'{v:.2f}' for v in tcp_xyz)
+    line = f'| {stamp} | [{values}] | {note.strip() or "(이유 없음)"} |\n'
+    header = ('\n## 8. 등록 이력 (`apply_tool_tcp.py` 가 자동으로 남긴다)\n\n'
+              '기본값이 아닌 TCP 로 등록에 성공했을 때만 한 줄이 붙는다. 손으로 지우지 않는다.\n\n'
+              '| 시각 | TCP x · y · z [mm] | 이유 (`--note`) |\n|---|---|---|\n')
+    try:
+        with io.open(path, encoding='utf-8') as f:
+            need_header = '## 8. 등록 이력' not in f.read()
+        with io.open(path, 'a', encoding='utf-8') as f:
+            f.write((header if need_header else '') + line)
+        print(f'  등록 이력을 남겼다: {path}')
+    except OSError as exc:   # 기록 실패가 등록 결과를 뒤집지는 않는다
+        print(f'  등록 이력을 남기지 못했다 ({exc}). 손으로 적는다: {line.strip()}')
 
 
 if __name__ == '__main__':

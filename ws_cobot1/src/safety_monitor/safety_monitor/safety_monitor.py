@@ -44,6 +44,7 @@ PARAMS = {
     'sample_stale_ms': Parameter.Type.INTEGER,
     'robot_status_timeout_ms': Parameter.Type.INTEGER,
     'confirm_n': Parameter.Type.INTEGER,
+    'startup_grace_s': Parameter.Type.DOUBLE,
     'stop_confirm_timeout_s': Parameter.Type.DOUBLE,
     'stop_retry_period_s': Parameter.Type.DOUBLE,
     'status_publish_period_s': Parameter.Type.DOUBLE,
@@ -72,6 +73,7 @@ class SafetyMonitorNode(Node):
         self.state = SafetyState(self._limits(self.values), StopTracker(
             self.values['stop_confirm_timeout_s'], self.values['stop_retry_period_s']))
 
+        self.started_s = self.now_s()
         self.last_sample_s = None
         self.last_status_s = None
         self.last_published = None           # 직전에 발행한 내용. 바뀌면 바로 다시 발행한다
@@ -100,7 +102,7 @@ class SafetyMonitorNode(Node):
     @staticmethod
     def _limits(v) -> SafetyLimits:
         return SafetyLimits(v['over_force_n'], v['drop_limit_m'], v['sample_stale_ms'],
-                            v['robot_status_timeout_ms'], v['confirm_n'])
+                            v['robot_status_timeout_ms'], v['confirm_n'], v['startup_grace_s'])
 
     def on_set_parameters(self, params):
         """SetConfig 전파(계약 2.4 P03). 래치는 파라미터로 풀 수 없다 — /safety/reset 으로만 푼다."""
@@ -142,7 +144,8 @@ class SafetyMonitorNode(Node):
     def on_check(self):
         """최신성 감시와 정지 확인 시간 초과. 샘플이 끊겨도 이 타이머는 돈다."""
         now = self.now_s()
-        self.react(self.state.watch.check_freshness(now, self.last_sample_s, self.last_status_s))
+        self.react(self.state.watch.check_freshness(
+            now, self.last_sample_s, self.last_status_s, uptime_s=now - self.started_s))
         if self.state.stop.due_for_retry(now):
             self.get_logger().error(
                 f'정지 요청이 {self.values["stop_confirm_timeout_s"]:.1f} s 안에 확인되지 않았다. 다시 요청한다. '

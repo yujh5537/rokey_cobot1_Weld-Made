@@ -46,6 +46,99 @@ function getPhaseLabel(
   }
 }
 
+function getCommandLabel(commandTopic) {
+  switch (commandTopic) {
+    case 'cmd/scan/start':
+      return '시작'
+
+    case 'cmd/scan/stop':
+      return '중지'
+
+    case 'cmd/scan/home':
+      return '안전복귀'
+
+    case 'cmd/scan/resume':
+      return '재시작'
+
+    default:
+      return commandTopic ?? '-'
+  }
+}
+
+function formatLogTime(timestampMs) {
+  if (!timestampMs) {
+    return '-'
+  }
+
+  return new Date(timestampMs).toLocaleTimeString()
+}
+
+function formatNumber(value) {
+  return Number.isFinite(value)
+    ? value.toFixed(2)
+    : '-'
+}
+
+function formatScanLogMessage(payload) {
+  const parts = []
+
+  const level =
+    payload.level ?? 'INFO'
+
+  const phase =
+    payload.phase ?? 'UNKNOWN'
+
+  parts.push(`[${level}]`)
+  parts.push(`[${phase}]`)
+
+  if (
+    payload.direction &&
+    payload.direction !== 'NONE'
+  ) {
+    parts.push(
+      `[${payload.direction}]`
+    )
+  }
+
+  if (payload.code_name) {
+    parts.push(
+      `[${payload.code_name}:${payload.code ?? 0}]`
+    )
+  }
+
+  parts.push(
+    payload.message ?? 'scan log'
+  )
+
+  if (
+    payload.pose_valid === true &&
+    payload.pose
+  ) {
+    const x =
+      payload.pose.x_mm
+
+    const y =
+      payload.pose.y_mm
+
+    const z =
+      payload.pose.z_mm
+
+    parts.push(
+      `좌표 X ${formatNumber(x)} mm / ` +
+      `Y ${formatNumber(y)} mm / ` +
+      `Z ${formatNumber(z)} mm`
+    )
+
+    if (payload.frame_id) {
+      parts.push(
+        `frame=${payload.frame_id}`
+      )
+    }
+  }
+
+  return parts.join(' ')
+}
+
 function App() {
   // Three.js canvas
   const canvasRef = useRef(null)
@@ -74,6 +167,9 @@ function App() {
   const [lastRequestId, setLastRequestId] =
     useState(null)
 
+  // request_id별 명령 상태 이력
+  const [commandHistory, setCommandHistory] = useState([])
+
   // FastAPI WebSocket 연결 상태
   const [wsConnected, setWsConnected] = useState(false)
 
@@ -94,13 +190,82 @@ function App() {
   // =========================
   // 로그 추가 함수
   // =========================
-  function addLog(message) {
-    const now = new Date().toLocaleTimeString()
+  function addLog(
+    message,
+    timestampMs = Date.now()
+  ) {
+    const newLog = {
+      timestampMs,
+      message,
+    }
 
-    setLogs((prevLogs) => [
-      ...prevLogs,
-      `${now} - ${message}`,
-    ])
+    setLogs((prevLogs) => {
+      const nextLogs = [
+        ...prevLogs,
+        newLog,
+      ]
+
+      nextLogs.sort(
+        (a, b) =>
+          a.timestampMs - b.timestampMs
+      )
+
+      return nextLogs.slice(-100)
+    })
+  }
+
+
+  // =========================
+  // 명령 상태 이력 갱신 함수
+  // =========================
+  function updateCommandHistory(payload) {
+    const requestId =
+      payload.request_id
+
+    if (!requestId) {
+      return
+    }
+
+    setCommandHistory((prevHistory) => {
+      const existingIndex =
+        prevHistory.findIndex(
+          (command) =>
+            command.requestId === requestId
+        )
+
+      const newCommand = {
+        requestId,
+        commandTopic:
+          payload.command_topic ?? '-',
+        status:
+          payload.status ?? 'UNKNOWN',
+        createdAtMs:
+          payload.created_at_ms ?? null,
+        updatedAtMs:
+          payload.updated_at_ms ?? Date.now(),
+        ack:
+          payload.ack ?? null,
+        result:
+          payload.result ?? null,
+      }
+
+      // 처음 보는 request_id
+      if (existingIndex === -1) {
+        return [
+          ...prevHistory,
+          newCommand,
+        ]
+      }
+
+      // 이미 있는 request_id면
+      // 기존 항목만 최신 상태로 교체한다.
+      return prevHistory.map(
+        (command, index) =>
+          index === existingIndex
+            ? newCommand
+            : command
+      )
+    })
   }
 
 
@@ -308,7 +473,8 @@ function App() {
         // scan/log
         if (topic === 'scan/log') {
           addLog(
-            payload.message ?? 'scan log'
+            formatScanLogMessage(payload),
+            payload.stamp_ms
           )
         }
 
@@ -321,6 +487,8 @@ function App() {
           setLastRequestId(
             payload.request_id ?? null
           )
+
+          updateCommandHistory(payload)
         }
 
       } catch (error) {
@@ -730,11 +898,11 @@ function App() {
             <p>
               팁 위치:
               {' '}
-              X {tipPose.x.toFixed(2)} mm /
+              X {formatNumber(tipPose.x)} mm /
               {' '}
-              Y {tipPose.y.toFixed(2)} mm /
+              Y {formatNumber(tipPose.y)} mm /
               {' '}
-              Z {tipPose.z.toFixed(2)} mm
+              Z {formatNumber(tipPose.z)} mm
             </p>
           </>
         ) : (
@@ -745,6 +913,84 @@ function App() {
 
       </section>
 
+      {/* 명령 상태 이력 */}
+      <section>
+
+        <h2>명령 상태 이력</h2>
+
+        {commandHistory.length === 0 && (
+          <p>아직 전송한 명령이 없습니다.</p>
+        )}
+
+        {commandHistory.map((command) => (
+          <div key={command.requestId}>
+
+            <p>
+              명령:{' '}
+              {getCommandLabel(
+                command.commandTopic
+              )}
+            </p>
+
+            <p>
+              접수 결과:{' '}
+              {command.status === 'REJECTED'
+                ? '거절'
+                : command.ack?.accepted === true
+                  ? '접수'
+                  : '대기'}
+            </p>
+
+            <p>
+              실행 결과:{' '}
+              {command.status === 'SUCCEEDED'
+                ? '완료'
+                : command.status === 'FAILED'
+                  ? '실패'
+                  : command.status === 'REJECTED'
+                    ? '-'
+                    : '대기'}
+            </p>
+
+            <p>
+              상태 코드: {command.status}
+            </p>
+
+            {command.ack?.accepted === false &&
+              command.ack?.reason && (
+                <p>
+                  거절 사유: {command.ack.reason}
+                  {command.ack.reason_code != null &&
+                    ` (${command.ack.reason_code})`}
+                  {command.ack.detail &&
+                    ` — ${command.ack.detail}`}
+                </p>
+              )}
+
+            {command.status === 'FAILED' &&
+              command.result?.reason && (
+                <p>
+                  실패 사유: {command.result.reason}
+                  {command.result.reason_code != null &&
+                    ` (${command.result.reason_code})`}
+                  {command.result.detail &&
+                    ` — ${command.result.detail}`}
+                </p>
+              )}
+
+            <p>
+              Request ID: {command.requestId}
+            </p>
+
+            <p>
+              갱신 시각:{' '}
+              {formatLogTime(command.updatedAtMs)}
+            </p>
+
+          </div>
+        ))}
+
+      </section>
 
       {/* Three.js */}
       <section>
@@ -766,8 +1012,12 @@ function App() {
         )}
 
         {logs.map((log, index) => (
-          <p key={index}>
-            {log}
+          <p
+            key={`${log.timestampMs}-${index}`}
+          >
+            {formatLogTime(log.timestampMs)}
+            {' - '}
+            {log.message}
           </p>
         ))}
 

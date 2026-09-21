@@ -63,12 +63,15 @@ class SafetyLimits:
     sample_stale_ms: int
     robot_status_timeout_ms: int
     confirm_n: int               # 조건을 확정하는 연속 샘플 수
+    startup_grace_s: float       # 기동 후 이 시간 동안은 최신성으로 정지 · 래치를 걸지 않는다
 
     def __post_init__(self):
         if not (self.over_force_n > 0 and self.drop_limit_m > 0):
             raise ValueError('over_force_n, drop_limit_m 은 0 보다 커야 한다')
         if self.sample_stale_ms <= 0 or self.robot_status_timeout_ms <= 0:
             raise ValueError('sample_stale_ms, robot_status_timeout_ms 는 0 보다 커야 한다')
+        if self.startup_grace_s < 0:
+            raise ValueError('startup_grace_s 는 0 이상이어야 한다')
         if self.confirm_n < 1:
             raise ValueError('confirm_n 은 1 이상이어야 한다')
 
@@ -108,6 +111,10 @@ class ConditionWatch:
         self.last_operation = OP_NONE
         self.active: Dict[str, Condition] = {}        # 지금 참인 조건 (래치 해제 가능 여부의 근거)
         self._runs = {code: _Run() for code in (OVER_FORCE, DROP_LIMIT)}
+
+    @property
+    def startup_grace_s(self) -> float:
+        return self.limits.startup_grace_s
 
     def set_limits(self, limits: SafetyLimits):
         """SetConfig 전파(계약 2.4 P03). 기준 z 와 진행 중인 연속 횟수는 유지한다."""
@@ -152,8 +159,18 @@ class ConditionWatch:
         return None if was_active else condition       # 같은 조건을 되풀이해 올리지 않는다
 
     def check_freshness(self, now_s: float, last_sample_s: Optional[float],
-                        last_status_s: Optional[float]) -> List[Condition]:
-        """한계 시간을 넘게 소식이 없는 입력을 찾는다. 아직 한 번도 못 받았으면 감시하지 않는다(기동 직후)."""
+                        last_status_s: Optional[float], uptime_s: float) -> List[Condition]:
+        """한계 시간을 넘게 소식이 없는 입력을 찾는다.
+
+        아직 한 번도 못 받았으면 감시하지 않는다. 그리고 기동 후 startup_grace_s 동안도 감시하지 않는다 —
+        노드들이 순차로 준비되는 동안 샘플 주기가 불안정하고(2026-09-21 종단 실행에서 508 ms 공백),
+        그때 robot_manager 는 '위치를 모르면 이동 중'이라 moving=true 를 낸다(PR #72). 두 보수적 기본값이
+        겹쳐 기동하자마자 래치가 걸렸다. **과대 외력 · 하강 제한은 유예하지 않는다** — 기동과 무관한 실제 위험이다.
+        """
+        if uptime_s < self.startup_grace_s:
+            self.active.pop(SAMPLE_STALE, None)
+            self.active.pop(ROBOT_STATUS_LOST, None)
+            return []
         found = []
         for code, last_s, limit_ms in (
                 (SAMPLE_STALE, last_sample_s, self.limits.sample_stale_ms),

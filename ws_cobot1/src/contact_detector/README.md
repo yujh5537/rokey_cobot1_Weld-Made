@@ -5,10 +5,30 @@
 | 파일 | 역할 |
 |---|---|
 | `contact_detector/detector_core.py` | 판정 로직. **rclpy 를 import 하지 않는다.** tare(기준값 F0), 임계 · 디바운스, 과대 외력 |
+| `contact_detector/sim_source.py` | sim 입력원. 가상 직육면체와 TCP 위치로 외력 · z 를 만든다. **rclpy 를 import 하지 않는다** |
 | `contact_detector/offline.py` | 기록한 CSV 를 같은 판정 로직에 통과시키는 분석기 (`analyze_samples`). 실측 주기, 무접촉 잡음, 임계 × 디바운스 비교표 |
 | `contact_detector/contact_detector.py` | 노드. `/robot/sample`(SENSOR) 구독 → 판정 → `/contact/event`(EVENT) 발행, `/contact/tare` 서비스, `/scan/state` 로 `scan_id` 태깅. 로봇을 움직이지 않는다 |
 
-아직 없는 것: sim 입력원(가상 직육면체). 지금은 `source` 가 무엇이든 샘플의 외력 · 위치를 그대로 판정한다. 외력 감소(보조 신호)는 쓰지 않는다.
+외력 감소(보조 신호)는 쓰지 않는다(이슈 #16 코멘트에 근거).
+
+## sim 입력원 (`source: sim`)
+Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(BRD 위험 2, `api-check-log.md`), 실제 샘플만으로는
+접촉도 소실도 일어나지 않는다. 그래서 **샘플의 외력과 z 를 가상 모델의 값으로 바꿔서** 판정기에 넣는다.
+**x · y 는 실제 로봇 값을 그대로 쓴다** — 치수는 Virtual 로봇이 실제로 이동한 거리에서 나온다. 이벤트에도 바꾼 값을 싣는다.
+
+| 팁이 박스 경계를 지난 거리 d | 팁이 닿을 수 있는 높이 |
+|---|---|
+| d ≤ 0 (윗면 위) | `z_top` |
+| 0 < d < r (모서리에 얹힘) | `z_top − (r − √(r² − d²))` — geometry_estimator 보정식의 **정방향** |
+| d ≥ r (완전히 벗어남) | 박스 밑면(지지면). 팁이 옆면을 따라 내려간다 |
+
+- `OP_SLIDE` 중에는 순응 제어가 팁을 표면에 붙여 둔다고 본다. 목표 침투(`sim_slide_press_n` / 강성)를 유지하되
+  **내려가는 속도를 `sim_fall_speed_mps` 로 제한한다.** 그 밖에서는 팁이 로봇이 지시한 z 에 그대로 있다
+- 외력 = 침투 깊이 × `sim_stiffness_n_per_m`, Base 기준 +z
+- 샘플의 `frame_id` 가 `sim_box_frame_id` 와 다르면 판정하지 않고 경고한다
+- **`sim_tip_radius_m` 은 scan_manager 의 `tip_radius_m` 과 같아야 치수가 복원된다**
+- 합격 기준: `test_sim_source.py::test_full_scan_recovers_the_virtual_box` 가 sim → 판정 → 편향 보정이
+  가상 박스 치수(100 × 60 × 40 mm)를 0.4 mm 안에서 복원하는지 본다
 
 ## 판정 규칙
 - **CONTACT**: `operation == OP_DESCEND` 이고 tare 가 끝난 상태에서 `|F − F0| > contact_threshold_n` 인 샘플이 연속 `debounce_n` 회. `motion_id` 마다 1 회
@@ -36,8 +56,13 @@
 `source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
 `over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n`
 
+`source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
+
 ## 샘플 최신성 · 경고
 - `now − max(pose_stamp, force_stamp) > stale_age_ms` 인 샘플은 버린다(계약 3.1). 샘플 간격이 `stale_age_ms` 를 넘으면 경고한다(판정은 바꾸지 않는다). 샘플이 비는 동안에는 접촉도 하강도 볼 수 없다
+- **샘플이 `stale_age_ms` 넘게 끊기면 EDGE 추세선과 대기 버퍼를 버리고 다시 쌓는다**(경고). 공백을 사이에 둔 두 점을
+  같은 추세에 넣으면 그사이 하강이 '정상 추세'로 흡수되어 늦은 좌표로 EDGE 를 확정하거나 아예 놓친다
+  (Virtual 실측 342 ms 공백, 2026-09-20). 판정이 몇 샘플 늦어지는 대신 틀린 좌표를 내지 않는다
 - DESCEND · SLIDE 인데 `motion_id` 가 0 이면 경고한다(robot_manager 는 그 이벤트로 정지하지 않는다). SLIDE 인데 tare 전이면 경고한다
 - `ros2 topic echo /robot/sample` 은 `--qos-reliability best_effort` 가 필요하다
 

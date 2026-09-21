@@ -49,6 +49,11 @@ safety_monitor:
     over_force_n: 30.0               # 계약 이름. contact_detector 와 같은 값
     drop_limit_m: 0.005              # 계약 이름. SLIDE 첫 샘플 z 기준 하강 제한. 출발값 5 mm
     confirm_n: 1                     # 조건을 확정하는 연속 샘플 수. 1 = 한 샘플로 즉시(안전 쪽)
+    startup_grace_s: 3.0          # 기동 후 이 시간 동안은 최신성(샘플 · 상태)으로 정지 · 래치를 걸지 않는다
+                                     #   근거: 2026-09-21 종단 실행에서 기동 직후 샘플이 508 ms 끊겼고,
+                                     #   그때 robot_manager 는 '위치를 모르면 이동 중'이라 moving=true 였다(PR #72).
+                                     #   두 보수적 기본값이 겹쳐 뜨자마자 래치가 걸렸다
+                                     #   과대 외력 · 하강 제한은 유예하지 않는다
                                      #   이슈 #53(1차·2차 동시 래치) 결정 전까지 1 로 둔다. 2 이상으로 올리면
                                      #   값과 기준 z 는 계약 7.2 대로 1차와 같게 두면서 2차만 늦출 수 있다
     sample_stale_ms: 300             # /robot/sample 이 이 시간 넘게 없으면 이상. 정지를 요청하는 기준이므로
@@ -70,7 +75,31 @@ safety_monitor:
 robot_manager:
   ros__parameters:
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
-    # slide_target_force_n:          # 계약 이름. 값 TBD (학민)
+    slide_target_force_n: 3.0        # 계약 이름 [N]. 출발값이고 잠정이다.
+                                     #   ⚠️ set_desired_force 를 DR_FC_MOD_REL 로 부른다. 드라이버
+                                     #   정의가 "relative to initial state (the instance when this
+                                     #   function is called)" 이므로, 이 값은 tare 대비가 아니라
+                                     #   **호출 시점에 이미 실려 있는 힘에 더해지는 값**이다.
+                                     #   SLIDE 는 DESCEND 가 접촉으로 끝난 직후에 오므로 기준선이
+                                     #   접촉력(증분 3~5 N 추정)이고, 실제 누름은 그만큼 더 커진다.
+                                     #   실기에서 SLIDE 시작 로그의 기준선 Fz 를 보고 정한다 (#73).
+                                     #   ⚠️ edge_arm_force_n · contact_threshold_n 과 직접 비교하지
+                                     #   않는다. 그 둘은 tare 대비 증분(|F − F0|)이고 이 값은 호출
+                                     #   시점 기준이라, 기준이 다른 값끼리는 대소 비교가 성립하지
+                                     #   않는다 (현지 리뷰, PR #73). 실제 누름을 tare 기준으로
+                                     #   환산하려면 SLIDE 시작 로그의 기준선 Fz 를 더해야 한다.
+                                     #   9/20 실기 편향 2.25 mm 는 tare 대비 증분 2~4 N 에서 잰 값이다.
+                                     #   확정 순서: 이동 중 잡음 → 임계 → 누름 힘 → 편향 (병후)
+    compliance_stiffness: [3000.0, 3000.0, 3000.0, 200.0, 200.0, 200.0]
+                                     # task_compliance_ctrl 강성 [N/m ×3, N·m/rad ×3].
+                                     #   두산 기본값. 실기에서 조정한다
+    arrival_tolerance_m: 0.003       # OP_MOVE_TO 도착 판정 허용치 [m]. 멈춘 것과 도착한 것은
+                                     #   다르다. 이 값을 넘으면 TARGET_REACHED 가 아니라
+                                     #   ROBOT_ERROR 다. 출발값이고 실기에서 확정한다 (#73)
+    arrival_grace_s: 1.0             # 명령 후 이 시간 안에 안 움직이면 도착으로 본다 [s]
+    release_force_time_s: 0.3        # release_force 의 강성 제어 전환 시간 [s] (0~1.0).
+                                     #   0 이면 즉시 전환이라 참조 외력이 점프한다
+                                     #   (두산 매뉴얼 5.1.4 알아두기). 실기에서 확인한다
     frame_id: base_link              # units-frames.md 가칭. 계약에서 확정되면 같이 바꾼다
     dsr_namespace: dsr01
     sample_rate_hz: 50.0             # 설정값. 실측은 Virtual 37.6 Hz, 실기 42.8 Hz
@@ -96,6 +125,17 @@ scan_manager:
     # max_slide_m:                   # 계약 이름. TBD. 부재 크기 · 작업영역으로 정한다
     # motion_timeout_s:              # 계약 이름. TBD. **이 값이 없으면 START 뿐 아니라 안전복귀(/scan/home)도 거절된다**
                                      #   (OP_HOME 에 실을 제한 시간이다. 실기 세션 전에 가장 먼저 채운다)
+    # --- 모션 (계약 이름). 실기는 sim 보다 보수적으로 둔다. 전부 설계 출발값이며 실측이 아니다 ---
+    descend_speed_mps: 0.003         # OP_DESCEND 속도. 저속 등속(BRD 4.2.1: 가감속 관성력이 외력으로 읽히는 것을 피한다)
+                                     #   느릴수록 판정 지연이 거리로 덜 환산된다. TR-01(T24)에서 조정
+    slide_speed_mps: 0.005           # OP_SLIDE 속도. 편향은 속도에 비례하므로 sim(0.010)보다 낮춘다. T25 에서 조정
+    max_descend_m: 0.120             # 미접촉 실패 한계. 근거(PR #60 · #80): 홈 팁 높이에서 작업대까지 약 0.112,
+                                     #   80 mm 큐브 윗면까지 약 0.032. 하한 0.117(접촉 실측 + 여유) < 0.120 < 상한 약 0.184
+                                     #   ⚠️ 부재가 없으면 팁이 작업대까지 내려간다. 목표 z 제한이 유일한 보호다
+    max_slide_m: 0.060               # 미소실 실패 한계. 80 mm 큐브 반폭 0.040 + 여유
+    motion_timeout_s: 60.0           # 단위 모션 제한
+    move_speed_mps: 0.030            # OP_MOVE_TO 속도(기준점 이동 · 방향 전환의 올림과 수평 이동 · 마무리 들어 올림)
+    recontact_speed_mps: 0.002       # 방향 전환 뒤 내림 속도. 이동 속도가 아니라 저속이어야 한다(계약 7.3)
     lift_height_m: 0.05              # 계약 이름. 방향 전환 · 마무리 때 팁 상승량. 출발값 50 mm (BRD 4.2.6)
     # move_speed_mps:                # OP_MOVE_TO 속도. TBD. robot_manager 는 OP_HOME 이 아닌 goal 의 speed <= 0 을 거절한다(PR #73)
     recontact_margin_m: 0.001        # 방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값. 출발값 1 mm (계약 7.3). drop_limit_m 보다 충분히 작아야 한다
@@ -105,7 +145,20 @@ scan_manager:
     # base_to_fixture:               # 작업대 원점의 Base 좌표 x y z. 평행 이동만. **TBD**
                                      #   units-frames.md v0.1.3 의 초안은 [0.42356, -0.18606, 0.1006] 이다(2026-09-19 학민, PR #60).
                                      #   그 세션 한정 초안이고 부재를 같은 자리에 놓는 방법이 없어, 값을 확인한 사람이 날짜 · 조건과 함께 넣는다
+    # --- 좌표 (아직 채우지 않았다. 없으면 scan_manager 가 START 를 INVALID_VALUE 로 거절한다) ---
+    # search_origin_pose:            # 탐색 기준점 상공. Base, x y z qx qy qz qw (계약 v0.1.7, PR #82)
+    # base_to_fixture:               # 작업대 원점의 Base 좌표 x y z. 평행 이동만
+    #   ⚠️ 둘 다 PR #80 의 **탐침 밀림 확인 결과가 나와야** 정할 수 있다. 탐침이 홀더 안으로 밀리고 있으면
+    #   그 세션에서 찍은 좌표가 전부 무효다(80분 사이 0.6 → 1.3 mm). 2026-09-21 오전 실기 첫 순서로 확인한다
+    #   초안값은 units-frames.md 에 있다: base_to_fixture = (0.42356, -0.18606, 0.1006) m
+    #   support_z_m 도 같은 이유로 확정 전이다(아래 주석 참고)
     support_z_m: 0.0                 # 지지면 높이(작업대 좌표). z=0 이 작업대 표면이다(units-frames.md). 0 이 정당한 값이다
+    detect_latency_s: 0.020          # 편향 보정 지연 t. **설계 출발값이며 실측이 아니다**
+                                     #   구성: 샘플 주기의 절반(실기 42.7 Hz 면 약 12 ms) + 조회 왕복(get_tool_force 4~7 ms, PR #66)
+                                     #        + 실제 접촉부터 힘이 임계에 닿기까지(금속이라 짧을 것으로 보지만 **미측정**)
+                                     #   계약 v0.1.5 로 판정 샘플이 '조건이 처음 성립한 샘플'이 되어 디바운스 몫은 빠졌다
+                                     #   sim.yaml 은 가상 강성 모델이 있어 근거가 다르다(그쪽 주석 참고)
+                                     #   T24 에서 detect_stamp - force_stamp 로 실측해 바꾼다
     tip_radius_m: 0.000225           # 편향 보정 r. **반지름**이다(지름 0.45 mm). 실측: 2026-09-19 학민, 인공눈물 용기 끝(units-frames.md, PR #57)
     # detect_latency_s:              # 편향 보정 지연 t. TBD (T24 · T30 실측). '판정 샘플'의 정의(이슈 #69)에 따라 뜻이 달라진다
     edge_round_radius_m: 0.0         # 부재 모서리 둥글림 R. 기준 큐브(80 x 80 x 80 mm)는 모서리가 예리하다: 라운드 없음

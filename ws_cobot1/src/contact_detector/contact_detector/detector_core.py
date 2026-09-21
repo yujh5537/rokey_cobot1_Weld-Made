@@ -77,10 +77,12 @@ class EdgeConfig:
     arm_force_n: float              # |F - F0| 가 이 값을 넘으면 "누르고 있다"로 본다. 그 뒤부터 EDGE 를 판정한다
     trend_window_s: float           # 추세선을 맞추는 최근 구간의 길이
     trend_min_samples: int          # 구간 안의 샘플이 이보다 적으면 판정하지 않는다
+    max_gap_s: float                # 샘플이 이보다 오래 끊기면 추세선을 버리고 다시 쌓는다
 
     def __post_init__(self):
-        if not (self.edge_drop_m > 0 and self.arm_force_n > 0 and self.trend_window_s > 0):
-            raise ValueError('edge_drop_m, arm_force_n, trend_window_s 는 0 보다 커야 한다')
+        if not (self.edge_drop_m > 0 and self.arm_force_n > 0 and self.trend_window_s > 0
+                and self.max_gap_s > 0):
+            raise ValueError('edge_drop_m, arm_force_n, trend_window_s, max_gap_s 는 0 보다 커야 한다')
         if self.debounce_n < 1 or self.trend_min_samples < 2:
             raise ValueError('debounce_n 은 1 이상, trend_min_samples 는 2 이상이어야 한다')
 
@@ -182,9 +184,11 @@ class ContactDetector:
         self._edge_armed = False                     # 이 동작에서 누름이 확인됐다
         self._edge_latched = False                   # 한 motion_id 에서 EDGE 는 1 회만
         self._edge_first_drop: Optional[float] = None
+        self._last_edge_t: Optional[float] = None
         self._pending: Deque[Tuple[float, float]] = deque()   # 아직 추세선에 넣지 않은 최근 샘플
         self._trend = (_Trend(edge_config.trend_window_s, edge_config.trend_min_samples)
                        if edge_config else None)
+        self.trend_gap = False                       # 직전 update 에서 공백 때문에 추세선을 버렸다
 
     @property
     def edge_armed(self) -> bool:
@@ -196,6 +200,7 @@ class ContactDetector:
         self._edge_armed = False
         self._edge_latched = False
         self._edge_first_drop = None
+        self._last_edge_t = None
         self._pending.clear()
         if self._trend:
             self._trend.clear()
@@ -216,6 +221,7 @@ class ContactDetector:
             self._reset_edge()
 
         detections = []
+        self.trend_gap = False
         over = self._update_over_force(sample)
         if over:
             detections.append(over)
@@ -262,6 +268,16 @@ class ContactDetector:
             return None
 
         t, z = sample.pose_stamp, sample.position[2]
+        # 공백이면 추세선 · 대기 버퍼 · 연속 횟수를 즉시 버린다. 대기 버퍼를 지난 뒤에 알아차리면
+        # 그사이 공백 이전의 추세로 판정하게 되고, 공백 동안 일어난 하강을 한 번에 EDGE 로 확정한다
+        # (Virtual 실측 342 ms 공백, 2026-09-20). 판정이 몇 샘플 늦어지는 대신 틀린 좌표를 내지 않는다
+        if self._last_edge_t is not None and t - self._last_edge_t > cfg.max_gap_s:
+            self._trend.clear()
+            self._pending.clear()
+            self._edge_run.reset()
+            self.trend_gap = True
+        self._last_edge_t = t
+
         if not self._edge_armed:
             # 틈을 메우며 내려가는 동안에는 판정하지 않는다. 누르는 힘이 확인된 뒤의 z 만 기준선에 쓴다
             if self._arm_run.update(self.force_delta(sample) > cfg.arm_force_n, sample) >= cfg.debounce_n:

@@ -11,7 +11,7 @@ BRD는 "매뉴얼 설명 / 소스 확인 / 실제 PC 호출 확인 / 실기 성�
 | amovel | | 미확인 | 미확인 | | |
 | motion/move_stop (DR_QSTOP) | | 미확인 | 미확인 | | |
 | task_compliance_ctrl / release_compliance_ctrl | | 미확인 | 미확인 | | Virtual에서 힘 제어가 정상 동작하지 않을 수 있음 [E10] |
-| set_desired_force (DR_FC_MOD_REL) / release_force | | 미확인 | 미확인 | | |
+| set_desired_force (DR_FC_MOD_REL) / release_force | | 미확인 | 미확인 | | **mod 의미는 헤더에서 확인**(`dsr_msgs2/srv/detail/set_desired_force__struct.h`): ABS(0)=절대값, REL(1)=**호출 시점 상태 기준 상대값**. 실기에서 ① SLIDE 시작 직후 `|F − F0|` 1회, ② `DR_FC_MOD_ABS` 가 실제로 동작하는지 확인한다 (#73) |
 | check_position_condition | | 미확인 | 미확인 | | |
 | drl_script_run (set_external_force_reset 경유) | | 미확인 | 미확인 | | |
 | /onrobot/sendCommand (RG2 파지) | | 미확인 | 미확인 | | 실제 노드·네임스페이스 대조 필요 |
