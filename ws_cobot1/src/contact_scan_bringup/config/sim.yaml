@@ -46,6 +46,7 @@ contact_detector:
                                      #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
     # --- 하강 · 밀기 기준 분리 (#109). 값의 근거는 real.yaml ---
     descend_ref_window_s: 1.0        # sim 도 같은 경로를 탄다. sim 외력은 무접촉이면 0 이라 이동 기준도 0 근처다
+                                     #   느린 접촉 경계 약 4.6 N/s(real.yaml 주석, #139). sim 은 sim_stiffness_n_per_m × descend_speed_mps
     descend_ref_lag_s: 0.3
     descend_ref_min_samples: 10
     descend_ref_settle_s: 5.5
