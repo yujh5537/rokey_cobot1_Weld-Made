@@ -22,8 +22,13 @@ class CallQueue:
     `on_done(response)`는 응답이 없으면 `None`으로 불린다. 호출자는 값을 0으로 채우지 않는다.
     """
 
-    def __init__(self, now_s, timeout_s, logger=None, abandon_after_s=5.0):
+    def __init__(self, now_s, timeout_s, logger=None, abandon_after_s=5.0, slow_s=None):
         self.now_s, self.timeout_s, self.logger = now_s, timeout_s, logger
+        # 이보다 늦게 온 응답은 서비스 이름 · 걸린 시간 · 보낸 시각을 남긴다(#130). None 이면 끈다.
+        # 실기에서 정지 중 약 3 s 주기로 한 호출이 330~365 ms 늦었다. 어느 서비스가 언제 늦는지가
+        # 드라이버 쪽 원인을 가르는 근거다
+        self.slow_s = slow_s
+        self.slow_calls = 0
         # 시간 초과를 알린 뒤에도 이만큼은 다음 호출을 보내지 않는다. 응답이 늦을 뿐인
         # 요청이 살아 있는데 새로 보내면 같은 서비스로 여러 건이 동시에 뜬다
         # (병후 리뷰, PR #72). 드라이버가 느려지는 것은 멈추기 직전 증상이다
@@ -62,8 +67,18 @@ class CallQueue:
             if self.logger:
                 self.logger.warn(f'{call.label} 호출 실패: {exc}')
         self.current = None
+        self.note_slow(call)
         self.finish(call, response, '')
         self.pump()
+
+    def note_slow(self, call):
+        waited = self.now_s() - call.sent_s
+        if self.slow_s is None or waited <= self.slow_s:
+            return
+        self.slow_calls += 1
+        if self.logger:
+            self.logger.warn(f'{call.label} 응답 {waited * 1000:.0f} ms (> {self.slow_s * 1000:.0f} ms). '
+                             f'보낸 시각 {call.sent_s:.3f} s, 누적 {self.slow_calls}회')
 
     def poll(self):
         """시간 초과를 검사한다. 주기적으로(타이머에서) 부른다.

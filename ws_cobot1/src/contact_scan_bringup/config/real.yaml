@@ -109,6 +109,8 @@ robot_manager:
     sample_rate_hz: 50.0             # 설정값. 실측은 Virtual 37.6 Hz, 실기 42.8 Hz
     status_rate_hz: 10.0
     service_timeout_s: 0.5
+    slow_call_warn_s: 0.15           # 이보다 늦은 두산 서비스 응답을 이름 · 시간과 함께 남긴다(#130). 0 이면 끈다.
+                                     #   9/21 실기: 정지 중 약 3 s 주기로 한 호출이 330~365 ms 늦었다(평소 4~20 ms)
     moving_eps_m: 0.0002             # 이 창 안에서 이만큼 움직이면 이동 중.
                                      #   실기 posx 잡음이 0.2 mm 를 넘으면 영원히 '이동 중'이 되어
                                      #   정지 완료가 안 나오고, 너무 크면 느린 하강을 정지로 본다.

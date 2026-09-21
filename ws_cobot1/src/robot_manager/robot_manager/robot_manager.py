@@ -79,6 +79,8 @@ class RobotManager(Node):
         self.declare_parameter('sample_rate_hz', 50.0)           # 설계 출발값. 실측은 README
         self.declare_parameter('status_rate_hz', 10.0)
         self.declare_parameter('service_timeout_s', 0.5)
+        # 이보다 늦은 응답을 서비스 이름과 함께 남긴다(#130). 0 이면 끈다
+        self.declare_parameter('slow_call_warn_s', 0.0)
         # moving 판정: get_robot_state 는 Virtual 에서 이동 중에도 STANDBY(1)를 돌려줬다
         # (2026-09-20 확인, docs/env/api-check-log.md). 그래서 위치 변화로 본다.
         self.declare_parameter('moving_eps_m', 0.0002)
@@ -122,7 +124,9 @@ class RobotManager(Node):
         self.srv_clients = dsr_client.make_clients(self, self.get_parameter('dsr_namespace').value)
         for client in self.srv_clients.values():
             client.callback_group = group
-        self.queue = CallQueue(self.now_s, self.service_timeout_s, self.get_logger())
+        slow_call_warn_s = float(self.get_parameter('slow_call_warn_s').value)
+        self.queue = CallQueue(self.now_s, self.service_timeout_s, self.get_logger(),
+                               slow_s=slow_call_warn_s if slow_call_warn_s > 0.0 else None)
 
         self.sample_pub = self.create_publisher(RobotSample, '/robot/sample', QOS_SENSOR)
         self.status_pub = self.create_publisher(RobotStatus, '/robot/status', QOS_STATE)
