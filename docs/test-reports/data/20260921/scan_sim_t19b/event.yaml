@@ -1,0 +1,280 @@
+event_id: 1
+scan_id: 20260921-131938-1493
+motion_id: 2
+sample_id: 3414
+type: 0
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.425
+    y: -0.184
+    z: 0.4397650146484375
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 4.699707031250444
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964394
+  nanosec: 444255388
+force_stamp:
+  sec: 1789964394
+  nanosec: 446999279
+detect_stamp:
+  sec: 1789964394
+  nanosec: 489242040
+force_delta_n: 8.599853515625089
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 2
+scan_id: 20260921-131938-1493
+motion_id: 3
+sample_id: 3699
+type: 1
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.47539999389648435
+    y: -0.184
+    z: 0.43863136005346426
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964400
+  nanosec: 325822973
+force_stamp:
+  sec: 1789964400
+  nanosec: 328984361
+detect_stamp:
+  sec: 1789964400
+  nanosec: 365817573
+force_delta_n: 0.0
+z_drop_m: 0.00121863994653576
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 3
+scan_id: 20260921-131938-1493
+motion_id: 7
+sample_id: 4680
+type: 1
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.37476998901367187
+    y: -0.184
+    z: 0.4389514300496507
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964420
+  nanosec: 243390087
+force_stamp:
+  sec: 1789964420
+  nanosec: 245712137
+detect_stamp:
+  sec: 1789964420
+  nanosec: 287548476
+force_delta_n: 0.0
+z_drop_m: 0.000898569950349315
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4
+scan_id: 20260921-131938-1493
+motion_id: 11
+sample_id: 5571
+type: 1
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.425
+    y: -0.15369000244140624
+    z: 0.43862080697656086
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964438
+  nanosec: 526471866
+force_stamp:
+  sec: 1789964438
+  nanosec: 529231875
+detect_stamp:
+  sec: 1789964438
+  nanosec: 567242228
+force_delta_n: 0.0
+z_drop_m: 0.0012291930234391568
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 5
+scan_id: 20260921-131938-1493
+motion_id: 15
+sample_id: 6444
+type: 1
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.425
+    y: -0.21427999877929688
+    z: 0.43892481192107885
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964456
+  nanosec: 243125815
+force_stamp:
+  sec: 1789964456
+  nanosec: 246002178
+detect_stamp:
+  sec: 1789964456
+  nanosec: 286512203
+force_delta_n: 0.0
+z_drop_m: 0.0009251880789211131
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 6
+scan_id: 20260921-132213-8133
+motion_id: 2
+sample_id: 11047
+type: 0
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.425
+    y: -0.184
+    z: 0.43980999755859373
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 3.8000488281253464
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964549
+  nanosec: 524127579
+force_stamp:
+  sec: 1789964549
+  nanosec: 526578009
+detect_stamp:
+  sec: 1789964549
+  nanosec: 565850080
+force_delta_n: 7.600097656249583
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 7
+scan_id: 20260921-132936-9492
+motion_id: 2
+sample_id: 32970
+type: 0
+source: sim
+frame_id: base_link
+pose:
+  position:
+    x: 0.425
+    y: -0.184
+    z: 0.43984500122070314
+  orientation:
+    x: 0.9999832198302206
+    y: 0.005536941895155514
+    z: -0.0014006997477005886
+    w: 0.0009697281325718571
+wrench:
+  force:
+    x: 0.0
+    y: 0.0
+    z: 3.0999755859373312
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1789964991
+  nanosec: 724983754
+force_stamp:
+  sec: 1789964991
+  nanosec: 727545894
+detect_stamp:
+  sec: 1789964991
+  nanosec: 766902697
+force_delta_n: 6.799926757812269
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---

@@ -1,0 +1,32 @@
+Waiting for an action server to become available...
+Sending goal:
+     request_id: t19b-A7
+use_override: false
+config_override:
+  contact_threshold_n: 0.0
+  contact_threshold_set: false
+  edge_drop_m: 0.0
+  edge_drop_set: false
+  debounce_n: 0
+  debounce_set: false
+  over_force_n: 0.0
+  over_force_set: false
+  descend_speed_mps: 0.0
+  descend_speed_set: false
+  slide_speed_mps: 0.0
+  slide_speed_set: false
+  max_descend_m: 0.0
+  max_descend_set: false
+  max_slide_m: 0.0
+  max_slide_set: false
+  motion_timeout_s: 0.0
+  motion_timeout_set: false
+  lift_height_m: 0.0
+  lift_height_set: false
+  target_force_n: 0.0
+  target_force_set: false
+  drop_limit_m: 0.0
+  drop_limit_set: false
+
+Goal accepted with ID: b4b019be42874a6d93a8db13981659a6
+

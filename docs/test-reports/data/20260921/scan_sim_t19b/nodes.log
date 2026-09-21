@@ -1,0 +1,258 @@
+[INFO] [launch]: All log files can be found below /home/rokey/.ros/log/2026-09-21-13-18-40-652753-rokey-115459
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: [bringup] source=sim, 파라미터 파일=/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/contact_scan_bringup/share/contact_scan_bringup/config/sim.yaml
+[INFO] [launch.user]: [bringup] mqtt_bridge: 패키지가 설치되지 않아 건너뜀
+[INFO] [robot_manager-1]: process started with pid [115462]
+[INFO] [contact_detector-2]: process started with pid [115463]
+[INFO] [safety_monitor-3]: process started with pid [115464]
+[INFO] [scan_manager-4]: process started with pid [115465]
+[contact_detector-2] [0m[INFO] [1789964322.183359495] [contact_detector]: sim 가상 직육면체: 밑면 중심 (0.425, -0.184, 0.4) m, 크기 (0.1, 0.06, 0.04) m, 윗면 z=0.4400 m (frame_id=base_link)[0m
+[contact_detector-2] [0m[INFO] [1789964322.185630485] [contact_detector]: source=sim contact_threshold_n=3.0 edge_drop_m=0.0005 debounce_n=3 over_force_n=30.0 over_force_debounce_n=1 edge_arm_force_n=1.5 edge_trend_window_s=0.5 edge_trend_min_samples=10 stale_age_ms=200 tare_duration_s=1.5 tare_min_samples=30 tare_max_std_n=0.3 tare_max_force_n=6.0 sim_box_frame_id=base_link sim_box_origin_m=[0.425, -0.184, 0.4] sim_box_size_m=[0.1, 0.06, 0.04] sim_stiffness_n_per_m=20000.0 sim_tip_radius_m=0.000225 sim_fall_speed_mps=0.05 sim_slide_press_n=3.0[0m
+[scan_manager-4] [0m[INFO] [1789964322.685004112] [scan_manager]: scan_manager 준비: /scan/run · /scan/home · /scan/resume · /scan/stop · /scan/set_config[0m
+[safety_monitor-3] [0m[INFO] [1789964322.902195542] [safety_monitor]: over_force_n=30.0 drop_limit_m=0.005 sample_stale_ms=500 robot_status_timeout_ms=1000 confirm_n=1 startup_grace_s=3.0 stop_confirm_timeout_s=0.6 stop_retry_period_s=2.0 status_publish_period_s=1.0 check_period_s=0.05[0m
+[robot_manager-1] [0m[INFO] [1789964323.011032401] [robot_manager]: robot_manager 시작. 샘플 50.0 Hz, 상태 10.0 Hz, 서비스 /dsr01/dsr_controller2/[0m
+[contact_detector-2] [33m[WARN] [1789964336.959641418] [contact_detector]: 샘플이 284 ms 묵었다. 버린다[0m
+[contact_detector-2] [33m[WARN] [1789964364.545823173] [contact_detector]: 샘플 간격 295 ms > stale_age_ms[0m
+[scan_manager-4] [0m[INFO] [1789964367.937208226] [scan_manager]: [ERROR code=0] 기록에서 되돌렸다: 20260921-113935-4768 ERROR 1/4[0m
+[scan_manager-4] [0m[INFO] [1789964367.959337828] [scan_manager]: [HOMING code=0] 안전복귀 시작 request_id=t19b-A-prehome[0m
+[robot_manager-1] [0m[INFO] [1789964367.970829063] [robot_manager]: goal 수락: scan=20260921-113935-4768 motion_id=8 op=4 dir=0 speed=0.0 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964375.999817059] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964378.548030928] [scan_manager]: [PREPARING code=0] 작업 시작 request_id=t19b-A1[0m
+[robot_manager-1] [0m[INFO] [1789964378.560506346] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=1 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964379.935083527] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[contact_detector-2] [0m[INFO] [1789964381.531759399] [contact_detector]: tare OK: 74 samples / 1.50 s, |F0| 0.00 N, |F-F0| rms 0.000 N[0m
+[scan_manager-4] [0m[INFO] [1789964381.536689785] [scan_manager]: [PREPARING code=0] tare 완료: |F0|=0.000 N, std=0.000 N, n=74[0m
+[robot_manager-1] [0m[INFO] [1789964381.550443811] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=2 op=2 dir=0 speed=0.005 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964394.507196855] [robot_manager]: 정지: 접촉[0m
+[robot_manager-1] [0m[INFO] [1789964394.797964592] [robot_manager]: goal 종료: reason=1 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964394.817299047] [scan_manager]: [TOP_SEARCH code=0] 윗면 접촉 확정 (판정 좌표)[0m
+[robot_manager-1] [0m[INFO] [1789964394.840896710] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=3 op=3 dir=1 speed=0.01 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964394.841941647] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=-0.04 N (|F|=0.05 N). 목표 3.00 N 은 여기에 더해진다[0m
+[robot_manager-1] [0m[INFO] [1789964400.390645278] [robot_manager]: 정지: 접촉 소실[0m
+[robot_manager-1] [0m[INFO] [1789964400.696509022] [robot_manager]: goal 종료: reason=2 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964400.729016394] [scan_manager]: [EDGE_SEARCH code=0] POS_X 모서리 확정 (판정 좌표)[0m
+[robot_manager-1] [0m[INFO] [1789964400.751693547] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=4 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964402.349347809] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964402.368013953] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=5 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964404.015228836] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964404.035540872] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=6 op=1 dir=0 speed=0.005 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964414.763125454] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964414.777445831] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=7 op=3 dir=2 speed=0.01 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964414.784100023] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=-0.04 N (|F|=0.09 N). 목표 3.00 N 은 여기에 더해진다[0m
+[robot_manager-1] [0m[INFO] [1789964420.321022830] [robot_manager]: 정지: 접촉 소실[0m
+[robot_manager-1] [0m[INFO] [1789964420.646173028] [robot_manager]: goal 종료: reason=2 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964420.682540968] [scan_manager]: [EDGE_SEARCH code=0] NEG_X 모서리 확정 (판정 좌표)[0m
+[robot_manager-1] [0m[INFO] [1789964420.703584246] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=8 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964422.353290914] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964422.378149947] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=9 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964424.028820968] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964424.052349103] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=10 op=1 dir=0 speed=0.005 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964435.148452396] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964435.167162835] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=11 op=3 dir=3 speed=0.01 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964435.168292794] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=0.03 N (|F|=0.13 N). 목표 3.00 N 은 여기에 더해진다[0m
+[robot_manager-1] [0m[INFO] [1789964438.573982558] [robot_manager]: 정지: 접촉 소실[0m
+[robot_manager-1] [0m[INFO] [1789964438.947931906] [robot_manager]: goal 종료: reason=2 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964438.972809802] [scan_manager]: [EDGE_SEARCH code=0] POS_Y 모서리 확정 (판정 좌표)[0m
+[robot_manager-1] [0m[INFO] [1789964438.994495240] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=12 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964440.592585405] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964440.611388117] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=13 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964441.810762277] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964441.835833224] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=14 op=1 dir=0 speed=0.005 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964452.856360428] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964452.876916734] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=15 op=3 dir=4 speed=0.01 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964452.881799072] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=-0.06 N (|F|=0.08 N). 목표 3.00 N 은 여기에 더해진다[0m
+[robot_manager-1] [0m[INFO] [1789964456.295791790] [robot_manager]: 정지: 접촉 소실[0m
+[robot_manager-1] [0m[INFO] [1789964456.605476361] [robot_manager]: goal 종료: reason=2 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964456.636391670] [scan_manager]: [EDGE_SEARCH code=0] NEG_Y 모서리 확정 (판정 좌표)[0m
+[scan_manager-4] [0m[INFO] [1789964456.658728855] [scan_manager]: [GEOMETRY code=0] 형상 계산 성공. 윗면 보정 0.0001 m (result_store 에는 방향별 보정만 남는다)[0m
+[robot_manager-1] [0m[INFO] [1789964456.678316768] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=16 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964458.249067027] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[robot_manager-1] [0m[INFO] [1789964458.268164595] [robot_manager]: goal 수락: scan=20260921-131938-1493 motion_id=17 op=4 dir=0 speed=0.0 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964459.332899639] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964533.655883713] [scan_manager]: [PREPARING code=0] 작업 시작 request_id=t19b-A5[0m
+[robot_manager-1] [0m[INFO] [1789964533.672687511] [robot_manager]: goal 수락: scan=20260921-132213-8133 motion_id=1 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964535.081404985] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[contact_detector-2] [0m[INFO] [1789964536.633544719] [contact_detector]: tare OK: 75 samples / 1.50 s, |F0| 0.00 N, |F-F0| rms 0.000 N[0m
+[scan_manager-4] [0m[INFO] [1789964536.642852998] [scan_manager]: [PREPARING code=0] tare 완료: |F0|=0.000 N, std=0.000 N, n=75[0m
+[robot_manager-1] [0m[INFO] [1789964536.658711529] [robot_manager]: goal 수락: scan=20260921-132213-8133 motion_id=2 op=2 dir=0 speed=0.005 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964549.571041166] [robot_manager]: 정지: 접촉[0m
+[robot_manager-1] [0m[INFO] [1789964549.939913210] [robot_manager]: goal 종료: reason=1 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964549.973286229] [scan_manager]: [TOP_SEARCH code=0] 윗면 접촉 확정 (판정 좌표)[0m
+[robot_manager-1] [0m[INFO] [1789964549.993071466] [robot_manager]: goal 수락: scan=20260921-132213-8133 motion_id=3 op=3 dir=1 speed=0.01 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964549.995658310] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=0.02 N (|F|=0.06 N). 목표 3.00 N 은 여기에 더해진다[0m
+[scan_manager-4] [33m[WARN] [1789964554.124070243] [scan_manager]: [STOPPING code=200] 작업 중지 접수: phase=STOPPING. /robot/stop 서버가 없다[0m
+[robot_manager-1] [0m[INFO] [1789964554.127362375] [robot_manager]: 정지: Action 취소[0m
+[robot_manager-1] [0m[INFO] [1789964554.642454618] [robot_manager]: goal 종료: reason=6 code=201 Action 취소[0m
+[scan_manager-4] [0m[INFO] [1789964554.650625913] [scan_manager]: [STOPPING code=0] Action 취소[0m
+[scan_manager-4] [0m[INFO] [1789964554.774819497] [scan_manager]: [STOPPING code=200] 정지 완료 확인 (정지 좌표)[0m
+[scan_manager-4] [0m[INFO] [1789964925.907295510] [scan_manager]: [HOMING code=0] 안전복귀 시작 request_id=t19b-A6[0m
+[robot_manager-1] [0m[INFO] [1789964925.919778639] [robot_manager]: goal 수락: scan=20260921-132213-8133 motion_id=4 op=4 dir=0 speed=0.0 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964927.333068419] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964953.889172222] [scan_manager]: [PREPARING code=0] 작업 시작 request_id=t19b-A3-nocontact[0m
+[robot_manager-1] [0m[INFO] [1789964953.906964117] [robot_manager]: goal 수락: scan=20260921-132913-3267 motion_id=1 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964955.343600298] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[contact_detector-2] [0m[INFO] [1789964956.928162730] [contact_detector]: tare OK: 75 samples / 1.50 s, |F0| 0.00 N, |F-F0| rms 0.000 N[0m
+[scan_manager-4] [0m[INFO] [1789964956.935251064] [scan_manager]: [PREPARING code=0] tare 완료: |F0|=0.000 N, std=0.000 N, n=75[0m
+[robot_manager-1] [0m[INFO] [1789964956.947717020] [robot_manager]: goal 수락: scan=20260921-132913-3267 motion_id=2 op=2 dir=0 speed=0.005 max=0.01[0m
+[robot_manager-1] [0m[INFO] [1789964959.499430243] [robot_manager]: goal 종료: reason=3 code=300 최대 거리까지 접촉이 없었다[0m
+[scan_manager-4] [31m[ERROR] [1789964959.530908369] [scan_manager]: [TOP_SEARCH code=300] TOP_SEARCH 실패: max_descend_m 0.01 안에 접촉이 없다 (정지 좌표)[0m
+[scan_manager-4] [0m[INFO] [1789964976.419640978] [scan_manager]: [PREPARING code=0] 작업 시작 request_id=t19b-A3-noedge[0m
+[robot_manager-1] [0m[INFO] [1789964976.446220574] [robot_manager]: goal 수락: scan=20260921-132936-9492 motion_id=1 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789964977.222301494] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[contact_detector-2] [0m[INFO] [1789964978.826522541] [contact_detector]: tare OK: 75 samples / 1.50 s, |F0| 0.00 N, |F-F0| rms 0.000 N[0m
+[scan_manager-4] [0m[INFO] [1789964978.832646762] [scan_manager]: [PREPARING code=0] tare 완료: |F0|=0.000 N, std=0.000 N, n=75[0m
+[robot_manager-1] [0m[INFO] [1789964978.843629941] [robot_manager]: goal 수락: scan=20260921-132936-9492 motion_id=2 op=2 dir=0 speed=0.005 max=0.08[0m
+[robot_manager-1] [0m[INFO] [1789964991.778456120] [robot_manager]: 정지: 접촉[0m
+[robot_manager-1] [0m[INFO] [1789964992.055346746] [robot_manager]: goal 종료: reason=1 code=0 [0m
+[scan_manager-4] [0m[INFO] [1789964992.186457680] [scan_manager]: [TOP_SEARCH code=0] 윗면 접촉 확정 (판정 좌표)[0m
+[robot_manager-1] [0m[INFO] [1789964992.198430917] [robot_manager]: goal 수락: scan=20260921-132936-9492 motion_id=3 op=3 dir=1 speed=0.01 max=0.005[0m
+[robot_manager-1] [0m[INFO] [1789964992.199476228] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=-0.01 N (|F|=0.03 N). 목표 3.00 N 은 여기에 더해진다[0m
+[robot_manager-1] [0m[INFO] [1789964993.244046769] [robot_manager]: goal 종료: reason=3 code=301 최대 거리까지 접촉 소실이 없었다[0m
+[scan_manager-4] [31m[ERROR] [1789964993.271580333] [scan_manager]: [EDGE_SEARCH code=301] EDGE_SEARCH 실패: max_slide_m 0.005 안에 접촉 소실이 없다 (정지 좌표)[0m
+[scan_manager-4] [0m[INFO] [1789965052.161005489] [scan_manager]: [PREPARING code=0] 작업 시작 request_id=t19b-A7[0m
+[robot_manager-1] [0m[INFO] [1789965052.174515196] [robot_manager]: goal 수락: scan=20260921-133052-6538 motion_id=1 op=1 dir=0 speed=0.05 max=0.0[0m
+[robot_manager-1] [0m[INFO] [1789965054.028194429] [robot_manager]: goal 종료: reason=0 code=0 [0m
+[contact_detector-2] [0m[INFO] [1789965055.630256747] [contact_detector]: tare OK: 75 samples / 1.50 s, |F0| 0.00 N, |F-F0| rms 0.000 N[0m
+[scan_manager-4] [0m[INFO] [1789965055.636814017] [scan_manager]: [PREPARING code=0] tare 완료: |F0|=0.000 N, std=0.000 N, n=75[0m
+[robot_manager-1] [0m[INFO] [1789965055.657373201] [robot_manager]: goal 수락: scan=20260921-133052-6538 motion_id=2 op=2 dir=0 speed=0.005 max=0.08[0m
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [scan_manager-4]: sending signal 'SIGINT' to process[scan_manager-4]
+[INFO] [safety_monitor-3]: sending signal 'SIGINT' to process[safety_monitor-3]
+[INFO] [contact_detector-2]: sending signal 'SIGINT' to process[contact_detector-2]
+[INFO] [robot_manager-1]: sending signal 'SIGINT' to process[robot_manager-1]
+[robot_manager-1] Traceback (most recent call last):
+[robot_manager-1]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/robot_manager/lib/robot_manager/robot_manager", line 33, in <module>
+[robot_manager-1]     sys.exit(load_entry_point('robot-manager', 'console_scripts', 'robot_manager')())
+[robot_manager-1]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[robot_manager-1]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/robot_manager/robot_manager/robot_manager.py", line 714, in main
+[robot_manager-1]     node.destroy_node()
+[robot_manager-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1956, in destroy_node
+[robot_manager-1]     self.destroy_publisher(self._publishers[0])
+[robot_manager-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1836, in destroy_publisher
+[robot_manager-1]     publisher.destroy()
+[robot_manager-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 105, in destroy
+[robot_manager-1]     self.__publisher.destroy_when_not_in_use()
+[robot_manager-1] KeyboardInterrupt
+[safety_monitor-3] Traceback (most recent call last):
+[safety_monitor-3]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/safety_monitor/lib/safety_monitor/safety_monitor", line 33, in <module>
+[safety_monitor-3]     sys.exit(load_entry_point('safety-monitor', 'console_scripts', 'safety_monitor')())
+[safety_monitor-3]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[safety_monitor-3]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/safety_monitor/safety_monitor/safety_monitor.py", line 268, in main
+[safety_monitor-3]     node.destroy_node()
+[safety_monitor-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1962, in destroy_node
+[safety_monitor-3]     self.destroy_service(self._services[0])
+[safety_monitor-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 1886, in destroy_service
+[safety_monitor-3]     service.destroy()
+[safety_monitor-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/service.py", line 123, in destroy
+[safety_monitor-3]     self.__service.destroy_when_not_in_use()
+[safety_monitor-3] KeyboardInterrupt
+[scan_manager-4] [31m[ERROR] [1789965067.144769175] [scan_manager]: internal: RCLError("Failed to publish: publisher's context is invalid, at ./src/rcl/publisher.c:423")[0m
+[scan_manager-4] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[scan_manager-4] [31m[ERROR] [1789965067.149485501] [scan_manager]: 실패 처리도 실패: RCLError("Failed to publish: publisher's context is invalid, at ./src/rcl/publisher.c:423")[0m
+[scan_manager-4] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[robot_manager-1] [31m[ERROR] [1789965067.151205656] [robot_manager]: 모션 실행 중 오류: Failed to publish feedback with an action server: feedback publisher is invalid, at ./src/rcl_action/action_server.c:1004[0m
+[robot_manager-1] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[robot_manager-1] [31m[ERROR] [1789965067.153060071] [robot_manager.action_server]: Error raised in execute callback: cannot use Destroyable because destruction was requested[0m
+[robot_manager-1] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[robot_manager-1] Traceback (most recent call last):
+[robot_manager-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/action/server.py", line 360, in _execute_goal
+[robot_manager-1]     execute_result = await await_or_execute(execute_callback, goal_handle)
+[robot_manager-1]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[robot_manager-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 115, in await_or_execute
+[robot_manager-1]     return callback(*args)
+[robot_manager-1]            ^^^^^^^^^^^^^^^
+[robot_manager-1]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/robot_manager/robot_manager/robot_manager.py", line 419, in execute_motion
+[robot_manager-1]     self.set_state(self.connected, self.moving, '')
+[robot_manager-1]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/robot_manager/robot_manager/robot_manager.py", line 311, in set_state
+[robot_manager-1]     self.publish_status()
+[robot_manager-1]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/robot_manager/robot_manager/robot_manager.py", line 329, in publish_status
+[robot_manager-1]     self.status_pub.publish(msg)
+[robot_manager-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 68, in publish
+[robot_manager-1]     with self.handle:
+[robot_manager-1] rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested
+[robot_manager-1] [33m[WARN] [1789965067.156780758] [robot_manager.action_server]: Goal state not set, assuming aborted. Goal ID: [246  25 187 207 137  29  77 165 138  22  47 119 255 104 184 154][0m
+[robot_manager-1] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[scan_manager-4] [31m[ERROR] [1789965067.174067397] [scan_manager.action_server]: Error raised in execute callback: Failed to publish: publisher's context is invalid, at ./src/rcl/publisher.c:423[0m
+[scan_manager-4] Failed to publish log message to rosout: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[scan_manager-4] Traceback (most recent call last):
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 1197, in execute
+[scan_manager-4]     if not node.wait_future(done, backstop):
+[scan_manager-4]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[robot_manager-1] The following exception was never retrieved: Failed get goal status array: feedback publisher is invalid, at ./src/rcl_action/action_server.c:1004
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 435, in wait_future
+[scan_manager-4]     return self._wait(done.is_set, timeout_s, done.wait)
+[scan_manager-4]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 424, in _wait
+[scan_manager-4]     raise _Closing()
+[scan_manager-4] scan_manager.scan_manager._Closing
+[scan_manager-4] 
+[scan_manager-4] During handling of the above exception, another exception occurred:
+[scan_manager-4] 
+[scan_manager-4] Traceback (most recent call last):
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 626, in _run_job
+[scan_manager-4]     outcome = run()
+[scan_manager-4]               ^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 620, in run
+[scan_manager-4]     return ScanRunner(MotionPlanner(job.params), ports, job.params.direction_order).run()
+[scan_manager-4]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/sequence.py", line 419, in run
+[scan_manager-4]     self._search()
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/sequence.py", line 438, in _search
+[scan_manager-4]     first_contact_z = self._find_top()
+[scan_manager-4]                       ^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/sequence.py", line 465, in _find_top
+[scan_manager-4]     event, result = self._measure(request, TOP)
+[scan_manager-4]                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/sequence.py", line 378, in _measure
+[scan_manager-4]     result = self._execute(request, target)
+[scan_manager-4]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/sequence.py", line 357, in _execute
+[scan_manager-4]     result = self._ports.execute(self.last_motion_id, request)
+[scan_manager-4]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 1219, in execute
+[scan_manager-4]     node.state_machine.set_motion_id(0)
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/state_machine.py", line 413, in set_motion_id
+[scan_manager-4]     self._emit()
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/state_machine.py", line 431, in _emit
+[scan_manager-4]     self._on_change(self.snapshot())
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 320, in _on_change
+[scan_manager-4]     self._publish_state(snapshot)
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 308, in _publish_state
+[scan_manager-4]     self._state_pub.publish(to_msg(snapshot, self._now_msg()))
+[scan_manager-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 70, in publish
+[scan_manager-4]     self.__publisher.publish(msg)
+[scan_manager-4] rclpy._rclpy_pybind11.RCLError: Failed to publish: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[scan_manager-4] 
+[scan_manager-4] During handling of the above exception, another exception occurred:
+[scan_manager-4] 
+[scan_manager-4] Traceback (most recent call last):
+[scan_manager-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/action/server.py", line 360, in _execute_goal
+[scan_manager-4]     execute_result = await await_or_execute(execute_callback, goal_handle)
+[scan_manager-4]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 115, in await_or_execute
+[scan_manager-4]     return callback(*args)
+[scan_manager-4]            ^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 621, in _execute_run
+[scan_manager-4]     return self._run_job(goal_handle, result, job, ports, run)
+[scan_manager-4]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 633, in _run_job
+[scan_manager-4]     outcome = self._internal_failure(job, exc)
+[scan_manager-4]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 752, in _internal_failure
+[scan_manager-4]     self.state_machine.notify(
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/state_machine.py", line 403, in notify
+[scan_manager-4]     self._emit()
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/state_machine.py", line 431, in _emit
+[scan_manager-4]     self._on_change(self.snapshot())
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 320, in _on_change
+[scan_manager-4]     self._publish_state(snapshot)
+[scan_manager-4]   File "/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/build/scan_manager/scan_manager/scan_manager.py", line 308, in _publish_state
+[scan_manager-4]     self._state_pub.publish(to_msg(snapshot, self._now_msg()))
+[scan_manager-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 70, in publish
+[scan_manager-4]     self.__publisher.publish(msg)
+[scan_manager-4] rclpy._rclpy_pybind11.RCLError: Failed to publish: publisher's context is invalid, at ./src/rcl/publisher.c:423
+[scan_manager-4] [33m[WARN] [1789965067.306909951] [scan_manager.action_server]: Failed to send result response (the client may have gone away)[0m
+[ERROR] [robot_manager-1]: process has died [pid 115462, exit code -2, cmd '/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/robot_manager/lib/robot_manager/robot_manager --ros-args -r __node:=robot_manager --params-file /tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/contact_scan_bringup/share/contact_scan_bringup/config/sim.yaml'].
+[ERROR] [safety_monitor-3]: process has died [pid 115464, exit code -2, cmd '/tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/safety_monitor/lib/safety_monitor/safety_monitor --ros-args -r __node:=safety_monitor --params-file /tmp/claude-1000/-home-rokey-cobot1-rokey-cobot1-Weld-Made/13fafb96-39de-4c8d-b00c-102f273bb8be/scratchpad/t19b/c/install/contact_scan_bringup/share/contact_scan_bringup/config/sim.yaml'].
+[INFO] [contact_detector-2]: process has finished cleanly [pid 115463]
+[INFO] [scan_manager-4]: process has finished cleanly [pid 115465]

@@ -1,0 +1,283 @@
+Waiting for an action server to become available...
+Sending goal:
+     request_id: t19b-A1
+use_override: false
+config_override:
+  contact_threshold_n: 0.0
+  contact_threshold_set: false
+  edge_drop_m: 0.0
+  edge_drop_set: false
+  debounce_n: 0
+  debounce_set: false
+  over_force_n: 0.0
+  over_force_set: false
+  descend_speed_mps: 0.0
+  descend_speed_set: false
+  slide_speed_mps: 0.0
+  slide_speed_set: false
+  max_descend_m: 0.0
+  max_descend_set: false
+  max_slide_m: 0.0
+  max_slide_set: false
+  motion_timeout_s: 0.0
+  motion_timeout_set: false
+  lift_height_m: 0.0
+  lift_height_set: false
+  target_force_n: 0.0
+  target_force_set: false
+  drop_limit_m: 0.0
+  drop_limit_set: false
+
+Goal accepted with ID: c0ffea4e45654d16824adc99dacb6b2e
+
+Result:
+    scan_id: 20260921-131938-1493
+success: true
+reason_code: 0
+detail: ''
+result:
+  scan_id: 20260921-131938-1493
+  stamp:
+    sec: 1789964456
+    nanosec: 656271476
+  success: true
+  reason_code: 0
+  detail: ''
+  frame_id: workpiece_fixture
+  z_top: 0.03986501464843746
+  z_top_valid: true
+  x_pos: 0.04997499389648436
+  x_pos_valid: true
+  x_neg: -0.04980501098632812
+  x_neg_valid: true
+  y_pos: 0.029884997558593758
+  y_pos_valid: true
+  y_neg: -0.029854998779296878
+  y_neg_valid: true
+  width: 0.09978000488281248
+  length: 0.059739996337890636
+  height: 0.03986501464843746
+  dims_valid: true
+  support_z: 0.0
+  support_z_valid: true
+  vertices:
+  - x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  - x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  - x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  - x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  - x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.0
+  - x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.0
+  - x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.0
+  - x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.0
+  box_valid: true
+  edges:
+  - start:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    end:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    length: 0.09978000488281248
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    end:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    length: 0.059739996337890636
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    end:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    length: 0.09978000488281248
+    valid: true
+  - start:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    end:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    length: 0.059739996337890636
+    valid: true
+  - start:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.0
+    end:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.0
+    length: 0.09978000488281248
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.0
+    end:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.0
+    length: 0.059739996337890636
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.0
+    end:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.0
+    length: 0.09978000488281248
+    valid: true
+  - start:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.0
+    end:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.0
+    length: 0.059739996337890636
+    valid: true
+  - start:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    end:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.0
+    length: 0.03986501464843746
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    end:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.0
+    length: 0.03986501464843746
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    end:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.0
+    length: 0.03986501464843746
+    valid: true
+  - start:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    end:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.0
+    length: 0.03986501464843746
+    valid: true
+  path_candidates:
+  - start:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    end:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    length: 0.09978000488281248
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    end:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    length: 0.059739996337890636
+    valid: true
+  - start:
+      x: 0.04997499389648436
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    end:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    length: 0.09978000488281248
+    valid: true
+  - start:
+      x: -0.04980501098632812
+      y: 0.029884997558593758
+      z: 0.03986501464843746
+    end:
+      x: -0.04980501098632812
+      y: -0.029854998779296878
+      z: 0.03986501464843746
+    length: 0.059739996337890636
+    valid: true
+  config:
+    contact_threshold_n: 3.0
+    contact_threshold_set: true
+    edge_drop_m: 0.0005
+    edge_drop_set: true
+    debounce_n: 3
+    debounce_set: true
+    over_force_n: 30.0
+    over_force_set: true
+    descend_speed_mps: 0.005
+    descend_speed_set: true
+    slide_speed_mps: 0.01
+    slide_speed_set: true
+    max_descend_m: 0.08
+    max_descend_set: true
+    max_slide_m: 0.08
+    max_slide_set: true
+    motion_timeout_s: 30.0
+    motion_timeout_set: true
+    lift_height_m: 0.05
+    lift_height_set: true
+    target_force_n: 3.0
+    target_force_set: true
+    drop_limit_m: 0.005
+    drop_limit_set: true
+  started_at:
+    sec: 1789964378
+    nanosec: 539821121
+  finished_at:
+    sec: 1789964456
+    nanosec: 636732874
+
+Goal finished with status: SUCCEEDED
