@@ -330,3 +330,26 @@ def test_stop_in_pos_x_then_kill_the_process_then_resume_from_the_files(sim, tmp
     assert '기록에서 되돌렸다' in rig.log()
     assert rig.close() == 0, rig.log()
     assert 'Traceback' not in rig.log(), rig.log()
+
+
+# ---- 종료 (T19) ----
+DESCEND_GOAL = 2   # 1 기준점, 2 하강
+
+
+def test_sigint_during_a_motion_exits_quietly(sim):
+    """모션 도중의 SIGINT. 종료 경로의 마지막 상태 전이가 발행을 시도해도 트레이스백 없이 코드 0 으로 끝난다.
+
+    2026-09-21 Virtual Mode 에서 OP_DESCEND 중에 launch 를 Ctrl-C 로 끊었을 때 본 것이다:
+    context 가 내려간 뒤에 /scan/state 를 발행하려다 RCLError 가 터졌다.
+    """
+    rig = sim()
+    rig.wait_process_ready(rig.run_client)
+    rig.peers.hold_goal = DESCEND_GOAL   # 하강이 끝나지 않는다. 그 사이에 SIGINT 를 보낸다
+    rig.start_command(rig.run_client, RunScan.Goal(request_id='sim-run'))
+    assert rig.wait(lambda: len(rig.peers.goals) >= DESCEND_GOAL), rig.log()
+    assert rig.wait(
+        lambda: any(s.phase == ScanState.PHASE_TOP_SEARCH for s in rig.states)), rig.log()
+
+    assert rig.close() == 0, rig.log()
+    assert 'Traceback' not in rig.log(), rig.log()
+    assert '실패 처리도 실패' not in rig.log(), rig.log()

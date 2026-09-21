@@ -302,10 +302,34 @@ class ScanManager(Node):
     def _now_stamp(self) -> Stamp:
         return Stamp(*self.get_clock().now().seconds_nanoseconds())
 
+    def _shutting_down(self) -> bool:
+        """종료 중인가. context 가 내려간 뒤의 발행은 RCLError 를 낸다.
+
+        _closing 만 보면 늦다: SIGINT 는 rclpy 의 처리기가 context 를 먼저 내리고, close() 는 그 뒤에 불린다.
+        그 사이에 마지막 상태 전이(STOPPED · ERROR)가 일어나면 /scan/state 발행이 터진다.
+        """
+        return self._closing.is_set() or not rclpy.ok(context=self.context)
+
+    def _publish_quietly(self, publisher, build_msg) -> bool:
+        """종료 중이 아닐 때만 발행한다. 발행했으면 True.
+
+        검사와 발행 사이에 context 가 내려가는 창이 있다. 그때 난 예외는 삼키고, 종료와 무관한 발행 실패는
+        그대로 올린다(조용한 종료가 평소의 발행 실패까지 덮지 않게 한다).
+        """
+        if self._shutting_down():
+            return False
+        try:
+            publisher.publish(build_msg())
+        except Exception:
+            if not self._shutting_down():
+                raise
+            return False
+        return True
+
     def _publish_state(self, snapshot: Snapshot):
         with self._state_pub_lock:
             self._state_seq += 1
-            self._state_pub.publish(to_msg(snapshot, self._now_msg()))
+            self._publish_quietly(self._state_pub, lambda: to_msg(snapshot, self._now_msg()))
 
     def _publish_state_periodic(self):
         # 스냅숏을 뜬 뒤에 상태가 바뀌었으면 그 변경이 이미 발행됐다. 옛 상태로 덮어쓰지 않는다.
@@ -313,7 +337,7 @@ class ScanManager(Node):
         snapshot = self.state_machine.snapshot()
         with self._state_pub_lock:
             if seq == self._state_seq:
-                self._state_pub.publish(to_msg(snapshot, self._now_msg()))
+                self._publish_quietly(self._state_pub, lambda: to_msg(snapshot, self._now_msg()))
 
     def _on_change(self, snapshot: Snapshot):
         # 상태 기계의 락 안이다. 발행하고 큐에 넣기만 한다(디스크 쓰기 · 대기 금지).
@@ -372,7 +396,7 @@ class ScanManager(Node):
             nan = conversions.NAN
             p, q = msg.pose.position, msg.pose.orientation
             p.x = p.y = p.z = q.x = q.y = q.z = q.w = nan  # 재지 않은 값에 기본 자세 (0, 0, 0, 1) 을 남기지 않는다
-        self._log_pub.publish(msg)
+        self._publish_quietly(self._log_pub, lambda: msg)
         # rclpy 로거는 호출 위치마다 severity 를 고정한다. 그래서 줄을 나눈다.
         text = f'[{snapshot.phase.name} code={int(code)}] {message}'
         if level == ScanLog.LEVEL_ERROR:
@@ -630,7 +654,7 @@ class ScanManager(Node):
         except _Closing:
             outcome = None
         except Exception as exc:  # 기록 실패 등. 모션은 동기로 기다리므로 이 시점에 진행 중인 모션은 없다
-            outcome = self._internal_failure(job, exc)
+            outcome = self._internal_failure(job, exc)   # 종료가 깨운 예외면 None(= _Closing 과 같다)
         finally:
             # 예외로 끝나도 남긴다. 같은 작업의 안전복귀 · 재시작이 motion_id 를 이어서 발급한다(계약 6.2절).
             # 모션 없이 끝난 재시작(last_motion_id = 0)이 앞선 번호를 지우지 않게 큰 쪽을 둔다.
@@ -740,6 +764,14 @@ class ScanManager(Node):
                 self._job = None
 
     def _internal_failure(self, job, exc, recorded=True):
+        """돌던 명령이 예외로 끝났다. 종료 중이면 None 을 돌려준다(_Closing 과 같은 취급).
+
+        종료 경로에서 터진 예외(context 가 내려간 뒤의 발행 · 기록)는 작업의 실패가 아니다. 여기서 FAILED 로
+        보내면 그 전이가 다시 발행을 부르고(ERROR), 그것도 터져 "실패 처리도 실패" 와 트레이스백이 남는다.
+        """
+        if self._shutting_down():
+            self.get_logger().info(f'종료 중 예외. 작업의 실패로 남기지 않는다: {exc!r}')
+            return None
         detail = f'internal: {exc!r}'
         self.get_logger().error(detail)
         try:
@@ -758,7 +790,7 @@ class ScanManager(Node):
     def _publish_result(self, job, shape):
         job.result_msg = conversions.result_to_msg(
             job.scan_id, shape, job.config_msg, self._now_msg())
-        self._result_pub.publish(job.result_msg)
+        self._publish_quietly(self._result_pub, lambda: job.result_msg)
 
     def _publish_partial_result(self, job, reason_code, detail):
         """실패 · 중단으로 끝난 작업의 결과. 확보한 값만 유효하고 나머지는 NaN + *_valid=false 다."""
@@ -818,6 +850,7 @@ class ScanManager(Node):
         except _Closing:
             outcome, final = None, None
         except Exception as exc:
+            # 종료가 깨운 예외면 _internal_failure 가 None 을 준다(= _Closing 과 같다)
             outcome, final = self._internal_failure(job, exc, recorded), None
         finally:
             if ports.last_motion_id:
