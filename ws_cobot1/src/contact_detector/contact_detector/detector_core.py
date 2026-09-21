@@ -18,10 +18,12 @@ EDGE 를 "밀기 시작 z 대비 누적 하강량"으로 재지 않는 이유 �
   외력 추정값은 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다(실기 기록 1-1 · 5-2 · 5-11). 정지 상태에서 잡은
   F0 로 하강하면 허공에서 거짓 CONTACT 가 나고(큐브 45 mm 위), 하강용 F0 를 옆으로 미는 동안 쓰면 닿기 전에도
   |F - F0| 가 수 N 이 된다(+x 밀기 중 허공에서도 Fx -5 N).
-  - 하강(CONTACT): DescendTareConfig 가 있으면 DESCEND 가 시작되고 delay_s 뒤부터 duration_s 동안 **이동 중
-    F0 를 자동으로 다시 잡는다.** 실패하면 다음 구간을 다시 모은다(max_attempts). 이동 중 F0 가 없는 동안
-    (모으는 중 · 전부 실패)은 판정을 끄지 않고 /contact/tare 의 F0(없으면 DESCEND 첫 샘플의 F)와
-    hold_threshold_n 으로 둔하게 본다. 끄면 그 구간에 닿았을 때 과대 외력까지 막을 것이 없다.
+  - 하강(CONTACT): DescendRefConfig 가 있으면 F0 를 **최근 구간 [t - window_s, t - lag_s] 의 외력 평균**으로 둔다
+    (이동 기준). 추정값은 움직이기 시작하면 계단식으로 바뀌고, 107 mm 를 내려가는 동안 자세에 따라 1~2 N 더
+    흐른다(9/21 17 시 54 분 실기: 한 번 잡은 이동 중 F0 가 23 s 뒤 3.15 N 벗어나 윗면 38 mm 위 거짓 접촉).
+    접촉은 0.1 s 안에 수 N 오르는 급변이라 최근 구간 기준으로 가를 수 있다. 조건이 성립한 동안에는 구간에
+    넣지 않는다(기준을 얼린다). 구간이 차기 전(출발 직후 · 공백 뒤)에는 판정을 끄지 않고 /contact/tare 의 F0
+    (없으면 DESCEND 첫 샘플의 F)와 hold_threshold_n 으로 둔하게 본다.
   - 밀기(EDGE 판정 켜기): EdgeConfig 의 arm_still_* 가 있으면 |F - F0| 대신 **z 가 멈췄고(틈을 다 메움) x · y 는
     움직이는 중**일 때 켠다. F0 에 기대지 않는다. x · y 조건이 없으면 힘 제어를 켜는 동안(팁이 아직 떠 있고
     z 도 멈춰 있다) 너무 일찍 켜진다.
@@ -130,7 +132,7 @@ class Detection:
     force_delta_n: float          # 확정 샘플의 값. CONTACT · EDGE: |F - F0|, OVER_FORCE: 원시 |F|
     debounce_count: int
     z_drop_m: Optional[float] = None   # EDGE 만. first_sample 에서 추세선보다 내려간 양 (편향 보정의 δ)
-    hold: bool = False                 # CONTACT 만. 이동 중 F0 없이 올린 임계로 확정했다(측정 품질이 낮다)
+    hold: bool = False                 # CONTACT 만. 이동 기준 없이 올린 임계로 확정했다(측정 품질이 낮다)
 
     @property
     def debounce_delay_s(self) -> float:
@@ -197,18 +199,16 @@ class ContactDetector:
     """
 
     def __init__(self, config: DetectorConfig, edge_config: Optional[EdgeConfig] = None,
-                 descend_tare: Optional['DescendTareConfig'] = None):
+                 descend_ref: Optional['DescendRefConfig'] = None):
         self.config = config
         self.edge_config = edge_config
-        self.descend_tare = descend_tare
+        self.descend_ref = descend_ref
         self.baseline: Optional[Vector3] = None      # /contact/tare 의 F0. None = tare 전
-        self.descend_baseline: Optional[Vector3] = None   # 이번 하강에서 자동으로 잡은 F0 (#109)
-        self.descend_tare_result: Optional['TareResult'] = None   # 방금 끝난 자동 영점. 노드가 읽고 지운다
-        self._dt_state = 'idle'                      # idle · waiting · collecting · done · failed
-        self._dt_start: Optional[float] = None
-        self._dt_acc: Optional['TareAccumulator'] = None
-        self.descend_tare_attempt = 0                 # 이번 하강에서 몇 번째 구간을 모으는 중인가 (0 = 아직)
+        self.descend_baseline: Optional[Vector3] = None   # 마지막 CONTACT 때의 이동 기준. 밀기의 보고값에 쓴다 (#109)
         self.descend_start_force: Optional[Vector3] = None   # 이번 DESCEND 첫 샘플의 F. /contact/tare 가 없을 때 둔한 판정의 기준
+        self._ref: Deque[Tuple[float, Vector3]] = deque()    # 이동 기준 구간: 최근 (force_stamp, F)
+        self._ref_since: Optional[float] = None      # 이 시각부터 구간을 쌓았다 (DESCEND 시작 · 공백 뒤)
+        self._ref_mean: Optional[Vector3] = None     # 이번 샘플의 이동 기준. None = 아직 구간이 안 찼다
         self._prev_operation = OP_NONE
         self._arm_points: Deque[Tuple[float, Vector3]] = deque()   # z 로 켜기: 최근 (시각, 위치)
         self._contact_run = _Run()
@@ -244,16 +244,11 @@ class ContactDetector:
             self._trend.clear()
 
     def set_baseline(self, baseline: Optional[Vector3]):
-        """/contact/tare 의 F0. 가장 최근 값을 쓴다: 하강에서 자동으로 잡은 F0 가 남아 있으면 버린다
-        (하강 뒤 다시 tare 했는데 밀기의 보고값 |F - F0| 가 하강 때 F0 로 계속 나오지 않게)."""
+        """/contact/tare 의 F0. 가장 최근 값을 쓴다: 앞 하강의 이동 기준이 남아 있으면 버린다
+        (하강 뒤 다시 tare 했는데 밀기의 보고값 |F - F0| 가 하강 때 기준으로 계속 나오지 않게)."""
         self.baseline = baseline
-        if self._dt_state == 'done':
-            self._dt_state, self.descend_baseline = 'idle', None
+        self.descend_baseline = None
         self._contact_run.reset()
-
-    @property
-    def descend_tare_state(self) -> str:
-        return self._dt_state
 
     @property
     def active_baseline(self) -> Optional[Vector3]:
@@ -262,56 +257,52 @@ class ContactDetector:
 
     @property
     def contact_hold(self) -> bool:
-        """이동 중 F0 가 없어(모으는 중 · 전부 실패) CONTACT 를 올린 임계(hold_threshold_n)로 보고 있다."""
-        return self.descend_tare is not None and self._dt_state in ('waiting', 'collecting', 'failed')
+        """DESCEND 중인데 이동 기준 구간이 아직 안 차서 CONTACT 를 올린 임계(hold_threshold_n)로 보고 있다."""
+        return self.descend_ref is not None and self._prev_operation == OP_DESCEND and self._ref_mean is None
 
     def _judge_baseline(self) -> Optional[Vector3]:
-        """판정 · 보고에 쓰는 F0. 이번 하강에서 자동으로 잡았으면 그것, 아니면 /contact/tare 의 값.
-        둔한 판정 중인데 /contact/tare 가 없으면 이번 DESCEND 첫 샘플의 F."""
-        if self.descend_tare is not None and self._dt_state == 'done':
+        """판정 · 보고에 쓰는 F0.
+        DESCEND: 이동 기준. 구간이 안 찼으면 /contact/tare 의 F0, 그것도 없으면 이번 DESCEND 첫 샘플의 F.
+        그 밖: 마지막 CONTACT 의 이동 기준과 /contact/tare 중 나중 것."""
+        if self.descend_ref is not None and self._prev_operation == OP_DESCEND:
+            if self._ref_mean is not None:
+                return self._ref_mean
+            return self.baseline if self.baseline is not None else self.descend_start_force
+        if self.descend_baseline is not None:
             return self.descend_baseline
-        if self.contact_hold and self.baseline is None:
-            return self.descend_start_force
         return self.baseline
 
-    def _update_descend_tare(self, sample: Sample, motion_changed: bool):
-        cfg = self.descend_tare
+    def _update_descend_ref(self, sample: Sample, motion_changed: bool):
+        """이번 샘플의 이동 기준(_ref_mean)을 정한다. 샘플을 구간에 넣는 것은 판정 뒤(_admit_descend_ref)."""
+        cfg = self.descend_ref
         starting = sample.operation == OP_DESCEND and (
             motion_changed or self._prev_operation != OP_DESCEND)
         self._prev_operation = sample.operation
         if cfg is None or sample.operation != OP_DESCEND:
+            self._ref_mean = None
             return
         t = sample.force_stamp
         if starting:
-            self._dt_state, self._dt_start = 'waiting', t
-            self._dt_acc = TareAccumulator(cfg.tare)
-            self.descend_baseline = None
-            self.descend_tare_attempt = 0
+            self._ref.clear()
+            self._ref_since = t
             self.descend_start_force = sample.force
-        if self._dt_state not in ('waiting', 'collecting'):
+        # 샘플 공백이 나도 구간을 비우지 않는다. 시간 창이라 오래된 샘플은 저절로 빠지고, 남은 샘플이 min_samples 보다
+        # 적으면 기준이 없다(둔한 판정). 실기 공백 120~360 ms 동안 흐르는 양은 0.1 N 이 안 된다. 비우면 1 s 동안
+        # 둔한 판정으로 떨어져 더 눌린 좌표를 낸다(9/21 실기 재생에서 23 회 중 4 회)
+        while self._ref and self._ref[0][0] < t - cfg.window_s:
+            self._ref.popleft()
+        used = [f for ft, f in self._ref if ft <= t - cfg.lag_s]
+        if t - self._ref_since < cfg.window_s or len(used) < cfg.min_samples:
+            self._ref_mean = None
             return
-        elapsed = t - self._dt_start
-        if self._dt_state == 'waiting' and elapsed >= cfg.delay_s:
-            self._dt_state = 'collecting'
-            self.descend_tare_attempt = 1
-        if self._dt_state == 'collecting':
-            self._dt_acc.add(sample)
-            if elapsed >= cfg.delay_s + self.descend_tare_attempt * cfg.duration_s:
-                result = self._dt_acc.result()
-                self.descend_tare_result = result
-                if result.success:
-                    self.descend_baseline, self._dt_state = result.baseline, 'done'
-                elif self.descend_tare_attempt < cfg.max_attempts:
-                    # 정지 F0 로 돌아가지 않고 다음 구간을 다시 모은다. 9/21 실기에서 한 번 실패(모으는 동안 Fz 가
-                    # 2.6 → 1.5 N 으로 흘렀다)한 하강이 정지 F0 로 판정해 윗면 3.8 mm 위에서 거짓 접촉을 냈다.
-                    # 같은 하강의 다음 구간은 성공했다
-                    self.descend_tare_attempt += 1
-                    self._dt_acc = TareAccumulator(cfg.tare)
-                else:
-                    # 모두 실패하면 하강 끝까지 둔한 판정(hold_threshold_n)을 유지한다. 원래 임계 3 N 에 정지 F0 를 쓰면
-                    # 9/21 오전 45 mm 위 거짓 접촉을 낸 조합으로 돌아간다(현지 리뷰, PR #127)
-                    self._dt_state = 'failed'
-                self._contact_run.reset()
+        n = len(used)
+        self._ref_mean = tuple(sum(f[i] for f in used) / n for i in range(3))
+
+    def _admit_descend_ref(self, sample: Sample):
+        """조건이 성립하지 않은 샘플만 구간에 넣는다. 닿기 시작한 샘플이 기준을 끌어올리지 않게(기준을 얼린다)."""
+        if (self.descend_ref is not None and sample.operation == OP_DESCEND
+                and self._contact_run.count == 0):
+            self._ref.append((sample.force_stamp, sample.force))
 
     def update(self, sample: Sample) -> List[Detection]:
         # 무효 샘플은 정보가 없다. 세지도 않고 연속 구간을 끊지도 않는다
@@ -324,7 +315,7 @@ class ContactDetector:
             self._contact_run.reset()
             self._contact_latched = False
             self._reset_edge()
-        self._update_descend_tare(sample, motion_changed)
+        self._update_descend_ref(sample, motion_changed)
 
         detections = []
         self.trend_gap = False
@@ -334,6 +325,9 @@ class ContactDetector:
         contact = self._update_contact(sample)
         if contact:
             detections.append(contact)
+            if self._ref_mean is not None:
+                self.descend_baseline = self._ref_mean
+        self._admit_descend_ref(sample)
         edge = self._update_edge(sample)
         if edge:
             detections.append(edge)
@@ -357,10 +351,10 @@ class ContactDetector:
         if self._judge_baseline() is None:
             self._contact_run.reset()
             return None
-        # 이동 중 F0 가 없는 동안은 판정을 끄지 않고 둔하게 본다. 끄면 이 구간에서 닿았을 때 과대 외력(실기 30 N)까지
-        # 막을 것이 없다(현지 리뷰, PR #127). 윗면이 이 구간 뒤에 있어야 원래 임계로 재는 것은 측정 품질 조건이다
+        # 이동 기준 구간이 차기 전에도 판정을 끄지 않고 둔하게 본다. 끄면 이 구간에서 닿았을 때 과대 외력(실기 30 N)까지
+        # 막을 것이 없다(현지 리뷰, PR #127)
         hold = self.contact_hold
-        threshold = self.descend_tare.hold_threshold_n if hold else self.config.contact_threshold_n
+        threshold = self.descend_ref.hold_threshold_n if hold else self.config.contact_threshold_n
         delta = self.force_delta(sample)
         count = self._contact_run.update(delta > threshold, sample)
         if count == 0 and self._motion_id == 0:
@@ -459,31 +453,23 @@ class TareConfig:
 
 
 @dataclass(frozen=True)
-class DescendTareConfig:
-    """하강 중 자동 영점 (#109). 하강과 같은 운동 상태 · 같은 자세 근처에서 F0 를 잡는다(실기 기록 5-11)."""
+class DescendRefConfig:
+    """하강 이동 기준 (#109). F0 를 최근 구간 [t - window_s, t - lag_s] 의 외력 평균으로 둔다."""
 
-    delay_s: float                # DESCEND 가 시작되고 이만큼 지난 뒤 모으기 시작한다(출발 약 4 s 뒤 치우침이 계단식으로 생긴다)
-    duration_s: float             # 모으는 길이
-    tare: TareConfig              # 샘플 수 · 불안정 · 툴 등록 판정은 /contact/tare 와 같은 기준을 쓴다
-    max_attempts: int = 1         # 실패하면 바로 다음 duration_s 구간으로 다시 모은다. 이 횟수까지
-    hold_threshold_n: float = 6.0 # 이동 중 F0 가 없는 동안(모으는 중 · 전부 실패) CONTACT 를 끄지 않고 이 임계로 둔하게 본다.
-                                  # 기준은 /contact/tare 의 F0, 없으면 이번 DESCEND 첫 샘플의 F. 관측된 이동 치우침
-                                  # (최대 3.04 N, 9/21 5-2)보다 높아 거짓 접촉은 없고, 닿으면 과대 외력이 아니라 이 힘에서 멈춘다
+    window_s: float               # 기준 구간의 길이
+    lag_s: float                  # 가장 최근 이만큼은 빼고 평균한다(막 오르기 시작한 샘플이 기준을 끌어올리지 않게)
+    min_samples: int              # 구간 안의 샘플이 이보다 적으면 기준이 없다(둔한 판정)
+    hold_threshold_n: float       # 기준이 없는 동안의 CONTACT 임계. 기준은 /contact/tare 의 F0, 없으면 DESCEND 첫 샘플의 F.
+                                  # 움직이기 시작할 때의 계단식 치우침(9/21 5-2 최대 3.04 N)보다 높아야 한다
 
     def __post_init__(self):
-        if not (math.isfinite(self.delay_s) and self.delay_s >= 0
-                and math.isfinite(self.duration_s) and self.duration_s > 0):
-            raise ValueError('delay_s 는 0 이상, duration_s 는 0 보다 커야 한다')
-        if self.max_attempts < 1:
-            raise ValueError('max_attempts 는 1 이상이어야 한다')
-        if not (math.isfinite(self.hold_threshold_n) and self.hold_threshold_n > 0):
-            raise ValueError('hold_threshold_n 은 0 보다 커야 한다')
-
-    @property
-    def hold_s(self) -> float:
-        """둔한 판정(hold_threshold_n)이 가장 오래 이어지는 시간(모든 구간 실패 전까지). 측정 품질 조건:
-        이 동안 내려가는 거리보다 부재 윗면이 아래에 있어야 원래 임계로 잰다. 안전 조건은 아니다."""
-        return self.delay_s + self.max_attempts * self.duration_s
+        if not all(math.isfinite(v) and v > 0
+                   for v in (self.window_s, self.hold_threshold_n)):
+            raise ValueError('window_s, hold_threshold_n 은 0 보다 커야 한다')
+        if not (math.isfinite(self.lag_s) and 0 <= self.lag_s < self.window_s):
+            raise ValueError('lag_s 는 0 이상, window_s 보다 작아야 한다')
+        if self.min_samples < 1:
+            raise ValueError('min_samples 는 1 이상이어야 한다')
 
 
 @dataclass(frozen=True)

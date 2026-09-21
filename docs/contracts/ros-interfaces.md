@@ -1,6 +1,6 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 이동 중 자동 영점, 밀기는 z 로 판정 켜기 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 최근 구간 평균(이동 기준), 밀기는 z 로 판정 켜기 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
@@ -42,7 +42,7 @@
 | 이름 | 타입 | 서버 | 클라이언트 | 의미 |
 |---|---|---|---|---|
 | `/robot/stop` | `StopRobot` | robot_manager | scan_manager · safety_monitor | 로봇 정지 요청. safety_monitor는 웹을 거치지 않고 직접 호출 |
-| `/contact/tare` | `TareForce` | contact_detector | scan_manager | 외력 기준값 F₀ 설정(무접촉 · 정지). **[v0.1.12]** 툴 등록 점검과 예비 기준이다. 하강 판정은 contact_detector 가 하강 중에 자동으로 다시 잡은 F₀ 를 쓴다(3.3) |
+| `/contact/tare` | `TareForce` | contact_detector | scan_manager | 외력 기준값 F₀ 설정(무접촉 · 정지). **[v0.1.12]** 툴 등록 점검과 예비 기준이다. 하강 판정은 contact_detector 가 하강 중 최근 구간의 외력 평균(이동 기준)을 쓴다(3.3) |
 | `/scan/stop` | `StopScan` | scan_manager | mqtt_bridge | 작업 중지 요청 |
 | `/scan/set_config` | `SetConfig` | scan_manager | mqtt_bridge | 설정 등록. 동작 중이면 거절 |
 | `/safety/reset` | `ResetSafety` | safety_monitor | mqtt_bridge | 안전 래치 해제. 조건이 해소됐을 때만 성공. 로봇을 움직이지 않는다 |
@@ -139,11 +139,11 @@ uint8 debounce_count        # 판정을 확정한 연속 횟수
 ```
 - **판정 모드는 샘플의 `operation`에서 얻는다**: `OP_DESCEND` → CONTACT만, `OP_SLIDE` → EDGE만, 그 밖(`OP_NONE` · `OP_MOVE_TO` · `OP_HOME`) → CONTACT/EDGE 판정 안 함. **OVER_FORCE는 모든 모드에서** 원시 외력 크기로 판정한다(영점에 의존하지 않음).
 - **하강 기준과 밀기 기준을 나눈다 [v0.1.12, #109]** — `get_tool_force`는 센서가 아니라 모델 기반 추정이고, 그 치우침(2~3 N)은 시간이 아니라 **마지막 이동 방향과 자세**에 딸리며 멈추면 수 초~수십 초에 걸쳐 풀린다(2026-09-21 실기. 같은 자리 · 같은 자세에서 마지막 이동 방향만 다른 두 점이 2.50 N 차이). 그래서 F₀는 상수가 아니라 "그 모션, 그 자세 근처"에서만 유효하고, F₀ 하나를 하강과 밀기에 같이 쓰지 않는다.
-  - **CONTACT(하강)**: contact_detector 가 DESCEND 가 시작될 때마다 `descend_tare_delay_s` 뒤 `tare_duration_s` 동안 **이동 중 F₀ 를 자동으로 다시 잡고** 그것으로 판정한다. 잡지 못하면 다음 `tare_duration_s` 구간을 다시 모은다(`descend_tare_max_attempts` 회까지).
-  - **이동 중 F₀ 가 없는 동안(모으는 중, 그리고 모두 실패하면 하강 끝까지) CONTACT 를 끄지 않고 `/contact/tare` 의 F₀ 와 올린 임계 `descend_hold_threshold_n` 으로 판정한다.** `/contact/tare` 를 한 번도 하지 않았으면 그 DESCEND 첫 샘플의 F 를 기준으로 쓴다. 판정을 끄면 이 구간에서 닿았을 때 OVER_FORCE 까지 막을 것이 없다. 원래 임계(`contact_threshold_n`) + 정지 F₀ 조합으로는 돌아가지 않는다(공중 거짓 CONTACT를 낸 조합이다).
-  - **측정 품질 조건**(안전 조건 아님): 올린 임계로 보는 구간에 하강하는 거리(하강 속도 × (`descend_tare_delay_s` + `tare_duration_s`), 최악 (`descend_tare_delay_s` + `descend_tare_max_attempts` × `tare_duration_s`))보다 부재 윗면이 아래에 있어야 원래 임계로 잰다(`units-frames.md` 탐색 기준점 행). 올린 임계로 확정한 CONTACT 는 그만큼 더 눌린 좌표다.
+  - **CONTACT(하강)**: DESCEND 중 F₀ 는 **최근 구간 `[t − descend_ref_window_s, t − descend_ref_lag_s]` 의 외력 평균(이동 기준)** 이다. 조건이 성립한 샘플은 구간에 넣지 않는다(기준을 얼린다). 추정값은 움직이기 시작하면 계단식으로 바뀌고 107 mm 를 내려가는 동안 자세에 따라 1~2 N 더 흐르지만(초당 약 0.2 N), 접촉은 0.1 s 안에 수 N 오르는 급변이라 가를 수 있다. 9/21 실기 하강 23 회 재생: 한 번 잡은 F₀(정지 · 이동 중)는 1~2 회 공중 거짓 CONTACT, 이동 기준은 0 회이고 윗면 z 는 같다.
+  - **이동 기준이 없는 동안**(출발 뒤 `descend_ref_window_s` · 구간 안 샘플이 `descend_ref_min_samples` 보다 적을 때) CONTACT 를 끄지 않고 `/contact/tare` 의 F₀(없으면 그 DESCEND 첫 샘플의 F)와 올린 임계 `descend_hold_threshold_n` 으로 판정한다. 끄면 그 사이에 닿았을 때 OVER_FORCE 까지 막을 것이 없다. 이렇게 확정한 CONTACT 는 더 눌린 좌표다(측정 품질 조건: 윗면이 출발점에서 하강 속도 × `descend_ref_window_s` 보다 아래에 있어야 원래 임계로 잰다. 실기 3 mm)
+  - **한계**: 이동 기준은 느리게 오르는 접촉(부드러운 부재)을 흐름으로 흡수할 수 있다. 기준 큐브 · 탐침(43 N/mm)은 3 mm/s 에서 초당 약 130 N 이라 해당하지 않는다.
   - **EDGE(밀기)**: 판정을 켜는 "누르고 있다" 확인을 F₀ 로 하지 않는다. **z 가 멈췄고(틈을 다 메움) x · y 가 움직이는 중**이면 켠다(`edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`). EDGE 판정 자체는 전과 같이 z 추세선이다. 다만 판정하려면 F₀ 가 있어야 한다(보고값 `force_delta_n` 을 위해).
-  - `/contact/tare` 는 가장 최근 값이 이긴다: 하강 뒤에 다시 tare 하면 하강 때 자동으로 잡은 F₀ 를 버린다.
+  - 밀기 등 DESCEND 가 아닐 때의 F₀(보고값 `force_delta_n` 용)는 마지막 CONTACT 때의 이동 기준과 `/contact/tare` 중 **나중 것**이다.
   - scan_manager 절차는 바뀌지 않는다. 준비 단계의 `/contact/tare`(정지)는 툴 등록 점검으로 그대로 부른다.
 - `/scan/state`는 `scan_id` 태깅에만 쓴다.
 - 판정 좌표(이 메시지)와 정지 완료 좌표(`ExecuteMotion.Result.pose`)를 혼용하지 않는다. 측정값의 출처는 판정 좌표다.

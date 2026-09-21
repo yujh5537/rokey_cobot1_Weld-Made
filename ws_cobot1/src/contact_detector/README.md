@@ -33,11 +33,13 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 ## 판정 규칙
 - **하강 기준과 밀기 기준을 나눈다 (#109).** 외력 추정값은 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다(2026-09-21 실기 1-1 · 5-2 · 5-11). 정지 F0 로 하강하면 허공에서 거짓 CONTACT 가 나고, 하강용 F0 를 밀기에 쓰면 옆 이동 이력(허공에서도 Fx −5 N) 때문에 닿기 전에도 `|F − F0|` 가 수 N 이다
 - **CONTACT**: `operation == OP_DESCEND` 이고 기준값이 있는 상태에서 `|F − F0| > contact_threshold_n` 인 샘플이 연속 `debounce_n` 회. `motion_id` 마다 1 회
-  - `descend_tare_enabled` 이면 **하강마다 이동 중 F0 를 자동으로 다시 잡는다**: DESCEND 시작(새 `motion_id` 또는 다른 동작에서 바뀜) 뒤 `descend_tare_delay_s` 가 지나면 `tare_duration_s` 동안 모은다. 판정 기준은 `/contact/tare` 와 같다(`tare_min_samples` · `tare_max_std_n` · `tare_max_force_n`). **실패하면 바로 다음 `tare_duration_s` 구간을 다시 모은다**(`descend_tare_max_attempts` 회까지)
-  - **이동 중 F0 가 없는 동안(모으는 중, 모두 실패하면 하강 끝까지) CONTACT 를 끄지 않고 둔하게 본다**: `/contact/tare` 의 F0(없으면 이번 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(6 N). 끄면 그 구간에 닿았을 때 과대 외력(30 N)까지 막을 것이 없다(현지 리뷰, PR #127). 원래 임계 3 N + 정지 F0 로는 돌아가지 않는다 — 9/21 오전 45 mm 위, 17 시 3.8 mm 위 거짓 접촉을 낸 조합이다. 이렇게 확정한 CONTACT 는 로그에 경고로 남는다(더 눌린 좌표)
-  - 측정 품질 조건(안전 조건 아님): 둔하게 보는 구간에 내려가는 거리(하강 속도 × (`descend_tare_delay_s` + `tare_duration_s`), 최악 × (`descend_tare_delay_s` + `descend_tare_max_attempts` × `tare_duration_s`))보다 부재 윗면이 아래에 있어야 원래 임계로 잰다. 실기 3 mm/s 면 22.5 mm, 최악 31.5 mm. 홈 → 80 mm 큐브 윗면은 107 mm
-  - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 둔한 판정의 기준으로 남는다. **가장 최근 값이 이긴다**: 하강 뒤 다시 tare 하면 하강 때 자동으로 잡은 F0 를 버린다(밀기의 보고값 `|F − F0|` 가 하강 때 F0 로 나오지 않게)
-  - 하강 중에 파라미터를 바꾸면 detector 를 새로 만들어 자동 영점을 처음부터 다시 모은다(그동안 둔한 판정). 이미 닿아 있을 때는 바꾸지 않는다
+  - `descend_ref_window_s > 0` 이면 **DESCEND 의 F0 는 최근 구간 `[t − descend_ref_window_s, t − descend_ref_lag_s]` 의 외력 평균(이동 기준)** 이다. 조건이 성립한 샘플은 구간에 넣지 않는다(닿는 힘이 기준을 끌어올리지 않게). 추정값은 움직이기 시작하면 계단식으로 바뀌고 자세에 따라 계속 흐르지만(초당 약 0.2 N) 접촉은 0.1 s 안에 수 N 오르는 급변이다
+    - 9/21 실기 하강 23 회 재생: 한 번 잡은 F0(홈 정지 · 하강 중 1회)는 1~2 회 공중 거짓 CONTACT(윗면 38 · 44 · 78 mm 위), 이동 기준은 0 회이고 윗면 z 는 같다. 공중 최대 `|F − F0|` 2.92 N(도중에 멈춘 하강), 홈 출발 정상 하강 2.26 N
+    - 샘플 공백으로 구간을 비우지 않는다. 시간 창이라 오래된 샘플은 저절로 빠진다
+  - **이동 기준이 없는 동안**(출발 뒤 `descend_ref_window_s`, 구간 안 샘플이 `descend_ref_min_samples` 보다 적을 때) **CONTACT 를 끄지 않고 둔하게 본다**: `/contact/tare` 의 F0(없으면 이번 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(6 N). 끄면 그 사이에 닿았을 때 과대 외력(30 N)까지 막을 것이 없다(현지 리뷰, PR #127). 이렇게 확정한 CONTACT 는 로그에 경고로 남는다(더 눌린 좌표)
+  - 한계: 느리게 오르는 접촉(부드러운 부재)은 흐름으로 흡수될 수 있다. 기준 큐브 · 탐침(43 N/mm, 3 mm/s 면 초당 약 130 N)은 해당하지 않는다
+  - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 둔한 판정의 기준으로 남는다. DESCEND 가 아닐 때(밀기의 보고값 `|F − F0|`)는 마지막 CONTACT 의 이동 기준과 `/contact/tare` 중 **나중 것**을 쓴다
+  - 하강 중에 파라미터를 바꾸면 detector 를 새로 만들어 구간을 다시 쌓는다(그동안 둔한 판정). 이미 닿아 있을 때는 바꾸지 않는다
 - **EDGE**: `operation == OP_SLIDE` 이고 기준값이 있는 상태에서(판정을 켜는 조건은 F0 를 쓰지 않지만, F0 가 하나도 없으면 EDGE 를 판정하지 않는다. 보고값 `force_delta_n` 때문)
   1. "누르고 있다" 확인. 그 뒤부터 판정한다
      - `edge_arm_still_window_s > 0`(실기 · sim 기본): 최근 그 구간 동안 **z 가 `edge_arm_still_m` 안에 머물고 x · y 가 `edge_arm_travel_m` 넘게 움직였으면** 켠다. F0 를 쓰지 않는다. 틈을 다 메우면 z 가 멈추기 때문이다. x · y 조건이 없으면 힘 제어를 켜는 동안(팁이 떠 있는데 z 도 멈춰 있다) 너무 일찍 켜진다
@@ -62,7 +64,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 ## 파라미터
 값은 `contact_scan_bringup/config/sim.yaml` · `real.yaml` 에만 둔다. 코드에 기본값이 없어서 값이 빠지면 노드가 기동하지 않는다.
 `source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
-`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_tare_enabled` · `descend_tare_delay_s` · `descend_tare_max_attempts` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
+`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
 
 `source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
 

@@ -5,12 +5,13 @@
 ## v0.1.12 (2026-09-21, 하강 · 밀기 기준 분리, #109)
 타입 변경 없음. `ros-interfaces.md`의 **`/contact/tare` 설명(2장)과 판정 규칙(3.3)**을 고쳤다. 영향: contact_detector(판정 · 파라미터 7개 추가) · scan_manager(절차 변경 없음) · 실기 절차.
 - 2026-09-21 실기: 외력 추정값이 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다. 정지 F₀ 로 하강하면 큐브 45 mm 위에서 거짓 CONTACT(5-2), 이동 중 F₀ 는 판정 오차 0.016 mm(5-5 · 5-8), 다른 자세의 F₀ 는 1.4 mm 만에 거짓 접촉(5-11). 밀기 중에는 허공에서도 Fx −5 N(5-1)
-- **하강**: contact_detector 가 DESCEND 마다 `descend_tare_delay_s`(실기 6.0 s) 뒤 `tare_duration_s` 동안 이동 중 F₀ 를 자동으로 다시 잡는다. 실패하면 다음 구간을 다시 모은다(`descend_tare_max_attempts`, 실기 3). 재시도 근거: 9/21 17 시 실기 시험 7 회 중 1 회가 첫 구간에서 실패했고, 정지 F₀ + 3 N 으로 판정해 윗면 3.8 mm 위에서 거짓 CONTACT. 같은 하강의 다음 구간은 성공
-- **이동 중 F₀ 가 없는 동안(모으는 중 · 전부 실패) CONTACT 를 끄지 않고** `/contact/tare` F₀(없으면 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(실기 6.0 N)으로 판정한다(현지 · 병후 리뷰, PR #127). 끄면 그 구간에 닿았을 때 OVER_FORCE(30 N)까지 막을 것이 없다. 6 N 은 관측된 이동 치우침 최대 3.04 N 보다 높고, 43 N/mm 탐침에서 약 0.14 mm 다. 구간 하강 거리 < 기준점 → 윗면 거리(실기 22.5 mm, 최악 31.5 mm < 107 mm)는 **측정 품질 조건**이다
-- `get_tool_force` 치우침은 마지막 이동 방향 · 자세에 딸린다. F₀ 는 "그 모션, 그 자세 근처"에서만 유효하다(3.3 에 한 문장). `/contact/tare` 는 가장 최근 값이 이긴다(하강 뒤 다시 tare 하면 하강 때 F₀ 를 버린다)
+- **하강**: DESCEND 중 F₀ 를 **최근 구간 [t − 1.0, t − 0.3] s 의 외력 평균(이동 기준)** 으로 둔다(`descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples`). 조건 성립 중에는 구간을 얼린다. 처음 안(DESCEND 뒤 6 s 에 한 번 이동 중 F₀ 를 잡고 실패하면 다시 모으는 방식)은 9/21 17 시 54 분 실기에서 한 번 잡은 F₀ 가 23 s 뒤 3.15 N 흘러 **윗면 38 mm 위 거짓 CONTACT** 를 냈다(자세에 따른 흐름). 실기 하강 23 회 재생: 한 번 잡는 방식(정지 · 이동 중)은 1~2 회 거짓 CONTACT, 이동 기준은 0 회 · 윗면 z 같음 · 공중 최대 \|F − F₀\| 2.92 N
+- **이동 기준이 없는 동안**(출발 뒤 1 s 등) CONTACT 를 끄지 않고 `/contact/tare` F₀(없으면 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(실기 6.0 N)으로 판정한다(현지 · 병후 리뷰, PR #127). 끄면 그 사이 닿았을 때 OVER_FORCE(30 N)까지 막을 것이 없다
+- `get_tool_force` 치우침은 마지막 이동 방향 · 자세에 딸린다. F₀ 는 "그 모션, 그 자세 근처"에서만 유효하다(3.3 에 한 문장). DESCEND 가 아닐 때 F₀ 는 마지막 CONTACT 의 이동 기준과 `/contact/tare` 중 나중 것
+- 접촉 임계 `contact_threshold_n` 3 N 은 유지한다(TR-01 검출 하중 5 N 이하. 학민 결정)
 - **밀기**: EDGE 판정을 켜는 조건을 `|F − F₀| > edge_arm_force_n` 에서 **z 멈춤 + x · y 이동**으로 바꿨다. 하강용 F₀ 를 밀기에 쓰면 옆 이동 이력 때문에 닿기 전에 켜져, 2~4 방향의 틈을 메우는 동안 판정을 쉬게 하는 보호가 사라졌다
 - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 예비 기준으로 남는다. scan_manager 절차는 바뀌지 않는다
-- 새 contact_detector 파라미터(계약 이름 아님): `descend_tare_enabled` · `descend_tare_delay_s` · `descend_tare_max_attempts` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`. 값은 설계 출발값이며 실기에서 조정한다
+- 새 contact_detector 파라미터(계약 이름 아님): `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`. 값은 설계 출발값이며 실기에서 조정한다
 
 ## v0.1.11 (2026-09-21, 배치 원칙 · 탐침 전제조건, #108)
 타입 변경 없음. `units-frames.md`에 **배치 원칙**과 **탐침 상태 전제조건** 절을 새로 두고, 2026-09-21 탐침 교체 뒤의 실측으로 z 계열 값을 확정했다. 영향: scan_manager(`search_origin_pose` · `base_to_fixture` · `max_descend_m` 범위) · geometry_estimator(`edge_bias_offset_m`) · T24 · T25 · T30 · 실기 세션 절차. (v0.1.9는 #91에 예약돼 있어 번호가 머지 순서와 다를 수 있다.)

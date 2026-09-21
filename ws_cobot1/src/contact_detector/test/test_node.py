@@ -23,7 +23,7 @@ PARAMS = {
     'stale_age_ms': 1000,        # 테스트 프로세스 안의 처리 지연으로 샘플이 버려지지 않게 넉넉히 둔다
     'tare_duration_s': 0.6, 'tare_min_samples': 5, 'tare_max_std_n': 0.3, 'tare_max_force_n': 5.0,
     # #109 기능은 끈 채로 기존 노드 시험을 돈다(판정 로직은 test_split_baseline.py 가 본다)
-    'descend_tare_enabled': False, 'descend_tare_delay_s': 6.0, 'descend_tare_max_attempts': 3, 'descend_hold_threshold_n': 6.0,
+    'descend_ref_window_s': 0.0, 'descend_ref_lag_s': 0.3, 'descend_ref_min_samples': 10, 'descend_hold_threshold_n': 6.0,
     'edge_arm_still_window_s': 0.0, 'edge_arm_still_m': 0.0001, 'edge_arm_travel_m': 0.0005,
 }
 F0 = (0.6, 0.8, 1.5)          # 실기 무접촉 잔류 외력과 비슷한 크기

@@ -3,6 +3,8 @@
 수치는 2026-09-21 실기 기록(docs/test-reports/realrobot-session_20260921.md)에서 가져왔다.
 - 5-2: 홈에서 정지 상태로 잡은 F0 = (0.321, 0.514, 2.101) N. 출발 약 4 s 뒤 외력 추정이 (1.97, 1.31, 0.56) N
   계단식으로 치우쳐 |F - F0| 2.43 N, 21.7 s 에 3.04 N 으로 기어올라 큐브 45 mm 위에서 거짓 CONTACT
+- 17 시 54 분 시험 407: 이동 중 7.5~9 s 에 잡은 F0 에서 21 s 에 3.15 N 벗어나 윗면 38 mm 위 거짓 CONTACT
+  (자세에 따라 흐른다: 같은 하강에서 Fz 1.8 → 4.1 N)
 - 5-5: 새 탐침 접촉 강성 약 43 N/mm. 하강 3 mm/s
 - 5-1: +x 로 미는 동안 허공에서도 Fx 약 -5 N (옆 이동 이력)
 """
@@ -12,16 +14,13 @@ import pytest
 
 from contact_detector.detector_core import (
     ContactDetector,
-    DescendTareConfig,
+    DescendRefConfig,
     DetectorConfig,
     EdgeConfig,
     OP_DESCEND,
     OP_MOVE_TO,
     OP_SLIDE,
     Sample,
-    TARE_TOOL_REG_SUSPECT,
-    TARE_UNSTABLE,
-    TareConfig,
     TYPE_CONTACT,
     TYPE_EDGE,
     TYPE_OVER_FORCE,
@@ -30,8 +29,7 @@ from contact_detector.detector_core import (
 MM = 1e-3
 DT = 0.02
 CONFIG = DetectorConfig(contact_threshold_n=3.0, debounce_n=3, over_force_n=30.0, over_force_debounce_n=1)
-DESCEND_TARE = DescendTareConfig(delay_s=6.0, duration_s=1.5,
-                                 tare=TareConfig(min_samples=30, max_std_n=0.3, max_force_n=6.0))
+DESCEND_REF = DescendRefConfig(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0)
 
 STATIC_F0 = (0.321, 0.514, 2.101)          # 5-2 정지 tare
 MOVING_BIAS = (1.97, 1.31, 0.56)           # 5-2 출발 4 s 뒤 계단식 치우침 (|.| = 2.43 N)
@@ -46,14 +44,24 @@ def run(detector, samples):
 
 
 def descent(z_top=Z_TOP, seconds=40.0, motion_id=1, start_t=0.0, noise=None, extra=(0.0, 0.0, 0.0),
-            operation=OP_DESCEND, start_id=1):
-    """홈에서 3 mm/s 하강. 4 s 뒤 치우침이 붙고 천천히 기어오른다(21.7 s 에 3.04 N). 윗면에서 반력이 생긴다."""
+            operation=OP_DESCEND, start_id=1, path_drift=None, gap=None):
+    """홈에서 3 mm/s 하강. 4 s 뒤 치우침이 붙고 천천히 기어오른다(21.7 s 에 3.04 N). 윗면에서 반력이 생긴다.
+
+    path_drift: (시작 s, 끝 s, (dx, dy, dz)) 동안 추정값이 그만큼 서서히 흐른다(자세에 따른 흐름, 407).
+    gap: (시작 s, 길이 s) 동안 샘플이 없다.
+    """
     samples = []
     for i in range(int(seconds / DT)):
         t = i * DT
+        if gap and gap[0] <= t < gap[0] + gap[1]:
+            continue
         z = Z0 - V_DOWN * t
         k = 0.0 if t < 4.0 else 1.0 + 0.25 * (t - 4.0) / 17.7
         f = [STATIC_F0[j] + k * MOVING_BIAS[j] + extra[j] for j in range(3)]
+        if path_drift:
+            a, b, d = path_drift
+            r = min(max((t - a) / (b - a), 0.0), 1.0)
+            f = [f[j] + r * d[j] for j in range(3)]
         if noise:
             f[2] += noise(i, t)
         if z < z_top:
@@ -71,131 +79,123 @@ def contact_before_over_force(detections):
                                       or types.index(TYPE_CONTACT) < types.index(TYPE_OVER_FORCE))
 
 
-def detector(descend_tare=DESCEND_TARE, edge=None):
-    d = ContactDetector(CONFIG, edge, descend_tare)
-    d.set_baseline(STATIC_F0)                              # scan_manager 가 준비 단계에서 잡는 정지 F0
+def contacts(detections):
+    return [x for x in detections if x.type == TYPE_CONTACT]
+
+
+def detector(descend_ref=DESCEND_REF, edge=None, static=STATIC_F0):
+    d = ContactDetector(CONFIG, edge, descend_ref)
+    if static is not None:
+        d.set_baseline(static)                             # scan_manager 가 준비 단계에서 잡는 정지 F0
     return d
 
 
-# ---------------------------------------------------------------- 하강: 이동 중 자동 영점
+# ---------------------------------------------------------------- 하강: 이동 기준
 
 def test_static_baseline_reproduces_the_false_contact_in_the_air():
-    """자동 영점이 없으면(이전 동작) 9/21 5-2 처럼 윗면 한참 위에서 거짓 CONTACT 가 난다."""
-    contacts = [d for d in run(detector(descend_tare=None), descent()) if d.type == TYPE_CONTACT]
-    assert contacts, '재현 조건이 틀렸다'
-    assert contacts[0].first_sample.position[2] - Z_TOP > 0.020        # 20 mm 넘게 위 허공
+    """이전 동작(정지 F0 하나): 5-2 의 치우침만으로 공중에서 CONTACT."""
+    found = contacts(run(detector(descend_ref=None), descent()))
+    assert found and found[0].first_sample.position[2] > Z_TOP + 0.030
 
 
-def test_moving_baseline_removes_the_false_contact_and_finds_the_top():
+def test_moving_reference_removes_the_false_contact_and_finds_the_top():
     d = detector()
-    contacts = [x for x in run(d, descent()) if x.type == TYPE_CONTACT]
-    assert d.descend_tare_state == 'done'
-    assert d.descend_tare_result.success
-    assert len(contacts) == 1
-    assert contacts[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
-    # 판정 기준은 이동 중 F0 다(치우침이 흡수됐다)
-    assert d.descend_baseline[0] == pytest.approx(STATIC_F0[0] + MOVING_BIAS[0] * 1.03, abs=0.05)
+    found = contacts(run(d, descent()))
+    assert len(found) == 1 and not found[0].hold
+    assert found[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
 
 
-def test_contact_is_judged_with_the_hold_threshold_while_the_moving_baseline_is_collected():
-    """영점을 잡는 동안(delay_s + duration_s)도 판정을 끄지 않는다. 정지 F0 와 올린 임계(6 N)로 보고,
-    닿으면 과대 외력(30 N)이 아니라 6 N 근처에서 멈춘다(현지 리뷰, PR #127).
+def test_drift_along_the_path_does_not_give_a_false_contact():
+    """407: 한 번 잡은 이동 중 F0 에서 14 s 동안 약 3 N 흐르면 공중에서 CONTACT 가 났다. 이동 기준은 따라간다."""
+    drift = (9.0, 23.0, (1.2, -0.3, 2.3))                  # |.| 약 2.6 N, 5-2 의 기어오름에 더해진다
+    found = contacts(run(detector(), descent(path_drift=drift)))
+    assert len(found) == 1
+    assert found[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
 
-    윗면이 이 구간(3 mm/s x 7.5 s = 22.5 mm) 뒤에 있어야 원래 임계로 잰다. 측정 품질 조건이다(계약 3.3).
-    """
-    near_top = Z0 - 0.005                                   # 출발 5 mm 아래에 윗면
-    window_s = DESCEND_TARE.delay_s + DESCEND_TARE.duration_s
-    detections = run(detector(), descent(z_top=near_top, seconds=window_s - 0.1))
-    contacts = [x for x in detections if x.type == TYPE_CONTACT]
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contacts[0].first_sample.position[2] == pytest.approx(near_top, abs=0.2 * MM)
+
+def test_contact_right_after_start_is_judged_with_the_hold_threshold():
+    """출발 뒤 1 s 는 이동 기준이 없다. 판정을 끄지 않고 정지 F0 와 6 N 으로 본다. 과대 외력보다 먼저 멈춘다."""
+    near_top = Z0 - 0.002                                   # 출발 2 mm 아래(0.67 s)에 윗면
+    detections = run(detector(), descent(z_top=near_top, seconds=1.5))
+    found = contacts(detections)
+    assert len(found) == 1 and found[0].hold
+    assert found[0].first_sample.position[2] == pytest.approx(near_top, abs=0.2 * MM)
     assert contact_before_over_force(detections)
-
-
-def test_hold_threshold_does_not_give_the_false_contact_of_the_static_baseline():
-    """정지 F0 + 3 N 은 45 mm 위에서 거짓 접촉을 냈다(5-2). 같은 F0 라도 6 N 이면 공중에서는 나지 않는다."""
-    held = ContactDetector(CONFIG, None, DESCEND_TARE)
-    held.set_baseline(STATIC_F0)
-    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t <= 7.6 else 0.0   # noqa: E731
-    contacts = [x for x in run(held, descent(noise=wobble)) if x.type == TYPE_CONTACT]
-    assert held.descend_tare_state == 'failed' and held.contact_hold
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contacts[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
 
 
 def test_without_any_tare_the_hold_uses_the_force_at_descend_start():
-    """/contact/tare 를 한 번도 안 했으면 이번 DESCEND 첫 샘플의 F 를 둔한 판정의 기준으로 쓴다(9/21 17 시 절차처럼)."""
-    d = ContactDetector(CONFIG, None, DESCEND_TARE)         # set_baseline 없음
-    near_top = Z0 - 0.005
-    contacts = [x for x in run(d, descent(z_top=near_top, seconds=7.0)) if x.type == TYPE_CONTACT]
+    """/contact/tare 를 한 번도 안 했으면 이번 DESCEND 첫 샘플의 F 를 둔한 판정의 기준으로 쓴다."""
+    d = detector(static=None)
+    near_top = Z0 - 0.002
+    found = contacts(run(d, descent(z_top=near_top, seconds=1.5)))
     assert d.descend_start_force == pytest.approx(STATIC_F0)
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contacts[0].first_sample.position[2] == pytest.approx(near_top, abs=0.2 * MM)
+    assert len(found) == 1 and found[0].hold
 
 
-def test_without_any_tare_and_every_attempt_failing_the_contact_is_still_judged():
-    d = ContactDetector(CONFIG, None, DESCEND_TARE)
-    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t <= 7.6 else 0.0   # noqa: E731
-    contacts = [x for x in run(d, descent(noise=wobble)) if x.type == TYPE_CONTACT]
-    assert d.descend_tare_state == 'failed'
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contacts[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
+def test_without_any_tare_the_full_descent_still_finds_the_top():
+    found = contacts(run(detector(static=None), descent()))
+    assert len(found) == 1 and not found[0].hold
+    assert found[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
 
 
-def test_recreating_the_detector_mid_descent_keeps_judging():
-    """파라미터를 바꾸면 노드가 detector 를 새로 만든다. 다음 샘플부터 하강이 새로 시작된 것으로 보고 다시 모으지만,
-    그동안도 정지 F0 와 올린 임계로 판정한다(윗면 10 mm 위에서 바꿔도 박히지 않는다)."""
-    samples = descent()
-    t_change = (Z0 - (Z_TOP + 0.010)) / V_DOWN              # 윗면 10 mm 위
-    before = [x for x in samples if x.pose_stamp < t_change]
-    after = [x for x in samples if x.pose_stamp >= t_change]
-    first = detector()
-    run(first, before)
-    second = ContactDetector(CONFIG, None, DESCEND_TARE)
-    second.set_baseline(first.baseline)
-    detections = run(second, after)
-    contacts = [x for x in detections if x.type == TYPE_CONTACT]
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contacts[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
+def test_short_sample_gap_keeps_the_reference():
+    """실기 공백(120~360 ms)으로는 구간을 비우지 않는다. 비우면 1 s 동안 둔한 판정으로 떨어져 더 눌린 좌표를 낸다."""
+    gap_at = (Z0 - Z_TOP) / V_DOWN - 0.5                    # 윗면 1.5 mm 위에서 0.36 s 공백
+    found = contacts(run(detector(), descent(gap=(gap_at, 0.36))))
+    assert len(found) == 1 and not found[0].hold
+    assert found[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
+
+
+def test_long_sample_gap_falls_back_to_the_hold_threshold():
+    """구간 안에 남은 샘플이 min_samples 보다 적으면 기준이 없다. 그동안도 판정은 한다(6 N)."""
+    gap_at = (Z0 - Z_TOP) / V_DOWN - 1.0
+    detections = run(detector(), descent(gap=(gap_at, 0.9)))
+    found = contacts(detections)
+    assert len(found) == 1 and found[0].hold
     assert contact_before_over_force(detections)
 
 
-def test_a_later_static_tare_replaces_the_moving_baseline():
-    """하강 뒤 /contact/tare 를 다시 하면 그 값을 쓴다. 밀기의 보고값 |F - F0| 가 하강 때 F0 로 계속 나오지 않게."""
+def test_recreating_the_detector_mid_descent_keeps_judging():
+    """파라미터를 바꾸면 노드가 detector 를 새로 만든다. 구간을 다시 쌓는 동안도 정지 F0 와 올린 임계로 판정한다."""
+    samples = descent()
+    t_change = (Z0 - (Z_TOP + 0.002)) / V_DOWN              # 윗면 2 mm 위(0.67 s 앞)
+    first = detector()
+    run(first, [x for x in samples if x.pose_stamp < t_change])
+    second = ContactDetector(CONFIG, None, DESCEND_REF)
+    second.set_baseline(first.baseline)
+    detections = run(second, [x for x in samples if x.pose_stamp >= t_change])
+    found = contacts(detections)
+    assert len(found) == 1 and found[0].hold
+    assert contact_before_over_force(detections)
+
+
+def test_reference_is_frozen_while_the_contact_builds_up():
+    """조건이 성립한 샘플은 구간에 넣지 않는다. 닿는 힘이 기준을 끌어올려 판정이 풀리지 않게."""
     d = detector()
-    run(d, descent(seconds=9.0))
-    assert d.descend_tare_state == 'done'
+    run(d, descent())
+    ref = d.descend_baseline
+    assert ref is not None and abs(ref[2] - (STATIC_F0[2] + MOVING_BIAS[2] * 1.4)) < 0.3
+
+
+def test_contact_reference_is_kept_for_the_slide_until_a_new_tare():
+    """밀기의 보고값 |F - F0| 에는 CONTACT 때의 이동 기준을 쓴다. 그 뒤 /contact/tare 를 하면 그 값이 이긴다."""
+    d = detector()
+    run(d, descent())
+    slide_sample = Sample(sample_id=99999, pose_stamp=100.0, force_stamp=100.0, position=(0.43, -0.1861, Z_TOP),
+                          force=STATIC_F0, motion_id=2, operation=OP_SLIDE)
+    d.update(slide_sample)
+    assert d.active_baseline == d.descend_baseline
     new_f0 = (0.5, 0.5, 2.5)
     d.set_baseline(new_f0)
-    assert d.active_baseline == new_f0 and d.descend_tare_state == 'idle'
+    d.update(slide_sample)
+    assert d.active_baseline == new_f0
 
 
-def test_failed_moving_baseline_falls_back_to_the_static_one():
-    """모으는 동안 흔들리면(무접촉 · 등속이 아니면) 자동 영점을 버리고 /contact/tare 의 F0 로 판정한다."""
-    d = detector()
-    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t <= 7.6 else 0.0   # noqa: E731
-    run(d, descent(seconds=9.0, noise=wobble))
-    assert d.descend_tare_state == 'failed'
-    assert d.descend_tare_result.error == TARE_UNSTABLE
-    assert d._judge_baseline() == STATIC_F0
-
-
-def test_tool_registration_suspect_is_not_adopted():
-    """툴 미등록(외력 12 N 치우침)이면 자동 영점도 채택하지 않는다(TOOL_REG_SUSPECT, BRD 4.1.5)."""
-    d = detector()
-    run(d, descent(seconds=9.0, extra=(0.0, 0.0, 10.0)))
-    assert d.descend_tare_state == 'failed'
-    assert d.descend_tare_result.error == TARE_TOOL_REG_SUSPECT
-
-
-def test_each_descent_takes_its_own_baseline():
-    """다음 하강(새 motion_id)은 앞 하강의 F0 를 쓰지 않고 다시 잡는다. 자세 · 이력이 다를 수 있다."""
+def test_each_descent_builds_its_own_reference():
     d = detector()
     run(d, descent(seconds=9.0, motion_id=1))
-    assert d.descend_tare_state == 'done'
-    second = descent(seconds=1.0, motion_id=2, start_t=100.0, start_id=10000)
-    run(d, second)
-    assert d.descend_tare_state == 'waiting' and d.descend_baseline is None
+    run(d, descent(seconds=0.5, motion_id=2, start_t=100.0, start_id=10000))
+    assert d.contact_hold                                    # 새 하강은 구간이 빈 채로 시작한다
 
 
 def test_descend_after_another_operation_restarts_even_with_the_same_motion_id():
@@ -203,77 +203,16 @@ def test_descend_after_another_operation_restarts_even_with_the_same_motion_id()
     run(d, descent(seconds=9.0, motion_id=0))
     run(d, descent(seconds=0.2, motion_id=0, operation=OP_MOVE_TO, start_t=50.0, start_id=5000))
     run(d, descent(seconds=0.2, motion_id=0, start_t=60.0, start_id=6000))
-    assert d.descend_tare_state == 'waiting'
-
-
-def test_config_rejects_bad_descend_tare_values():
-    with pytest.raises(ValueError):
-        DescendTareConfig(delay_s=-1.0, duration_s=1.5, tare=DESCEND_TARE.tare)
-    with pytest.raises(ValueError):
-        DescendTareConfig(delay_s=6.0, duration_s=0.0, tare=DESCEND_TARE.tare)
-    with pytest.raises(ValueError):
-        DescendTareConfig(delay_s=6.0, duration_s=1.5, tare=DESCEND_TARE.tare, max_attempts=0)
-    with pytest.raises(ValueError):
-        DescendTareConfig(delay_s=6.0, duration_s=1.5, tare=DESCEND_TARE.tare, hold_threshold_n=0.0)
-
-
-# ---------------------------------------------------------------- 하강: 자동 영점 재시도
-# 2026-09-21 17 시 실기(#127 시험): 7 회 중 1 회가 첫 구간에서 TARE_UNSTABLE(rms 0.494 N, 모으는 동안
-# Fz 2.6 → 1.5 N). 정지 F0 로 판정해 윗면 3.8 mm 위(185.12)에서 거짓 CONTACT. 같은 하강의 다음 구간은 성공했다
-
-RETRY_TARE = DescendTareConfig(delay_s=6.0, duration_s=1.5, tare=DESCEND_TARE.tare, max_attempts=3)
-
-
-def drift_in(start_s, end_s):
-    """[start_s, end_s) 동안 Fz 가 +0.55 N 에서 -0.55 N 으로 흐른다(rms 약 0.32 N > 0.3)."""
-    return lambda i, t: 0.55 - 1.1 * (t - start_s) / (end_s - start_s) if start_s <= t < end_s else 0.0  # noqa: E731
-
-
-def test_failed_first_window_retries_instead_of_using_the_static_baseline():
-    d = detector(descend_tare=RETRY_TARE)
-    detections = run(d, descent(noise=drift_in(6.0, 7.5)))
-    assert d.descend_tare_state == 'done' and d.descend_tare_attempt == 2
-    contacts = [x for x in detections if x.type == TYPE_CONTACT]
-    assert len(contacts) == 1
-    assert abs(contacts[0].first_sample.position[2] - Z_TOP) < 0.2 * MM   # 공중이 아니라 윗면
-
-
-def test_the_same_drift_without_retry_stays_on_the_hold_threshold():
-    """재시도가 없어도 실패 뒤 정지 F0 + 3 N(공중 거짓 접촉 조합)으로 돌아가지 않고 6 N 으로 끝까지 본다.
-    재시도는 원래 임계로 잴 기회를 되찾는 측정 품질용이다."""
-    d = detector()
-    contacts = [x for x in run(d, descent(noise=drift_in(6.0, 7.5))) if x.type == TYPE_CONTACT]
-    assert d.descend_tare_state == 'failed'
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contacts[0].first_sample.position[2] == pytest.approx(Z_TOP, abs=0.2 * MM)
-
-
-def test_contact_is_withheld_while_retrying():
-    d = detector(descend_tare=RETRY_TARE)
-    run(d, descent(seconds=8.0, noise=drift_in(6.0, 7.5)))
-    assert d.descend_tare_state == 'collecting' and d.descend_tare_attempt == 2
     assert d.contact_hold
 
 
-def test_all_attempts_failing_falls_back_to_the_static_baseline():
-    """모두 실패하면 정지 F0 로 판정한다. 판정하지 않으면 과대 외력(실기 30 N)까지 눌러 버린다."""
-    d = detector(descend_tare=RETRY_TARE)
-    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t < 10.6 else 0.0   # noqa: E731
-    run(d, descent(seconds=11.0, noise=wobble))
-    assert d.descend_tare_state == 'failed' and d.descend_tare_attempt == 3
-    assert d._judge_baseline() == STATIC_F0
-
-
-def test_hold_time_covers_every_attempt():
-    """최악(1 · 2번째 실패) 10.5 s 동안 올린 임계로 본다. 그 안에서 닿아도 판정은 나온다."""
-    assert RETRY_TARE.hold_s == pytest.approx(6.0 + 3 * 1.5)
-    near_top = Z0 - V_DOWN * (RETRY_TARE.hold_s - 0.5)              # 마지막 구간 안에서 윗면에 닿는다
-    wobble = lambda i, t: (1.0 if i % 2 else -1.0) if 6.0 <= t < 9.0 else 0.0   # noqa: E731
-    detections = run(detector(descend_tare=RETRY_TARE),
-                     descent(z_top=near_top, seconds=RETRY_TARE.hold_s - 0.1, noise=wobble))
-    contacts = [x for x in detections if x.type == TYPE_CONTACT]
-    assert len(contacts) == 1 and contacts[0].hold
-    assert contact_before_over_force(detections)
+def test_config_rejects_bad_descend_ref_values():
+    for bad in (dict(window_s=0.0), dict(lag_s=1.0), dict(lag_s=-0.1), dict(min_samples=0),
+                dict(hold_threshold_n=0.0)):
+        values = dict(window_s=1.0, lag_s=0.3, min_samples=10, hold_threshold_n=6.0)
+        values.update(bad)
+        with pytest.raises(ValueError):
+            DescendRefConfig(**values)
 
 
 # ---------------------------------------------------------------- 밀기: z 로 판정 켜기
@@ -322,20 +261,20 @@ def armed_at(d, samples):
 
 def test_force_arming_turns_on_before_the_gap_is_filled():
     """(이전 동작) 하강용 F0 로 |F - F0| 를 보면 옆 이동 이력 5 N 때문에 닿기 전에 켜진다."""
-    t = armed_at(detector(descend_tare=None, edge=EDGE_FORCE), slide(gap_fill, 2.0))
+    t = armed_at(detector(descend_ref=None, edge=EDGE_FORCE), slide(gap_fill, 2.0))
     fill_done = ENABLE_S + 0.5
     assert t is not None and t < fill_done
 
 
 def test_z_arming_waits_until_the_gap_is_filled_and_the_tip_slides():
-    t = armed_at(detector(descend_tare=None, edge=EDGE_Z), slide(gap_fill, 2.0))
+    t = armed_at(detector(descend_ref=None, edge=EDGE_Z), slide(gap_fill, 2.0))
     fill_done = ENABLE_S + 0.5                              # 1 mm ÷ 2 mm/s
     assert t is not None and t >= fill_done + 0.75 * EDGE_Z.arm_still_window_s - DT
 
 
 def test_z_arming_does_not_turn_on_while_force_control_is_being_enabled():
     """힘 제어를 켜는 동안에는 팁이 떠 있는데 z 도 멈춰 있다. x · y 가 움직이지 않으면 켜지 않는다."""
-    d = detector(descend_tare=None, edge=EDGE_Z)
+    d = detector(descend_ref=None, edge=EDGE_Z)
     for s in slide(gap_fill, ENABLE_S):
         d.update(s)
     assert not d.edge_armed
@@ -347,7 +286,7 @@ def test_first_direction_in_contact_arms_and_finds_the_edge():
 
     def z(t):
         return Z_TOP if t < t_edge else Z_TOP - 0.010 * (t - t_edge)   # 모서리 뒤 10 mm/s 로 내려앉음
-    d = detector(descend_tare=None, edge=EDGE_Z)
+    d = detector(descend_ref=None, edge=EDGE_Z)
     samples = slide(z, t_edge + 1.0)
     edges = [x for x in run(d, samples) if x.type == TYPE_EDGE]
     assert len(edges) == 1
@@ -355,7 +294,7 @@ def test_first_direction_in_contact_arms_and_finds_the_edge():
 
 
 def test_sample_gap_restarts_the_arming_window():
-    d = detector(descend_tare=None, edge=EDGE_Z)
+    d = detector(descend_ref=None, edge=EDGE_Z)
     t = armed_at(d, slide(lambda t: Z_TOP, 2.0, gap_at=(ENABLE_S + 0.02, ENABLE_S + 0.32)))
     assert t is not None and t >= ENABLE_S + 0.32 + 0.75 * EDGE_Z.arm_still_window_s - DT
 
