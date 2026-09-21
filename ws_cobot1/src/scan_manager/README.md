@@ -107,7 +107,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 두 테스트 모두 `ROS_DOMAIN_ID`를 따로 잡고 가짜 `/robot/execute_motion` · `/contact/tare` · `/robot/stop` 서버와 가짜 `/contact/event` · `/robot/status` · `/safety/status` 발행기를 같은 프로세스에 띄운다. 로봇 · 드라이버 · Virtual Mode를 쓰지 않는다.
 
 ## 파라미터
-값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s`만 본다(측정 파라미터가 비었다고 홈 복귀를 막지 않는다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
+값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s`만 본다(측정 파라미터가 비었다고 홈 복귀를 막지 않는다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
 
 | 이름 | 형 | 필수 | 범위 | 뜻 |
 |---|---|---|---|---|
@@ -130,6 +130,8 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `event_wait_timeout_s` | double | ● | > 0 | Result가 가리킨 `ContactEvent`를 기다리는 한도 |
 | `stop_confirm_timeout_s` | double | ● | > 0 | 정지 완료(`connected && !moving`)를 기다리는 한도. Result가 끝내 오지 않을 때의 대비(`motion_timeout_s` + 이 값)에도 쓴다 |
 | `server_wait_timeout_s` | double | ● | > 0 | 상대 서버의 미기동 판단 |
+| `safety_status_timeout_s` | double | ● | > 0 | `/safety/status`의 마지막 `stamp`가 이보다 오래되면 **끊김**으로 보고 `START` · `RESUME`을 거절한다. 안전복귀는 막지 않는다. safety_monitor의 `status_publish_period_s`(1.0)의 여러 배로 둔다 |
+| `robot_status_timeout_s` | double | ● | > 0 | `/robot/status`의 마지막 `stamp`가 이보다 오래되면 끊김으로 보고 `START` · `RESUME` · `HOME`을 거절한다. robot_manager의 발행 주기(10 Hz)와 부하에 따른 공백(이슈 #130)을 감안한다 |
 | `result_frame_id` · `motion_frame_id` | string | — (`workpiece_fixture` · `base_link`) | | 프레임 이름(가칭) |
 | `direction_order` | string[] | — (`POS_X, NEG_X, POS_Y, NEG_Y`) | 네 방향을 한 번씩 | 모서리 탐색 순서. **기동할 때만 읽는다**(상태 기계가 순서를 들고 있다). 나머지는 START 때마다 읽는다 |
 
@@ -199,6 +201,15 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 | `SET_CONFIG` | `/scan/set_config` | 없음. phase는 바뀌지 않고 접수 여부만 판정한다 |
 
 `Conditions(robot_connected, safety_latched)`는 명령 시점의 `/robot/status.connected`와 `/safety/status.latched`다. `None`은 "아직 받지 못함"이고 거절 사유가 된다.
+
+여기에 **최신성**이 붙는다(이슈 #120). `Conditions`는 두 상태 메시지의 `*_age_s`(마지막 `stamp`가 지난 시간)와 `*_timeout_s`(한도)를 같이 싣는다. **노드는 재기만 하고, 끊겼는지 판정하는 것은 순수 함수 `status_stale()`이다** — 그래서 경계(정확히 한계 시간 · 미래 `stamp` · 시계 0 · 한도 파라미터 없음)를 ROS 없이 시험할 수 있고, 주기 점검 로그도 관문과 같은 함수를 쓴다.
+
+- **이미 받은 마지막 상태는 발행이 끊겨도 그대로 남는다.** 죽기 직전의 `latched=false`가 영원히 "안전 정상"으로 읽히는 것이 이 결함이다.
+- 나이를 **수신 시각이 아니라 메시지 `stamp`**로 재는 이유는 따로 있다. `TRANSIENT_LOCAL`은 **발행자 프로세스가 살아 있는 한** 늦게 붙은 구독자에게도 마지막 샘플을 준다. 발행만 멈춘 채 프로세스가 살아 있으면(행 · 타이머 정지) 늦게 뜬 scan_manager가 옛 샘플을 "방금" 받고, 수신 시각으로는 그것을 거를 수 없다. `wait_still()`과 같은 관례이기도 하다. **발행자 프로세스가 아예 죽었으면** 늦은 구독자는 아무것도 못 받고, 그것은 지금도 `미수신`으로 거절된다(sim 종단에서 확인).
+- "한 번도 못 받음"(`None`)과 "받다가 끊김"은 **같은 ReasonCode에 다른 `detail`**이다. 끊김을 `false`나 `0`으로 적지 않는다(규칙 4).
+- 끊김은 래치보다 **먼저** 알린다. 끊긴 뒤의 `latched`는 죽은 감시자가 남긴 옛 값이라 믿을 수 없다.
+- 나이를 잴 수 없거나(ROS 시계가 0) 한도 파라미터가 없으면 **통과시키지 않는다.**
+- 관문은 `START`를 누른 뒤에야 알려 준다. 그래서 노드는 `/scan/state` 발행 주기마다 최신성을 보고 **끊긴 순간과 돌아온 순간을 `/scan/log`에 한 번씩** 남긴다(되풀이하지 않는다). 막지는 않는다.
 
 **Signal** — 노드 내부의 진행 보고. `sm.notify(Signal.X)`. 현재 phase에서 허용되지 않으면 `InvalidTransition`을 던진다. 조용히 무시하지 않는다. 경합(예: 중지 직후에 도착한 EDGE)을 어떻게 다룰지는 호출 측이 정한다.
 
@@ -271,9 +282,18 @@ stateDiagram-v2
 |---|---|
 | `START` | `BUSY`(100) → `SAFETY_LATCHED`(103) → `ROBOT_DISCONNECTED`(104) |
 | `SET_CONFIG` | `BUSY` |
-| `HOME` | `BUSY` → `ROBOT_DISCONNECTED`. 안전 래치는 막지 않는다 |
+| `HOME` | `BUSY` → `ROBOT_DISCONNECTED`. 안전 래치도 `/safety/status` 끊김도 막지 않는다 |
 | `RESUME` | `BUSY` → `NO_RESUMABLE_SCAN`(105) 또는 `NOT_SUPPORTED`(107) → `SAFETY_LATCHED` → `ROBOT_DISCONNECTED` |
 | `STOP` | 거절 없음 |
+
+103 · 104 안에서의 순서와 `detail`(새 ReasonCode를 만들지 않는다. 사람이 읽는 문구로 가른다):
+
+| 상황 | 사유 | `detail` |
+|---|---|---|
+| 한 번도 받지 못했다 | 103 · 104 | `/safety/status 미수신` |
+| 마지막 `stamp`가 한도보다 오래됐다 | 103 · 104 | `… 끊김(마지막 stamp 가 N.N s 전, 한계 N.N s)` |
+| 나이를 잴 수 없다(ROS 시계 0) · 한도 파라미터가 없다 | 103 · 104 | `… 최신성을 판정할 수 없다(…)` |
+| 래치 중이다 · 연결이 끊겼다 | 103 · 104 | (빈 문자열) |
 
 `RESUME`의 105 · 107:
 

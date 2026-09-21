@@ -129,5 +129,5 @@ def test_home_needs_only_its_own_parameters():
     assert result.params.motion_frame_id == 'base_link'
 
     result = P.check_home({'motion_timeout_s': -1.0, 'server_wait_timeout_s': 0.2})
-    assert not result.ok and result.missing == ('stop_confirm_timeout_s',)
+    assert not result.ok and result.missing == ('stop_confirm_timeout_s', 'robot_status_timeout_s')
     assert any(problem.startswith('motion_timeout_s = ') for problem in result.invalid)

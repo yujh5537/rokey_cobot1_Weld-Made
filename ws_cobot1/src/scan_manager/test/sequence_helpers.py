@@ -9,6 +9,7 @@ import itertools
 import math
 import os
 
+from conftest import FRESH_STATUS
 from scan_manager import geometry_adapter
 from scan_manager.contract_enums import Direction
 from scan_manager.contract_enums import MotionReason
@@ -52,9 +53,13 @@ VALUES = {
     'event_wait_timeout_s': 1.0,
     'stop_confirm_timeout_s': 5.0,
     'server_wait_timeout_s': 2.0,
+    # 끊김 한도도 real.yaml 과 같은 값이다. 가짜 상대 노드는 STATUS_PERIOD_S(0.02 s)마다 발행하므로
+    # 정상 경로는 이 한도 근처에도 가지 않는다. 끊김을 시험하는 테스트만 make_rig(...) 로 짧게 덮어쓴다.
+    'safety_status_timeout_s': 5.0,
+    'robot_status_timeout_s': 2.0,
 }
 SCAN_ID = '20260920-120000-0001'
-READY = Conditions(robot_connected=True, safety_latched=False)
+READY = Conditions(robot_connected=True, safety_latched=False, **FRESH_STATUS)
 
 # 가상 직육면체 (Base)
 BOX_CENTER = (0.40, 0.00)

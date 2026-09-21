@@ -112,6 +112,10 @@ SPECS: Tuple[ParamSpec, ...] = (
     ParamSpec('event_wait_timeout_s', DOUBLE, True, positive, 'Result 와 ContactEvent 의 도착 순서 차이'),
     ParamSpec('stop_confirm_timeout_s', DOUBLE, True, positive, '정지 완료 확인을 기다리는 한도'),
     ParamSpec('server_wait_timeout_s', DOUBLE, True, positive, '상대 서버 미기동 판단'),
+    ParamSpec('safety_status_timeout_s', DOUBLE, True, positive,
+              '/safety/status 가 끊긴 것으로 보는 한도. 발행 주기의 여러 배로 둔다'),
+    ParamSpec('robot_status_timeout_s', DOUBLE, True, positive,
+              '/robot/status 가 끊긴 것으로 보는 한도. 발행 주기의 여러 배로 둔다'),
     ParamSpec('result_frame_id', STRING, False, _non_empty_text,
               'ScanResult 의 프레임(가칭)', default='workpiece_fixture'),
     ParamSpec('motion_frame_id', STRING, False, _non_empty_text,
@@ -157,6 +161,8 @@ class ScanParams:
     event_wait_timeout_s: float
     stop_confirm_timeout_s: float
     server_wait_timeout_s: float
+    safety_status_timeout_s: float
+    robot_status_timeout_s: float
     result_frame_id: str
     motion_frame_id: str
     direction_order: Tuple[Direction, ...]
@@ -260,7 +266,10 @@ def check(values: Mapping[str, object]) -> ParamCheck:
 
 # 안전복귀(/scan/home)에 필요한 것. 측정 · 보정 파라미터가 비어 있다고 홈 복귀까지 막지 않는다.
 HOME_PARAM_NAMES = (
-    'motion_timeout_s', 'stop_confirm_timeout_s', 'server_wait_timeout_s', 'motion_frame_id')
+    'motion_timeout_s', 'stop_confirm_timeout_s', 'server_wait_timeout_s', 'motion_frame_id',
+    # 안전복귀도 /robot/status 의 최신성을 본다(끊긴 로봇으로는 복귀 모션 자체가 불가능하다).
+    # /safety/status 는 보지 않는다: 감시자가 죽었다고 돌아오지 못하면 안 된다(CLAUDE.md 규칙 3).
+    'robot_status_timeout_s')
 
 
 @dataclass(frozen=True)
@@ -269,6 +278,7 @@ class HomeParams:
     stop_confirm_timeout_s: float
     server_wait_timeout_s: float
     motion_frame_id: str
+    robot_status_timeout_s: float
 
 
 def check_home(values: Mapping[str, object]) -> ParamCheck:

@@ -93,6 +93,7 @@ from .state_machine import InvalidTransition
 from .state_machine import ScanStateMachine
 from .state_machine import Signal
 from .state_machine import Snapshot
+from .state_machine import status_stale
 
 # 설계 출발값. 실제 값은 contact_scan_bringup/config/*.yaml 에 둔다.
 DEFAULT_STATE_PUBLISH_PERIOD_S = 1.0
@@ -269,7 +270,9 @@ class ScanManager(Node):
             SetConfig, '/scan/set_config', self._on_set_config,
             callback_group=MutuallyExclusiveCallbackGroup())
 
-        self._state_timer = self.create_timer(period, self._publish_state_periodic)
+        # 최신성 점검은 발행 주기에 얹는다(타이머 · 파라미터를 새로 만들지 않는다).
+        self._status_stale = {'/safety/status': False, '/robot/status': False}
+        self._state_timer = self.create_timer(period, self._on_state_timer)
         self._on_change(self.state_machine.snapshot())
 
     def announce_ready(self):
@@ -330,6 +333,10 @@ class ScanManager(Node):
         with self._state_pub_lock:
             self._state_seq += 1
             self._publish_quietly(self._state_pub, lambda: to_msg(snapshot, self._now_msg()))
+
+    def _on_state_timer(self):
+        self._publish_state_periodic()
+        self._watch_status_freshness()
 
     def _publish_state_periodic(self):
         # 스냅숏을 뜬 뒤에 상태가 바뀌었으면 그 변경이 이미 발행됐다. 옛 상태로 덮어쓰지 않는다.
@@ -423,13 +430,64 @@ class ScanManager(Node):
         with self._status_cond:
             self._safety_status = msg
 
+    def _status_age_s(self, msg, now_ns):
+        """상태 메시지의 stamp 가 지난 시간(s). 잴 수 없으면 None.
+
+        수신 시각이 아니라 stamp 를 쓴다. TRANSIENT_LOCAL 이라 **발행자 프로세스가 살아 있는 한**
+        늦게 붙은 구독자도 마지막 샘플을 받는다 — 발행이 멈춘 채 프로세스만 살아 있으면 옛 샘플을
+        "방금" 받게 되고, 수신 시각으로는 그것을 거를 수 없다(이슈 #120).
+        시계가 0 이면(use_sim_time 인데 /clock 이 없다) 잴 수 없다 — wait_still() 과 같은 관례다.
+        """
+        if now_ns <= 0:
+            return None
+        return (now_ns - (msg.stamp.sec * 1_000_000_000 + msg.stamp.nanosec)) / 1e9
+
+    def _timeout_param(self, name):
+        """끊김 한도 파라미터. 없거나 0 이하면 None 이고, 그러면 최신성을 판정할 수 없다."""
+        value = self.get_parameter_or(name).value
+        return None if value is None or scan_params.positive(value) else float(value)
+
     def conditions(self) -> Conditions:
-        """명령 시점의 보호 조건. 아직 받지 못한 것은 None 이고 거절 사유가 된다."""
+        """명령 시점의 보호 조건. 아직 받지 못한 것은 None 이고 거절 사유가 된다.
+
+        최신성은 **재기만** 한다. 한계 시간과 비교해 거절하는 규칙은 상태 기계(status_stale)에 있다.
+        """
+        now_ns = self.get_clock().now().nanoseconds
         with self._status_cond:
             robot, safety = self._robot_status, self._safety_status
         return Conditions(
             robot_connected=None if robot is None else bool(robot.connected),
-            safety_latched=None if safety is None else bool(safety.latched))
+            safety_latched=None if safety is None else bool(safety.latched),
+            robot_status_age_s=None if robot is None else self._status_age_s(robot, now_ns),
+            safety_status_age_s=None if safety is None else self._status_age_s(safety, now_ns),
+            robot_status_timeout_s=self._timeout_param('robot_status_timeout_s'),
+            safety_status_timeout_s=self._timeout_param('safety_status_timeout_s'))
+
+    def _watch_status_freshness(self):
+        """끊김 · 회복을 각각 한 번씩 알린다. 막지는 않는다(이슈 #120).
+
+        관문은 START 를 누른 뒤에야 알려 준다. 오늘 사고는 **아무도 모른 채 한 시간이 지난 것**이라
+        주기 점검으로 먼저 알린다. 한 번도 받지 못한 토픽은 여기서 알리지 않는다(기동 직후의 정상 상태다).
+        """
+        conditions = self.conditions()
+        watched = (
+            ('/safety/status', conditions.safety_latched is not None, Reason.SAFETY_LATCHED,
+             status_stale('/safety/status', 'safety_status_timeout_s',
+                          conditions.safety_status_age_s, conditions.safety_status_timeout_s),
+             'START · 재시작을 거절한다'),
+            ('/robot/status', conditions.robot_connected is not None, Reason.ROBOT_DISCONNECTED,
+             status_stale('/robot/status', 'robot_status_timeout_s',
+                          conditions.robot_status_age_s, conditions.robot_status_timeout_s),
+             'START · 재시작 · 안전복귀를 거절한다'),
+        )
+        for topic, received, code, stale, effect in watched:
+            if not received or bool(stale) == self._status_stale[topic]:
+                continue  # 한 번도 못 받았거나, 이미 알린 상태 그대로다. 되풀이하지 않는다
+            self._status_stale[topic] = bool(stale)
+            if stale:
+                self.log(ScanLog.LEVEL_WARN, code, f'{stale}. {effect}')
+            else:
+                self.log(ScanLog.LEVEL_INFO, Reason.OK, f'{topic} 수신 회복')
 
     def safety_reason_code(self) -> int:
         with self._status_cond:

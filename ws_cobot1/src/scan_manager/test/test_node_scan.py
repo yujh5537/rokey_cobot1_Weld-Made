@@ -191,6 +191,16 @@ def rig(make_rig):
     return rig
 
 
+def guards(conditions):
+    """래치 · 연결만. 나이(*_age_s)는 부를 때마다 달라지므로 Conditions 를 통째로 비교하지 않는다."""
+    return conditions.safety_latched, conditions.robot_connected
+
+
+def wait_stale(rig, age_of, timeout_s):
+    """마지막 stamp 가 한계 시간보다 오래될 때까지 기다린다."""
+    assert rig.wait(lambda: (age_of(rig.node.conditions()) or 0.0) > timeout_s), '끊기지 않았다'
+
+
 def phases(rig):
     seen = []
     for state in rig.states:
@@ -232,7 +242,7 @@ def test_start_is_refused_by_conditions(make_rig, setup, code):
     rig = make_rig()
     setup(rig.peers)
     rig.wait_ready()
-    assert rig.wait(lambda: rig.node.conditions() != READY)
+    assert rig.wait(lambda: guards(rig.node.conditions()) != guards(READY))
     result = rig.run()
     assert not result.success and result.reason_code == code
     assert rig.node.state_machine.phase is Phase.IDLE
@@ -255,6 +265,99 @@ def test_resume_with_nothing_recorded_is_refused_and_changes_nothing(rig):
     assert not result.success and result.reason_code == Reason.NO_RESUMABLE_SCAN
     assert math.isnan(result.result.z_top) and not result.result.z_top_valid
     assert rig.node.state_machine.phase is Phase.IDLE and rig.peers.goals == []
+
+
+# ---- 상태 토픽 끊김 (이슈 #120) ----
+# 감시자가 죽어도 /safety/status 는 TRANSIENT_LOCAL 이라 마지막 "안전 정상"이 남는다.
+# 2026-09-21 실기에서 그 상태로 하강 5 회가 시작됐고 한 시간 넘게 아무도 몰랐다.
+
+def test_start_is_refused_when_the_safety_monitor_stops_publishing(make_rig):
+    rig = make_rig(safety_status_timeout_s=0.3)
+    rig.wait_ready()
+    rig.peers.publish_safety = False          # 감시자가 죽었다. 마지막 메시지는 latched=false 다
+    wait_stale(rig, lambda c: c.safety_status_age_s, 0.3)
+
+    result = rig.run()
+    assert not result.success and result.reason_code == Reason.SAFETY_LATCHED
+    assert '끊김' in result.detail and '미수신' not in result.detail
+    assert rig.node.state_machine.phase is Phase.IDLE
+    assert rig.peers.goals == []              # 모션은 하나도 나가지 않았다
+
+
+def test_resume_is_refused_when_the_safety_monitor_stops_publishing(make_rig):
+    rig = make_rig(safety_status_timeout_s=0.3)
+    rig.wait_ready()
+    stop_during_slide(rig)
+    rig.peers.publish_safety = False
+    wait_stale(rig, lambda c: c.safety_status_age_s, 0.3)
+
+    result = resume(rig)
+    assert not result.success and result.reason_code == Reason.SAFETY_LATCHED
+    assert '끊김' in result.detail
+    assert rig.node.state_machine.phase is Phase.STOPPED   # 거절이 재개 지점을 지우지 않는다
+
+
+def test_start_passes_again_once_the_monitor_comes_back(make_rig):
+    rig = make_rig(safety_status_timeout_s=0.3)
+    rig.wait_ready()
+    rig.peers.publish_safety = False
+    wait_stale(rig, lambda c: c.safety_status_age_s, 0.3)
+    assert not rig.run().success
+
+    rig.peers.publish_safety = True           # 감시자를 다시 띄웠다
+    assert rig.wait(lambda: rig.node.conditions().safety_status_age_s < 0.3)
+    result = rig.run()
+    assert result.success, result.detail
+
+
+def test_home_is_accepted_while_the_safety_monitor_is_quiet(make_rig):
+    """안전복귀는 독립된 명령이다(규칙 3). 감시자가 죽었다고 돌아오지 못하면 안 된다."""
+    rig = make_rig(safety_status_timeout_s=0.3)
+    rig.wait_ready()
+    rig.peers.publish_safety = False
+    wait_stale(rig, lambda c: c.safety_status_age_s, 0.3)
+
+    result = rig.home()
+    assert result.success, result.detail
+    assert [Operation(g.operation) for g in rig.peers.goals] == [Operation.HOME]
+
+
+def test_a_stale_robot_status_refuses_start_and_home(make_rig):
+    rig = make_rig(robot_status_timeout_s=0.3)
+    rig.wait_ready()
+    rig.peers.publish_status = False
+    wait_stale(rig, lambda c: c.robot_status_age_s, 0.3)
+
+    for result in (rig.run(), rig.home()):
+        assert not result.success and result.reason_code == Reason.ROBOT_DISCONNECTED
+        assert '끊김' in result.detail
+    assert rig.peers.goals == []
+
+
+def test_the_gap_and_the_recovery_are_logged_once_each(make_rig):
+    """START 를 누를 때까지 기다리지 않는다. 끊긴 순간과 돌아온 순간을 한 번씩 알린다."""
+    rig = make_rig(safety_status_timeout_s=0.3, state_publish_period_s=0.1)
+    rig.wait_ready()
+
+    def lines(level, text):
+        return [log for log in rig.logs if log.level == level and text in log.message]
+
+    rig.peers.publish_safety = False
+    assert rig.wait(lambda: lines(ScanLog.LEVEL_WARN, '/safety/status 끊김'))
+    rig.peers.publish_safety = True
+    assert rig.wait(lambda: lines(ScanLog.LEVEL_INFO, '/safety/status 수신 회복'))
+
+    time.sleep(0.5)   # 주기가 여러 번 더 돈다. 같은 말을 되풀이하지 않는다
+    assert len(lines(ScanLog.LEVEL_WARN, '/safety/status 끊김')) == 1
+    assert len(lines(ScanLog.LEVEL_INFO, '/safety/status 수신 회복')) == 1
+    assert lines(ScanLog.LEVEL_WARN, '/safety/status 끊김')[0].code == Reason.SAFETY_LATCHED
+
+
+def test_a_topic_never_received_is_not_reported_as_a_gap(make_rig):
+    """기동 직후 상대 노드가 아직 없는 것은 끊김이 아니다. 그것은 START 가 '미수신'으로 거절한다."""
+    rig = make_rig(start_peers=False, state_publish_period_s=0.1)
+    time.sleep(0.5)
+    assert [log for log in rig.logs if log.level == ScanLog.LEVEL_WARN] == []
 
 
 # ---- 정상 경로 ----

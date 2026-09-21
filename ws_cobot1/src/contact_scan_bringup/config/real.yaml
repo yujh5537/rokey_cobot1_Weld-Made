@@ -182,6 +182,13 @@ scan_manager:
     event_wait_timeout_s: 1.0        # Result 가 가리킨 ContactEvent 를 기다리는 한도. 설계 출발값
     stop_confirm_timeout_s: 5.0      # 정지 완료(connected && !moving)를 기다리는 한도. 설계 출발값
     server_wait_timeout_s: 2.0       # 상대 서버의 미기동 판단. 설계 출발값
+    # --- 상태 토픽이 끊긴 것을 보는 한도 (이슈 #120, 병후). 설계 출발값이며 실측값이 아니다 ---
+    # /safety/status · /robot/status 는 TRANSIENT_LOCAL 이라 발행자가 죽어도 마지막 메시지가 남는다.
+    # 마지막 stamp 가 이 값보다 오래되면 "끊김"으로 보고 START · 재시작을 거절한다(안전복귀는 /safety/status 를 보지 않는다).
+    # 너무 짧게 잡으면 발행이 잠깐 늦은 것만으로 부당 거절이 난다. 발행 주기의 여러 배로 둔다.
+    safety_status_timeout_s: 5.0     # safety_monitor.status_publish_period_s(1.0) 의 5 배
+    robot_status_timeout_s: 2.0      # robot_manager.status_rate_hz(10 Hz = 0.1 s) 의 20 배.
+                                     #   정지 중 300~360 ms 의 샘플 공백이 보고돼 있다(이슈 #130) — 그 5 배 이상으로 둔다
 
 # mqtt_bridge:                       # (병후)
 #   ros__parameters:

@@ -11,6 +11,7 @@ import random
 import threading
 
 import pytest
+from conftest import FRESH_STATUS
 from result_store_helpers import CONFIG
 from result_store_helpers import FakeClock
 from result_store_helpers import FRAMES
@@ -41,7 +42,7 @@ from scan_manager.state_machine import DEFAULT_DIRECTION_ORDER
 from scan_manager.state_machine import ScanStateMachine
 from scan_manager.state_machine import Signal
 
-READY = Conditions(robot_connected=True, safety_latched=False)
+READY = Conditions(robot_connected=True, safety_latched=False, **FRESH_STATUS)
 DOWN = (0.0, 1.0, 0.0, 0.0)
 
 # 가상 직육면체 (base_link). 작업대 좌표의 원점은 base_link 의 (0.4, 0.0, 0.0) 이고 축은 평행하다.
