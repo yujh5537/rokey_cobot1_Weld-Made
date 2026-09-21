@@ -547,6 +547,11 @@ class RobotManager(Node):
                 reason_code, detail = request
                 stopped, why = self.stop_robot(f'정지 요청 ({detail})')
                 if not stopped:   # 접수했다고 멈춘 것이 아니다 (계약 4.1)
+                    # 확인 못 했으니 되돌려 놓는다. 동작 없음 경로(stop_idle)와 같은 약속이다:
+                    # 멈췄는지 모르는 로봇에 다음 goal(HOME 포함)을 보내지 않는다 (#113).
+                    # finally 의 settle_leftover_stop_request 가 한 번 더 확인하고, 그래도 안 되면
+                    # /robot/stop 을 다시 불러야 풀린다(README)
+                    self.restore_stop_request(request)
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'정지 요청 ({detail}). {why}')
                 return (ExecuteMotion.Result.REASON_STOP_REQUESTED,
@@ -678,6 +683,12 @@ class RobotManager(Node):
         with self.stop_lock:
             request, self.stop_requested = self.stop_requested, None
         return request
+
+    def restore_stop_request(self, entry):
+        """정지를 확인하지 못한 요청을 되돌려 놓는다. 그 사이 새 요청이 왔으면 그것을 남긴다."""
+        with self.stop_lock:
+            if self.stop_requested is None:
+                self.stop_requested = entry
 
     def clear_stop_request(self, entry):
         """`entry` 가 아직 남은 요청일 때만 지운다. 그 사이 새로 온 요청은 남긴다."""
