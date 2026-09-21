@@ -1,0 +1,976 @@
+scan_id: 20260921-131938-1493
+stamp:
+  sec: 1789964456
+  nanosec: 656271476
+success: true
+reason_code: 0
+detail: ''
+frame_id: workpiece_fixture
+z_top: 0.03986501464843746
+z_top_valid: true
+x_pos: 0.04997499389648436
+x_pos_valid: true
+x_neg: -0.04980501098632812
+x_neg_valid: true
+y_pos: 0.029884997558593758
+y_pos_valid: true
+y_neg: -0.029854998779296878
+y_neg_valid: true
+width: 0.09978000488281248
+length: 0.059739996337890636
+height: 0.03986501464843746
+dims_valid: true
+support_z: 0.0
+support_z_valid: true
+vertices:
+- x: -0.04980501098632812
+  y: -0.029854998779296878
+  z: 0.03986501464843746
+- x: 0.04997499389648436
+  y: -0.029854998779296878
+  z: 0.03986501464843746
+- x: 0.04997499389648436
+  y: 0.029884997558593758
+  z: 0.03986501464843746
+- x: -0.04980501098632812
+  y: 0.029884997558593758
+  z: 0.03986501464843746
+- x: -0.04980501098632812
+  y: -0.029854998779296878
+  z: 0.0
+- x: 0.04997499389648436
+  y: -0.029854998779296878
+  z: 0.0
+- x: 0.04997499389648436
+  y: 0.029884997558593758
+  z: 0.0
+- x: -0.04980501098632812
+  y: 0.029884997558593758
+  z: 0.0
+box_valid: true
+edges:
+- start:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  end:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  length: 0.09978000488281248
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  end:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  length: 0.059739996337890636
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  end:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  length: 0.09978000488281248
+  valid: true
+- start:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  end:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  length: 0.059739996337890636
+  valid: true
+- start:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.0
+  end:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.0
+  length: 0.09978000488281248
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.0
+  end:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.0
+  length: 0.059739996337890636
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.0
+  end:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.0
+  length: 0.09978000488281248
+  valid: true
+- start:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.0
+  end:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.0
+  length: 0.059739996337890636
+  valid: true
+- start:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  end:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.0
+  length: 0.03986501464843746
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  end:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.0
+  length: 0.03986501464843746
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  end:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.0
+  length: 0.03986501464843746
+  valid: true
+- start:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  end:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.0
+  length: 0.03986501464843746
+  valid: true
+path_candidates:
+- start:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  end:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  length: 0.09978000488281248
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  end:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  length: 0.059739996337890636
+  valid: true
+- start:
+    x: 0.04997499389648436
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  end:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  length: 0.09978000488281248
+  valid: true
+- start:
+    x: -0.04980501098632812
+    y: 0.029884997558593758
+    z: 0.03986501464843746
+  end:
+    x: -0.04980501098632812
+    y: -0.029854998779296878
+    z: 0.03986501464843746
+  length: 0.059739996337890636
+  valid: true
+config:
+  contact_threshold_n: 3.0
+  contact_threshold_set: true
+  edge_drop_m: 0.0005
+  edge_drop_set: true
+  debounce_n: 3
+  debounce_set: true
+  over_force_n: 30.0
+  over_force_set: true
+  descend_speed_mps: 0.005
+  descend_speed_set: true
+  slide_speed_mps: 0.01
+  slide_speed_set: true
+  max_descend_m: 0.08
+  max_descend_set: true
+  max_slide_m: 0.08
+  max_slide_set: true
+  motion_timeout_s: 30.0
+  motion_timeout_set: true
+  lift_height_m: 0.05
+  lift_height_set: true
+  target_force_n: 3.0
+  target_force_set: true
+  drop_limit_m: 0.005
+  drop_limit_set: true
+started_at:
+  sec: 1789964378
+  nanosec: 539821121
+finished_at:
+  sec: 1789964456
+  nanosec: 636732874
+---
+scan_id: 20260921-132213-8133
+stamp:
+  sec: 1789964554
+  nanosec: 776800099
+success: false
+reason_code: 200
+detail: stopped
+frame_id: workpiece_fixture
+z_top: 0.039909997558593716
+z_top_valid: true
+x_pos: .nan
+x_pos_valid: false
+x_neg: .nan
+x_neg_valid: false
+y_pos: .nan
+y_pos_valid: false
+y_neg: .nan
+y_neg_valid: false
+width: .nan
+length: .nan
+height: .nan
+dims_valid: false
+support_z: 0.0
+support_z_valid: true
+vertices:
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+box_valid: false
+edges:
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+path_candidates:
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+config:
+  contact_threshold_n: 3.0
+  contact_threshold_set: true
+  edge_drop_m: 0.0005
+  edge_drop_set: true
+  debounce_n: 3
+  debounce_set: true
+  over_force_n: 30.0
+  over_force_set: true
+  descend_speed_mps: 0.005
+  descend_speed_set: true
+  slide_speed_mps: 0.01
+  slide_speed_set: true
+  max_descend_m: 0.08
+  max_descend_set: true
+  max_slide_m: 0.08
+  max_slide_set: true
+  motion_timeout_s: 30.0
+  motion_timeout_set: true
+  lift_height_m: 0.05
+  lift_height_set: true
+  target_force_n: 3.0
+  target_force_set: true
+  drop_limit_m: 0.005
+  drop_limit_set: true
+started_at:
+  sec: 1789964533
+  nanosec: 652994617
+finished_at:
+  sec: 1789964554
+  nanosec: 776233963
+---
+scan_id: 20260921-132913-3267
+stamp:
+  sec: 1789964959
+  nanosec: 538913992
+success: false
+reason_code: 300
+detail: max_descend_m 0.01 안에 접촉이 없다
+frame_id: workpiece_fixture
+z_top: .nan
+z_top_valid: false
+x_pos: .nan
+x_pos_valid: false
+x_neg: .nan
+x_neg_valid: false
+y_pos: .nan
+y_pos_valid: false
+y_neg: .nan
+y_neg_valid: false
+width: .nan
+length: .nan
+height: .nan
+dims_valid: false
+support_z: 0.0
+support_z_valid: true
+vertices:
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+box_valid: false
+edges:
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+path_candidates:
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+config:
+  contact_threshold_n: 3.0
+  contact_threshold_set: true
+  edge_drop_m: 0.0005
+  edge_drop_set: true
+  debounce_n: 3
+  debounce_set: true
+  over_force_n: 30.0
+  over_force_set: true
+  descend_speed_mps: 0.005
+  descend_speed_set: true
+  slide_speed_mps: 0.01
+  slide_speed_set: true
+  max_descend_m: 0.01
+  max_descend_set: true
+  max_slide_m: 0.08
+  max_slide_set: true
+  motion_timeout_s: 30.0
+  motion_timeout_set: true
+  lift_height_m: 0.05
+  lift_height_set: true
+  target_force_n: 3.0
+  target_force_set: true
+  drop_limit_m: 0.005
+  drop_limit_set: true
+started_at:
+  sec: 1789964953
+  nanosec: 886234093
+finished_at:
+  sec: 1789964959
+  nanosec: 538549218
+---
+scan_id: 20260921-132936-9492
+stamp:
+  sec: 1789964993
+  nanosec: 283274120
+success: false
+reason_code: 301
+detail: max_slide_m 0.005 안에 접촉 소실이 없다
+frame_id: workpiece_fixture
+z_top: 0.039945001220703116
+z_top_valid: true
+x_pos: .nan
+x_pos_valid: false
+x_neg: .nan
+x_neg_valid: false
+y_pos: .nan
+y_pos_valid: false
+y_neg: .nan
+y_neg_valid: false
+width: .nan
+length: .nan
+height: .nan
+dims_valid: false
+support_z: 0.0
+support_z_valid: true
+vertices:
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+- x: .nan
+  y: .nan
+  z: .nan
+box_valid: false
+edges:
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+path_candidates:
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+- start:
+    x: .nan
+    y: .nan
+    z: .nan
+  end:
+    x: .nan
+    y: .nan
+    z: .nan
+  length: .nan
+  valid: false
+config:
+  contact_threshold_n: 3.0
+  contact_threshold_set: true
+  edge_drop_m: 0.0005
+  edge_drop_set: true
+  debounce_n: 3
+  debounce_set: true
+  over_force_n: 30.0
+  over_force_set: true
+  descend_speed_mps: 0.005
+  descend_speed_set: true
+  slide_speed_mps: 0.01
+  slide_speed_set: true
+  max_descend_m: 0.08
+  max_descend_set: true
+  max_slide_m: 0.005
+  max_slide_set: true
+  motion_timeout_s: 30.0
+  motion_timeout_set: true
+  lift_height_m: 0.05
+  lift_height_set: true
+  target_force_n: 3.0
+  target_force_set: true
+  drop_limit_m: 0.005
+  drop_limit_set: true
+started_at:
+  sec: 1789964976
+  nanosec: 414912804
+finished_at:
+  sec: 1789964993
+  nanosec: 281131596
+---

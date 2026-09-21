@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "kind": "contact_scan.progress",
+  "units": {
+    "length": "m",
+    "angle": "rad",
+    "force": "N",
+    "torque": "N*m",
+    "time": "s"
+  },
+  "scan_id": "20260921-132913-3267",
+  "revision": 9,
+  "started_at": {
+    "sec": 1789964953,
+    "nanosec": 886234093
+  },
+  "updated_at": {
+    "sec": 1789964959,
+    "nanosec": 535964576
+  },
+  "state": {
+    "phase": "ERROR",
+    "direction": "NONE",
+    "progress": 0,
+    "progress_total": 4,
+    "motion_id": 0
+  },
+  "last_motion_id": 2,
+  "frames": {
+    "detection": "base_link",
+    "result": "workpiece_fixture"
+  },
+  "direction_order": [
+    "POS_X",
+    "NEG_X",
+    "POS_Y",
+    "NEG_Y"
+  ],
+  "config": {
+    "contact_threshold_n": 3.0,
+    "contact_threshold_set": true,
+    "edge_drop_m": 0.0005,
+    "edge_drop_set": true,
+    "debounce_n": 3,
+    "debounce_set": true,
+    "over_force_n": 30.0,
+    "over_force_set": true,
+    "descend_speed_mps": 0.005,
+    "descend_speed_set": true,
+    "slide_speed_mps": 0.01,
+    "slide_speed_set": true,
+    "max_descend_m": 0.01,
+    "max_descend_set": true,
+    "max_slide_m": 0.08,
+    "max_slide_set": true,
+    "motion_timeout_s": 30.0,
+    "motion_timeout_set": true,
+    "lift_height_m": 0.05,
+    "lift_height_set": true,
+    "target_force_n": 3.0,
+    "target_force_set": true,
+    "drop_limit_m": 0.005,
+    "drop_limit_set": true
+  },
+  "node_params": {
+    "move_speed_mps": 0.05,
+    "recontact_margin_m": 0.001,
+    "recontact_speed_mps": 0.005,
+    "search_origin_pose": [
+      0.425,
+      -0.184,
+      0.5,
+      0.9999832196,
+      0.0055369752,
+      -0.0014006997,
+      0.0009697282
+    ],
+    "base_to_fixture": [
+      0.425,
+      -0.184,
+      0.4
+    ],
+    "support_z_m": 0.0,
+    "tip_radius_m": 0.000225,
+    "detect_latency_s": 0.02,
+    "edge_round_radius_m": 0.0,
+    "edge_bias_offset_m": 0.0,
+    "result_dir": "data",
+    "event_wait_timeout_s": 1.0,
+    "stop_confirm_timeout_s": 5.0,
+    "server_wait_timeout_s": 2.0,
+    "result_frame_id": "workpiece_fixture",
+    "motion_frame_id": "base_link"
+  },
+  "measurements": {
+    "top": {
+      "status": "FAILED",
+      "valid": false,
+      "detection": null,
+      "stop_pose": {
+        "position_m": [
+          0.425,
+          -0.184,
+          0.49
+        ],
+        "orientation_xyzw": [
+          0.9999832198302206,
+          0.005536941895155514,
+          -0.0014006997477005886,
+          0.0009697281325718571
+        ],
+        "frame_id": "base_link",
+        "stamp": {
+          "sec": 1789964959,
+          "nanosec": 481646012
+        }
+      },
+      "stop_pose_valid": true,
+      "reason_code": 300,
+      "detail": "max_descend_m 0.01 안에 접촉이 없다",
+      "recorded_at": {
+        "sec": 1789964959,
+        "nanosec": 524846969
+      }
+    },
+    "edges": {
+      "POS_X": {
+        "status": "NOT_ATTEMPTED",
+        "valid": false,
+        "detection": null,
+        "stop_pose": null,
+        "stop_pose_valid": false,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": null
+      },
+      "NEG_X": {
+        "status": "NOT_ATTEMPTED",
+        "valid": false,
+        "detection": null,
+        "stop_pose": null,
+        "stop_pose_valid": false,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": null
+      },
+      "POS_Y": {
+        "status": "NOT_ATTEMPTED",
+        "valid": false,
+        "detection": null,
+        "stop_pose": null,
+        "stop_pose_valid": false,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": null
+      },
+      "NEG_Y": {
+        "status": "NOT_ATTEMPTED",
+        "valid": false,
+        "detection": null,
+        "stop_pose": null,
+        "stop_pose_valid": false,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": null
+      }
+    }
+  },
+  "interruptions": [],
+  "home_return": {
+    "requested": false,
+    "request_count": 0,
+    "requested_at": null,
+    "interruptions_at_request": 0,
+    "origin_phase": null,
+    "completed": null,
+    "completed_at": null,
+    "final_pose": null,
+    "final_pose_valid": false
+  },
+  "failure": {
+    "reason_code": 300,
+    "detail": "max_descend_m 0.01 안에 접촉이 없다",
+    "phase": "TOP_SEARCH",
+    "recorded_at": {
+      "sec": 1789964959,
+      "nanosec": 535964576
+    }
+  },
+  "result_saved": false,
+  "result_success": null
+}

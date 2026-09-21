@@ -1,0 +1,283 @@
+Waiting for an action server to become available...
+Sending goal:
+     request_id: t19b-A3-nocontact
+use_override: true
+config_override:
+  contact_threshold_n: 0.0
+  contact_threshold_set: false
+  edge_drop_m: 0.0
+  edge_drop_set: false
+  debounce_n: 0
+  debounce_set: false
+  over_force_n: 0.0
+  over_force_set: false
+  descend_speed_mps: 0.0
+  descend_speed_set: false
+  slide_speed_mps: 0.0
+  slide_speed_set: false
+  max_descend_m: 0.01
+  max_descend_set: true
+  max_slide_m: 0.0
+  max_slide_set: false
+  motion_timeout_s: 0.0
+  motion_timeout_set: false
+  lift_height_m: 0.0
+  lift_height_set: false
+  target_force_n: 0.0
+  target_force_set: false
+  drop_limit_m: 0.0
+  drop_limit_set: false
+
+Goal accepted with ID: dc70f731d6124d798159cfd4a04eca35
+
+Result:
+    scan_id: 20260921-132913-3267
+success: false
+reason_code: 300
+detail: max_descend_m 0.01 안에 접촉이 없다
+result:
+  scan_id: 20260921-132913-3267
+  stamp:
+    sec: 1789964959
+    nanosec: 538913992
+  success: false
+  reason_code: 300
+  detail: max_descend_m 0.01 안에 접촉이 없다
+  frame_id: workpiece_fixture
+  z_top: .nan
+  z_top_valid: false
+  x_pos: .nan
+  x_pos_valid: false
+  x_neg: .nan
+  x_neg_valid: false
+  y_pos: .nan
+  y_pos_valid: false
+  y_neg: .nan
+  y_neg_valid: false
+  width: .nan
+  length: .nan
+  height: .nan
+  dims_valid: false
+  support_z: 0.0
+  support_z_valid: true
+  vertices:
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  - x: .nan
+    y: .nan
+    z: .nan
+  box_valid: false
+  edges:
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  path_candidates:
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  - start:
+      x: .nan
+      y: .nan
+      z: .nan
+    end:
+      x: .nan
+      y: .nan
+      z: .nan
+    length: .nan
+    valid: false
+  config:
+    contact_threshold_n: 3.0
+    contact_threshold_set: true
+    edge_drop_m: 0.0005
+    edge_drop_set: true
+    debounce_n: 3
+    debounce_set: true
+    over_force_n: 30.0
+    over_force_set: true
+    descend_speed_mps: 0.005
+    descend_speed_set: true
+    slide_speed_mps: 0.01
+    slide_speed_set: true
+    max_descend_m: 0.01
+    max_descend_set: true
+    max_slide_m: 0.08
+    max_slide_set: true
+    motion_timeout_s: 30.0
+    motion_timeout_set: true
+    lift_height_m: 0.05
+    lift_height_set: true
+    target_force_n: 3.0
+    target_force_set: true
+    drop_limit_m: 0.005
+    drop_limit_set: true
+  started_at:
+    sec: 1789964953
+    nanosec: 886234093
+  finished_at:
+    sec: 1789964959
+    nanosec: 538549218
+
+Goal finished with status: ABORTED
