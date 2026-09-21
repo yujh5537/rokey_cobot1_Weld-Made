@@ -46,9 +46,12 @@ VALUES = {
     'edge_round_radius_m': 0.0,
     'edge_bias_offset_m': 0.0002,
     'result_dir': '/tmp/unused',
-    'event_wait_timeout_s': 0.2,
-    'stop_confirm_timeout_s': 0.5,
-    'server_wait_timeout_s': 0.2,
+    # 세 한도는 real.yaml 과 같은 값이다. 정상 경로에서는 응답이 바로 오므로 넉넉해도 소요 시간이 늘지 않고,
+    # 짧게 두면 부하가 걸렸을 때 정상 경로가 한도를 넘어 104(ROBOT_DISCONNECTED)로 떨어진다(이슈 #107).
+    # **한도가 지나는 것 자체를 시험하는 테스트**만 그 테스트 안에서 make_rig(...) 로 짧게 덮어쓴다.
+    'event_wait_timeout_s': 1.0,
+    'stop_confirm_timeout_s': 5.0,
+    'server_wait_timeout_s': 2.0,
 }
 SCAN_ID = '20260920-120000-0001'
 READY = Conditions(robot_connected=True, safety_latched=False)
