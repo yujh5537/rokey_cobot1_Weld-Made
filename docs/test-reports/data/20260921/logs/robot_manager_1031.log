@@ -1,0 +1,17 @@
+[INFO] [1789954312.578880297] [robot_manager]: robot_manager 시작. 샘플 50.0 Hz, 상태 10.0 Hz, 서비스 /dsr01/dsr_controller2/
+[INFO] [1789954383.093321456] [robot_manager]: goal 수락: scan=r0921 motion_id=1 op=4 dir=0 speed=0.05 max=0.0
+[INFO] [1789954384.763655114] [robot_manager]: goal 종료: reason=0 code=0 
+[INFO] [1789954478.006503774] [robot_manager]: goal 수락: scan=r0921 motion_id=1 op=4 dir=0 speed=0.05 max=0.0
+[INFO] [1789954479.011469755] [robot_manager]: goal 종료: reason=0 code=0 
+[INFO] [1789954486.924568585] [robot_manager]: goal 수락: scan=r0921 motion_id=2 op=2 dir=0 speed=0.003 max=0.1
+[INFO] [1789954520.717512390] [robot_manager]: goal 종료: reason=3 code=300 최대 거리까지 접촉이 없었다
+[INFO] [1789954525.944913708] [robot_manager]: goal 수락: scan=r0921 motion_id=3 op=4 dir=0 speed=0.05 max=0.0
+[INFO] [1789954527.730239846] [robot_manager]: goal 종료: reason=0 code=0 
+[INFO] [1789954533.397575160] [robot_manager]: goal 수락: scan=r0921 motion_id=4 op=2 dir=0 speed=0.003 max=0.111
+[INFO] [1789954570.482294793] [robot_manager]: 정지: 과대 외력
+[INFO] [1789954570.769087259] [robot_manager]: goal 종료: reason=7 code=400 과대 외력 16.17 N
+[INFO] [1789954607.318978522] [robot_manager]: goal 수락: scan=r0921 motion_id=5 op=3 dir=1 speed=0.005 max=0.06
+[INFO] [1789954607.320790973] [robot_manager]: SLIDE 시작: DR_FC_MOD_REL 기준선 Fz=9.83 N (|F|=10.30 N). 목표 3.00 N 은 여기에 더해진다
+[INFO] [1789954620.056608738] [robot_manager]: goal 종료: reason=3 code=301 최대 거리까지 접촉 소실이 없었다
+[INFO] [1789954633.909161956] [robot_manager]: goal 수락: scan=r0921 motion_id=6 op=4 dir=0 speed=0.05 max=0.0
+[INFO] [1789954635.554285031] [robot_manager]: goal 종료: reason=0 code=0 

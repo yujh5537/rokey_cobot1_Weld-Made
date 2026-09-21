@@ -1,0 +1,14 @@
+[INFO] [1789954311.815445201] [contact_detector]: source=robot_force contact_threshold_n=3.0 edge_drop_m=0.0005 debounce_n=3 over_force_n=30.0 over_force_debounce_n=1 edge_arm_force_n=1.5 edge_trend_window_s=0.5 edge_trend_min_samples=10 stale_age_ms=100 tare_duration_s=1.5 tare_min_samples=30 tare_max_std_n=0.3 tare_max_force_n=6.0
+[WARN] [1789954375.482333048] [contact_detector]: 샘플 간격 201 ms > stale_age_ms
+[WARN] [1789954443.137819198] [contact_detector]: 샘플 간격 356 ms > stale_age_ms
+[WARN] [1789954478.157381915] [contact_detector]: 샘플 간격 160 ms > stale_age_ms
+[WARN] [1789954570.598563690] [contact_detector]: 샘플 간격 121 ms > stale_age_ms
+[WARN] [1789954607.071863554] [contact_detector]: 샘플 간격 353 ms > stale_age_ms
+[WARN] [1789954607.321365032] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954609.321440866] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954611.341122266] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954613.357552781] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954615.357678617] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954617.357728005] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954619.358141385] [contact_detector]: SLIDE 인데 기준값 F0 가 없다(tare 전). EDGE 를 판정하지 않는다
+[WARN] [1789954620.057177811] [contact_detector]: 샘플 간격 182 ms > stale_age_ms

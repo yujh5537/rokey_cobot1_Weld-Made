@@ -34,14 +34,14 @@ TOOL_NAME = 'rg2_probe'
 TOOL_WEIGHT_KG = 1.3
 TOOL_COG_MM = [0.0, 31.08, 29.84]
 TCP_NAME = 'rg2_probe_tip'
-TCP_POS = [-1.30, 3.71, 248.52, 0.0, 0.0, 0.0]  # 2026-09-20 잠정. 과압으로 탐침이 1.47 mm
-# 짧아진 상태(구 중심 z 248.29 + 팁 반지름 0.225). z만 확인, x·y 미확인.
-# 밀림이 진행 중일 수 있어 다음 세션 첫 항목이 밀림 확인이다. T03-follow-up_20260920.md 7절
-# 탐침을 새로 물리거나 바꾸면 이 값을 되돌리고 피벗 보정을 다시 한다 (원래 값 249.99)
+TCP_POS = [-1.30, 3.71, 252.12, 0.0, 0.0, 0.0]  # 2026-09-21 탐침 교체 후 z 확정(units-frames.md v0.1.11).
+# z 는 작업대 기준점(525.19, -172.09) 힘 접촉으로 맞췄다(기준값 100.503, 재확인 100.519).
+# x · y 는 옛 탐침(2026-09-19 피벗) 값을 임시로 쓴다. 새 탐침은 180° 회전으로 확인 예정. z 이력: 249.99(9/19) -> 248.52(9/20 밀림) -> 252.12(9/21 교체)
+# 탐침을 바꾸면 units-frames.md '탐침 상태 전제조건'의 교체 절차로 z 를 다시 구하고 이 값도 고친다
 
 
 def parse_args(argv):
-    """TCP 를 바꿔서 등록할 때만 인자를 쓴다. 기본값은 T02 피벗 보정값이다."""
+    """TCP 를 바꿔서 등록할 때만 인자를 쓴다. 기본값은 units-frames.md 의 현재 TCP 다."""
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument('--tcp-z', type=float, help='TCP z [mm]. 탐침이 밀리거나 바뀌었을 때만 쓴다')
     p.add_argument('--tcp-x', type=float, help='TCP x [mm]')
