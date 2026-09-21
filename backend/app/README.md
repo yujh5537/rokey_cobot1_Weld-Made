@@ -140,7 +140,7 @@ Web → ROS:
 
 Main PC의 mqtt_bridge는 Web PC Broker를 사용했다.
 
-    broker_host = 172.24.0.51
+    broker_host = <Web PC 주소>
     broker_port = 1883
 
 ### 실제 검증 결과
@@ -173,9 +173,14 @@ Web PC Broker를 지정한 mqtt_bridge를 실행하면 동일 노드가 두 개 
 현재 Stop 검증에서는 `/scan/stop`이 정상 접수되고 Action cancel을 통해
 실제 로봇 동작이 중지되어 `STOPPED`까지 전이했다.
 
-이때 ACK detail에 `/robot/stop 서버가 없다` 경고가 표시될 수 있다.
-이는 별도의 직접 `/robot/stop` 경로가 없다는 의미이며,
-이번 T27 검증에서는 Action cancel 경로를 통해 Stop 자체는 정상 완료됐다.
+이때 ACK detail에 `/robot/stop 서버가 없다`가 표시됐다. 계약상 `/robot/stop`은
+robot_manager가 제공하고, scan_manager는 중지 시 `/robot/stop` 호출과 goal cancel을
+함께 한다(ros-interfaces.md 2장·4.4절). 이번 검증은 **goal cancel 경로 하나로만**
+정지했다.
+
+현재 main의 robot_manager에는 `/robot/stop` 서버가 없다(T14, 진행 중 PR 있음).
+safety_monitor의 웹 비경유 정지도 이 서비스를 쓰므로, **시연 전에 반드시 들어가야 한다.**
+해당 PR 머지 후 중지 경로를 다시 확인한다.
 
 ## T28 PostgreSQL 측정·이벤트 저장
 
