@@ -4,7 +4,7 @@ React + Three.js 기반 접촉 탐색 시스템 Web UI.
 
 ## 현재 구현 범위
 
-T29 기준으로 다음 기능을 구현한다.
+T29와 T36 기준으로 다음 기능을 구현한다.
 
 ### 실시간 상태 표시
 
@@ -15,6 +15,7 @@ FastAPI WebSocket `/ws`를 통해 MQTT 데이터를 수신한다.
 - `scan/state`
 - `robot/sample`
 - `contact/event`
+- `scan/result`
 - `scan/log`
 - `command/status`
 
@@ -135,20 +136,97 @@ Three.js를 사용해 다음 정보를 표시한다.
 - 현재 TCP 팁 위치
 - TCP 이동 궤적
 - 접촉점
+- `scan/result.edges` 일반 모서리
+- `scan/result.path_candidates` 외곽 엣지·경로 후보
 
 표시 구분:
 
 - 빨간 점: 현재 TCP 팁
 - 파란 선: TCP 이동 궤적
 - 노란 점: 접촉점
+- 회색 선: 스캔 결과의 일반 모서리
+- 초록 선: 외곽 엣지·경로 후보
 
 `robot/sample`과 `contact/event`의 좌표는 `base_link` 기준이며 웹에서는 mm 단위다.
+
+`scan/result`의 `edges`와 `path_candidates`는 `workpiece_fixture` 기준이며,
+화면에 `frame_id`를 함께 표시해 실시간 `base_link` 좌표와 구분한다.
 
 현재 3D 화면은 목업 단계이므로 화면 표시를 위해 다음 배율을 사용한다.
 
 ```text
 100 mm = Three.js 1 unit
 ```
+
+---
+
+## T36 외곽 엣지·경로 후보 표시
+
+`scan/result`를 WebSocket으로 수신해 최종 형상 결과를 화면에 표시한다.
+
+데이터 흐름:
+
+```text
+scan/result
+  ├─ edges
+  │   └─ Three.js 일반 모서리
+  │
+  └─ path_candidates
+      ├─ Three.js 강조 경로
+      └─ 좌표·길이 표
+```
+
+경로 후보 표에는 각 선분의 다음 정보를 mm 단위로 표시한다.
+
+- 시작점 X/Y/Z
+- 끝점 X/Y/Z
+- 길이
+
+`scan/result.success=true`인 경우에만 유효한 형상 데이터를 표시한다.
+
+3D 표시에서는 `valid=true`인 `edges`와 `path_candidates`만 렌더링한다.
+
+홈 복귀와 재시작 진행 상태는 기존 `scan/state`의 phase 표시를 사용한다.
+
+```text
+HOMING   → 홈 복귀 진행
+RESUMING → 재시작 진행
+```
+
+### 정적 검증
+
+Main PC에서 다음 검증을 수행했다.
+
+```bash
+npm run lint
+npm run build
+git diff --check
+```
+
+검증 결과:
+
+```text
+npm run lint     → 통과
+npm run build    → 통과
+git diff --check → 통과
+```
+
+Vite production build는 정상 완료됐으며,
+Three.js가 포함된 bundle에 대해 500 kB 초과 경고만 발생했다.
+
+### 통합 검증 상태
+
+Web PC에서 수행할 다음 통합 검증은 아직 완료하지 않았다.
+
+```text
+Mock MQTT scan/result
+  → Mosquitto
+  → FastAPI
+  → WebSocket
+  → React / Three.js
+```
+
+통합 검증 후 실제 표시 결과를 이 문서에 추가한다.
 
 ---
 

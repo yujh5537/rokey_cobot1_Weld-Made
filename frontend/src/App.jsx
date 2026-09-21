@@ -152,6 +152,12 @@ function App() {
   // Three.js 접촉점들을 담는 Group
   const contactGroupRef = useRef(null)
 
+  // Three.js 스캔 결과의 일반 모서리를 담는 Group
+  const edgeGroupRef = useRef(null)
+
+  // Three.js 외곽 엣지·경로 후보를 담는 Group
+  const pathCandidateGroupRef = useRef(null)
+
   // 화면에 표시할 현재 상태
   const [phase, setPhase] = useState('IDLE')
   const [direction, setDirection] = useState('-')
@@ -182,6 +188,9 @@ function App() {
 
   // contact/event로 받은 접촉점 목록
   const [contactPoints, setContactPoints] = useState([])
+
+  // scan/result로 받은 최종 형상 결과
+  const [scanResult, setScanResult] = useState(null)
 
   // 시간순 로그
   const [logs, setLogs] = useState([])
@@ -478,6 +487,18 @@ function App() {
           )
         }
 
+        // scan/result
+        if (topic === 'scan/result') {
+          setScanResult(payload)
+
+          addLog(
+            payload.success === true
+              ? '스캔 형상 결과 수신'
+              : `스캔 결과 실패: ${payload.reason ?? 'UNKNOWN'}`,
+            payload.stamp_ms
+          )
+        }
+
         // command/status
         if (topic === 'command/status') {
           setCommandStatus(
@@ -676,7 +697,21 @@ function App() {
 
     contactGroupRef.current = contactGroup
 
-    // 11. 실시간 렌더링
+    // 11. 스캔 결과의 일반 모서리를 담을 Group
+    const edgeGroup = new THREE.Group()
+
+    scene.add(edgeGroup)
+
+    edgeGroupRef.current = edgeGroup
+
+    // 12. 외곽 엣지·경로 후보를 담을 Group
+    const pathCandidateGroup = new THREE.Group()
+
+    scene.add(pathCandidateGroup)
+
+    pathCandidateGroupRef.current = pathCandidateGroup
+
+    // 13. 실시간 렌더링
     let animationFrameId
 
     function animate() {
@@ -699,6 +734,8 @@ function App() {
       tipMeshRef.current = null
       trajectoryLineRef.current = null
       contactGroupRef.current = null
+      pathCandidateGroupRef.current = null
+      edgeGroupRef.current = null
 
       renderer.dispose()
     }
@@ -813,6 +850,173 @@ function App() {
 
   }, [contactPoints])
 
+  // =========================
+  // 스캔 결과 일반 모서리 3D 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!edgeGroupRef.current) {
+      return
+    }
+
+    const group =
+      edgeGroupRef.current
+
+    // 이전 scan/result에서 그린 모서리를 정리한다.
+    group.children.forEach((child) => {
+      child.geometry?.dispose()
+      child.material?.dispose()
+    })
+
+    group.clear()
+
+    // 성공한 scan/result와 edges 배열이 있을 때만 그린다.
+    if (
+      scanResult?.success !== true ||
+      !Array.isArray(scanResult.edges)
+    ) {
+      return
+    }
+
+    const DISPLAY_SCALE = 0.01
+
+    scanResult.edges.forEach((edge) => {
+      if (
+        edge?.valid !== true ||
+        !edge.start ||
+        !edge.end
+      ) {
+        return
+      }
+
+      const start =
+        new THREE.Vector3(
+          edge.start.x_mm *
+            DISPLAY_SCALE,
+          edge.start.z_mm *
+            DISPLAY_SCALE,
+          edge.start.y_mm *
+            DISPLAY_SCALE
+        )
+
+      const end =
+        new THREE.Vector3(
+          edge.end.x_mm *
+            DISPLAY_SCALE,
+          edge.end.z_mm *
+            DISPLAY_SCALE,
+          edge.end.y_mm *
+            DISPLAY_SCALE
+        )
+
+      const geometry =
+        new THREE.BufferGeometry()
+          .setFromPoints([
+            start,
+            end,
+          ])
+
+      const material =
+        new THREE.LineBasicMaterial({
+          color: 0x666666,
+        })
+
+      const line =
+        new THREE.Line(
+          geometry,
+          material
+        )
+
+      group.add(line)
+    })
+  }, [scanResult])
+
+  // =========================
+  // 외곽 엣지·경로 후보 3D 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!pathCandidateGroupRef.current) {
+      return
+    }
+
+    const group =
+      pathCandidateGroupRef.current
+
+    // 이전 scan/result에서 그린 선의
+    // geometry와 material을 먼저 정리한다.
+    group.children.forEach((child) => {
+      child.geometry?.dispose()
+      child.material?.dispose()
+    })
+
+    group.clear()
+
+    // 정상적인 스캔 결과가 아니면
+    // 그릴 경로 후보가 없다.
+    if (
+      scanResult?.success !== true ||
+      !Array.isArray(
+        scanResult.path_candidates
+      )
+    ) {
+      return
+    }
+
+    const DISPLAY_SCALE = 0.01
+
+    scanResult.path_candidates.forEach(
+      (candidate) => {
+        if (
+          candidate?.valid !== true ||
+          !candidate.start ||
+          !candidate.end
+        ) {
+          return
+        }
+
+        const start =
+          new THREE.Vector3(
+            candidate.start.x_mm *
+              DISPLAY_SCALE,
+            candidate.start.z_mm *
+              DISPLAY_SCALE,
+            candidate.start.y_mm *
+              DISPLAY_SCALE
+          )
+
+        const end =
+          new THREE.Vector3(
+            candidate.end.x_mm *
+              DISPLAY_SCALE,
+            candidate.end.z_mm *
+              DISPLAY_SCALE,
+            candidate.end.y_mm *
+              DISPLAY_SCALE
+          )
+
+        const geometry =
+          new THREE.BufferGeometry()
+            .setFromPoints([
+              start,
+              end,
+            ])
+
+        const material =
+          new THREE.LineBasicMaterial({
+            color: 0x00ff66,
+          })
+
+        const line =
+          new THREE.Line(
+            geometry,
+            material
+          )
+
+        group.add(line)
+      }
+    )
+  }, [scanResult])
 
   return (
     <main>
@@ -910,6 +1114,112 @@ function App() {
             팁 위치: 아직 수신되지 않음
           </p>
         )}
+
+      </section>
+
+      {/* 외곽 엣지·경로 후보 */}
+      <section>
+
+        <h2>외곽 엣지·경로 후보</h2>
+
+        {scanResult && (
+          <p>
+            결과 좌표 프레임:{' '}
+            {scanResult.frame_id ?? '-'}
+          </p>
+        )}
+
+        {scanResult &&
+          scanResult.success !== true && (
+            <p>
+              경로 후보를 생성하지 못했습니다.
+              {' '}
+              {scanResult.reason ?? 'UNKNOWN'}
+            </p>
+          )}
+
+        {scanResult?.success === true &&
+          !scanResult.path_candidates && (
+            <p>
+              경로 후보 데이터가 없습니다.
+            </p>
+          )}
+
+        {scanResult?.success === true &&
+          Array.isArray(
+            scanResult.path_candidates
+          ) && (
+            <table>
+
+              <thead>
+                <tr>
+                  <th>번호</th>
+                  <th>시작 X</th>
+                  <th>시작 Y</th>
+                  <th>시작 Z</th>
+                  <th>끝 X</th>
+                  <th>끝 Y</th>
+                  <th>끝 Z</th>
+                  <th>길이</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {scanResult.path_candidates.map(
+                  (candidate, index) => (
+                    <tr key={index}>
+                      <td>
+                        {index + 1}
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.start?.x_mm
+                        )} mm
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.start?.y_mm
+                        )} mm
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.start?.z_mm
+                        )} mm
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.end?.x_mm
+                        )} mm
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.end?.y_mm
+                        )} mm
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.end?.z_mm
+                        )} mm
+                      </td>
+
+                      <td>
+                        {formatNumber(
+                          candidate.length_mm
+                        )} mm
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+
+            </table>
+          )}
 
       </section>
 
