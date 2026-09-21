@@ -103,7 +103,7 @@ wait
 ros2 action send_goal $G $T "{scan_id: 'pm', motion_id: 5, operation: 1, frame_id: 'base_link', speed: 0.01, target: {position: {x: 0.52519, y: -0.17209, z: 0.28784}, $Q}}"
 ```
 - 30 mm 를 3 mm/s 로 약 10 s. **main 코드**에서는 손 tare(1.5 s)가 접촉 전에 끝난다. 판정이 실패해도 `max_distance` 0.031 이라 작업대 아래 0.5 mm 에서 멈춘다
-- **#127(하강 중 자동 영점) 코드로 할 때는 이 문장이 틀린다.** 자동 영점은 출발 6 s 뒤부터 모으고, 그동안(보통 7.5 s, 최악 10.5 s = 31.5 mm)은 CONTACT 를 올린 임계(6 N)로 본다. 작업대까지 29.5 mm 라 최악이면 6 N 판정(더 눌린 좌표)이 된다. 손 tare 는 필요 없다. 이 점검은 main 코드로 하거나, 출발 높이를 더 올린다(z 0.150 이면 49.5 mm)
+- **#127 코드로 할 때는 손 tare 가 필요 없다.** 하강 F0 는 최근 1 s 평균(이동 기준)이고, 출발 뒤 1 s(3 mm)만 올린 임계(6 N)로 본다. 작업대까지 29.5 mm 라 원래 임계(3 N)로 잰다
 - **판정 좌표**(`/contact/event` 의 `pose.position.z`)를 쓴다. 정지 좌표(Result.pose)는 판정 뒤 눌린 만큼 낮다(작업대 0.29 mm)
 
 | 판정 z [mm] | 기준값 | 차 | 허용치 | 판정 |
