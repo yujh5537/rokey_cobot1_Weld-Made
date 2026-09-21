@@ -16,3 +16,5 @@ docs/            BRD, 아키텍처, 계약, 결정 기록, 환경, 시험 결과
 ```
 
 `ws_dsr/`(두산·RG2 드라이버)와 `DartPlatform/`은 이 레포에 없다. `docs/env/`를 따라 각자 구축한다.
+
+웹 백엔드 역할 분담과 Spring Boot API는 [`backend/spring/README.md`](backend/spring/README.md)를 본다.
