@@ -69,7 +69,9 @@ def main(argv=None):
     (dx, dy), residual, spin, tilt = solve_xy(pose_a, pose_b)
     print(f'툴 z축 회전 {spin:+.1f}°, 축 기울기 차 {tilt:.2f}°')
     if abs(abs(spin) - 180.0) > 20.0:
-        print('  경고: 180° 에서 20° 넘게 벗어났다. 회전각이 작으면 추정이 불안정하다')
+        # 회전각이 작으면 (R1 - R2) 가 0 에 가까워 보정량이 발산한다(9/21: J6 을 안 돌린 채 찍어 dx -391 mm 가 나왔다).
+        # 후보를 내지 않는다. 잘못된 값을 등록하는 것을 막는다
+        sys.exit(f'실패: 툴 z축 회전이 {spin:+.1f}° 다. J6 을 180° 돌린 뒤 xy_180 을 다시 찍는다(180° 에서 20° 안이어야 한다)')
     if tilt > 1.0:
         print('  경고: 툴 z축이 두 자세에서 1° 넘게 다르다. J6 만 돌렸는지 확인한다')
     print(f'z 방향 잔차 {residual:.2f} mm (1 mm 를 넘으면 높이가 바뀌었거나 표시를 잘못 맞춘 것이다)')
