@@ -18,13 +18,13 @@ test('URDF fixed-axis pitch/yaw maps local X to base Z', () => {
 })
 
 // Independent Rz(yaw) Ry(pitch) Rx(roll) matrix FK from upstream.
-// Measured RG2 probe-grip angle gives gripper end z=0.2070176171 m;
-// the physical probe extends 13 mm from that end, so the visual probe tip is
-// flange [0, 0, 0.2200176171] m, then (x,z,-y) * 10.
+// Pinned RG2 visual mesh at the measured probe-grip angle has jaw end
+// z=0.2334099757 m. The physical probe extends 13 mm outside that visible end,
+// so the visual probe tip is RG2 local z=0.2464099757 m.
 for (const [q, expected] of [
-  [[0, 0, 0, 0, 0, 0], [0.0014444522012173227, 12.545175837238018, -0.0638327646451112]],
-  [[-0.3704, 0.2164, 1.5402, -0.0007, 1.3843, -0.2655], [4.216537885824838, 1.2684007340839023, 1.574866982918841]],
-  [[0.4, -0.6, 0.8, 0.3, -0.2, 0.1], [-1.3825211359226715, 11.747798159923079, 0.7324330952610463]],
+  [[0, 0, 0, 0, 0, 0], [0.0014982063613451675, 12.80909941809073, -0.06383275369571406]],
+  [[-0.3704, 0.2164, 1.5402, -0.0007, 1.3843, -0.2655], [4.216553471999683, 1.0044773375857998, 1.575183143645359]],
+  [[0.4, -0.6, 0.8, 0.3, -0.2, 0.1], [-1.37432660135036, 12.011256016611105, 0.7457922408970368]],
 ]) {
   test(`probe follows six-joint FK: ${q}`, () => {
     const model = buildM0609Model({ loadVisuals: false })
