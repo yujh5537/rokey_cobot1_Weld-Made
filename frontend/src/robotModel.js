@@ -25,6 +25,11 @@ const RG2_PROBE_GRIP_JOINTS = {
 
 const PROBE_EXTENSION_FROM_GRIPPER_M = 0.013
 
+// pinned RG2 visual mesh를 실기 탐침 파지각(0.721396 rad)으로 놓았을 때
+// 두 inner_finger mesh의 최외곽 끝면 z. 탐침은 이 면 밖에서 시작해야 한다.
+// 이전 controller kinematic height(약 207 mm)를 쓰면 visual jaw 안쪽에서 시작해 보였다.
+const RG2_PROBE_GRIPPER_END_Z_M = 0.23340997572974415
+
 export function setRosOrigin(
   object,
   xyz,
@@ -301,18 +306,10 @@ function buildRg2Model(
     }
   )
 
-  // upstream RG2 control geometry의 닫힌 자세에서 손가락 끝 높이를 계산한다.
-  // 사용자가 실측한 기준: 그리퍼 끝 -> 탐침 최하단 끝 = 13 mm.
-  const rg2L3 = 0.055
-  const rg2Theta3 = 0.76794
-  const rg2Dz = 0.1095 + 0.0427
+  // 실제 보이는 jaw 끝면에서 바깥쪽(+Z)으로 13 mm만 노출한다.
+  // 즉 13 mm는 탐침 전체 길이가 아니라 RG2 밖으로 돌출된 길이다.
   const gripperEndZ =
-    rg2L3 *
-      Math.sin(
-        RG2_PROBE_GRIP_MASTER_RAD +
-          rg2Theta3
-      ) +
-    rg2Dz
+    RG2_PROBE_GRIPPER_END_Z_M
 
   const probeLength =
     PROBE_EXTENSION_FROM_GRIPPER_M
