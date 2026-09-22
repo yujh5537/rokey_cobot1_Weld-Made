@@ -57,6 +57,7 @@ VALUES = {
     # 정상 경로는 이 한도 근처에도 가지 않는다. 끊김을 시험하는 테스트만 make_rig(...) 로 짧게 덮어쓴다.
     'safety_status_timeout_s': 5.0,
     'robot_status_timeout_s': 2.0,
+    'home_pose_max_age_s': 1.0,
 }
 SCAN_ID = '20260920-120000-0001'
 READY = Conditions(robot_connected=True, safety_latched=False, **FRESH_STATUS)
@@ -139,6 +140,7 @@ class FakePorts(Ports):
         self.tare_outcome = StepOutcome(True)
         self.safety_code = 0
         self.geometry_outcome = None  # StepOutcome 으로 덮어쓰면 계산하지 않고 그 값을 돌려준다
+        self.damage_reason = ''       # 비지 않으면 안전복귀가 올림도 HOME 도 하지 않는다 (계약 7.5 ②)
 
     # -- 관제자 --
 
@@ -237,6 +239,16 @@ class FakePorts(Ports):
     def wait_still(self):
         self.trace.append(('wait_still',))
         return self.still
+
+    def current_pose(self):
+        """안전복귀(계약 7.5)가 묻는 "지금 어디에 있나". None 이면 모르는 것이다."""
+        self.trace.append(('current_pose',))
+        if self.position is None:
+            return None
+        return self.position, DOWN
+
+    def damage_suspect_reason(self):
+        return self.damage_reason
 
     def tare(self):
         self.trace.append(('tare',))

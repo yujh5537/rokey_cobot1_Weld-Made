@@ -41,6 +41,10 @@ NODE_NAME = 'safety_monitor'
 PARAMS = {
     'over_force_n': Parameter.Type.DOUBLE,              # 계약 이름 (6.4). contact_detector 와 같은 값
     'drop_limit_m': Parameter.Type.DOUBLE,              # 계약 이름. robot_manager 와 같은 값
+    # 계약 이름이 **아니다**(ScanConfig 에 없어 SetConfig 전파 대상도 아니다). 2차 감시만의 여유:
+    # 실제 한계는 drop_limit_m + 이 값이다. SetConfig 가 두 노드의 drop_limit_m 을 같은 값으로
+    # 덮어써도 여유는 남는다 (계약 7.2, #53)
+    'drop_limit_margin_m': Parameter.Type.DOUBLE,
     'sample_stale_ms': Parameter.Type.INTEGER,
     'robot_status_timeout_ms': Parameter.Type.INTEGER,
     'confirm_n': Parameter.Type.INTEGER,
@@ -102,7 +106,8 @@ class SafetyMonitorNode(Node):
     @staticmethod
     def _limits(v) -> SafetyLimits:
         return SafetyLimits(v['over_force_n'], v['drop_limit_m'], v['sample_stale_ms'],
-                            v['robot_status_timeout_ms'], v['confirm_n'], v['startup_grace_s'])
+                            v['robot_status_timeout_ms'], v['confirm_n'], v['startup_grace_s'],
+                            v['drop_limit_margin_m'])
 
     def on_set_parameters(self, params):
         """SetConfig 전파(계약 2.4 P03). 래치는 파라미터로 풀 수 없다 — /safety/reset 으로만 푼다."""

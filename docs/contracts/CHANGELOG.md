@@ -2,6 +2,23 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.1.19 (2026-09-23, T06 감사 후 팀 결정 10건)
+**타입 변경 있음**(번호 · 필드 **추가**만. 기존 번호 · 필드는 그대로다): `ReasonCode` 에 `STOP_UNCONFIRMED(407)`, `RobotStatus` 에 SLIDE 누름 목표 6개(`slide_mode` · `slide_force_setpoint_n` · `slide_force_baseline_n` · `slide_force_estimate_n` · `step_press_lo_n` · `step_press_hi_n`). 영향: scan_manager(재시작 허용 목록 · 안전복귀 경로) · safety_monitor(2차 하강 제한 여유 · 최신성 500 ms) · robot_manager(1차 하강 제한 기준 z · 상태의 누름 세 값) · mqtt_bridge(`robot/status` JSON 6개) · contact_detector(문서만).
+
+입력: `docs/test-reports/safety-audit-review_20260922.md`(§7 "팀 결정이 필요한 항목" 10건)과 그 입력이 된 감사 보고서(PR #144, 아직 병합되지 않았다). 결정 전문과 근거는 `docs/decisions/0004-safety-audit-decisions.md` 에 있다.
+
+- **결정 1 · ERROR 재시작(9장 TBD 해소).** `ERROR` 로 끝난 작업은 **허용 목록**(`SAMPLE_STALE 403` · `ROBOT_STATUS_LOST 404` · `STOP_UNCONFIRMED 407`)일 때만 `/safety/reset` 뒤 `/scan/resume` 을 받는다. `OVER_FORCE` · `DROP_LIMIT` · 알 수 없는 오류 · **목록에 없는 새 사유**는 `NOT_SUPPORTED` 로 거절하고 새 START 만 가능하다. 자동 재개는 없다. 기존 관문(래치 · 상태 최신성 · 연결)은 그대로 본다. "정지 미확인"이 `ROBOT_STATUS_LOST(404)` 에 섞여 있던 것을 새 코드 **407** 로 갈랐다 — 허용 목록을 사유로 판단하려면 사유가 갈려 있어야 한다
+- **결정 2 · 하강 제한 여유(7.2, #53).** `drop_limit_m` 은 두 노드가 **같은 값**(쌍 검사 유지). safety_monitor 에만 `drop_limit_margin_m`(계약 이름 아님, `ScanConfig` 에 없음)을 두어 2차 한계를 `drop_limit_m + margin` 으로 한다. real · sim 모두 1차 5 mm · 2차 9 mm. `SetConfig` 가 두 노드의 `drop_limit_m` 을 같은 값으로 덮어도 여유는 남는다. `confirm_n` 으로 늦추지 않는다
+  - **선행 조건이었던 기준 z 통일을 같이 했다(C-9).** robot_manager 의 1차 기준 z 를 "실행 직전의 마지막 위치"에서 **"자기가 `OP_SLIDE` 로 발행한 첫 유효 샘플의 z"** 로 바꿨다. safety_monitor 가 잡는 것과 **같은 메시지의 같은 값**이다. 순응을 켜면 z 가 약 0.7 mm 올라와 두 기준이 어긋나 있었다
+- **결정 3 · 최신성(6.3 예외).** **이 항목만 시연 전에 v0.1.16(#168)로 먼저 나갔다.** real 의 `sample_stale_ms` 300 → **500**. #130 에서 316~365 ms 공백이 반복돼 goal 의 약 40 %가 `SAMPLE_STALE` 로 멈췄다. 500 이면 기록된 공백 14개 중 687 ms 하나만 걸린다. **700 은 지금 올리지 않는다**(데이터가 쌓이면 검토만). #130 원인이 풀리면 300 으로 되돌린다. "한계보다 원인이 먼저"라는 지침의 예외임을 6.3 에 적었다
+- **결정 4 · force/REL 표시.** `force` 모드의 누름은 설정 증분(`slide_target_force_n`, `DR_FC_MOD_REL`) · SLIDE 시작 기준 Fz · 추정 최종 힘(둘의 합) **세 값이 다른 것**이다. 자유 문자열에 섞지 않고 `RobotStatus` 필드로 갈라 싣는다. 추정값은 이름으로 추정임을 밝힌다(`slide_force_estimate_n`). **`step` 모드에서는 세 값이 NaN** 이고 목표 누름 띠(`step_press_lo_n` · `step_press_hi_n`)를 싣는다. 실기 기본은 `step`, sim 은 `force`
+- **결정 5 · EDGE.** PR #160(v0.1.15)의 스텝 모드 방식을 승인한다. 이 버전에서 로직을 바꾸지 않았다
+- **결정 6 · 중지 KPI(7.1).** **물리 정지 1 s 이내**(BRD 9장 그대로)와 **STOPPED 표시 3 s 이내**(신설)를 나눴다. 물리 정지에 3 s 를 허용하는 표현은 두지 않는다. 물리 정지 시간은 bag · 실기로만 판정한다
+- **결정 7 · 안전복귀(7.5 신설, 9장 TBD 해소).** 위치 확인 → 손상 의심 확인 → 수직 올림 → **도착 확인** → `OP_HOME`. 위치 불명 · 올림 실패 · 손상 의심(`OVER_FORCE` · `DROP_LIMIT` · `OUT_OF_WORKSPACE`)이면 HOME 을 보내지 않고 사람이 펜던트로 조그한다. #130 에서 올림이 실패했는데 HOME 이 나간 사례가 2회 있었다. 올림도 래치를 보지 않는다
+- **결정 8 · 과대 외력.** 전역 `over_force_n` **30 N 유지**. 스텝 모드의 `step_max_force_n` 12 N 은 **다른 것**(알고리즘이 스스로 들고 중단하는 로컬 보호)이며 그대로 둔다. 7.2 에 둘의 차이를 적고, real.yaml 의 "over_force_n(15)" 주석을 30 으로 바로잡았다
+- **결정 9 · 디바운스(3.3).** `debounce_n = 3` **현행 유지**. 다만 `get_tool_force` 가 약 10 Hz 로만 갱신되므로 "연속 샘플 3회"가 독립 측정 3회가 아니라는 사실을 적었다. "값 변화 3회"로 바꾸지 않는다(오프라인 계산에서 판정 순간 참 힘 중앙 34.8 N). 스텝 모드의 "멈춘 뒤 새 샘플만 평균 · `debounce_count = 1`" 은 별개라고 명시했다
+- **결정 10 · #141 기준점.** 작업환경 물리 재구성으로 해결. **수치는 바꾸지 않았다** — 확정된 새 실측값이 레포 · 이슈 · PR 어디에도 없어 추측하지 않는다
+
 ## v0.1.18 (2026-09-23, #147 · #142 새 작업대 · 새 홈 · 좌표 잠정)
 **타입 변경 없음.** 2026-09-22 작업대 교체(눌림 발견) 뒤 학민 실측값으로 `units-frames.md` 와 real 값을 바꾼다. **좌표 계열은 잠정**(z=0 1 점, 테이프 두께 · 부재 캘리퍼 미확정)이고, 확정되면 `support_z_m` · z=0 두 줄만 후속으로 고친다.
 - 홈 관절각 **[-21.19, 15.24, 52.97, -0.08, 111.80, -15.14] deg**(J6 을 ±180° 안으로). 옛 홈과 그 팁 좌표 · 높이는 무효. 홈은 좌표 기준이 아니다
@@ -11,7 +28,7 @@
 - `support_z_m` 0 → 0.002(테이프 두께 잠정). real `detect_latency_s` 0.020 → 0.0(스텝 모드는 멈춘 뒤 EDGE 확정, v0.1.15 7.2 후속)
 - 세션 시작 점검 2 에 **START 전 툴 · TCP 등록 확인 두 줄**을 넣었다(2026-09-23 등록 누락 비상정지 2 회)
 - 배치 원칙 1 · 2 · 6 은 바뀌었다는 표시만 하고 #147 에서 다시 쓴다
-영향: robot_manager(`home_joint_deg`) · scan_manager(좌표 · 편향 보정, real 값만). 번호: #161 이 v0.1.17 을 쓴다.
+영향: robot_manager(`home_joint_deg`) · scan_manager(좌표 · 편향 보정, real 값만). 번호: #161 은 v0.1.19 다(이 PR 뒤에 나와서 v0.1.17 을 건너뛴다).
 
 ## v0.1.16 (2026-09-23, #130 최신성 한계)
 **타입 변경 없음.** real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다(6.3절). 6.3 의 "한계를 올리기 전에 원인을 없앤다"는 원칙의 **예외**이며, 이유 · 남는 위험(687 ms 공백) · 되돌릴 조건을 6.3 과 real.yaml 주석에 같이 남겼다. 코드 기본값과 sim 값은 바꾸지 않았다(sim 은 이미 500). 영향: safety_monitor(실기 값만).

@@ -5,9 +5,11 @@ import math
 
 from mqtt_bridge.encoders import (
     encode_command_ack, encode_contact_event, encode_robot_sample,
-    encode_ros_connection, encode_ros_heartbeat, encode_scan_config,
+    encode_robot_status, encode_ros_connection, encode_ros_heartbeat, encode_scan_config,
     encode_scan_result,
 )
+
+NAN = float("nan")
 
 
 def config():
@@ -118,3 +120,49 @@ def test_config_ack_heartbeat_connection():
     assert ack["applied"]["edge_drop_mm"] == 0.5
     assert encode_ros_heartbeat(3, 11)["seq"] == 3
     assert encode_ros_connection(True, 12)["connected"] is True
+
+
+def robot_status(**changes):
+    """계약 3.2 (v0.1.16). SLIDE 누름 목표 6개를 포함한다."""
+    return {
+        "stamp": {"sec": 1, "nanosec": 0}, "connected": True, "moving": True,
+        "error": False, "error_code": 0,
+        "compliance_active": True, "force_ctrl_active": True,
+        "motion_id": 7, "operation": 3, "detail": "",
+        "slide_mode": "force", "slide_force_setpoint_n": 3.0,
+        "slide_force_baseline_n": 5.3, "slide_force_estimate_n": 8.3,
+        "step_press_lo_n": NAN, "step_press_hi_n": NAN,
+        **changes,
+    }
+
+
+def test_robot_status_carries_the_three_force_mode_values():
+    """설정 · 시작 기준 · 추정 합을 각각 싣는다. 웹이 셋을 구분할 수 있어야 한다."""
+    out = encode_robot_status(robot_status(), 1030)
+    assert out["slide_mode"] == "force"
+    assert out["slide_force_setpoint_n"] == 3.0
+    assert out["slide_force_baseline_n"] == 5.3
+    assert out["slide_force_estimate_n"] == 8.3
+    # step 전용 값은 force 모드에서 null 이다 (0 이 아니다)
+    assert out["step_press_lo_n"] is None and out["step_press_hi_n"] is None
+    assert json.dumps(out)      # NaN 이 그대로 새어 나가면 JSON 이 깨진다
+
+
+def test_robot_status_in_step_mode_has_no_rel_values():
+    """step 모드의 REL 세 값은 제어 목표가 아니다 → null. 대신 목표 누름 띠를 싣는다."""
+    out = encode_robot_status(robot_status(
+        slide_mode="step", slide_force_setpoint_n=NAN, slide_force_baseline_n=NAN,
+        slide_force_estimate_n=NAN, step_press_lo_n=3.0, step_press_hi_n=7.0), 1030)
+    assert out["slide_mode"] == "step"
+    for key in ("slide_force_setpoint_n", "slide_force_baseline_n", "slide_force_estimate_n"):
+        assert out[key] is None, key
+    assert out["step_press_lo_n"] == 3.0 and out["step_press_hi_n"] == 7.0
+
+
+def test_robot_status_unknown_baseline_is_null_not_zero():
+    """기준선을 모르면 null 이다. 0 이면 '설정값 = 실제 누름'이라는 거짓이 된다 (규칙 4)."""
+    out = encode_robot_status(robot_status(
+        slide_force_baseline_n=NAN, slide_force_estimate_n=NAN), 1030)
+    assert out["slide_force_setpoint_n"] == 3.0
+    assert out["slide_force_baseline_n"] is None
+    assert out["slide_force_estimate_n"] is None

@@ -640,6 +640,9 @@ class FailureRecord:
 
     pose 는 실패한 ExecuteMotion 의 정지 좌표(Result.pose)다. Interruption.pose 와 같은 규칙으로,
     Result 를 못 받았거나 Result.pose 가 채워지지 않았으면 None 이다. 모르는 좌표를 0 으로 채우지 않는다.
+
+    resumed_at 은 이 실패에서 재시작을 접수한 시각이다(계약 9장의 허용 목록, v0.1.16). Interruption 의
+    같은 이름과 같은 뜻이며, 같은 실패로 두 번 재시작하지 않게 막는다. None = 아직 재시작하지 않았다.
     """
 
     reason_code: int
@@ -647,6 +650,7 @@ class FailureRecord:
     phase: Phase  # 실패가 난 phase
     pose: Optional[PoseRecord] = None
     recorded_at: Optional[Stamp] = None
+    resumed_at: Optional[Stamp] = None
 
     def __post_init__(self):
         if _uint(self.reason_code, 'reason_code') == 0:
@@ -668,6 +672,7 @@ class FailureRecord:
             'pose': _dump(self.pose),
             'pose_valid': self.pose is not None,
             'recorded_at': _dump(self.recorded_at),
+            'resumed_at': _dump(self.resumed_at),
         }
 
     @classmethod
@@ -680,6 +685,9 @@ class FailureRecord:
             phase=_text(data['phase'], 'phase'),
             pose=_load(PoseRecord, data.get('pose')),
             recorded_at=_load(Stamp, data['recorded_at']),
+            # 뒤에 더한 필드다. 없으면 "재시작한 적 없음"으로 읽는다(옛 기록은 ERROR 재시작
+            # 자체가 없었다. result_store/README.md 의 "필드를 더할 때")
+            resumed_at=_load(Stamp, data.get('resumed_at')),
         )
         written = ('pose' in data, 'pose_valid' in data)
         if any(written):

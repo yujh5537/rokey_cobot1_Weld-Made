@@ -79,6 +79,20 @@ class MotionPlanner:
         x, y, z = stop_position
         return self._move_to(label, (x, y, z + self._p.lift_height_m), self._p.move_speed_mps)
 
+    def vertical_lift(self, position: Position, orientation: Orientation,
+                      label='home_lift') -> MotionRequest:
+        """안전복귀(7.5절)의 수직 올림. x · y 와 **자세를 바꾸지 않고** z 만 올린다.
+
+        lift() 와 달리 기준점 자세(origin_orientation)를 쓰지 않는다. 안전복귀는 search_origin_pose 가
+        아직 비어 있어도(TBD) 돌아야 하고, 탐침이 무언가에 닿아 있을 수 있는 자리에서 자세를 돌리면
+        그 자체가 위험하다. 그래서 지금 자세를 그대로 목표로 준다.
+        """
+        x, y, z = position
+        return MotionRequest(
+            Operation.MOVE_TO, label, speed=self._p.move_speed_mps,
+            target_position=(x, y, z + self._p.lift_height_m),
+            target_orientation=tuple(orientation), timeout_s=self._p.motion_timeout_s)
+
     def change_direction(self, stop_position: Position, first_contact_z: float):
         """7.3절: ① 올림 ② 기준 원점의 x · y 로 수평 이동 ③ 첫 접촉 z + margin 까지 저속 내림.
 
@@ -254,6 +268,18 @@ class Ports:
         """**이 호출보다 뒤에 찍힌** /robot/status 로 connected && !moving 을 확인한다."""
         raise NotImplementedError
 
+    def current_pose(self) -> Optional[Tuple[Position, Orientation]]:
+        """지금 TCP 가 어디에 어떤 자세로 있는가. **모르면 None** (계약 7.5 ①).
+
+        /robot/sample 의 마지막 유효 pose 다. 오래됐거나(home_pose_max_age_s) 유효 샘플을 한 번도
+        받지 못했으면 None 이다. 모르는 좌표를 0 으로 채우지 않는다(CLAUDE.md 규칙 4).
+        """
+        raise NotImplementedError
+
+    def damage_suspect_reason(self) -> str:
+        """지금 자동복귀를 하면 안 되는 이유(탐침 · 부재 손상 가능). 없으면 "" (계약 7.5 ②)."""
+        raise NotImplementedError
+
     def tare(self) -> StepOutcome:
         raise NotImplementedError
 
@@ -393,8 +419,11 @@ class _Runner:
 
     def _finish_stop(self, during_final_homing: bool) -> RunOutcome:
         if not self._ports.wait_still():
+            # 사유를 ROBOT_STATUS_LOST(404) 와 섞지 않는다 (계약 6.1, v0.1.16). 404 는 "상태가
+            # 안 온다"이고 이것은 "정지를 요청했는데 완료를 확인하지 못했다"다. 재시작 허용 여부를
+            # 사유로 판단하므로(계약 9장) 사유가 갈려 있어야 한다. 둘 다 허용 목록에는 있다
             return self._finish_fail(_Fail(
-                Reason.ROBOT_STATUS_LOST, '정지 완료(connected && !moving)를 확인하지 못했다'))
+                Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
         self._ports.record_stop(self._position, self._last_result, during_final_homing)
         self._ports.notify(Signal.STOP_CONFIRMED)
         return RunOutcome(OutcomeKind.STOPPED, int(Reason.STOP_REQUESTED), 'stopped')
@@ -595,14 +624,61 @@ class ResumeRunner(ScanRunner):
         return self._ports.compute_geometry()
 
 
+# 자동 안전복귀를 하지 않는 실패 사유 (계약 7.5 ②, v0.1.16).
+#
+# 여기까지 온 실패는 탐침이 무언가에 세게 닿은 뒤다. 탐침 · 부재가 상했을 수 있고, 그 상태로 관절
+# 복귀(OP_HOME)를 보내면 끌고 간다. 사람이 눈으로 보고 펜던트로 조그한다.
+# 알 수 없는 오류(ROBOT_ERROR)는 넣지 않았다 — 통신 · 드라이버 오류가 대부분이고 전부 막으면
+# 안전복귀가 사실상 사라진다. 대신 접촉이 원인인 셋만 보수적으로 본다.
+DAMAGE_SUSPECT_CODES = (
+    (Reason.OVER_FORCE, '과대 외력'),
+    (Reason.DROP_LIMIT, '하강 제한 초과'),
+    (Reason.OUT_OF_WORKSPACE, '작업영역 · 하강 한계'),
+)
+
+
+def damage_suspect_reason(failure) -> str:
+    """이 실패 뒤에 자동복귀를 막아야 하는가. 막아야 하면 사람이 읽는 사유, 아니면 ""."""
+    if failure is None:
+        return ''
+    for code, label in DAMAGE_SUSPECT_CODES:
+        if int(failure.reason_code) == int(code):
+            return (f'{label}({int(code)})로 끝났다. 탐침 · 부재가 상했을 수 있어 자동복귀하지 '
+                    f'않는다. 눈으로 확인하고 펜던트로 조그한다: {failure.detail}')
+    return ''
+
+
 def run_home(planner: MotionPlanner, ports: Ports, first_motion_id: int = 1) -> RunOutcome:
     """관제자의 안전복귀(/scan/home). HOME 이 접수된 뒤(phase=HOMING)에 부른다.
 
-    홈 복귀 경로 · 순서는 TBD(계약 7.4절)라 OP_HOME 하나만 보낸다.
+    계약 7.5절: 위치 확인 → 손상 의심 확인 → 수직 올림 → **도착 확인** → OP_HOME.
+
+    2026-09-21 실기에서 올림이 실패했는데 HOME 이 나간 사례가 2회 있었다(#130). 탐침이 부재에 닿은 채
+    관절 복귀가 나가면 탐침 · 부재가 상한다. 그래서 올림이 TARGET_REACHED 일 때만 HOME 으로 간다.
+
+    멈출 때는 사유만 남기고 **다른 명령을 자동으로 부르지 않는다**(CLAUDE.md 규칙 3).
     """
-    # 안전 래치는 안전복귀를 막지 않는다(T10 결정, scan_manager/README.md)
+    # 안전 래치는 안전복귀를 막지 않는다(T10 결정, scan_manager/README.md). 올림도 같다 —
+    # 래치 때문에 돌아오지 못하면 안 된다
     runner = _Runner(planner, ports, first_motion_id, block_on_latch=False)
     try:
+        blocked = ports.damage_suspect_reason()
+        if blocked:
+            raise _Fail(Reason.NOT_SUPPORTED, f'안전복귀 중단: {blocked}')
+        pose = ports.current_pose()
+        if pose is None:
+            raise _Fail(Reason.NOT_SUPPORTED,
+                        '안전복귀 중단: 지금 TCP 위치를 모른다(유효 샘플 없음 또는 오래됨). '
+                        '올릴 목표를 만들 수 없다 — 사람이 펜던트로 조그한다')
+        position, orientation = pose
+        lift = planner.vertical_lift(position, orientation)
+        result = runner._execute(lift)
+        if result.reason is not MotionReason.TARGET_REACHED:
+            # _execute 의 classify 가 이미 대부분을 _Fail 로 걸러 내지만, "올림이 도착했을 때만
+            # HOME" 이라는 규칙을 여기서 한 번 더 눈에 보이게 둔다. 판정이 바뀌어도 이 줄이 막는다
+            raise _Fail(Reason.ROBOT_ERROR,
+                        f'안전복귀 중단: 올림이 도착으로 끝나지 않았다'
+                        f'({getattr(result.reason, "name", result.reason)}). HOME 을 보내지 않는다')
         runner._execute(planner.home())
         runner._notify(Signal.HOMING_DONE)
     except _Stop:

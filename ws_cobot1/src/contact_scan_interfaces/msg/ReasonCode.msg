@@ -41,6 +41,7 @@ uint16 SAMPLE_STALE=403         # 샘플 최신성 위반
 uint16 ROBOT_STATUS_LOST=404    # 로봇 상태 미수신
 uint16 HB_EXPIRED=405           # 웹 heartbeat 만료
 uint16 CONDITION_ACTIVE=406     # 래치 해제 요청 시 조건이 아직 참
+uint16 STOP_UNCONFIRMED=407     # 정지를 요청했지만 완료(connected && !moving)를 확인하지 못함
 
 # 5xx 형상
 uint16 INVALID_SHAPE=500        # 폭 0 이하 · 높이 음수

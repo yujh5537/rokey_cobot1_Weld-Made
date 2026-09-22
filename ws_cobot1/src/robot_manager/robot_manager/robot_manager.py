@@ -237,6 +237,10 @@ class Motion:
         self.event = None               # 정지 사유가 된 ContactEvent
         self.stop_at_accept = None      # 수락 시점에 남아 있던 /robot/stop 요청 (OP_HOME 전용, #115)
         self.step_mode = False          # SLIDE 를 스텝 모드로 실행 중 (EDGE 는 robot_manager 가 확정한다)
+        # 첫 OP_SLIDE 샘플로 start_z 를 다시 잡았는가. 한 모션에서 한 번만 잡는다 (계약 7.2)
+        self.slide_start_latched = False
+        # force 모드에서 set_desired_force 를 부른 시점의 Fz. REL 기준이다. 모르면 None (계약 3.2)
+        self.slide_force_baseline = None
 
 
 class RobotManager(Node):
@@ -486,7 +490,38 @@ class RobotManager(Node):
             msg.wrench.torque.x = msg.wrench.torque.y = msg.wrench.torque.z = NAN
 
         msg.valid = pose_ok and force_ok
+        self.latch_slide_start_z(msg, (x, y, z) if pose_ok else None)
         self.sample_pub.publish(msg)
+
+    def latch_slide_start_z(self, msg, position):
+        """1차 하강 제한의 기준 z 를 **이 샘플**로 잡는다 (계약 7.2, v0.1.16).
+
+        safety_monitor(2차)는 `operation` 이 OP_SLIDE 로 바뀐 첫 유효 샘플의 z 를 기준으로 쓴다.
+        1차가 "실행 직전의 마지막 위치"를 쓰면 둘이 어긋난다 — 순응 제어를 켜면 z 가 약 0.7 mm
+        올라오고(2026-09-21 실기), 그 사이에 샘플이 한 번 나가느냐에 따라 값이 달라진다. 기준이
+        어긋나면 2차의 여유(drop_limit_margin_m)가 의미를 잃는다. 그래서 **같은 메시지의 같은 값**을
+        쓴다: 여기서 잡은 값이 곧 safety_monitor 가 잡을 값이다.
+
+        실행 직전에 잡아 둔 값은 지우지 않고 덮어쓴다. 첫 OP_SLIDE 샘플이 나가기 전까지는 그 값으로
+        감시한다 — 기준이 없다고 감시를 끄지 않는다(감시 없이 도는 것이 가장 나쁘다).
+        """
+        if not msg.valid or position is None or msg.operation != RobotSample.OP_SLIDE:
+            return
+        with self.motion_lock:
+            motion = self.motion
+            if motion is None or motion.slide_start_latched:
+                return
+            motion.slide_start_latched = True
+            before, motion.start_z = motion.start_z, position[2]
+        if before is None:
+            self.get_logger().info(
+                f'SLIDE 하강 제한 기준 z = {position[2]:.5f} m (sample_id={msg.sample_id}. '
+                f'2차 감시도 같은 샘플로 잡는다)')
+        elif abs(before - position[2]) > 1e-9:
+            self.get_logger().info(
+                f'SLIDE 하강 제한 기준 z 를 첫 OP_SLIDE 샘플로 맞췄다: {before:.5f} → '
+                f'{position[2]:.5f} m (차이 {1000 * (position[2] - before):+.2f} mm, '
+                f'sample_id={msg.sample_id})')
 
     # ---- 상태 -------------------------------------------------------------
     def on_status_timer(self):
@@ -511,7 +546,53 @@ class RobotManager(Node):
 
     def status_key(self):
         return (self.connected, self.moving, self.compliance_active, self.force_ctrl_active,
-                self.motion_id, self.operation, self.detail)
+                self.motion_id, self.operation, self.detail, self.slide_press_key())
+
+    def slide_press_key(self):
+        press = self.slide_press()
+        # NaN != NaN 이라 값으로 비교하면 매번 "바뀌었다"가 된다. 비교용으로만 문자열로 바꾼다
+        return (press['mode'],) + tuple(f'{press[k]!r}' for k in (
+            'setpoint_n', 'baseline_n', 'estimate_n', 'press_lo_n', 'press_hi_n'))
+
+    def slide_press(self):
+        """SLIDE 의 누름 목표 (계약 3.2, v0.1.16). 모르는 값은 0 이 아니라 NaN 이다 (규칙 4).
+
+        **세 값은 서로 다른 것이다.** `slide_target_force_n` 은 DR_FC_MOD_REL 이라 "설정한 증분"이고,
+        실제 누름은 SLIDE 가 어디서 시작하느냐에 따라 달라진다(9/22 실기 방향별 1.5~8.6 N). 그래서
+        설정 · 시작 기준 · 추정 합을 한 자리에 섞지 않고 각각 싣는다. 합은 **추정**이며 실측이 아니다 —
+        힘 제어 중의 조회 Fz 는 1 N 안팎이 나와 "실측 누름"으로 쓰면 오히려 오해를 부른다.
+
+        **step 모드에서는 세 값이 전부 NaN 이다.** 스텝 모드는 순응 · 힘 제어를 켜지 않으므로 REL 값이
+        제어 목표가 아니다. 대신 목표 누름 띠(step_follow_lo_n ~ step_follow_hi_n)를 싣는다.
+        """
+        blank = {'mode': '', 'setpoint_n': NAN, 'baseline_n': NAN, 'estimate_n': NAN,
+                 'press_lo_n': NAN, 'press_hi_n': NAN}
+        try:
+            mode = str(self.param('slide_mode'))
+        except (ParameterUninitializedException, KeyError, TypeError):
+            return blank
+        out = dict(blank, mode=mode)
+        motion = self.motion
+        sliding = (motion is not None and motion.goal.operation == RobotSample.OP_SLIDE)
+        if mode == 'step':
+            for key, name in (('press_lo_n', 'step_follow_lo_n'), ('press_hi_n', 'step_follow_hi_n')):
+                try:
+                    out[key] = float(self.param(name))
+                except (ParameterUninitializedException, KeyError, TypeError, ValueError):
+                    pass                                  # 값이 없으면 NaN 그대로 둔다
+            return out
+        if mode != 'force':
+            return out
+        try:
+            out['setpoint_n'] = float(self.param('slide_target_force_n'))
+        except (ParameterUninitializedException, KeyError, TypeError, ValueError):
+            return out
+        baseline = motion.slide_force_baseline if sliding else None
+        if baseline is None:
+            return out                                    # 기준을 모르면 합도 내지 않는다
+        out['baseline_n'] = baseline
+        out['estimate_n'] = baseline + out['setpoint_n']
+        return out
 
     def publish_status(self):
         msg = RobotStatus()
@@ -524,6 +605,13 @@ class RobotManager(Node):
         msg.force_ctrl_active = self.force_ctrl_active
         msg.motion_id = self.motion_id
         msg.operation = self.operation
+        press = self.slide_press()
+        msg.slide_mode = press['mode']
+        msg.slide_force_setpoint_n = press['setpoint_n']
+        msg.slide_force_baseline_n = press['baseline_n']
+        msg.slide_force_estimate_n = press['estimate_n']
+        msg.step_press_lo_n = press['press_lo_n']
+        msg.step_press_hi_n = press['press_hi_n']
         msg.detail = self.detail
         self.status_pub.publish(msg)
         self.last_status_key = self.status_key()
@@ -717,15 +805,22 @@ class RobotManager(Node):
         "접촉할 대상물에 근접하여 DR_FC_MOD_REL 로 힘제어를 시작"하라고 권한다(REL 유지 여부는 TBD).
         """
         baseline = self.last_force
+        setpoint = float(self.param('slide_target_force_n'))
         if baseline is None:
+            # 모르는 기준선을 0 으로 채우지 않는다. 그러면 '추정 최종 힘'이 설정값과 같아져
+            # "3 N 으로 눌렀다"는 거짓 숫자가 된다 (CLAUDE.md 규칙 4, 계약 3.2)
+            motion.slide_force_baseline = None
             self.get_logger().warning(
                 'SLIDE 시작: 직전 힘을 모른다. DR_FC_MOD_REL 기준선을 확인할 수 없다')
         else:
             fz = baseline[2]
+            motion.slide_force_baseline = fz
             self.get_logger().info(
                 f'SLIDE 시작: DR_FC_MOD_REL 기준선 Fz={fz:.2f} N '
                 f'(|F|={math.dist(baseline, (0.0, 0.0, 0.0)):.2f} N). '
-                f'목표 {float(self.param("slide_target_force_n")):.2f} N 은 여기에 더해진다')
+                f'설정 증분 {setpoint:.2f} N 은 여기에 더해진다 → '
+                f'추정 최종 누름 {fz + setpoint:.2f} N (**추정이며 실측이 아니다**)')
+        self.publish_status()                 # 세 값이 바뀌었다. 웹이 곧바로 받는다 (계약 3.2)
         # 켜는 호출을 보내기 **전에** 해제 대상으로 표시한다. call_sync 는 응답 시간 초과도 False 로
         # 돌려주는데, 그때 컨트롤러는 이미 켰을 수 있다. 성공 응답을 받은 뒤에만 표시하면 release_all 이
         # 해제를 부르지 않아 순응 · 힘 제어가 켜진 채 남는다(CLAUDE.md 규칙 2, T14). 켜지지 않았는데
@@ -740,7 +835,7 @@ class RobotManager(Node):
             return False
         motion.force_on = self.force_ctrl_active = True
         if not self.call_sync(self.srv_clients['force_on'],
-                              dsr_client.force_on_request(float(self.param('slide_target_force_n'))),
+                              dsr_client.force_on_request(setpoint),
                               'set_desired_force'):
             self.get_logger().error('set_desired_force 응답 없음 또는 거절. 켜졌을 수 있어 해제를 부른다'
                                     '(켜기 시간 초과 뒤 해제 — 해제 실패면 compliance_released=false)')

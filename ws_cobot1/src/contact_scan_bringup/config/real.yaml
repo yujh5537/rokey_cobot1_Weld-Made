@@ -73,7 +73,16 @@ contact_detector:
 safety_monitor:
   ros__parameters:
     over_force_n: 30.0               # 계약 이름. contact_detector 와 같은 값
-    drop_limit_m: 0.005              # 계약 이름. SLIDE 첫 샘플 z 기준 하강 제한. 출발값 5 mm
+    drop_limit_m: 0.005              # 계약 이름. SLIDE 첫 샘플 z 기준 하강 제한. 출발값 5 mm.
+                                     #   robot_manager 와 **같은 값**이다(쌍 검사 대상). 2차의 실제 한계는 아래 여유를 더한 값이다
+    drop_limit_margin_m: 0.004       # 계약 이름이 **아니다**(ScanConfig 에 없어 SetConfig 전파 대상이 아니다).
+                                     #   2차 감시만의 여유: 실제 한계 = drop_limit_m + 이 값 = 9 mm (계약 7.2, #53)
+                                     #   역할 구분 — 1차(robot_manager) 5 mm = 정상 동작의 제한,
+                                     #   2차(safety_monitor) 9 mm + 래치 = 1차가 막지 못했을 때의 최후 방어선.
+                                     #   값까지 같으면 잡음 한 샘플로도 2차가 먼저 걸려 1차가 정상 동작인데 래치부터 걸린다.
+                                     #   SetConfig 가 두 노드의 drop_limit_m 을 같은 값으로 덮어써도 이 여유는 남는다.
+                                     #   기준 z 는 1차와 **같다**(OP_SLIDE 첫 샘플). 늦추는 수단은 여유 하나다 — confirm_n 으로 늦추지 않는다
+                                     #   설계 출발값. 실기에서 1차가 실제로 몇 mm 에서 멈추는지 보고 조정한다
     confirm_n: 1                     # 조건을 확정하는 연속 샘플 수. 1 = 한 샘플로 즉시(안전 쪽)
     startup_grace_s: 3.0          # 기동 후 이 시간 동안은 최신성(샘플 · 상태)으로 정지 · 래치를 걸지 않는다
                                      #   근거: 2026-09-21 종단 실행에서 기동 직후 샘플이 508 ms 끊겼고,
@@ -185,7 +194,10 @@ robot_manager:
     step_release_n: 1.5              # ΔFz 가 이 아래면 접촉이 약함 / 소실 [N]. 정지 잡음 ±0.5 N 의 3 배
     step_follow_lo_n: 3.0            # 누름 하한 [N]. 이보다 약하면 z 를 더 내린다
     step_follow_hi_n: 7.0            # 누름 상한 [N]. 이보다 세면 z 를 올린다
-    step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. over_force_n(15) 보다 작게
+    step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. **전역 과대 외력과 다른 것이다** (계약 7.2, v0.1.16):
+                                     #   12 N = 스텝 알고리즘이 스스로 들고 중단하는 보수적 **운용** 한계(robot_manager 안에서만 쓴다)
+                                     #   30 N = contact_detector · safety_monitor 의 전역 **안전** 정지 · 래치 한계(over_force_n, 쌍 검사 대상)
+                                     #   12 를 30 으로 올리지 않는다 — 올리면 스텝 모드의 자체 보호가 사라진다
     step_side_hit_n: 8.0             # 수평 |ΔF| 가 이보다 크면 물러나고 중단 [N]. 프로토타입 마찰 수평 힘 약 2.6 N
     step_drop_m: 0.0005              # 힘이 빠졌을 때 최근 접촉 높이보다 이만큼 아래까지 내려가 본다 [m]. 이때도 안 닿아야 모서리
     step_z_tol_m: 0.001              # 긁는 동안 누르는 높이 변화 한계의 최솟값 [m]. 넘으면 탐침 밀림 · 물체 이동으로 보고 중단
@@ -282,6 +294,10 @@ scan_manager:
     safety_status_timeout_s: 5.0     # safety_monitor.status_publish_period_s(1.0) 의 5 배
     robot_status_timeout_s: 2.0      # robot_manager.status_rate_hz(10 Hz = 0.1 s) 의 20 배.
                                      #   정지 중 300~360 ms 의 샘플 공백이 보고돼 있다(이슈 #130) — 그 5 배 이상으로 둔다
+    # 안전복귀(계약 7.5)가 "지금 TCP 위치를 안다"고 보는 /robot/sample 나이의 한도 [s].
+    # 넘으면 올리지도 HOME 하지도 않고 NOT_SUPPORTED 로 끝낸다 — 사람이 펜던트로 조그한다.
+    # 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
+    home_pose_max_age_s: 1.0      # robot_manager 실측 약 43 Hz(23 ms) 의 40 배 이상. 정지 중 687 ms 공백 기록(#130)보다 크게 둔다
 
 # mqtt_bridge:                       # (병후)
 #   ros__parameters:

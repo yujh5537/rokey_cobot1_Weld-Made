@@ -133,6 +133,15 @@ def encode_robot_status(status, published_at_ms):
         "force_ctrl_active": status["force_ctrl_active"],
         "motion_id": status["motion_id"],
         "operation": encode_robot_operation(status["operation"]),
+        # SLIDE 누름 목표 (계약 3.2, v0.1.16). 모르는 값은 NaN → null 이다. 0 으로 채우지 않는다.
+        # slide_force_estimate_n 은 **추정**이다(기준 + 설정). 실측 누름이 아니다 —
+        # 웹은 이 값을 "실측"이라고 표시하면 안 된다
+        "slide_mode": status["slide_mode"],
+        "slide_force_setpoint_n": non_finite_to_none(status["slide_force_setpoint_n"]),
+        "slide_force_baseline_n": non_finite_to_none(status["slide_force_baseline_n"]),
+        "slide_force_estimate_n": non_finite_to_none(status["slide_force_estimate_n"]),
+        "step_press_lo_n": non_finite_to_none(status["step_press_lo_n"]),
+        "step_press_hi_n": non_finite_to_none(status["step_press_hi_n"]),
         "detail": status["detail"],
         "published_at_ms": published_at_ms,
     }

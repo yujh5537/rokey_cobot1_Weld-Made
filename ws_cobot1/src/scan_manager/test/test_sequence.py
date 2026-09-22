@@ -10,6 +10,7 @@ from scan_manager.contract_enums import Operation
 from scan_manager.contract_enums import Phase
 from scan_manager.contract_enums import Reason
 from scan_manager.sequence import classify
+from scan_manager.sequence import damage_suspect_reason
 from scan_manager.sequence import MotionPlanner
 from scan_manager.sequence import MotionRequest
 from scan_manager.sequence import MotionResult
@@ -22,8 +23,10 @@ from scan_manager.sequence import StepOutcome
 from scan_manager.sequence import TOP
 from scan_manager.sequence import VerdictKind
 from scan_manager.state_machine import Command
+from scan_manager.state_machine import Failure
 from scan_manager.state_machine import Signal
 from sequence_helpers import BOX_SIZE
+from sequence_helpers import DOWN
 from sequence_helpers import FakePorts
 from sequence_helpers import make_params
 from sequence_helpers import READY
@@ -314,7 +317,8 @@ def test_stop_that_cannot_be_confirmed_is_an_error(ports, params):
     calls = iter([True, False])
     ports.wait_still = lambda: next(calls)
     outcome = run(ports, params)
-    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.ROBOT_STATUS_LOST
+    # 404(상태가 안 온다)와 섞지 않는다. 407 = 정지를 요청했는데 완료를 확인하지 못했다 (계약 6.1)
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.STOP_UNCONFIRMED
     assert ports.sm.phase is Phase.ERROR
     assert ports.stop_record is None
 
@@ -355,12 +359,69 @@ def home_ports(params):
     return ports
 
 
-def test_run_home_sends_one_home_motion(params):
+def test_run_home_lifts_before_home(params):
+    """계약 7.5: 수직 올림 → 도착 확인 → HOME. 올림은 x · y 와 자세를 바꾸지 않는다."""
     ports = home_ports(params)
+    before = ports.position
     outcome = run_home(MotionPlanner(params), ports, first_motion_id=8)
     assert outcome.kind is OutcomeKind.DONE
-    assert [(m, r.operation) for m, r in ports.requests] == [(8, Operation.HOME)]
+    assert [(m, r.operation) for m, r in ports.requests] == [
+        (8, Operation.MOVE_TO), (9, Operation.HOME)]
+    lift = ports.requests[0][1]
+    assert lift.label == 'home_lift'
+    assert lift.target_position == (before[0], before[1], before[2] + params.lift_height_m)
+    assert lift.target_orientation == DOWN          # 기준점 자세가 아니라 지금 자세 그대로
     assert ports.sm.phase is Phase.STOPPED  # 안전복귀는 출발했던 phase 로 돌아간다
+
+
+def test_run_home_does_not_send_home_when_the_lift_fails(params):
+    """올림이 도착으로 끝나지 않으면 HOME 을 보내지 않는다 (#130 에서 2회 나갔다)."""
+    for injected in (MotionResult(accepted=False),
+                     MotionResult(reason=MotionReason.TIMEOUT, reason_code=int(Reason.TIMEOUT)),
+                     MotionResult(reason=MotionReason.ROBOT_ERROR,
+                                  reason_code=int(Reason.ROBOT_ERROR))):
+        ports = home_ports(params)
+        ports.override['home_lift'] = injected
+        outcome = run_home(MotionPlanner(params), ports)
+        assert outcome.kind is OutcomeKind.FAILED
+        assert ports.labels() == ['home_lift']      # HOME 은 없다
+        assert ports.sm.phase is Phase.ERROR
+
+
+def test_run_home_refuses_when_the_position_is_unknown(params):
+    """위치를 모르면 올림도 HOME 도 하지 않는다. 사람이 펜던트로 조그한다 (계약 7.5 ①)."""
+    ports = home_ports(params)
+    ports.position = None
+    outcome = run_home(MotionPlanner(params), ports)
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.NOT_SUPPORTED
+    assert ports.requests == []                     # 모션을 하나도 보내지 않았다
+    assert '조그' in outcome.detail
+    assert ports.sm.phase is Phase.ERROR
+
+
+@pytest.mark.parametrize('code', [Reason.OVER_FORCE, Reason.DROP_LIMIT, Reason.OUT_OF_WORKSPACE])
+def test_run_home_refuses_after_a_damage_suspect_failure(params, code):
+    """손상 가능 사유로 끝났으면 자동복귀하지 않는다 (계약 7.5 ②)."""
+    ports = home_ports(params)
+    ports.damage_reason = damage_suspect_reason(
+        Failure(int(code), 'detail', Phase.EDGE_SEARCH))
+    assert ports.damage_reason                      # 이 사유들은 실제로 막는다
+    outcome = run_home(MotionPlanner(params), ports)
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.NOT_SUPPORTED
+    assert ports.requests == []
+    assert ports.sm.phase is Phase.ERROR
+
+
+@pytest.mark.parametrize('code', [Reason.TIMEOUT, Reason.NO_CONTACT, Reason.SAMPLE_STALE,
+                                  Reason.STOP_UNCONFIRMED, Reason.ROBOT_ERROR])
+def test_ordinary_failures_do_not_block_the_home_return(params, code):
+    """접촉이 원인이 아닌 실패는 안전복귀를 막지 않는다. 전부 막으면 복귀 수단이 사라진다."""
+    assert damage_suspect_reason(Failure(int(code), '', Phase.EDGE_SEARCH)) == ''
+
+
+def test_no_failure_means_no_block(params):
+    """정상 중지(STOPPED)에는 failure 가 없다. 평소 안전복귀 경로는 그대로다."""
+    assert damage_suspect_reason(None) == ''
 
 
 def test_run_home_failure_and_stop(params):
@@ -374,12 +435,19 @@ def test_run_home_failure_and_stop(params):
     assert run_home(MotionPlanner(params), stopping).kind is OutcomeKind.STOPPED
     assert stopping.sm.phase is Phase.STOPPED
 
+    # 올림 도중의 중지도 STOPPED 다(실패가 아니다). HOME 은 나가지 않는다
+    lifting = home_ports(params)
+    lifting.stop_during = 'home_lift'
+    assert run_home(MotionPlanner(params), lifting).kind is OutcomeKind.STOPPED
+    assert lifting.labels() == ['home_lift'] and lifting.sm.phase is Phase.STOPPED
+
 
 def test_latch_does_not_block_the_operator_home(params):
     ports = home_ports(params)
     ports.safety_code = int(Reason.OVER_FORCE)  # 래치 중이다
     outcome = run_home(MotionPlanner(params), ports)
-    assert outcome.kind is OutcomeKind.DONE and ports.labels() == ['home']
+    # 올림도 래치를 보지 않는다 — 래치 때문에 돌아오지 못하면 안 된다(계약 7.5)
+    assert outcome.kind is OutcomeKind.DONE and ports.labels() == ['home_lift', 'home']
 
 
 # ---- classify · planner ----

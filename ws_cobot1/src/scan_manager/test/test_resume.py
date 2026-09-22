@@ -109,7 +109,9 @@ class RecordingPorts(FakePorts):
 
     def fail(self, reason_code, detail, position):
         super().fail(reason_code, detail, position)
-        self.store.record_failure(SCAN_ID, self.sm.failure)
+        # 노드와 같다(_NodePorts.fail): 실패한 모션의 정지 좌표를 같이 남긴다. ERROR 재시작의
+        # 올림 목표가 이 좌표다(계약 7.5 · 9장)
+        self.store.record_failure(SCAN_ID, self.sm.failure, self._pose(position))
 
     def compute_geometry(self):
         outcome = super().compute_geometry()
@@ -411,6 +413,98 @@ def refusal_of(record, params, **kwargs):
     return planned
 
 
+# ---- ERROR 재시작 허용 목록 (계약 5.3 · 9장, v0.1.16 결정 1) ----
+
+def failed_record(params, result_dir, reason_code, at_request=SLIDE_POS_X):
+    """at_request 번째 모션이 그 사유로 실패해 ERROR 로 끝난 기록."""
+    ports = RecordingPorts(params, result_dir)
+
+    def boom(request):
+        return MotionResult(reason=MotionReason.ROBOT_ERROR, reason_code=int(reason_code),
+                            detail='주입한 실패', position=ports.position)
+
+    ports.override['slide_POS_X'] = boom
+    outcome = ScanRunner(MotionPlanner(params), ports, params.direction_order).run()
+    assert outcome.kind is OutcomeKind.FAILED
+    assert ports.sm.phase is Phase.ERROR
+    return ports, ports.store.load(SCAN_ID)
+
+
+@pytest.mark.parametrize('code', [Reason.SAMPLE_STALE, Reason.ROBOT_STATUS_LOST,
+                                  Reason.STOP_UNCONFIRMED])
+def test_allowed_failure_can_be_resumed_from_the_record(params, result_dir, code):
+    """기록만 봐도 상태 기계와 같은 답이 나와야 한다(프로세스가 죽었다 떠도 같다)."""
+    ports, record = failed_record(params, result_dir, code)
+    assert record.state.phase is Phase.ERROR and record.failure.reason_code == int(code)
+
+    restoration, why = scan_resume.restoration_from(record)
+    assert restoration is not None and restoration.phase is Phase.ERROR, why
+    assert restoration.resume_phase is Phase.EDGE_SEARCH
+    assert not restoration.moved_since_stop
+
+    planned = scan_resume.plan_resume(
+        record, result_file_exists=False, direction_order=params.direction_order)
+    assert not isinstance(planned, scan_resume.Refusal), planned
+    assert planned.from_failure and planned.plan.phase is Phase.EDGE_SEARCH
+    assert planned.plan.position is not None        # 올림 목표가 있다
+
+
+@pytest.mark.parametrize('code', [Reason.OVER_FORCE, Reason.DROP_LIMIT, Reason.ROBOT_ERROR,
+                                  Reason.TIMEOUT, 999])
+def test_forbidden_failure_is_refused_from_the_record(params, result_dir, code):
+    _ports, record = failed_record(params, result_dir, code)
+    restoration, _why = scan_resume.restoration_from(record)
+    assert restoration is not None and restoration.resume_phase is None
+    refusal = refusal_of(record, params)
+    assert refusal.reason is Reason.NOT_SUPPORTED
+    assert '허용 목록' in refusal.detail or '재개할 단계' in refusal.detail
+
+
+def test_the_same_failure_is_not_resumed_twice(params, result_dir):
+    ports, _record = failed_record(params, result_dir, Reason.SAMPLE_STALE)
+    ports.store.record_failure_resume(SCAN_ID)
+    record = ports.store.load(SCAN_ID)
+    assert record.failure.resumed_at is not None
+    refusal = refusal_of(record, params)
+    assert refusal.reason is Reason.NOT_SUPPORTED and '이미' in refusal.detail
+    # 두 번 찍지 않는다
+    with pytest.raises(Exception):
+        ports.store.record_failure_resume(SCAN_ID)
+
+
+def test_resumed_at_survives_a_round_trip(params, result_dir):
+    ports, _record = failed_record(params, result_dir, Reason.SAMPLE_STALE)
+    ports.store.record_failure_resume(SCAN_ID)
+    reloaded = ResultStore(result_dir, now_fn=FakeClock()).load(SCAN_ID)
+    assert reloaded.failure.resumed_at is not None
+
+
+def test_home_return_after_a_failure_blocks_the_resume(params, result_dir):
+    """안전복귀를 하면 로봇이 실패 지점에 없다. 재접근 절차는 TBD 다 (계약 5.3)."""
+    ports, _record = failed_record(params, result_dir, Reason.SAMPLE_STALE)
+    ports.home()
+    record = ports.store.load(SCAN_ID)
+    refusal = refusal_of(record, params)
+    assert refusal.reason is Reason.NOT_SUPPORTED and 'TBD' in refusal.detail
+    restoration, _why = scan_resume.restoration_from(record)
+    assert restoration.resume_phase is None
+
+
+def test_a_failure_in_final_homing_is_not_resumable(params, result_dir):
+    """측정이 끝난 뒤의 실패다. 사유가 허용 목록이어도 재개 대상이 아니다 (계약 7.4)."""
+    ports, outcome = scan(
+        params, result_dir,
+        override={'home': MotionResult(reason=MotionReason.ROBOT_ERROR,
+                                       reason_code=int(Reason.SAMPLE_STALE), detail='x')})
+    assert outcome.kind is OutcomeKind.HOMING_FAILED
+    record = ports.store.load(SCAN_ID)
+    assert record.failure.phase is Phase.HOMING
+    restoration, _why = scan_resume.restoration_from(record)
+    assert restoration.resume_phase is None
+    refusal = refusal_of(record, params)
+    assert refusal.reason is Reason.NOT_SUPPORTED
+
+
 def test_without_a_stop_position_the_tip_cannot_be_lifted(params, result_dir):
     record = stopped_record(params, result_dir)
     record.interruptions[-1] = Interruption(
@@ -474,7 +568,7 @@ def test_a_recorded_failure_is_not_resumed_even_if_the_phase_says_stopped(params
     failure = type('F', (), {'reason_code': 301, 'detail': 'fake', 'phase': Phase.EDGE_SEARCH})()
     ports.store.record_failure(SCAN_ID, failure)
     refusal = refusal_of(ports.store.load(SCAN_ID), params)
-    assert refusal.reason is Reason.NOT_SUPPORTED and 'TBD' in refusal.detail
+    assert refusal.reason is Reason.NOT_SUPPORTED and '오류로 끝난 기록' in refusal.detail
 
 
 def test_the_plan_uses_the_recorded_settings_not_the_current_ones(params, result_dir):

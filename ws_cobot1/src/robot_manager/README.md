@@ -58,7 +58,11 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 - **이벤트 대조**(계약 5.4): `ContactEvent.motion_id` 가 현재 goal 과 같고 동작이 맞을 때만 정지한다.
   `TYPE_OVER_FORCE` 는 대조 없이 항상 정지한다.
 - **취소**: 취소 접수와 실제 정지 완료는 다르다. `move_stop` 뒤 `moving` 이 false 가 될 때까지 기다린 다음 결과를 돌려준다.
-- **SLIDE 하강 제한**: 첫 샘플 z 기준으로 `drop_limit_m` 를 넘으면 정지하고 `DROP_LIMIT`(205) 로 끝낸다(계약 7.2 1차 감시).
+- **SLIDE 하강 제한**: 기준 z 보다 `drop_limit_m` 를 **초과**해 내려가면 정지하고 `DROP_LIMIT`(205) 로 끝낸다(계약 7.2 1차 감시. 정확히 한계면 걸리지 않는다).
+  - **기준 z = 이 노드가 `operation = OP_SLIDE` 로 발행한 첫 유효 샘플의 z** 다(v0.1.16). safety_monitor(2차)가 잡는 것과 **같은 메시지의 같은 값**이다. 실행 직전의 마지막 위치를 쓰면 순응을 켜며 z 가 약 0.7 mm 올라온 만큼 두 기준이 어긋나고, 그러면 2차의 여유가 의미를 잃는다.
+  - 첫 `OP_SLIDE` 샘플이 나가기 전까지는 실행 직전의 마지막 위치를 임시 기준으로 쓴다. **감시를 끄지 않는다.**
+  - 2차(safety_monitor)는 같은 기준 z 에 `drop_limit_margin_m` 를 더한 값에서 걸린다(real · sim 모두 1차 5 mm · 2차 9 mm). 1차 = 정상 동작의 제한, 2차 = 최후 방어선 + 래치.
+  - 스텝 모드에서도 **매 대기마다** 1차를 본다. 설정 검사가 `step_press_max_m + step_drop_m < drop_limit_m` 을 강제한다.
 - **순응 · 힘 제어는 `finally` 에서 해제**한다. 해제 호출이 실패하면 `compliance_released=false` 로 사실대로 보고한다
   - **켜는 호출을 보내기 전에** 해제 대상으로 표시한다. 켜는 호출이 응답 시간 초과여도 컨트롤러는 이미 켰을 수 있어서다. 켜지 않은 것을 해제하다 실패하면 `compliance_released=false` 가 된다(모르면 해제됐다고 하지 않는다)
   - 해제 순서는 힘 제어(`release_force`) → **`release_force_time_s` 대기** → 순응 제어(`release_compliance_ctrl`). 응답이 램프보다 먼저 올 수 있어 기다린다(매뉴얼 5.1.4 예제)
@@ -79,7 +83,7 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 | `moving_eps_m` | 0.0002 | 이동 판정 문턱 |
 | `moving_window_s` | 0.3 | 이동 판정 창 |
 | `slide_target_force_n` | 0.0 | **계약 이름.** SLIDE −z 목표 힘. 0 이면 SLIDE 를 거절한다 |
-| `drop_limit_m` | 0.005 | **계약 이름.** SLIDE 하강 제한. safety_monitor 와 같은 값 |
+| `drop_limit_m` | 0.005 | **계약 이름.** SLIDE 하강 제한(1차). safety_monitor 와 같은 값. 2차는 거기에 `drop_limit_margin_m`(4 mm)을 더한 9 mm 다 |
 | `home_joint_deg` | (없음) | `OP_HOME` 목적지 관절각 6개. 없으면 `OP_HOME` 을 거절한다 |
 | `home_speed_deg_s` | 20.0 | `OP_HOME` 관절 속도 |
 | `compliance_stiffness` | [3000, 3000, 3000, 200, 200, 200] | `task_compliance_ctrl` 강성 |
@@ -88,3 +92,27 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 | `feedback_period_s` | 0.1 | Action feedback 발행 주기 |
 
 계약 이름(`slide_target_force_n` · `drop_limit_m`)의 값은 `contact_scan_bringup/config/*.yaml`에 둔다(T05, 현지). `slide_target_force_n` 과 `home_joint_deg` 는 yaml 에 값이 들어와야 SLIDE · HOME 이 동작한다.
+
+## SLIDE 누름 목표를 상태에 싣는다 (계약 3.2, v0.1.16 결정 4)
+
+`slide_target_force_n` 은 `DR_FC_MOD_REL` 이라 **"설정한 증분"** 이지 실제 누름이 아니다. 실제 누름은 SLIDE 가
+어디서 시작하느냐에 따라 달라진다(9/22 실기 방향별 1.5~8.6 N). 그래서 세 값을 한 자리에 섞지 않고 `RobotStatus` 에
+각각 싣는다.
+
+| 필드 | `force` 모드 | `step` 모드 |
+|---|---|---|
+| `slide_mode` | `"force"` | `"step"` |
+| `slide_force_setpoint_n` | 설정 증분(`slide_target_force_n`) | **NaN** |
+| `slide_force_baseline_n` | `set_desired_force` 를 부른 시점의 Fz | **NaN** |
+| `slide_force_estimate_n` | 기준 + 설정 = **추정** 최종 누름 | **NaN** |
+| `step_press_lo_n` · `step_press_hi_n` | NaN | 목표 누름 ΔFz 띠(`step_follow_lo_n` ~ `step_follow_hi_n`) |
+
+- **`slide_force_estimate_n` 을 실측으로 표시하면 안 된다.** 힘 제어 중의 조회 Fz 는 1 N 안팎이 나와 "실측 누름"으로
+  쓰면 오히려 오해를 부른다. 그래서 "실측 누름"이라는 값은 만들지 않는다.
+- 기준선을 모르면 `baseline` 과 `estimate` 가 **NaN** 이다. 0 으로 채우면 "설정값 = 실제 누름"이라는 거짓이 된다(규칙 4).
+- **`step` 모드에서는 REL 세 값이 제어 목표가 아니다.** 스텝 모드는 순응 · 힘 제어를 아예 켜지 않는다.
+- mqtt_bridge 가 NaN → `null` 로 바꿔 `robot/status` 로 보낸다(`docs/contracts/mqtt-schema.md`).
+
+**`step_max_force_n`(12 N)과 `over_force_n`(30 N)은 다른 것이다** (결정 8). 12 N 은 스텝 알고리즘이 스스로 들고
+중단하는 보수적 **운용** 한계이며 이 노드 안에서만 쓴다. 30 N 은 contact_detector · safety_monitor 의 전역 **안전**
+정지 · 래치 한계다. **12 를 30 으로 올리지 않는다** — 올리면 스텝 모드의 자체 보호가 사라진다.

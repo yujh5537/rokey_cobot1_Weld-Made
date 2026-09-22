@@ -236,6 +236,21 @@ class ResultStore:
             record.interruptions[-1] = replace(last, resumed_at=now)
         return self._mutate(scan_id, apply)
 
+    def record_failure_resume(self, scan_id: str) -> ScanRecord:
+        """ERROR 로 끝난 작업의 재시작을 접수했다 (계약 9장의 허용 목록, v0.1.16).
+
+        중지의 record_resume 과 짝이다. 같은 실패로 두 번 재시작하지 않게 실패 기록에 시각을 찍는다.
+        로봇을 움직이기 **전에** 부른다 — 사실을 남기지 못하면 움직이지 않는다.
+        """
+        def apply(record, now):
+            failure = record.failure
+            if failure is None:
+                raise RecordStateError(f'{scan_id}: 재시작할 실패 기록이 없다')
+            if failure.resumed_at is not None:
+                raise RecordStateError(f'{scan_id}: 그 실패에서 이미 재시작했다')
+            record.failure = replace(failure, resumed_at=now)
+        return self._mutate(scan_id, apply)
+
     def record_home_requested(self, scan_id: str, origin_phase=None) -> ScanRecord:
         """홈 안전복귀를 접수했다. 끝까지 갔는지와 무관하게 남는다(계약 5.3절의 NOT_SUPPORTED 판정용)."""
         def apply(record, now):
