@@ -63,6 +63,12 @@ contact_detector:
     edge_arm_still_window_s: 0.2     # > 0 이면 EDGE 판정을 z 로 켠다: 이 구간 동안 z 가 edge_arm_still_m 안에 머물고
     edge_arm_still_m: 0.0001         #   x · y 가 edge_arm_travel_m 넘게 움직였으면 "누르고 있다". edge_arm_force_n 은 쓰지 않는다
     edge_arm_travel_m: 0.0005        #   (x · y 조건: 힘 제어를 켜는 동안 팁이 떠 있는데 z 도 멈춰 있어서). 설계 출발값
+    # --- 힘 꺾임 EDGE (#128). 0 = 끔. 켜는 것은 팀 결정(BRD 4.1.2 는 외력 감소를 보조 신호로 둔다) ---
+    edge_force_drop_n: 0.0           # 켤 때 출발값 1.0 N. 9/21 실기 밀기 4회 재생: 1.0 N 이면 464.43 · 464.53 · 464.59 · 466.70
+                                     #   (마지막은 9.8 N 으로 눌린 채 시작한 오전 1회). 모서리 앞 잡음 최대 0.65 N. 0.8 N 이면 네 번 모두 464.4~464.8
+    edge_force_window_s: 0.5         # 중앙값 구간. 설계 출발값
+    edge_force_lag_s: 0.1            # 구간에서 가장 최근 0.1 s 는 뺀다. 설계 출발값
+    edge_force_settle_s: 1.5         # SLIDE 시작 뒤 1.5 s 는 보지 않는다. 오전 1회는 순응이 켜진 뒤 약 1 s 동안 Fz 9.8 → 0.7 N (5 mm/s 면 7.5 mm)
 
 safety_monitor:
   ros__parameters:

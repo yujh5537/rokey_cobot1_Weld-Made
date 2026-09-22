@@ -9,6 +9,15 @@
 - **값을 바꾸지 않은 것**: 작업대 원점 (423.56, −186.06) · 기준점 (525.19, −172.09) · `search_origin_pose` · `base_to_fixture` 는 옛 탐침(피벗 ±1 mm)으로 잰 실제 위치라 그대로다. 새 탐침의 홈 팁 x · y 는 (424.40, −183.22)로 원점과 2.96 mm 떨어진다(v0.1.11 의 0.87 mm 는 틀린 TCP 로 읽은 값). 홈 → 기준점 이동이 약 3 mm 가 된다
 - `search_origin_pose` · `base_to_fixture` 를 켜는 조건 ②(TCP x · y 확인)가 끝났다. ①(#109)도 PR #127 로 끝났다(9/21 18:38 실기 홈 출발 하강 6 회 공중 거짓 CONTACT 0 회(`890a8de`, bag `docs/test-reports/data/20260921_pm/bag_t30_1838`), 머지본의 `descend_ref_settle_s` 5.5 s 는 bag 6 개 재생으로 확인). 켤 때는 TCP 를 [0, 0, 252.12] 로 등록한 세션이어야 한다
 
+## v0.1.13 (2026-09-21, 힘 꺾임 EDGE, #128)
+타입 변경 없음. `ros-interfaces.md` 3.3 의 EDGE 규칙에 **힘 꺾임**을 더했다. 기본 꺼짐. 영향: contact_detector(판정 · 파라미터 4개 추가) · scan_manager(편향 보정의 δ가 작아진다, 아래) · 실기 절차.
+- 2026-09-21 실기 밀기 4회를 기록에서 다시 넣었다: z 추세선 방식은 **한 번도 EDGE 를 내지 못했다**. 모서리 뒤 z 가 일정 속도(0.2~0.35 mm/s, 한 번은 2 mm/s)로 떨어져 추세선이 기울기를 따라간다. 반면 Fz 는 모서리에서 0.4 s 안에 약 2~4 N 꺾인다
+- `edge_force_drop_n > 0` 이면: 판정을 켠 뒤 원시 Fz 가 `[t − edge_force_window_s, t − edge_force_lag_s]` 중앙값보다 `edge_force_drop_n` 넘게 낮은 샘플이 연속 `debounce_n` 회면 EDGE. SLIDE 시작 뒤 `edge_force_settle_s` 동안은 보지 않는다. z 추세선과 둘 중 먼저 확정된 것을 낸다
+- 재생 결과(1.0 N): 464.43 · 464.53 · 464.59 · 466.70 (기대 463.56, 마지막은 눌린 채 시작한 1회)
+- `z_drop_m`: 힘으로 확정하면 판정 첫 샘플의 추세선 대비 하강량(음수면 0, 실기 0~0.1 mm). 추세선이 없으면 `z_drop_valid = false`. **scan_manager 편향 보정(`bias.py` `overshoot_m`)이 δ 로 쓰므로 켜기 전에 병후 확인이 필요하다**
+- 켜는 것은 팀 결정이다. BRD 4.1.2 는 z 급강하를 주 신호, 외력 감소를 보조 신호로 둔다
+- 새 contact_detector 파라미터(계약 이름 아님): `edge_force_drop_n`(0 = 끔) · `edge_force_window_s` · `edge_force_lag_s` · `edge_force_settle_s`
+
 ## v0.1.12 (2026-09-21, 하강 · 밀기 기준 분리, #109)
 타입 변경 없음. `ros-interfaces.md`의 **`/contact/tare` 설명(2장)과 판정 규칙(3.3)**을 고쳤다. 영향: contact_detector(판정 · 파라미터 7개 추가) · scan_manager(절차 변경 없음) · 실기 절차.
 - 2026-09-21 실기: 외력 추정값이 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다. 정지 F₀ 로 하강하면 큐브 45 mm 위에서 거짓 CONTACT(5-2), 이동 중 F₀ 는 판정 오차 0.016 mm(5-5 · 5-8), 다른 자세의 F₀ 는 1.4 mm 만에 거짓 접촉(5-11). 밀기 중에는 허공에서도 Fx −5 N(5-1)

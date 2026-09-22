@@ -53,6 +53,10 @@ contact_detector:
     edge_arm_still_window_s: 0.2     # z 로 EDGE 판정 켜기. sim 은 틈을 sim_fall_speed_mps 로 메운 뒤 윗면을 따라간다
     edge_arm_still_m: 0.0001
     edge_arm_travel_m: 0.0005
+    edge_force_drop_n: 0.0           # 힘 꺾임 EDGE (#128) 끔. 나머지는 real.yaml 과 같다
+    edge_force_window_s: 0.5
+    edge_force_lag_s: 0.1
+    edge_force_settle_s: 1.5
 
     # --- sim 입력원 전용: 가상 직육면체 (T07). 실제 부재와 무관한 가상값. 이름은 정의서 6.2 ---
     sim_box_frame_id: base_link            # 아래 좌표의 프레임. RobotSample.frame_id 와 다르면 sim 은 판정하지 않는다
