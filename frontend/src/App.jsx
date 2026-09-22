@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
-import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+import { buildM0609Model, disposeObject3D } from './robotModel.js'
+import { parseRobotJoints } from './robotJoints.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -83,459 +83,6 @@ function formatNumber(value) {
 }
 
 const DISPLAY_SCALE = 0.01
-const ROS_METERS_TO_THREE = 10
-
-const M0609_MESH_ROOT =
-  'https://raw.githubusercontent.com/DoosanRobotics/doosan-robot2/humble/dsr_description2/meshes/m0609_white/'
-
-const RG2_MESH_ROOT =
-  'https://raw.githubusercontent.com/ABC-iRobotics/onrobot-ros2/c6e390313e831a2e54a0ad5894b2911cc360a16a/onrobot_rg_description/meshes/rg2/visual/'
-
-function setRosOrigin(
-  object,
-  xyz,
-  rpy
-) {
-  object.position.set(
-    xyz[0],
-    xyz[1],
-    xyz[2]
-  )
-
-  object.rotation.set(
-    rpy[0],
-    rpy[1],
-    rpy[2],
-    'XYZ'
-  )
-}
-
-function makeJointFrame(
-  parent,
-  name,
-  xyz,
-  rpy,
-  jointRefs
-) {
-  const originFrame =
-    new THREE.Group()
-
-  setRosOrigin(
-    originFrame,
-    xyz,
-    rpy
-  )
-
-  parent.add(originFrame)
-
-  const jointFrame =
-    new THREE.Group()
-
-  originFrame.add(jointFrame)
-
-  jointRefs[name] =
-    jointFrame
-
-  const linkFrame =
-    new THREE.Group()
-
-  jointFrame.add(linkFrame)
-
-  return linkFrame
-}
-
-function disposeObject3D(object) {
-  object.traverse((child) => {
-    child.geometry?.dispose()
-
-    if (Array.isArray(child.material)) {
-      child.material.forEach(
-        (material) =>
-          material?.dispose?.()
-      )
-    } else {
-      child.material?.dispose?.()
-    }
-  })
-}
-
-function canonicalJointName(name) {
-  const match =
-    String(name ?? '')
-      .match(/joint_([1-6])$/)
-
-  return match
-    ? `joint_${match[1]}`
-    : String(name ?? '')
-}
-
-function buildRg2Model(
-  parent,
-  loadTasks
-) {
-  const stlLoader =
-    new STLLoader()
-
-  const base =
-    new THREE.Group()
-
-  // 프로젝트에서 사용하는 RG2 xacro의 고정 장착 자세.
-  base.rotation.z =
-    Math.PI / 2
-
-  parent.add(base)
-
-  const whiteMaterial =
-    new THREE.MeshStandardMaterial({
-      color: 0xd7dadd,
-      metalness: 0.35,
-      roughness: 0.4,
-    })
-
-  const darkMaterial =
-    new THREE.MeshStandardMaterial({
-      color: 0x252a2f,
-      metalness: 0.15,
-      roughness: 0.55,
-    })
-
-  function loadStl(
-    target,
-    filename,
-    material
-  ) {
-    const task =
-      stlLoader
-        .loadAsync(
-          `${RG2_MESH_ROOT}${filename}`
-        )
-        .then((geometry) => {
-          geometry.computeVertexNormals()
-
-          const mesh =
-            new THREE.Mesh(
-              geometry,
-              material
-            )
-
-          target.add(mesh)
-        })
-
-    loadTasks.push(task)
-  }
-
-  loadStl(
-    base,
-    'base_link.stl',
-    whiteMaterial
-  )
-
-  // 탐침을 계속 파지하는 MVP이므로 RG2 손가락은 고정 자세로 표시한다.
-  const fingerAngle = 0.0
-
-  function createFinger(
-    reflect
-  ) {
-    const outerOrigin =
-      new THREE.Group()
-
-    outerOrigin.position.set(
-      0,
-      reflect * -0.017178,
-      0.125797
-    )
-
-    if (reflect < 0) {
-      outerOrigin.rotation.z =
-        Math.PI
-    }
-
-    base.add(outerOrigin)
-
-    const outerJoint =
-      new THREE.Group()
-
-    outerJoint.rotation.x =
-      -fingerAngle
-
-    outerOrigin.add(outerJoint)
-
-    loadStl(
-      outerJoint,
-      'outer_knuckle.stl',
-      whiteMaterial
-    )
-
-    const innerFingerOrigin =
-      new THREE.Group()
-
-    innerFingerOrigin.position.set(
-      0,
-      -0.039592,
-      0.038177
-    )
-
-    outerJoint.add(
-      innerFingerOrigin
-    )
-
-    innerFingerOrigin.rotation.x =
-      fingerAngle
-
-    loadStl(
-      innerFingerOrigin,
-      'inner_finger.stl',
-      darkMaterial
-    )
-
-    const innerKnuckleOrigin =
-      new THREE.Group()
-
-    innerKnuckleOrigin.position.set(
-      0,
-      reflect * -0.007678,
-      0.142297
-    )
-
-    if (reflect < 0) {
-      innerKnuckleOrigin.rotation.z =
-        -Math.PI
-    }
-
-    innerKnuckleOrigin.rotation.x =
-      -fingerAngle
-
-    base.add(
-      innerKnuckleOrigin
-    )
-
-    loadStl(
-      innerKnuckleOrigin,
-      'inner_knuckle.stl',
-      whiteMaterial
-    )
-  }
-
-  createFinger(1)
-  createFinger(-1)
-
-  // 실기 TCP: flange -> probe tip = [0, 0, 252.12] mm.
-  // RG2는 고정 파지이므로 탐침 끝점을 이 TCP에 맞춰 표시한다.
-  const probeTipZ = 0.25212
-  const probeLength = 0.102
-  const probeRadius = 0.0015
-
-  const probeMaterial =
-    new THREE.MeshStandardMaterial({
-      color: 0x70757a,
-      metalness: 0.65,
-      roughness: 0.28,
-    })
-
-  const probe =
-    new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        probeRadius,
-        probeRadius,
-        probeLength,
-        18
-      ),
-      probeMaterial
-    )
-
-  probe.rotation.x =
-    Math.PI / 2
-
-  probe.position.z =
-    probeTipZ -
-    probeLength / 2
-
-  base.add(probe)
-
-  const probeTip =
-    new THREE.Mesh(
-      new THREE.SphereGeometry(
-        0.000225,
-        16,
-        16
-      ),
-      probeMaterial
-    )
-
-  probeTip.position.z =
-    probeTipZ
-
-  base.add(probeTip)
-
-  return base
-}
-
-function buildM0609Model() {
-  const root =
-    new THREE.Group()
-
-  // ROS z-up -> Three.js y-up:
-  // (x, y, z) -> (x, z, -y)
-  root.rotation.x =
-    -Math.PI / 2
-
-  // URDF는 metre 단위이고 화면은 100 mm = 1 unit.
-  root.scale.setScalar(
-    ROS_METERS_TO_THREE
-  )
-
-  const rosBase =
-    new THREE.Group()
-
-  root.add(rosBase)
-
-  const jointRefs = {}
-  const loadTasks = []
-
-  const colladaLoader =
-    new ColladaLoader()
-
-  function loadDae(
-    target,
-    filename
-  ) {
-    const task =
-      colladaLoader
-        .loadAsync(
-          `${M0609_MESH_ROOT}${filename}`
-        )
-        .then((result) => {
-          const visual =
-            result.scene
-
-          // 공식 M0609 URDF의 visual mesh scale=0.001.
-          visual.scale.setScalar(
-            0.001
-          )
-
-          target.add(visual)
-        })
-
-    loadTasks.push(task)
-  }
-
-  loadDae(
-    rosBase,
-    'MF0609_0_0.dae'
-  )
-
-  const link1 =
-    makeJointFrame(
-      rosBase,
-      'joint_1',
-      [0, 0, 0.1345],
-      [0, 0, 0],
-      jointRefs
-    )
-
-  loadDae(
-    link1,
-    'MF0609_1_0.dae'
-  )
-
-  const link2 =
-    makeJointFrame(
-      link1,
-      'joint_2',
-      [0, 0.0062, 0],
-      [0, -1.571, -1.571],
-      jointRefs
-    )
-
-  ;[
-    'MF0609_2_0.dae',
-    'MF0609_2_1.dae',
-    'MF0609_2_2.dae',
-  ].forEach(
-    (filename) =>
-      loadDae(
-        link2,
-        filename
-      )
-  )
-
-  const link3 =
-    makeJointFrame(
-      link2,
-      'joint_3',
-      [0.411, 0, 0],
-      [0, 0, 1.571],
-      jointRefs
-    )
-
-  loadDae(
-    link3,
-    'MF0609_3_0.dae'
-  )
-
-  const link4 =
-    makeJointFrame(
-      link3,
-      'joint_4',
-      [0, -0.368, 0],
-      [1.571, 0, 0],
-      jointRefs
-    )
-
-  ;[
-    'MF0609_4_0.dae',
-    'MF0609_4_1.dae',
-  ].forEach(
-    (filename) =>
-      loadDae(
-        link4,
-        filename
-      )
-  )
-
-  const link5 =
-    makeJointFrame(
-      link4,
-      'joint_5',
-      [0, 0, 0],
-      [-1.571, 0, 0],
-      jointRefs
-    )
-
-  loadDae(
-    link5,
-    'MF0609_5_0.dae'
-  )
-
-  const link6 =
-    makeJointFrame(
-      link5,
-      'joint_6',
-      [0, -0.121, 0],
-      [1.571, 0, 0],
-      jointRefs
-    )
-
-  loadDae(
-    link6,
-    'MF0609_6_0.dae'
-  )
-
-  buildRg2Model(
-    link6,
-    loadTasks
-  )
-
-  return {
-    root,
-    jointRefs,
-    loadPromise:
-      Promise.allSettled(
-        loadTasks
-      ),
-  }
-}
-
 function toThreePosition(
   xMm,
   yMm,
@@ -687,6 +234,7 @@ function App() {
 
   // M0609 joint state. /dsr01/joint_states -> MQTT robot/joints.
   const [jointPositions, setJointPositions] = useState({})
+  const [jointStatus, setJointStatus] = useState('수신 대기')
   const [robotModelStatus, setRobotModelStatus] = useState('LOADING')
 
   // 현재 로봇 TCP 팁 위치
@@ -884,6 +432,7 @@ function App() {
       `${wsProtocol}://${window.location.host}/ws`
 
     const websocket = new WebSocket(wsUrl)
+    let jointTimeout
 
 
     // WebSocket 연결 성공
@@ -946,32 +495,17 @@ function App() {
           setScanId(nextScanId)
         }
 
-        // robot/joints
-        if (
-          topic === 'robot/joints' &&
-          Array.isArray(payload.names) &&
-          Array.isArray(payload.positions_rad)
-        ) {
-          const nextPositions = {}
-
-          payload.names.forEach(
-            (name, index) => {
-              const value =
-                payload.positions_rad[index]
-
-              if (!Number.isFinite(value)) {
-                return
-              }
-
-              nextPositions[
-                canonicalJointName(name)
-              ] = value
-            }
-          )
-
-          setJointPositions(
-            nextPositions
-          )
+        // Apply only complete, finite J1~J6 snapshots, mapped by name.
+        if (topic === 'robot/joints') {
+          const nextPositions = parseRobotJoints(payload)
+          if (nextPositions) {
+            setJointPositions(nextPositions)
+            setJointStatus('실시간 수신 중')
+            window.clearTimeout(jointTimeout)
+            jointTimeout = window.setTimeout(() => {
+              setJointStatus('수신 지연 — 마지막 자세 표시')
+            }, 3000)
+          }
         }
 
         // robot/sample
@@ -1082,6 +616,8 @@ function App() {
       console.log('[WS] disconnected')
 
       setWsConnected(false)
+      window.clearTimeout(jointTimeout)
+      setJointStatus('연결 끊김 — 마지막 자세 표시')
       addLog('FastAPI WebSocket 연결 종료')
     }
 
@@ -1097,6 +633,11 @@ function App() {
 
     // React 컴포넌트 종료 시 연결 정리
     return () => {
+      window.clearTimeout(jointTimeout)
+      websocket.onopen = null
+      websocket.onmessage = null
+      websocket.onclose = null
+      websocket.onerror = null
       websocket.close()
     }
   }, [])
@@ -1107,6 +648,7 @@ function App() {
   // =========================
 
   useEffect(() => {
+    let disposed = false
     // 1. 3D 공간
     const scene = new THREE.Scene()
 
@@ -1430,6 +972,7 @@ function App() {
 
     robotModel.loadPromise
       .then((results) => {
+        if (disposed) return
         const rejected =
           results.filter(
             (result) =>
@@ -1439,7 +982,9 @@ function App() {
         setRobotModelStatus(
           rejected.length === 0
             ? 'READY'
-            : 'PARTIAL'
+            : rejected.length === results.length
+              ? 'ERROR'
+              : 'PARTIAL'
         )
 
         rejected.forEach(
@@ -1458,10 +1003,12 @@ function App() {
         .clone()
         .multiplyScalar(0.5)
 
+    // Include the fully extended arm while waiting for the first joint snapshot.
+    viewCenter.y = Math.max(viewCenter.y, 4.5)
     camera.position.set(
-      viewCenter.x + 5,
-      viewCenter.y + 4,
-      viewCenter.z + 6
+      viewCenter.x + 10,
+      viewCenter.y + 8,
+      viewCenter.z + 12
     )
 
     camera.lookAt(viewCenter)
@@ -1594,11 +1141,9 @@ function App() {
 
       controls.dispose()
 
-      if (robotModelRef.current) {
-        disposeObject3D(
-          robotModelRef.current
-        )
-      }
+      disposed = true
+      robotModel.dispose()
+      disposeObject3D(scene)
 
       robotModelRef.current = null
       robotJointRefs.current = {}
@@ -2152,7 +1697,7 @@ function App() {
 
         <p>
           M0609 관절 수신:{' '}
-          {Object.keys(jointPositions).length} / 6
+          {Object.keys(jointPositions).length} / 6 — {jointStatus}
         </p>
 
         {tipPose ? (
@@ -2377,6 +1922,12 @@ function App() {
 
         <h2>3D 화면</h2>
 
+        <p>좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
+        <p>RG2·탐침은 고정 시각화 자세이며 그리퍼 개폐 피드백은 반영하지 않습니다.</p>
+        {robotModelStatus === 'LOADING' && <p>로봇 모델을 불러오는 중입니다.</p>}
+        {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
+          <p role="alert">일부 로봇 모델을 불러오지 못했습니다. GitHub 모델 파일 접근을 확인한 뒤 새로고침하세요.</p>
+        )}
         <canvas ref={canvasRef} />
 
       </section>

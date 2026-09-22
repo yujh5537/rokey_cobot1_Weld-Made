@@ -536,32 +536,69 @@ workpiece_fixture → base_link 평행 이동 적용
 
 ---
 
-## 3D 목업 주의사항
+## T41 시각화 범위와 검증
 
-현재 화면의 작업대와 직육면체 부재 Mesh는
-UI 개발을 위한 고정 목업이다.
+M0609은 공식 URDF의 관절 계층을 Three.js Group으로 구성하고 공식 visual mesh를
+불러온다. URDFLoader 패키지를 사용하지 않으며 관절 원점과 축은
+`src/robotModel.js`에 정의한다. M0609 asset은 upstream commit
+`6c5f3ba622bfa9d6f9cffebf21fa44f57db55b48`에 고정한다.
 
-```text
-작업대 목업
-직육면체 부재 목업
+- URDF 고정축 RPY는 Three.js `ZYX`로 적용한다.
+- Z_UP COLLADA에 로더가 추가한 Y-up 변환을 해제한다. ROS → Three 축 변환은 로봇 root에서 한 번만 수행한다.
+- `robot/joints`의 관절 이름으로 J1~J6를 대응시킨다. 순서 변경과 `dsr01/`, `dsr01_` prefix를 허용한다.
+- 이름 중복, 누락, 비유한 각도가 있는 스냅샷은 적용하지 않는다. 비로봇팔 관절은 무시한다.
+- 유효한 6축 데이터가 3초 동안 없으면 **수신 지연 — 마지막 자세 표시**로 바뀐다. 수신 전 영점 자세는 실제 로봇 자세가 아니다.
+- RG2는 고정된 시각화 자세다. 실제 파지 폭은 아직 확인하지 않았으며 손가락 개폐 피드백은 반영하지 않는다.
+- 탐침 끝점은 현재 프로젝트 TCP `[0, 0, 252.12]` mm를 사용한다. 탐침 외형 길이·반경과 작업대 외형은 시각화용이다.
+- 작업대 상판 원점은 `base_to_fixture`를 적용한다. 부재는 유효한 `scan/result.vertices`로 생성한다.
+- 실기 TCP 표시와 모델 탐침 끝점의 정렬은 실제 관절·TCP를 함께 수신해 별도로 확인한다.
+
+검증 명령:
+
+```bash
+cd frontend
+npm ci
+node --test test/robot.test.mjs
+npm run lint
+npm run build
 ```
 
-은 실제 `base_link`의 절대 위치에 맞춰 배치된 디지털 트윈이 아니다.
+회귀 테스트는 독립적인 URDF 행렬 계산과 3개 자세의 탐침 끝점을 비교하고,
+관절 이름 매핑·잘못된 입력·모델 로딩 완료 전 화면 종료를 검증한다.
+실기 ROS 및 화면 종단 검증과 구분한다.
 
-반면 다음 데이터는 실제 전달 좌표를 기반으로 표시한다.
+실행 (기존 T41 checkout, sim 예):
 
-```text
-robot/sample
-contact/event
-scan/result.edges
-scan/result.path_candidates
+```bash
+# Main PC: 기존 ROS_DOMAIN_ID와 discovery 설정을 유지한 터미널
+source /opt/ros/jazzy/setup.bash
+cd ws_cobot1
+colcon build --packages-up-to mqtt_bridge --symlink-install
+source install/setup.bash
+# 기존 mqtt_bridge를 종료한 뒤 한 인스턴스만 실행한다.
+ros2 run mqtt_bridge mqtt_bridge --ros-args \
+  -p joint_state_topic:=/dsr01/joint_states \
+  -p joint_publish_hz:=20.0
 ```
 
-따라서 `base_to_fixture`를 적용하면 실시간 좌표 데이터가
-화면의 고정 목업과 떨어져 보일 수 있다.
+broker가 다른 PC에 있으면 기존 실행 환경의 `broker_host`를 함께 전달한다.
+기존 통합 launch를 쓰는 경우에는 재빌드 후 해당 launch를 재시작하면 된다.
 
-이는 현재 목업 단계에서는 정상이며,
-실제 장비 배치와 동일한 3D 모델 정렬은 별도 작업 범위다.
+```bash
+# Web PC: 기존 FastAPI·Mosquitto는 실행 상태여야 한다.
+cd frontend
+VITE_BASE_TO_FIXTURE_MM=425,-184,400 npm run dev
+```
+
+관절 경로 확인:
+
+```bash
+ros2 topic echo /dsr01/joint_states --once
+mosquitto_sub -h 127.0.0.1 -p 1883 -t 'robot/joints' -C 1 -v
+```
+
+`robot/joints` 수신은 웹 표시용이며 로봇에 모션 명령을 보내지 않는다.
+실기에서는 위 sim fixture 대신 실기 `base_to_fixture` 값을 사용한다.
 
 ---
 

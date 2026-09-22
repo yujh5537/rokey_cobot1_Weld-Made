@@ -62,6 +62,43 @@ def test_strict_json_rejects_nan():
         serialize_json({"x": math.nan})
 
 
+def test_joint_snapshot_validation_and_rate_limit(monkeypatch):
+    published = []
+    warnings = []
+    bridge = SimpleNamespace(
+        _last_joint=0.0,
+        _joint_period=0.05,
+        _joint_state_topic="/dsr01/joint_states",
+        get_logger=lambda: SimpleNamespace(warning=warnings.append),
+        _publish=lambda *args: published.append(args),
+    )
+    monkeypatch.setattr("mqtt_bridge.mqtt_bridge.time.monotonic", lambda: 10.0)
+    header = SimpleNamespace(stamp=SimpleNamespace(sec=3, nanosec=4_000_000))
+    for names, positions in [
+        (["joint_1"], []),
+        (["joint_1"], [math.nan]),
+        (["joint_1"], [math.inf]),
+        (["joint_1", "joint_1"], [0.0, 1.0]),
+    ]:
+        msg = SimpleNamespace(name=names, position=positions, header=header)
+        MqttBridge._on_joint_state(bridge, msg)
+        assert not published
+        assert bridge._last_joint == 0.0
+    assert len(warnings) == 4
+
+    names = [f"joint_{i}" for i in range(6, 0, -1)]
+    positions = [i / 10 for i in range(6)]
+    msg = SimpleNamespace(name=names, position=positions, header=header)
+    MqttBridge._on_joint_state(bridge, msg)
+    topic, payload, qos, retain = published[0]
+    assert (topic, qos, retain) == ("robot/joints", 0, False)
+    assert payload["names"] == names
+    assert payload["positions_rad"] == positions
+    assert payload["stamp_ms"] == 3004
+    MqttBridge._on_joint_state(bridge, msg)
+    assert len(published) == 1
+
+
 def test_epoch_ms_to_time():
     stamp = epoch_ms_to_time(1789720002431)
     assert stamp.sec == 1789720002

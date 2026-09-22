@@ -1,6 +1,7 @@
 """ROS 2 <-> MQTT bridge node."""
 
 import json
+import math
 import os
 import queue
 import time
@@ -186,6 +187,8 @@ class MqttBridge(Node):
         self._prefix = normalize_topic_prefix(str(self.get_parameter("topic_prefix").value))
         self._sample_hz = float(self.get_parameter("sample_publish_hz").value)
         self._joint_hz = float(self.get_parameter("joint_publish_hz").value)
+        if not math.isfinite(self._joint_hz) or self._joint_hz <= 0:
+            raise ValueError("joint_publish_hz must be a finite positive number")
         self._joint_state_topic = str(self.get_parameter("joint_state_topic").value)
         self._heartbeat_hz = float(self.get_parameter("heartbeat_hz").value)
         self._keepalive = int(self.get_parameter("keepalive_s").value)
@@ -557,17 +560,21 @@ class MqttBridge(Node):
         now = time.monotonic()
         if now - self._last_joint < self._joint_period:
             return
-        self._last_joint = now
 
         names = list(msg.name)
         positions = [float(value) for value in msg.position]
 
-        if not names or len(names) != len(positions):
+        if (not names or len(names) != len(positions)
+                or len(set(names)) != len(names)
+                or not all(name for name in names)
+                or not all(math.isfinite(value) for value in positions)):
             self.get_logger().warning(
                 f"{self._joint_state_topic}: invalid JointState "
                 f"names={len(names)} positions={len(positions)}"
             )
             return
+
+        self._last_joint = now
 
         stamp_ms = (
             int(msg.header.stamp.sec) * 1000
