@@ -169,6 +169,17 @@ def _scan_result_dedup_key(msg):
     return (msg.scan_id, int(msg.stamp.sec), int(msg.stamp.nanosec))
 
 
+_ARM_JOINT_NAMES = tuple(f"joint_{index}" for index in range(1, 7))
+_RG2_JOINT_NAMES = (
+    "rg2_finger_joint",
+    "rg2_left_inner_knuckle_joint",
+    "rg2_left_inner_finger_joint",
+    "rg2_right_outer_knuckle_joint",
+    "rg2_right_inner_knuckle_joint",
+    "rg2_right_inner_finger_joint",
+)
+
+
 class MqttBridge(Node):
     def __init__(self):
         super().__init__("mqtt_bridge")
@@ -205,6 +216,7 @@ class MqttBridge(Node):
         self._joint_period = 1.0 / self._joint_hz
         self._last_sample = 0.0
         self._last_joint = 0.0
+        self._last_gripper_joint = 0.0
         self._last_scan_id = ""
         self._scan_phase = ScanState.PHASE_IDLE
         self._pending_stop = []
@@ -558,8 +570,6 @@ class MqttBridge(Node):
 
     def _on_joint_state(self, msg):
         now = time.monotonic()
-        if now - self._last_joint < self._joint_period:
-            return
 
         names = list(msg.name)
         positions = [float(value) for value in msg.position]
@@ -574,25 +584,71 @@ class MqttBridge(Node):
             )
             return
 
-        self._last_joint = now
-
         stamp_ms = (
             int(msg.header.stamp.sec) * 1000
             + int(msg.header.stamp.nanosec) // 1_000_000
         )
+        if stamp_ms <= 0:
+            stamp_ms = now_ms()
 
-        self._publish(
-            "robot/joints",
-            {
-                "schema_version": "0.1",
-                "frame_id": "base_link",
-                "names": names,
-                "positions_rad": positions,
-                "stamp_ms": stamp_ms if stamp_ms > 0 else now_ms(),
-                "published_at_ms": now_ms(),
-            },
-            0,
-            False,
+        by_name = dict(zip(names, positions))
+
+        # /dsr01/joint_states has two publishers in the current bringup.
+        # - joint_state_broadcaster: M0609 six joints only
+        # - joint_state_publisher: M0609 + RG2 merged snapshot
+        # Keep robot/joints sourced only from the six-axis broadcaster so
+        # the browser does not alternate between 6-joint and 12-joint payloads.
+        if set(names) == set(_ARM_JOINT_NAMES):
+            if now - self._last_joint < self._joint_period:
+                return
+
+            self._last_joint = now
+            self._publish(
+                "robot/joints",
+                {
+                    "schema_version": "0.1",
+                    "frame_id": "base_link",
+                    "names": list(_ARM_JOINT_NAMES),
+                    "positions_rad": [
+                        by_name[name]
+                        for name in _ARM_JOINT_NAMES
+                    ],
+                    "stamp_ms": stamp_ms,
+                    "published_at_ms": now_ms(),
+                },
+                0,
+                False,
+            )
+            return
+
+        # The merged joint_state_publisher snapshot contains the RG2 mimic
+        # joints. Publish only those joints on a separate display-only topic.
+        if all(name in by_name for name in _RG2_JOINT_NAMES):
+            if now - self._last_gripper_joint < self._joint_period:
+                return
+
+            self._last_gripper_joint = now
+            self._publish(
+                "robot/gripper_joints",
+                {
+                    "schema_version": "0.1",
+                    "frame_id": "rg2_base_link",
+                    "names": list(_RG2_JOINT_NAMES),
+                    "positions_rad": [
+                        by_name[name]
+                        for name in _RG2_JOINT_NAMES
+                    ],
+                    "stamp_ms": stamp_ms,
+                    "published_at_ms": now_ms(),
+                },
+                0,
+                False,
+            )
+            return
+
+        self.get_logger().warning(
+            f"{self._joint_state_topic}: unsupported JointState layout "
+            f"names={names}"
         )
 
     def _on_robot_status(self, msg):
