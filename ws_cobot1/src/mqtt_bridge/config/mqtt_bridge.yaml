@@ -6,5 +6,7 @@ mqtt_bridge:
     dedup_cache_size: 100
     cmd_expiry_s: 5.0
     sample_publish_hz: 10.0
+    joint_publish_hz: 20.0
+    joint_state_topic: "/dsr01/joint_states"
     heartbeat_hz: 1.0
     keepalive_s: 60
