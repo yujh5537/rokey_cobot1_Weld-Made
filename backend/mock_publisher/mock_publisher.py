@@ -131,7 +131,46 @@ def publish_robot_sample(client):
 
 
 # =========================
-# 3. contact/event
+# 3. robot/joints
+# =========================
+
+def publish_robot_joints(client):
+    timestamp = now_ms()
+
+    message = {
+        "schema_version": "0.1",
+        "frame_id": "base_link",
+        "names": [
+            "joint_1",
+            "joint_2",
+            "joint_3",
+            "joint_4",
+            "joint_5",
+            "joint_6",
+        ],
+        "positions_rad": [
+            -0.3704,
+            0.2164,
+            1.5402,
+            -0.0007,
+            1.3843,
+            -0.2655,
+        ],
+        "stamp_ms": timestamp,
+        "published_at_ms": timestamp,
+    }
+
+    publish_message(
+        client,
+        "robot/joints",
+        message,
+        qos=0,
+        retain=False,
+    )
+
+
+# =========================
+# 4. contact/event
 # =========================
 
 def publish_contact_event(client):
@@ -183,7 +222,7 @@ def publish_contact_event(client):
 
 
 # =========================
-# 4. scan/result
+# 5. scan/result
 # =========================
 
 def publish_scan_result(client):
@@ -372,7 +411,7 @@ def publish_scan_result(client):
 
 
 # =========================
-# 5. scan/log
+# 6. scan/log
 # =========================
 
 def publish_scan_log(client):
@@ -436,11 +475,14 @@ def main():
     # 연결 직후 잠깐 기다린다.
     time.sleep(0.5)
 
-    # T12 요구사항 5종 발행
+    # 기존 5종 + T41 robot/joints 발행
     publish_scan_state(client)
     time.sleep(0.3)
 
     publish_robot_sample(client)
+    time.sleep(0.3)
+
+    publish_robot_joints(client)
     time.sleep(0.3)
 
     publish_contact_event(client)
@@ -454,7 +496,7 @@ def main():
     client.loop_stop()
     client.disconnect()
 
-    print("5개 MQTT 테스트 메시지 발행 완료")
+    print("6개 MQTT 테스트 메시지 발행 완료")
 
 
 if __name__ == "__main__":
