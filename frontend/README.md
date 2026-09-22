@@ -151,8 +151,8 @@ Three.js를 사용해 다음 정보를 표시한다.
 
 - 실제 Doosan M0609 visual mesh
 - M0609 J1~J6 실시간 관절 자세
-- OnRobot RG2 visual mesh(탐침 고정 파지 자세)
-- TCP [0, 0, 252.12] mm 기준 탐침 시각화
+- OnRobot RG2 visual mesh(닫힘 고정 파지 자세)
+- 그리퍼 끝에서 탐침 끝까지 13 mm 실측 기준 시각화
 - 작업대(상판 기준 실제 높이 94 mm)
 - `scan/result.vertices` 기반 동적 부재 Mesh
 - 현재 TCP 팁 위치
@@ -182,7 +182,7 @@ M0609 관절 데이터 흐름:
 
 M0609 visual mesh는 DoosanRobotics/doosan-robot2의 `m0609_white` COLLADA를 사용하고, RG2 visual mesh는 ABC-iRobotics/onrobot-ros2의 RG2 STL을 사용한다. 현재 웹은 이 공개 원격 asset을 읽으므로 브라우저에서 GitHub raw asset 접근이 가능해야 한다.
 
-RG2는 이번 MVP에서 탐침을 계속 고정 파지하므로 finger feedback을 별도 MQTT 계약으로 만들지 않고 고정 자세로 렌더링한다.
+RG2는 이번 MVP에서 탐침을 계속 고정 파지하므로 웹에서는 항상 닫힌 자세로 렌더링한다. 닫힘 자세는 upstream RG2 URDF의 `finger_joint` upper limit인 `0.785398 rad`를 기준으로 mimic 관절을 함께 적용한다. `robot/gripper_joints`가 들어와도 웹 시각 자세는 덮어쓰지 않는다.
 
 표시 구분:
 
@@ -548,8 +548,8 @@ M0609은 공식 URDF의 관절 계층을 Three.js Group으로 구성하고 공�
 - `robot/joints`의 관절 이름으로 J1~J6를 대응시킨다. 순서 변경과 `dsr01/`, `dsr01_` prefix를 허용한다.
 - 이름 중복, 누락, 비유한 각도가 있는 스냅샷은 적용하지 않는다. 비로봇팔 관절은 무시한다.
 - 유효한 6축 데이터가 3초 동안 없으면 **수신 지연 — 마지막 자세 표시**로 바뀐다. 수신 전 영점 자세는 실제 로봇 자세가 아니다.
-- RG2는 고정된 시각화 자세다. 실제 파지 폭은 아직 확인하지 않았으며 손가락 개폐 피드백은 반영하지 않는다.
-- 탐침 끝점은 현재 프로젝트 TCP `[0, 0, 252.12]` mm를 사용한다. 탐침 외형 길이·반경과 작업대 외형은 시각화용이다.
+- RG2는 닫힌 고정 시각화 자세다. `finger_joint=0.785398 rad`와 mimic 비율 `[1,-1,1,-1,-1,1]`을 적용하며 실시간 손가락 개폐 피드백은 화면 자세에 반영하지 않는다.
+- 탐침은 **그리퍼 끝 → 탐침 최하단 끝 = 13 mm** 실측값으로 표시한다. 기존 flange→TCP 252.12 mm를 탐침 돌출 길이로 사용하지 않는다.
 - 작업대 시각 모델은 실제 설비 위치 `VITE_TABLE_ORIGIN_MM`를 사용한다. 기본값은 실측 `423.56,-186.06,100.503` mm다.
 - `base_to_fixture`는 `scan/result` 좌표를 Base로 옮기는 용도다. sim의 `425,-184,400` mm는 가상 박스 지지면이므로 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
 - 부재는 유효한 `scan/result.vertices`로 생성한다.
