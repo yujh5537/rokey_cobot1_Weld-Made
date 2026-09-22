@@ -57,6 +57,9 @@ contact_detector:
     edge_force_window_s: 0.5
     edge_force_lag_s: 0.1
     edge_force_settle_s: 1.5
+    edge_force_settle_move_s: 1.0    # EDGE 판정이 켜진 뒤(실제 옆 출발)에도 1.0 s 는 힘 꺾임을 보지 않는다 (#154).
+                                     #   정상 밀기는 0.42~0.58 s 에 출발해 지금(1.5 s)과 거의 같고, 재출발로 늦게 떠난 밀기만 뒤로 밀린다
+                                     #   (9/22 실기 1553: 재출발 0.66 s 뒤 옆 2 mm 에서 가짜 EDGE)
 
     # --- sim 입력원 전용: 가상 직육면체 (T07). 실제 부재와 무관한 가상값. 이름은 정의서 6.2 ---
     sim_box_frame_id: base_link            # 아래 좌표의 프레임. RobotSample.frame_id 와 다르면 sim 은 판정하지 않는다

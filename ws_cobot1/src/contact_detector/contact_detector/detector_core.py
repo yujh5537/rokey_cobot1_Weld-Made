@@ -109,6 +109,9 @@ class EdgeConfig:
     force_lag_s: Optional[float] = None
     force_settle_s: float = 0.0     # SLIDE 첫 샘플부터 이만큼은 힘 꺾임을 보지 않는다. 순응이 켜지며 누름이 풀리는 동안
                                     # Fz 가 1 s 가까이 떨어진다(9/21 오전 9.8 → 0.7 N). z 로 켜기는 그 사이에 켜질 수 있다
+    force_settle_move_s: float = 0.0  # EDGE 판정이 켜진 시점(실제 옆 출발)부터도 이만큼은 보지 않는다. 0 = 끔 (#154)
+                                      # 옆 이동이 늦게 출발하면(재출발 약 1 s) 출발 흔들림이 첫 샘플 기준 대기 뒤에 온다
+                                      # (9/22 실기 1553: 재출발 0.66 s 뒤 옆 2 mm 에서 가짜 EDGE)
 
     def __post_init__(self):
         if not (self.edge_drop_m > 0 and self.arm_force_n > 0 and self.trend_window_s > 0
@@ -124,6 +127,8 @@ class EdgeConfig:
                 raise ValueError('force_lag_s 는 force_window_s 보다 작아야 한다')
         if not (math.isfinite(self.force_settle_s) and self.force_settle_s >= 0):
             raise ValueError('force_settle_s 는 0 이상이어야 한다')
+        if not (math.isfinite(self.force_settle_move_s) and self.force_settle_move_s >= 0):
+            raise ValueError('force_settle_move_s 는 0 이상이어야 한다')
         still = (self.arm_still_window_s, self.arm_still_m, self.arm_travel_m)
         if any(v is not None for v in still):
             if not all(v is not None and math.isfinite(v) and v > 0 for v in still):
@@ -250,6 +255,7 @@ class ContactDetector:
         self._force_first_drop: Optional[float] = None
         self._force_ref: Deque[Tuple[float, float]] = deque()   # 힘 꺾임: 판정을 켠 뒤의 (시각, 원시 Fz)
         self._slide_start_t: Optional[float] = None            # 이 SLIDE 의 첫 샘플 시각 (force_stamp)
+        self._edge_armed_t: Optional[float] = None             # EDGE 판정이 켜진 시각 (force_stamp) = 실제 옆 출발
         self._last_edge_t: Optional[float] = None
         self._pending: Deque[Tuple[float, float]] = deque()   # 아직 추세선에 넣지 않은 최근 샘플
         self._trend = (_Trend(edge_config.trend_window_s, edge_config.trend_min_samples)
@@ -271,6 +277,7 @@ class ContactDetector:
         self._force_first_drop = None
         self._force_ref.clear()
         self._slide_start_t = None
+        self._edge_armed_t = None
         self._last_edge_t = None
         self._pending.clear()
         if self._trend:
@@ -427,6 +434,7 @@ class ContactDetector:
             # 틈을 메우며 내려가는 동안에는 판정하지 않는다. 누르는 것이 확인된 뒤의 z 만 기준선에 쓴다
             if self._pressing(sample, cfg):
                 self._edge_armed = True
+                self._edge_armed_t = sample.force_stamp
                 self._pending.append((t, z))
             return None
 
@@ -464,7 +472,9 @@ class ContactDetector:
         while self._force_ref and self._force_ref[0][0] < t - cfg.force_window_s:
             self._force_ref.popleft()
         ref = [f for ft, f in self._force_ref if ft <= t - cfg.force_lag_s]
-        settled = self._slide_start_t is not None and t - self._slide_start_t >= cfg.force_settle_s
+        settled = (self._slide_start_t is not None and t - self._slide_start_t >= cfg.force_settle_s
+                   and (cfg.force_settle_move_s <= 0 or (self._edge_armed_t is not None
+                                                         and t - self._edge_armed_t >= cfg.force_settle_move_s)))
         below = (settled and len(ref) >= self.edge_config.trend_min_samples
                  and fz < statistics.median(ref) - cfg.force_drop_n)
         count = self._force_run.update(below, sample)

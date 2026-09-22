@@ -129,3 +129,53 @@ def test_config_rejects_bad_force_values():
         edge_config(**dict(FORCE, force_lag_s=0.5))                       # lag >= window
     with pytest.raises(ValueError):
         edge_config(**dict(FORCE, force_settle_s=-1.0))
+
+
+def late_start(delay_s=1.2, seconds=14.0):
+    """재출발처럼 delay_s 동안 제자리에 있다가 출발한다. 출발 0.5 s 뒤 0.3 s 동안 Fz 가 2.5 N 빠졌다 돌아온다.
+
+    9/22 실기 1553: 재출발 0.66 s 뒤, 옆 2 mm 에서 가짜 EDGE. 모서리는 출발점에서 40 mm 뒤다.
+    """
+    samples = []
+    for i in range(int(seconds / DT)):
+        t = i * DT
+        moving = max(0.0, t - delay_s)
+        x = X0 + V_SLIDE * moving
+        fz = F_PRESS
+        since = t - delay_s - 0.5
+        if 0.0 <= since < 0.3:
+            fz = F_PRESS - 2.5
+        past = (x - X_EDGE) / V_SLIDE
+        z = Z_TOP
+        if past > 0:
+            fz = F_PRESS + (F_AIR - F_PRESS) * min(past / 0.4, 1.0)
+            z = Z_TOP - 0.0003 * past
+        samples.append(Sample(
+            sample_id=i + 1, pose_stamp=t, force_stamp=t + 0.004, position=(x, -0.18606, z),
+            force=(-5.0, 0.8, fz + noise(i)), motion_id=7, operation=OP_SLIDE))
+    return samples
+
+
+def test_late_departure_dip_is_a_false_edge_without_move_settle():
+    """첫 샘플 기준 대기(1.5 s)만으로는 늦게 출발한 밀기의 출발 흔들림을 못 거른다 (#154)."""
+    found = edges(edge_config(**FORCE), late_start())
+    assert found and found[0].first_sample.position[0] - X0 < 5 * MM, '출발 직후(모서리 40 mm 앞)에서 난다'
+
+
+def test_move_settle_waits_from_the_real_departure():
+    """판정이 켜진 시점(실제 옆 출발)부터도 기다리면 출발 흔들림을 거르고 모서리만 잡는다 (#154)."""
+    found = edges(edge_config(**dict(FORCE, force_settle_move_s=1.0)), late_start())
+    assert len(found) == 1
+    assert 0.0 <= found[0].first_sample.position[0] - X_EDGE < 1.5 * MM
+
+
+def test_move_settle_keeps_an_on_time_slide_the_same():
+    """정상 출발(바로 움직임)이면 결과가 같다."""
+    base = edges(edge_config(**FORCE), slide())
+    with_move = edges(edge_config(**dict(FORCE, force_settle_move_s=1.0)), slide())
+    assert [e.first_sample.sample_id for e in base] == [e.first_sample.sample_id for e in with_move]
+
+
+def test_config_rejects_negative_move_settle():
+    with pytest.raises(ValueError):
+        edge_config(**dict(FORCE, force_settle_move_s=-0.1))
