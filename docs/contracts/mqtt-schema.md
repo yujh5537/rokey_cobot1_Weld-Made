@@ -1,6 +1,6 @@
 # MQTT 토픽·JSON 스키마 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석) · **v0.2.0** (2026-09-22, T41: M0609 웹 관절 시각화용 `robot/joints` 추가). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석) · **v0.2.0** (2026-09-22, T41: M0609 웹 관절 시각화용 `robot/joints` 추가) · **v0.2.1** (2026-09-22, T41: RG2 관절 표시용 `robot/gripper_joints` 분리). 변경은 PR + `CHANGELOG.md`로만 한다.
 이 문서 한 장이 ROS 쪽(의석, mqtt_bridge. scan_manager 쪽 접점은 병후)과 웹 쪽(의석, FastAPI)의 유일한 접점이다. 의석의 목업 발행기(`backend/mock_publisher`)와 mqtt_bridge 테스트는 **아래 예시를 그대로** 쓴다.
 
 브로커: 웹 PC의 Mosquitto 1개. 주소·포트는 `docker/.env`.
@@ -45,7 +45,8 @@
 | ROS → 웹 | `cmd/ack` | 1 | false | goal 수락/거절 · Service 응답 | **접수/거절.** 완료가 아니다 |
 | ROS → 웹 | `scan/command_result` | 1 | false | Action Result · `STOPPED` 전이 | 명령의 **완료/실패** (start · stop · home · resume) |
 | ROS → 웹 | `robot/sample` | 0 | false | `/robot/sample` | TCP · 힘. 10 Hz 다운샘플(설계 목표) |
-| ROS → 웹 | `robot/joints` | 0 | false | `/dsr01/joint_states` (`sensor_msgs/JointState`) | M0609 J1~J6 웹 3D 시각화. mqtt_bridge가 표시용으로 20 Hz 다운샘플 |
+| ROS → 웹 | `robot/joints` | 0 | false | `/dsr01/joint_states`의 `joint_state_broadcaster` (`sensor_msgs/JointState`) | M0609 J1~J6 웹 3D 시각화. mqtt_bridge가 표시용으로 20 Hz 다운샘플 |
+| ROS → 웹 | `robot/gripper_joints` | 0 | false | `/dsr01/joint_states`의 `joint_state_publisher` 합성 스냅샷 | RG2 finger/mimic 6축 웹 시각화. M0609 6축은 이 토픽에서 제거 |
 | ROS → 웹 | `robot/status` | 1 | **true** | `/robot/status` | 연결 · 동작 · 오류 |
 | ROS → 웹 | `scan/state` | 1 | **true** | `/scan/state` | 단계 · 방향 · 진행 n/4 |
 | ROS → 웹 | `scan/result` | 1 | false | `/scan/result` | 형상 결과 |
@@ -264,6 +265,28 @@ LWT는 같은 구조에 `"connected": false`.
 }
 ```
 `names[i]`와 `positions_rad[i]`가 같은 관절을 뜻한다. 관절 위치는 원본 `JointState.position`의 rad 값을 변환하지 않고 전달한다. 이 토픽은 웹 디지털 트윈 표시용이며 로봇 제어 입력으로 사용하지 않는다.
+
+현재 bringup에서는 같은 ROS 토픽 `/dsr01/joint_states`에 publisher가 2개다. mqtt_bridge는 **정확히 J1~J6만 있는 스냅샷**을 `robot/joints`로 보내고, M0609+RG2가 합쳐진 스냅샷에서는 RG2 관절만 떼어 다음 토픽으로 보낸다. 따라서 웹 M0609 자세가 6축/12축 payload 사이에서 번갈아 덮이지 않는다.
+
+#### robot/gripper_joints
+```json
+{
+  "schema_version": "0.1",
+  "frame_id": "rg2_base_link",
+  "names": [
+    "rg2_finger_joint",
+    "rg2_left_inner_knuckle_joint",
+    "rg2_left_inner_finger_joint",
+    "rg2_right_outer_knuckle_joint",
+    "rg2_right_inner_knuckle_joint",
+    "rg2_right_inner_finger_joint"
+  ],
+  "positions_rad": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "stamp_ms": 1789720001025,
+  "published_at_ms": 1789720001030
+}
+```
+RG2 값도 원본 `JointState.position`의 rad다. `robot/gripper_joints`는 표시 전용이며 RG2 제어 명령으로 사용하지 않는다.
 
 #### robot/status
 ```json
