@@ -125,6 +125,49 @@ function getBaseToFixtureMm() {
 
 const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
 
+// 작업대는 실제 설비 배치용 시각 모델이다.
+// sim의 base_to_fixture.z=400 mm는 가상 박스 지지면이므로
+// 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
+const DEFAULT_TABLE_ORIGIN_MM = {
+  x: 423.56,
+  y: -186.06,
+  z: 100.503,
+}
+
+function getTableOriginMm() {
+  const raw =
+    import.meta.env
+      .VITE_TABLE_ORIGIN_MM ?? ''
+
+  if (!raw.trim()) {
+    return DEFAULT_TABLE_ORIGIN_MM
+  }
+
+  const values = raw
+    .split(',')
+    .map((value) =>
+      Number(value.trim())
+    )
+
+  if (
+    values.length !== 3 ||
+    values.some(
+      (value) =>
+        !Number.isFinite(value)
+    )
+  ) {
+    return DEFAULT_TABLE_ORIGIN_MM
+  }
+
+  return {
+    x: values[0],
+    y: values[1],
+    z: values[2],
+  }
+}
+
+const TABLE_ORIGIN_MM = getTableOriginMm()
+
 function formatScanLogMessage(payload) {
   const parts = []
 
@@ -739,19 +782,17 @@ function App() {
     const floorY = -tableHeight
 
     // Three.js 장면은 base_link 기준으로 유지한다.
-    // 작업대 상판 원점은 base_to_fixture만큼 이동한
-    // workpiece_fixture 원점에 놓는다.
-    const fixtureOriginThree =
-      BASE_TO_FIXTURE_MM
-        ? toThreePosition(
-            BASE_TO_FIXTURE_MM.x,
-            BASE_TO_FIXTURE_MM.y,
-            BASE_TO_FIXTURE_MM.z
-          )
-        : new THREE.Vector3(0, 0, 0)
+    // 작업대 시각 모델은 실제 설비 위치를 사용한다.
+    // sim base_to_fixture는 가상 박스의 지지면이므로 작업대 위치와 분리한다.
+    const tableOriginThree =
+      toThreePosition(
+        TABLE_ORIGIN_MM.x,
+        TABLE_ORIGIN_MM.y,
+        TABLE_ORIGIN_MM.z
+      )
 
     worktable.position.copy(
-      fixtureOriginThree
+      tableOriginThree
     )
 
     const topMaterial =
@@ -973,9 +1014,9 @@ function App() {
       )
 
     floorGrid.position.set(
-      fixtureOriginThree.x,
-      fixtureOriginThree.y + floorY,
-      fixtureOriginThree.z
+      tableOriginThree.x,
+      tableOriginThree.y + floorY,
+      tableOriginThree.z
     )
 
     floorGrid.material.transparent =
@@ -1031,10 +1072,10 @@ function App() {
         )
       })
 
-    // M0609(base_link)와 작업대(workpiece_fixture)가
+    // M0609(base_link)와 실제 작업대가
     // 한 화면에 들어오도록 두 원점의 중간을 바라본다.
     const viewCenter =
-      fixtureOriginThree
+      tableOriginThree
         .clone()
         .multiplyScalar(0.5)
 
