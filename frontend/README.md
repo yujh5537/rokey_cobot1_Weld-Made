@@ -275,25 +275,17 @@ Y = -186.06 mm
 Z = 100.503 mm
 ```
 
-sim 기준:
+sim 통합 검증도 2026-09-22부터 실측 작업대 원점과 같은 좌표를 사용한다.
 
 ```text
-X = 425 mm
-Y = -184 mm
-Z = 400 mm
+X = 423.56 mm
+Y = -186.06 mm
+Z = 100.503 mm
 ```
 
-실기와 sim의 값이 다르므로 실행 환경에 맞는 값을 사용해야 한다.
-
-다만 현재 3D 관제 화면은 **측정값의 좌표/수치는 바꾸지 않고**,
-`scan/result` 형상·모서리·경로 후보의 표시 지지면(`workpiece_fixture Z=0`)만
-실제 작업대 상판 `VITE_TABLE_ORIGIN_MM.z`에 맞춘다.
-sim의 `base_to_fixture.z=400 mm`를 그대로 화면 높이에 쓰면
-94 mm 작업대 모델과 분리되어 탐지 물체가 공중에 떠 보이기 때문이다.
-X/Y는 `VITE_BASE_TO_FIXTURE_MM`을 유지한다.
-
-즉 이 보정은 **3D 표시용 Z 재배치**이며,
-MQTT/DB/좌표 표의 `workpiece_fixture` 값과 ROS 결과는 변경하지 않는다.
+따라서 `robot/sample`(탐침 TCP 궤적), `contact/event`(판정 순간 탐침 접촉점),
+`scan/result`(접촉점으로 계산한 형상)이 모두 같은 base_link 장면에서 일치한다.
+프론트에서 sim 결과만 임의로 위/아래로 이동하지 않는다.
 
 `search_origin_pose`와 `base_to_fixture`는 같은 값이 아니므로
 서로 대체해서 사용하지 않는다.
@@ -600,7 +592,7 @@ broker가 다른 PC에 있으면 기존 실행 환경의 `broker_host`를 함께
 ```bash
 # Web PC: 기존 FastAPI·Mosquitto는 실행 상태여야 한다.
 cd frontend
-VITE_BASE_TO_FIXTURE_MM=425,-184,400 \
+VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503 \
 VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
 npm run dev
 ```
@@ -629,7 +621,7 @@ VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503 \
 VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
 npm run dev
 ```
-를 사용한다. sim에서는 `VITE_BASE_TO_FIXTURE_MM=425,-184,400`을 유지하되 작업대 시각 모델은 실제 설비 높이를 유지한다. 이때 `scan/result`의 3D 지지면만 작업대 상판으로 표시되므로 탐지 형상이 공중에 뜨지 않는다.
+를 사용한다. 현재 sim 통합 검증도 같은 fixture 좌표를 사용한다. `contact/event`의 노란 접촉점과 `robot/sample`의 파란 탐침 궤적, `scan/result` 형상은 별도 표시 보정 없이 같은 좌표계에서 겹쳐야 한다.
 
 ---
 
