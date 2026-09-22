@@ -1191,7 +1191,6 @@ function App() {
 
       robotModelRef.current = null
       robotJointRefs.current = {}
-      robotGripperJointRefs.current = {}
 
       tipMeshRef.current = null
       trajectoryLineRef.current = null
