@@ -3,7 +3,7 @@
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
 ## v0.1.15 (2026-09-22, SLIDE 스텝 모드)
-타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가).
+타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가). `ContactEvent.msg` · 2.1 메시지 정의의 `source` 주석에 `robot_step` 을 더했다(주석만, 타입 · 빌드 영향 없음).
 - 9/22 실기: 힘 제어 밀기는 방향별 실제 누름이 1.5~8.6 N(같은 6 N 설정), 방향 전환 뒤 떠서 모서리를 놓침(#155), 가짜 EDGE(#154), 옆 이동 명령 누락(#153), 가짜 도착(#152). 뿌리가 같다 — 움직이는 중에 힘을 읽고 누름을 힘 제어에 맡긴다
 - 9/17 `tactile_probe/edge_scan.py` 프로토타입(같은 M0609)은 위치 제어로 한 스텝 가고 멈춘 뒤 힘을 읽어 z 를 맞추며 긁어 원점 + 네 방향을 한 번에 끝냈다(`~/tactile_probe_logs/scan_20260917_171305.csv`). 이것을 robot_manager `slide_mode: step` 으로 옮겼다. `force` 는 기존 그대로
 - 스텝 모드의 EDGE 는 "힘 빠짐 → 더 내려가 보기 → 확정 → 가는 스텝 다듬기"가 동작과 한 몸이라 robot_manager 가 확정하고 `/contact/event` 로 낸다(`source robot_step`, `event_id ≥ 2³²`, `z_drop_valid` 항상 true). 짝 맞추기와 scan_manager 절차는 그대로

@@ -125,7 +125,7 @@ string scan_id              # /scan/state 에서 받은 현재 scan_id. 없으�
 uint32 motion_id            # 판정에 쓴 RobotSample.motion_id 를 그대로 복사
 uint64 sample_id            # 판정 샘플(= 조건이 처음 성립한 샘플)의 RobotSample.sample_id
 uint8 type
-string source               # 'robot_force' | 'sim'
+string source               # 'robot_force' | 'sim' | 'robot_step' (robot_manager 스텝 모드 SLIDE 의 EDGE, v0.1.15)
 string frame_id             # RobotSample 과 동일
 geometry_msgs/Pose pose     # 판정 샘플의 TCP pose (≠ 확정 샘플, ≠ 정지 완료 좌표)
 geometry_msgs/Wrench wrench # 판정 샘플의 외력
