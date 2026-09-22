@@ -25,8 +25,9 @@ def params(**changes):
 class Box:
     """(0, 0) 중심, 반폭 HALF 인 상자. 윗면 기울기 slope_x [rad], 벽 (x 위치, 높이) 선택."""
 
-    def __init__(self, slope_x=0.0, wall_x=None, noise_n=0.0, seed=0):
+    def __init__(self, slope_x=0.0, wall_x=None, noise_n=0.0, seed=0, corner_n=0.0, corner_w=0.003):
         self.slope_x, self.wall_x, self.noise_n = slope_x, wall_x, noise_n
+        self.corner_n, self.corner_w = corner_n, corner_w
         self.rng = random.Random(seed)
 
     def top(self, x, y):
@@ -46,6 +47,9 @@ class Box:
             if h > 0:
                 fx -= 0.3 * press * last_move[0] / h
                 fy -= 0.3 * press * last_move[1] / h
+        past = max(abs(x), abs(y)) - HALF
+        if surface is None and 0.0 < past < self.corner_w and z < TOP_Z:
+            fz += self.corner_n      # 둥근 팁이 모서리 각에 걸친 힘. 더 눌러도 늘지 않는다 (9/22 motion 3104)
         if self.wall_x is not None and x >= self.wall_x and surface is not None and z < surface + 0.005:
             fx -= 30000.0 * (x - self.wall_x + 0.0001)
         if self.noise_n:
@@ -58,6 +62,7 @@ class FakeIO:
         self.box, self.pos = box, tuple(start)
         self.last_horizontal = (0.0, 0.0, 0.0)
         self.moves = 0
+        self.horizontal = []      # (출발 위치, 이동량)
         self.lines = []
 
     def position(self):
@@ -70,6 +75,7 @@ class FakeIO:
         self.moves += 1
         if abs(d[0]) > 1e-12 or abs(d[1]) > 1e-12:
             self.last_horizontal = tuple(d)
+            self.horizontal.append((self.pos, tuple(d)))
         self.pos = tuple(a + b for a, b in zip(self.pos, d))
 
     def log(self, text):
@@ -95,6 +101,18 @@ def test_starting_above_the_surface_presses_down_first():
     io = FakeIO(Box(), (0.0, 0.0, TOP_Z + 0.001))     # 방향 전환 뒤 1 mm 떠서 시작
     edge = step_slide.run(io, (1.0, 0.0, 0.0), params())
     assert edge.position[0] == pytest.approx(HALF, abs=0.00015)
+
+
+@pytest.mark.parametrize('corner_n', [1.8, 2.6])
+def test_weak_force_on_the_corner_does_not_drag_the_tip_down(corner_n):
+    """9/22 motion 3104: 모서리를 넘은 뒤 1.6~1.9 N 이 남아 release 1.5 를 넘었다. 최근 접촉 높이가 따라
+    내려가 모서리를 2.9 mm 타고 내려갔고, drop_m 만 들고 물러나다 옆면에 걸려 다시 누르지 못했다."""
+    io = FakeIO(Box(corner_n=corner_n), pressed_start())
+    edge = step_slide.run(io, (-1.0, 0.0, 0.0), params())
+    assert edge.position[0] == pytest.approx(-HALF, abs=0.00015)
+    assert min(pos[2] for pos, _ in io.horizontal) > TOP_Z - 0.0006 - 1e-9   # 흘러내리지 않았다
+    backing = [(pos, d) for pos, d in io.horizontal if d[0] > 0.0]            # 긁는 방향(−x) 반대로 물러남
+    assert backing and all(pos[2] > TOP_Z for pos, _ in backing)             # 윗면 위로 든 채 물러났다
 
 
 def test_no_surface_within_press_max_is_no_contact():

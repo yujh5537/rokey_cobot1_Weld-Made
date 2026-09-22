@@ -9,11 +9,16 @@
 순서
   0. 기준 힘: lift 만큼 들고, 긁을 방향으로 nudge 만큼 움직여 멈춘 뒤 F0 (마지막 이동 방향을 긁기와 같게.
      9/21 실기 1-1절: 멈춘 상태에서도 마지막 이동 방향만으로 Fz 가 1.9 N 달라진다)
-  1. 누르기: press_step 씩 내려가 ΔFz ≥ release_n. 한계 = 시작 z − press_max_m
+  1. 누르기: press_step 씩 내려가 ΔFz ≥ release_n (처음 닿음). 한계 = 시작 z − press_max_m
   2. 긁기: coarse 만큼 이동 → 누름 맞추기(keep_contact). ΔFz 를 [follow_lo, follow_hi] 로 유지하도록 z 를
      z_step 씩 조절한다. 힘이 빠지면 최근 접촉 높이(중앙값)보다 drop_m 아래까지 내려가 보고,
-     그래도 release_n 미만일 때만 접촉 소실 후보로 본다 → 흔들림을 모서리로 오판하지 않는다
-  3. 다듬기: 들고 뒤로 물러나 다시 누른 뒤 fine 씩 전진해 소실 지점을 다시 찾는다 → 모서리
+     그래도 follow_lo 미만일 때만 접촉 소실 후보로 본다 → 흔들림을 모서리로 오판하지 않는다.
+     평평한 윗면이면 drop_m 아래에서는 follow_lo 를 훨씬 넘는다(0.5 mm ≈ 7 N). 모서리를 넘으면 반지름 약
+     2 mm 팁이 모서리 각에 걸려 1~2 N 이 남는데(9/22 18:0x 위치 기록), 이 값은 F0 치우침(±0.6 N)만큼
+     release_n 을 넘나든다. 그래서 소실 기준은 follow_lo 이고, 최근 접촉 높이는 follow_lo 이상으로 누른
+     자리만 쌓는다(약한 걸침이 기준 높이를 끌어내리면 모서리를 타고 흘러내린다)
+  3. 다듬기: 윗면 위로 lift 만큼 들고, 마지막으로 제대로 누른 자리로 돌아가 다시 누른 뒤 fine 씩 전진해
+     소실 지점을 다시 찾는다 → 모서리
   4. 끝나면 lift 만큼 든다 (팁을 모서리에 걸쳐 두지 않는다)
 
 실패하면 가능한 한 면에서 떨어진 뒤 StepFailure 를 낸다. 단위: m · N.
@@ -48,7 +53,7 @@ class StepParams:
     press_max_m: float       # 처음 누를 때 시작 z 에서 내려갈 수 있는 최대 거리
     lift_m: float            # 기준 힘을 잴 때 · 끝났을 때 드는 높이
     nudge_m: float           # 기준 힘 전에 긁을 방향으로 움직이는 거리
-    release_n: float         # ΔFz 가 이 아래면 접촉이 약함 / 소실
+    release_n: float         # 처음 누를 때 이 이상이면 닿음 (소실 기준은 follow_lo_n)
     follow_lo_n: float       # 누름 하한 (이보다 약하면 조금 더 누름)
     follow_hi_n: float       # 누름 상한 (이보다 세면 조금 올라감)
     max_force_n: float       # |ΔF| 가 이보다 크면 들고 중단
@@ -141,20 +146,21 @@ def run(io, direction, p: StepParams):
         df = read()
     ref_z = io.position()[2]
     hist = [ref_z]
-    state = {'df': df}
+    state = {'df': df, 'good': io.position()}
 
     def keep_contact():
         """ΔFz 를 [follow_lo, follow_hi] 로 맞춘다. 닿아 있으면 True,
-        최근 접촉 높이 − drop_m 까지 내려가도 release 미만이면 False."""
+        최근 접촉 높이 − drop_m 까지 내려가도 follow_lo 미만이면 False."""
         f = read()
         for _ in range(200):
             floor = median(hist[-10:]) - p.drop_m
             can_go_down = io.position()[2] - p.z_step_m >= floor - 1e-9
             if f[2] > p.follow_hi_n:
                 io.move_rel((0.0, 0.0, p.z_step_m))
-            elif f[2] >= p.follow_lo_n or (f[2] >= p.release_n and not can_go_down):
+            elif f[2] >= p.follow_lo_n:
                 hist.append(io.position()[2])
                 state['df'] = f
+                state['good'] = io.position()
                 return True
             elif can_go_down:
                 io.move_rel((0.0, 0.0, -p.z_step_m))
@@ -184,21 +190,23 @@ def run(io, direction, p: StepParams):
                           back=True)
     io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 후보 → 가는 스텝으로 다시')
 
-    # 3. 다듬기: 살짝 들고 뒤로 간 뒤 다시 누르고 전진 (못 누르면 더 뒤로)
+    # 3. 다듬기: 윗면 위로 들고, 마지막으로 제대로 누른 자리로 돌아가 다시 누르고 전진 (못 누르면 더 뒤로).
+    # drop_m 만 들면 모서리 아래로 내려간 팁이 윗면보다 낮아 돌아가는 길에 옆면에 걸린다 (9/22 motion 3104)
     lost = io.position()
+    good = state['good']
+    ref = median(hist[-10:])
     for attempt in range(3):
-        ref = median(hist[-10:])
-        back = p.coarse_m * (attempt + 1) + 2 * p.fine_m
+        back = p.coarse_m * attempt
+        io.move_rel((0.0, 0.0, ref + p.lift_m - io.position()[2]))
         here = io.position()
-        io.move_rel((0.0, 0.0, ref + p.drop_m - here[2]))
-        here = io.position()
-        io.move_rel((lost[0] - back * u[0] - here[0], lost[1] - back * u[1] - here[1], 0.0))
+        io.move_rel((good[0] - back * u[0] - here[0], good[1] - back * u[1] - here[1], 0.0))
         io.move_rel((0.0, 0.0, ref - io.position()[2]))
         if keep_contact():
             break
     else:
-        lift_and_fail(UNSTABLE, '모서리 근처로 돌아왔는데 다시 누르지 못했다')
-    for _ in range(int(math.ceil((back + 4 * p.coarse_m) / p.fine_m))):
+        lift_and_fail(UNSTABLE, '마지막으로 누른 자리로 돌아왔는데 다시 누르지 못했다')
+    span = sum((a - b) * c for a, b, c in zip(lost, io.position(), u))
+    for _ in range(int(math.ceil((span + 4 * p.coarse_m) / p.fine_m))):
         io.move_rel(_add((0.0, 0.0, 0.0), u, p.fine_m))
         if not keep_contact():
             q = io.position()
