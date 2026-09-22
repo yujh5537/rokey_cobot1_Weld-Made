@@ -256,9 +256,7 @@ function buildRg2Model(
       new THREE.Group()
 
     outerJoint.rotation.x =
-      reflect > 0
-        ? -fingerAngle
-        : -fingerAngle
+      -fingerAngle
 
     outerOrigin.add(outerJoint)
 
@@ -357,7 +355,7 @@ function buildRg2Model(
   const probeTip =
     new THREE.Mesh(
       new THREE.SphereGeometry(
-        0.00225,
+        0.000225,
         16,
         16
       ),
