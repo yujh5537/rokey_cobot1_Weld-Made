@@ -127,6 +127,8 @@ robot_manager:
                                      #   다르다. 이 값을 넘으면 TARGET_REACHED 가 아니라
                                      #   ROBOT_ERROR 다. 출발값이고 실기에서 확정한다 (#73)
     arrival_grace_s: 1.0             # 명령 후 이 시간 안에 안 움직이면 도착으로 본다 [s]
+    motion_timeout_s: 120.0          # goal.timeout 이 0 일 때(손으로 보낸 goal, t25_all.sh) 쓰는 제한 [s]. 스텝 모드 SLIDE 는
+                                     #   한 방향에 50~70 s 라 코드 기본 60 이면 끊긴다. scan_manager 의 motion_timeout_s 와 같은 값
     release_force_time_s: 0.3        # release_force 의 강성 제어 전환 시간 [s] (0~1.0).
                                      #   0 이면 즉시 전환이라 참조 외력이 점프한다
                                      #   (두산 매뉴얼 5.1.4 알아두기). 실기에서 확인한다
@@ -142,6 +144,35 @@ robot_manager:
                                      #   정지 완료가 안 나오고, 너무 크면 느린 하강을 정지로 본다.
                                      #   실기에서 확인해 조정한다 (다음 세션 'moving 오탐 여부')
     moving_window_s: 0.3
+    # --- SLIDE 방식 (계약 7.2 스텝 모드, v0.1.15) ---------------------------------------------------
+    slide_mode: step                 # force = 순응 · 힘 제어로 끊지 않고 민다(위 slide_target_force_n · compliance_stiffness).
+                                     #   step = 위치 제어로 한 스텝 가고 멈춘 뒤 힘을 읽어 z 를 맞추며 긁는다(step_slide.py).
+                                     #   9/17 tactile_probe 프로토타입이 같은 M0609 로 네 방향을 한 번에 끝낸 방식.
+                                     #   힘 제어 밀기는 9/22 실기에서 방향별 누름 1.5~8.6 N 편차 · 뜸 · 가짜 EDGE 로 막혔다.
+                                     #   step 이면 EDGE 는 robot_manager 가 확정해 /contact/event 로 낸다(source robot_step).
+                                     #   아래 step_* 는 step 일 때만 읽는다. 값은 설계 출발값 — 실기 첫 시험에서 확정한다
+    step_coarse_m: 0.0005            # 긁기 스텝 [m]. 프로토타입 0.5 mm
+    step_fine_m: 0.0001              # 모서리 다듬기 스텝 [m]. 모서리 반복도의 분해능
+    step_z_m: 0.00005                # 누름 맞추기 z 스텝 [m]. 새 탐침 0.1 mm 당 약 1.4 N(t25_all.sh) → [3, 7] N 띠가 약 0.3 mm
+    step_press_step_m: 0.0001        # 시작 자리에서 처음 누를 때 내려가는 스텝 [m]
+    step_press_max_m: 0.003          # 시작 자리에서 내려갈 수 있는 최대 [m]. 방향 전환 뒤 recontact_margin_m(1 mm) 떠서 와도 닿는다.
+                                     #   step_press_max_m + step_drop_m < drop_limit_m 이어야 한다(하강 제한에 먼저 걸린다)
+    step_lift_m: 0.001               # 기준 힘을 잴 때 · 끝났을 때 드는 높이 [m]
+    step_nudge_m: 0.001              # 기준 힘 전에 긁을 방향으로 움직이는 거리 [m]. 마지막 이동 방향을 긁기와 같게 둔다
+                                     #   (9/21 1-1절: 멈춘 상태에서도 마지막 이동 방향만으로 Fz 가 1.9 N 다르다)
+    step_release_n: 1.5              # ΔFz 가 이 아래면 접촉이 약함 / 소실 [N]. 정지 잡음 ±0.5 N 의 3 배
+    step_follow_lo_n: 3.0            # 누름 하한 [N]. 이보다 약하면 z 를 더 내린다
+    step_follow_hi_n: 7.0            # 누름 상한 [N]. 이보다 세면 z 를 올린다
+    step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. over_force_n(15) 보다 작게
+    step_side_hit_n: 8.0             # 수평 |ΔF| 가 이보다 크면 물러나고 중단 [N]. 프로토타입 마찰 수평 힘 약 2.6 N
+    step_drop_m: 0.0005              # 힘이 빠졌을 때 최근 접촉 높이보다 이만큼 아래까지 내려가 본다 [m]. 이때도 안 닿아야 모서리
+    step_z_tol_m: 0.001              # 긁는 동안 누르는 높이 변화 한계의 최솟값 [m]. 넘으면 탐침 밀림 · 물체 이동으로 보고 중단
+    step_max_slope_deg: 5.0          # 높이 변화 한계 = max(step_z_tol_m, 긁은 거리 × tan(이 각도))
+    step_settle_s: 0.15              # 멈춘 뒤 힘을 읽기 전 대기 [s]. 프로토타입 0.1
+    step_force_samples: 3            # 그 뒤 새로 받은 샘플 몇 개를 평균낼지. 42.8 Hz 면 3 개 ≈ 70 ms
+    step_still_m: 0.00005            # 이 창 동안 위치 변화가 이 이하면 멈춤 [m]. posx 정지 잡음보다 커야 한다
+    step_still_window_s: 0.15
+    step_move_timeout_s: 2.0         # 한 스텝이 (거리/속도 + 이 값) 안에 멈추지 않으면 중단 [s]. 출발하지 않았으면 한 번 다시 보낸다(#153)
 
 scan_manager:
   ros__parameters:
@@ -166,7 +197,8 @@ scan_manager:
                                      #   홈은 바꾸지 않으므로 이 값이 닿는 부재 높이를 정한다: 0.120 이면 높이 72.3 mm 이상
                                      #   ⚠️ 부재가 없으면 팁이 작업대까지 내려간다. 목표 z 제한이 유일한 보호다
     max_slide_m: 0.060               # 미소실 실패 한계. 80 mm 큐브 반폭 0.040 + 여유
-    motion_timeout_s: 60.0           # 단위 모션 제한
+    motion_timeout_s: 120.0          # 단위 모션 제한. 스텝 모드 SLIDE(robot_manager slide_mode: step)는 40 mm 에 약 50~70 s
+                                     #   (0.5 mm 스텝마다 멈춰 힘을 읽는다, 프로토타입 실측 스텝당 0.4~0.5 s). 60 이면 모자란다
     move_speed_mps: 0.030            # OP_MOVE_TO 속도(기준점 이동 · 방향 전환의 올림과 수평 이동 · 마무리 들어 올림)
     recontact_speed_mps: 0.002       # 방향 전환 뒤 내림 속도. 이동 속도가 아니라 저속이어야 한다(계약 7.3)
     lift_height_m: 0.05              # 계약 이름. 방향 전환 · 마무리 때 팁 상승량. 출발값 50 mm (BRD 4.2.6)
