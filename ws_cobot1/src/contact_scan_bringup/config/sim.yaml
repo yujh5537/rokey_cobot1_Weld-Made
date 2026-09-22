@@ -56,10 +56,10 @@ contact_detector:
 
     # --- sim 입력원 전용: 가상 직육면체 (T07). 실제 부재와 무관한 가상값. 이름은 정의서 6.2 ---
     sim_box_frame_id: base_link            # 아래 좌표의 프레임. RobotSample.frame_id 와 다르면 sim 은 판정하지 않는다
-    sim_box_origin_m: [0.425, -0.184, 0.400]   # 밑면 중심(지지면 위)의 x, y, z. 홈 자세 바로 아래에 둔다
-                                           #   Virtual 기본 자세(관절 전부 0)는 특이점이라 move_line 의 역기구학 해가 없다.
-                                           #   서비스는 success=true 를 주고도 움직이지 않는다(2026-09-21 확인).
-                                           #   홈 관절각으로 간 뒤에는 정상이므로 박스도 그 근처에 둔다
+    sim_box_origin_m: [0.42356, -0.18606, 0.100503]   # 밑면 중심 = 웹 작업대 상판(workpiece_fixture z=0)의 Base 좌표
+                                           #   2026-09-22 통합 시각화에서 sim z=0.400을 쓰면
+                                           #   실제 94 mm 작업대와 contact/event·robot/sample·scan/result가 서로 다른 높이에 보였다.
+                                           #   sim도 실측 fixture 좌표를 사용해 탐침 궤적·접촉점·형상을 한 좌표계로 맞춘다.
     sim_box_size_m: [0.10, 0.06, 0.04]     # 가로(x) · 세로(y) · 높이(z). 윗면 z = origin z + 높이
     sim_stiffness_n_per_m: 20000.0         # 가상 외력 = 강성 x 윗면 침투 깊이. 3 N 에서 침투 0.15 mm, 30 N 에서 1.5 mm
     sim_tip_radius_m: 0.000225             # 가상 팁 반지름. PR #57 실측 r = 0.225 mm (지름 0.45 mm) 와 같게 둔다
@@ -101,10 +101,9 @@ safety_monitor:
 
 robot_manager:
   ros__parameters:
-    home_joint_deg: [-24.14, 17.03, 51.68, -0.18, 111.39, -204.84]   # OP_HOME 목적지(관절각 J1~J6, deg). 없으면 robot_manager 가 OP_HOME 을 거절한다
-                                     #   units-frames.md 의 홈위치 관절각(2026-09-19 학민 실기 확정)을 그대로 쓴다.
-                                     #   sim 도 같은 값을 쓰는 이유: Virtual 기본 자세(관절 전부 0)는 특이점이라
-                                     #   직선 이동(move_line)의 역기구학 해가 없다. 이 자세로 먼저 가야 OP_MOVE_TO 가 동작한다
+    home_joint_deg: [-21.19, 15.26, 52.94, -0.07, 111.80, -15.21]   # 2026-09-22 현재 홈 자세(J1~J6, deg)
+                                     #   task: [421.140, -156.030, 546.500, 179.5, -180.0, -174.59]
+                                     #   Virtual 기본 자세(관절 전부 0)는 특이점이라 이 홈으로 먼저 이동한 뒤 선형 탐색한다.
     home_speed_deg_s: 30.0           # 홈 복귀 관절 속도
     drop_limit_m: 0.005              # 계약 이름. safety_monitor 와 같은 값
     slide_target_force_n: 3.0        # 계약 이름 [N]. 출발값이고 잠정이다.
@@ -159,11 +158,11 @@ scan_manager:
     recontact_margin_m: 0.001        # 방향 전환 뒤 내림 목표 = 첫 접촉 z + 이 값. 출발값 1 mm (계약 7.3)
                                      #   drop_limit_m(0.005) 보다 충분히 작아야 한다: 틈을 메우는 하강도 하강 제한에 들어간다
     recontact_speed_mps: 0.005       # 방향 전환 뒤 내림 속도(저속)
-    search_origin_pose: [0.425, -0.184, 0.500, 0.9999832196, 0.0055369752, -0.0014006997, 0.0009697282]
-                                     # 탐색 기준점 상공. Base, x y z qx qy qz qw. sim 박스 중심의 위 0.10 m
-                                     #   자세는 팁이 아래를 보는 수직(두산 ZYZ (0, 180, 0) deg 에 해당). 오일러로 두지 않는다(ZYZ 규약 혼동)
-                                     #   Virtual Mode 에서 이 pose 에 도달하는지는 미확인이다(T19b)
-    base_to_fixture: [0.425, -0.184, 0.400]   # 작업대 원점의 Base 좌표 x y z. 평행 이동만. sim 은 박스 밑면 중심과 같게 둔다
+    search_origin_pose: [0.42356, -0.18606, 0.200503, 0.9999832196, 0.0055369752, -0.0014006997, 0.0009697282]
+                                     # 탐색 기준점 상공. Base, x y z qx qy qz qw. sim 박스 밑면 기준 +0.10 m
+                                     #   박스 윗면은 z=0.140503 m이므로 첫 하강 거리는 약 60 mm다.
+                                     #   자세는 기존 sim에서 검증한 수직 quaternion을 유지한다.
+    base_to_fixture: [0.42356, -0.18606, 0.100503]   # 작업대 상판 원점의 Base 좌표. sim 박스 밑면 중심과 동일
     support_z_m: 0.0                 # 지지면 높이(작업대 좌표). z=0 이 작업대 표면이다. 0 이 정당한 값이다
     tip_radius_m: 0.000225           # 편향 보정 r. **반지름**이다(지름 0.45 mm). units-frames.md 실측(2026-09-19 학민, PR #57)
                                      #   contact_detector 의 sim_tip_radius_m 과 같아야 sim 치수가 복원된다. 정의서 기본값 0.003 을 쓰지 않는다
