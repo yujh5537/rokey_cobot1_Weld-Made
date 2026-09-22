@@ -285,6 +285,16 @@ Z = 400 mm
 
 실기와 sim의 값이 다르므로 실행 환경에 맞는 값을 사용해야 한다.
 
+다만 현재 3D 관제 화면은 **측정값의 좌표/수치는 바꾸지 않고**,
+`scan/result` 형상·모서리·경로 후보의 표시 지지면(`workpiece_fixture Z=0`)만
+실제 작업대 상판 `VITE_TABLE_ORIGIN_MM.z`에 맞춘다.
+sim의 `base_to_fixture.z=400 mm`를 그대로 화면 높이에 쓰면
+94 mm 작업대 모델과 분리되어 탐지 물체가 공중에 떠 보이기 때문이다.
+X/Y는 `VITE_BASE_TO_FIXTURE_MM`을 유지한다.
+
+즉 이 보정은 **3D 표시용 Z 재배치**이며,
+MQTT/DB/좌표 표의 `workpiece_fixture` 값과 ROS 결과는 변경하지 않는다.
+
 `search_origin_pose`와 `base_to_fixture`는 같은 값이 아니므로
 서로 대체해서 사용하지 않는다.
 
@@ -551,7 +561,8 @@ M0609은 공식 URDF의 관절 계층을 Three.js Group으로 구성하고 공�
 - RG2는 실기 탐침 파지 고정 시각화 자세다. 기준 joint 크기는 `0.7213960652668464 rad`(약 41.3°)이고 부호는 `[+,-,+,-,-,+]`이다. velocity 0, effort 40.0으로 읽힌 실기 상태이며, 실시간 손가락 개폐 피드백은 화면 자세에 반영하지 않는다.
 - 탐침은 **보이는 RG2 jaw 최외곽 끝면 → 탐침 최하단 끝 = 13 mm** 실측값으로 표시한다. 실기 파지각에서 pinned RG2 mesh의 jaw 끝면 z를 기준으로 시작하므로 탐침이 그리퍼 내부로 파고들지 않는다. 기존 flange→TCP 252.12 mm와 controller kinematic gripper height는 탐침 돌출 시작점으로 사용하지 않는다.
 - 작업대 시각 모델은 실제 설비 위치 `VITE_TABLE_ORIGIN_MM`를 사용한다. 기본값은 실측 `423.56,-186.06,100.503` mm다.
-- `base_to_fixture`는 `scan/result` 좌표를 Base로 옮기는 용도다. sim의 `425,-184,400` mm는 가상 박스 지지면이므로 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
+- `base_to_fixture`는 `scan/result`의 계약상 Base 변환값이다. sim의 `425,-184,400` mm는 가상 박스 지지면이므로 실제 높이 94 mm 작업대 자체의 위치로 사용하지 않는다.
+- 3D에서 부재·일반 모서리·경로 후보는 X/Y는 `base_to_fixture`, Z=0 지지면은 작업대 상판에 맞춰 표시한다. 따라서 sim 결과도 작업대 위에 놓이지만 원본 `scan/result` 수치는 수정하지 않는다.
 - 부재는 유효한 `scan/result.vertices`로 생성한다.
 - 실기 TCP 표시와 모델 탐침 끝점의 정렬은 실제 관절·TCP를 함께 수신해 별도로 확인한다.
 
@@ -618,7 +629,7 @@ VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503 \
 VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
 npm run dev
 ```
-를 사용한다. sim에서는 `VITE_BASE_TO_FIXTURE_MM=425,-184,400`을 유지하되 작업대 시각 모델은 실제 설비 높이를 유지한다.
+를 사용한다. sim에서는 `VITE_BASE_TO_FIXTURE_MM=425,-184,400`을 유지하되 작업대 시각 모델은 실제 설비 높이를 유지한다. 이때 `scan/result`의 3D 지지면만 작업대 상판으로 표시되므로 탐지 형상이 공중에 뜨지 않는다.
 
 ---
 
