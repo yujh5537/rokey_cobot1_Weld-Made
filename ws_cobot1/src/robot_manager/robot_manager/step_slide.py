@@ -191,7 +191,7 @@ def run(io, direction, p: StepParams):
                           back=True)
     io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 후보 → 가는 스텝으로 다시')
 
-    # 3. 다듬기 (못 누르면 coarse 씩 더 뒤에서 다시, 최대 8 번 = 4.5 mm)
+    # 3. 다듬기 (못 누르면 coarse 씩 더 뒤에서 다시, 최대 7 번 = 4.5 mm)
     #   a. 접촉 높이 + lift 로 든다. drop_m 만 들면 모서리 아래로 내려간 팁이 윗면보다 낮아
     #      돌아가는 길에 옆면에 걸린다 (9/22 motion 3104: Fx −3 N, 세 번 다 못 누름)
     #   b. 마지막으로 follow_lo 이상 누른 자리(윗면이 확실한 곳)보다 nudge 만큼 뒤로 갔다가 nudge 만큼 전진한다.
@@ -201,7 +201,9 @@ def run(io, direction, p: StepParams):
     lost = io.position()
     good = state['good']
     ref = median(hist[-10:])
-    for attempt in range(8):
+    # 마지막 누른 자리는 모서리에서 한 스텝 안이라 걸침이 섞여 있다(9/22 18:40: 4방향 중 3방향이 거기서 못 누르고
+    # 한 스텝 더 뒤에서 성공). 처음부터 한 스텝 더 뒤에서 시작한다
+    for attempt in range(1, 8):
         back = p.coarse_m * attempt + p.nudge_m
         io.move_rel((0.0, 0.0, ref + p.lift_m - io.position()[2]))
         here = io.position()
@@ -210,7 +212,7 @@ def run(io, direction, p: StepParams):
             io.move_rel(_add((0.0, 0.0, 0.0), u, p.nudge_m))
         old = cur['base']
         cur['base'] = io.force()
-        io.log(f'스텝 긁기 다듬기 {attempt + 1}차: 소실 지점보다 '
+        io.log(f'스텝 긁기 다듬기 {attempt}차: 소실 지점보다 '
                f'{sum((a - b) * c for a, b, c in zip(lost, io.position(), u)) * 1000:.1f} mm 뒤로 돌아옴, '
                f'F0z {old[2]:.2f} → {cur["base"][2]:.2f} N')
         io.move_rel((0.0, 0.0, ref - io.position()[2]))
