@@ -58,18 +58,24 @@ class Box:
 
 
 class FakeIO:
-    def __init__(self, box, start):
+    def __init__(self, box, start, drift_n=0.0, drift_after=3):
         self.box, self.pos = box, tuple(start)
+        self.drift_n, self.drift_after = drift_n, drift_after   # 이동 drift_after 번 뒤 Fz 치우침이 바뀜
         self.last_horizontal = (0.0, 0.0, 0.0)
         self.moves = 0
         self.horizontal = []      # (출발 위치, 이동량)
+        self.reads = []           # 힘을 읽은 (위치, 마지막 수평 이동)
         self.lines = []
 
     def position(self):
         return self.pos
 
     def force(self):
-        return self.box.force(self.pos, self.last_horizontal)
+        f = self.box.force(self.pos, self.last_horizontal)
+        self.reads.append((self.pos, self.last_horizontal))
+        if self.moves > self.drift_after:
+            f = (f[0], f[1], f[2] + self.drift_n)
+        return f
 
     def move_rel(self, d):
         self.moves += 1
@@ -113,6 +119,25 @@ def test_weak_force_on_the_corner_does_not_drag_the_tip_down(corner_n):
     assert min(pos[2] for pos, _ in io.horizontal) > TOP_Z - 0.0006 - 1e-9   # 흘러내리지 않았다
     backing = [(pos, d) for pos, d in io.horizontal if d[0] > 0.0]            # 긁는 방향(−x) 반대로 물러남
     assert backing and all(pos[2] > TOP_Z for pos, _ in backing)             # 윗면 위로 든 채 물러났다
+
+
+def test_f0_drift_during_the_slide_is_removed_before_refining():
+    """긁기 시작 뒤 Fz 치우침이 1.5 N 올라 모서리 걸침 1.8 N 이 3.3 N 으로 읽혀도 (follow_lo 3 N 넘음)
+    높이 기준 덕분에 흘러내리지 않고, 다듬기 전에 F0 를 다시 재서 모서리를 제자리에서 잡는다."""
+    io = FakeIO(Box(corner_n=1.8), pressed_start(), drift_n=1.5, drift_after=40)   # 긁기 중간부터
+    edge = step_slide.run(io, (1.0, 0.0, 0.0), params())
+    assert edge.position[0] == pytest.approx(HALF, abs=0.00015)
+    assert min(pos[2] for pos, _ in io.horizontal) > TOP_Z - 0.0006 - 1e-9
+    assert any('다듬기 1차' in line for line in io.lines)
+
+
+@pytest.mark.parametrize('direction', [(1.0, 0.0, 0.0), (0.0, -1.0, 0.0)])
+def test_refine_reads_force_after_moving_in_the_slide_direction(direction):
+    """다듬기에서 F0 · 누름을 읽을 때 마지막 수평 이동이 긁는 방향이다 (9/21: 방향만으로 Fz 1.9 N 차이)."""
+    io = FakeIO(Box(corner_n=1.8), pressed_start())
+    step_slide.run(io, direction, params())
+    for pos, last in io.reads:
+        assert last[0] * direction[0] + last[1] * direction[1] > 0.0
 
 
 def test_no_surface_within_press_max_is_no_contact():

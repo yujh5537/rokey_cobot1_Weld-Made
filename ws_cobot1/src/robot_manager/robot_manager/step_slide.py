@@ -17,8 +17,8 @@
      2 mm 팁이 모서리 각에 걸려 1~2 N 이 남는데(9/22 18:0x 위치 기록), 이 값은 F0 치우침(±0.6 N)만큼
      release_n 을 넘나든다. 그래서 소실 기준은 follow_lo 이고, 최근 접촉 높이는 follow_lo 이상으로 누른
      자리만 쌓는다(약한 걸침이 기준 높이를 끌어내리면 모서리를 타고 흘러내린다)
-  3. 다듬기: 윗면 위로 lift 만큼 들고, 마지막으로 제대로 누른 자리로 돌아가 다시 누른 뒤 fine 씩 전진해
-     소실 지점을 다시 찾는다 → 모서리
+  3. 다듬기: 접촉 높이 + lift 로 들고, 마지막으로 제대로 누른 자리 뒤에서 긁는 방향으로 nudge 만큼 들어와
+     공중에서 F0 를 다시 잰 뒤 다시 누르고 fine 씩 전진해 소실 지점을 다시 찾는다 → 모서리
   4. 끝나면 lift 만큼 든다 (팁을 모서리에 걸쳐 두지 않는다)
 
 실패하면 가능한 한 면에서 떨어진 뒤 StepFailure 를 낸다. 단위: m · N.
@@ -116,6 +116,7 @@ def run(io, direction, p: StepParams):
         io.move_rel(_add((0.0, 0.0, 0.0), u, p.nudge_m))
     base = io.force()
     io.log(f'스텝 긁기: 기준 힘 F0 = ({base[0]:.2f}, {base[1]:.2f}, {base[2]:.2f}) N')
+    cur = {'base': base}      # 다듬기 직전에 다시 잰다
 
     def lift_and_fail(kind, message, back=False):
         if back:
@@ -125,7 +126,7 @@ def run(io, direction, p: StepParams):
 
     def read():
         raw = io.force()
-        df = tuple(r - b for r, b in zip(raw, base))
+        df = tuple(r - b for r, b in zip(raw, cur['base']))
         # 수평 힘을 먼저 본다: 무언가에 걸렸으면 들기 전에 옆으로 물러나야 한다 (걸린 채 들면 끌고 올라간다)
         side = math.hypot(df[0], df[1])
         if side > p.side_hit_n:
@@ -190,16 +191,28 @@ def run(io, direction, p: StepParams):
                           back=True)
     io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 후보 → 가는 스텝으로 다시')
 
-    # 3. 다듬기: 윗면 위로 들고, 마지막으로 제대로 누른 자리로 돌아가 다시 누르고 전진 (못 누르면 더 뒤로).
-    # drop_m 만 들면 모서리 아래로 내려간 팁이 윗면보다 낮아 돌아가는 길에 옆면에 걸린다 (9/22 motion 3104)
+    # 3. 다듬기 (못 누르면 coarse 씩 더 뒤에서 다시, 최대 8 번 = 4.5 mm)
+    #   a. 접촉 높이 + lift 로 든다. drop_m 만 들면 모서리 아래로 내려간 팁이 윗면보다 낮아
+    #      돌아가는 길에 옆면에 걸린다 (9/22 motion 3104: Fx −3 N, 세 번 다 못 누름)
+    #   b. 마지막으로 follow_lo 이상 누른 자리(윗면이 확실한 곳)보다 nudge 만큼 뒤로 갔다가 nudge 만큼 전진한다.
+    #      마지막 수평 이동을 긁는 방향과 같게 둬야 Fz 읽기 조건이 F0 · 긁기와 같다 (9/21: 방향만으로 1.9 N 차이)
+    #   c. 공중에서 F0 를 다시 잰다. 1 분 가까이 긁는 동안 외력 추정값이 흘러 실행마다 ±0.6 N 달랐다
+    #   d. 접촉 높이까지 내려가 누름을 맞춘다. 못 누르면(돌아온 자리도 모서리 밖) coarse 만큼 더 뒤에서 다시
     lost = io.position()
     good = state['good']
     ref = median(hist[-10:])
-    for attempt in range(3):
-        back = p.coarse_m * attempt
+    for attempt in range(8):
+        back = p.coarse_m * attempt + p.nudge_m
         io.move_rel((0.0, 0.0, ref + p.lift_m - io.position()[2]))
         here = io.position()
         io.move_rel((good[0] - back * u[0] - here[0], good[1] - back * u[1] - here[1], 0.0))
+        if p.nudge_m > 0.0:
+            io.move_rel(_add((0.0, 0.0, 0.0), u, p.nudge_m))
+        old = cur['base']
+        cur['base'] = io.force()
+        io.log(f'스텝 긁기 다듬기 {attempt + 1}차: 소실 지점보다 '
+               f'{sum((a - b) * c for a, b, c in zip(lost, io.position(), u)) * 1000:.1f} mm 뒤로 돌아옴, '
+               f'F0z {old[2]:.2f} → {cur["base"][2]:.2f} N')
         io.move_rel((0.0, 0.0, ref - io.position()[2]))
         if keep_contact():
             break
