@@ -10,17 +10,17 @@ const M0609_MESH_ROOT =
 const RG2_MESH_ROOT =
   'https://raw.githubusercontent.com/ABC-iRobotics/onrobot-ros2/c6e390313e831a2e54a0ad5894b2911cc360a16a/onrobot_rg_description/meshes/rg2/visual/'
 
-// RG2는 이 프로젝트에서 탐침을 고정 파지하므로 웹에서는 항상 닫힌 자세로 표시한다.
-// upstream RG2 URDF의 finger_joint upper limit(45 deg)를 닫힘 자세로 사용한다.
-export const RG2_CLOSED_MASTER_RAD = 0.785398
+// 실기에서 탐침을 물고 있는 RG2 상태를 /dsr01/joint_states로 읽은 값.
+// bringup은 그리퍼를 움직이지 않으므로 웹의 초기/고정 파지 자세로 사용한다.
+export const RG2_PROBE_GRIP_MASTER_RAD = 0.7213960652668464
 
-const RG2_CLOSED_JOINTS = {
-  rg2_finger_joint: RG2_CLOSED_MASTER_RAD,
-  rg2_left_inner_knuckle_joint: -RG2_CLOSED_MASTER_RAD,
-  rg2_left_inner_finger_joint: RG2_CLOSED_MASTER_RAD,
-  rg2_right_outer_knuckle_joint: -RG2_CLOSED_MASTER_RAD,
-  rg2_right_inner_knuckle_joint: -RG2_CLOSED_MASTER_RAD,
-  rg2_right_inner_finger_joint: RG2_CLOSED_MASTER_RAD,
+const RG2_PROBE_GRIP_JOINTS = {
+  rg2_finger_joint: RG2_PROBE_GRIP_MASTER_RAD,
+  rg2_left_inner_knuckle_joint: -RG2_PROBE_GRIP_MASTER_RAD,
+  rg2_left_inner_finger_joint: RG2_PROBE_GRIP_MASTER_RAD,
+  rg2_right_outer_knuckle_joint: -RG2_PROBE_GRIP_MASTER_RAD,
+  rg2_right_inner_knuckle_joint: -RG2_PROBE_GRIP_MASTER_RAD,
+  rg2_right_inner_finger_joint: RG2_PROBE_GRIP_MASTER_RAD,
 }
 
 const PROBE_EXTENSION_FROM_GRIPPER_M = 0.013
@@ -286,7 +286,7 @@ function buildRg2Model(
 
   // 실시간 RG2 joint 값과 무관하게 항상 닫힌 고정 파지 자세로 시작한다.
   Object.entries(
-    RG2_CLOSED_JOINTS
+    RG2_PROBE_GRIP_JOINTS
   ).forEach(
     ([name, positionRad]) => {
       const ref =
@@ -309,7 +309,7 @@ function buildRg2Model(
   const gripperEndZ =
     rg2L3 *
       Math.sin(
-        RG2_CLOSED_MASTER_RAD +
+        RG2_PROBE_GRIP_MASTER_RAD +
           rg2Theta3
       ) +
     rg2Dz
