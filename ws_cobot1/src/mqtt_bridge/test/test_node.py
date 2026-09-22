@@ -67,6 +67,7 @@ def test_joint_snapshot_validation_and_rate_limit(monkeypatch):
     warnings = []
     bridge = SimpleNamespace(
         _last_joint=0.0,
+        _last_gripper_joint=0.0,
         _joint_period=0.05,
         _joint_state_topic="/dsr01/joint_states",
         get_logger=lambda: SimpleNamespace(warning=warnings.append),
@@ -74,6 +75,7 @@ def test_joint_snapshot_validation_and_rate_limit(monkeypatch):
     )
     monkeypatch.setattr("mqtt_bridge.mqtt_bridge.time.monotonic", lambda: 10.0)
     header = SimpleNamespace(stamp=SimpleNamespace(sec=3, nanosec=4_000_000))
+
     for names, positions in [
         (["joint_1"], []),
         (["joint_1"], [math.nan]),
@@ -84,19 +86,49 @@ def test_joint_snapshot_validation_and_rate_limit(monkeypatch):
         MqttBridge._on_joint_state(bridge, msg)
         assert not published
         assert bridge._last_joint == 0.0
+        assert bridge._last_gripper_joint == 0.0
+
     assert len(warnings) == 4
 
+    # joint_state_broadcaster: M0609 six-axis source.
     names = [f"joint_{i}" for i in range(6, 0, -1)]
     positions = [i / 10 for i in range(6)]
     msg = SimpleNamespace(name=names, position=positions, header=header)
     MqttBridge._on_joint_state(bridge, msg)
+
     topic, payload, qos, retain = published[0]
     assert (topic, qos, retain) == ("robot/joints", 0, False)
-    assert payload["names"] == names
-    assert payload["positions_rad"] == positions
+    assert payload["names"] == [f"joint_{i}" for i in range(1, 7)]
+    assert payload["positions_rad"] == [0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
     assert payload["stamp_ms"] == 3004
+
+    # Same arm source inside the rate window is dropped.
     MqttBridge._on_joint_state(bridge, msg)
     assert len(published) == 1
+
+    # joint_state_publisher: merged M0609 + RG2 snapshot.
+    merged_names = [
+        "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6",
+        "rg2_finger_joint",
+        "rg2_left_inner_knuckle_joint",
+        "rg2_left_inner_finger_joint",
+        "rg2_right_outer_knuckle_joint",
+        "rg2_right_inner_knuckle_joint",
+        "rg2_right_inner_finger_joint",
+    ]
+    merged_positions = [0.0] * 6 + [0.1, -0.1, 0.1, -0.1, -0.1, 0.1]
+    merged = SimpleNamespace(
+        name=merged_names,
+        position=merged_positions,
+        header=header,
+    )
+    MqttBridge._on_joint_state(bridge, merged)
+
+    topic, payload, qos, retain = published[1]
+    assert (topic, qos, retain) == ("robot/gripper_joints", 0, False)
+    assert payload["names"] == merged_names[6:]
+    assert payload["positions_rad"] == merged_positions[6:]
+    assert payload["frame_id"] == "rg2_base_link"
 
 
 def test_epoch_ms_to_time():
