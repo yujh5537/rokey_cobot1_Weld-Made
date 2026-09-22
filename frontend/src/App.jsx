@@ -250,6 +250,10 @@ function App() {
   const robotModelRef = useRef(null)
   const robotJointRefs = useRef({})
 
+  // RG2에 고정된 실제 시각 탐침 끝점(probe_tip).
+  // contact/event가 들어온 순간의 이 위치를 노란 접촉점으로 스냅샷한다.
+  const visualProbeTipRef = useRef(null)
+
   // Three.js에서 현재 TCP 팁 Mesh를 참조한다.
   const tipMeshRef = useRef(null)
 
@@ -602,12 +606,41 @@ function App() {
           topic === 'contact/event' &&
           payload.pose
         ) {
+          // 계약상의 contact/event pose는 원본 좌표/로그용으로 그대로 보관한다.
+          // 노란 접촉점의 3D 위치는 이벤트 수신 순간 실제 RG2 시각 탐침 끝
+          // (probe_tip)을 스냅샷한다. 따라서 flange/TCP 표시 오프셋과 무관하게
+          // 접촉 구체가 항상 탐침 끝에서 생성된다.
+          let probeTipSnapshot = null
+          const visualProbeTip =
+            visualProbeTipRef.current
+
+          if (visualProbeTip) {
+            visualProbeTip.updateWorldMatrix(
+              true,
+              false
+            )
+
+            const worldPosition =
+              new THREE.Vector3()
+
+            visualProbeTip.getWorldPosition(
+              worldPosition
+            )
+
+            probeTipSnapshot = {
+              x: worldPosition.x,
+              y: worldPosition.y,
+              z: worldPosition.z,
+            }
+          }
+
           const newContactPoint = {
             eventId: payload.event_id,
             frameId: payload.frame_id,
             x: payload.pose.x_mm,
             y: payload.pose.y_mm,
             z: payload.pose.z_mm,
+            probeTipSnapshot,
           }
 
           setContactPoints((prevPoints) => {
@@ -1024,6 +1057,11 @@ function App() {
     robotJointRefs.current =
       robotModel.jointRefs
 
+    visualProbeTipRef.current =
+      robotModel.root.getObjectByName(
+        'probe_tip'
+      )
+
     scene.add(
       robotModel.root
     )
@@ -1205,6 +1243,7 @@ function App() {
 
       robotModelRef.current = null
       robotJointRefs.current = {}
+      visualProbeTipRef.current = null
 
       tipMeshRef.current = null
       trajectoryLineRef.current = null
@@ -1334,13 +1373,32 @@ function App() {
           material
         )
 
-      marker.position.copy(
-        toThreePosition(
-          point.x,
-          point.y,
-          point.z
+      const snapshot =
+        point.probeTipSnapshot
+
+      if (
+        snapshot &&
+        Number.isFinite(snapshot.x) &&
+        Number.isFinite(snapshot.y) &&
+        Number.isFinite(snapshot.z)
+      ) {
+        // probe_tip의 world 좌표는 이미 Three.js scene 좌표다.
+        marker.position.set(
+          snapshot.x,
+          snapshot.y,
+          snapshot.z
         )
-      )
+      } else {
+        // 모델이 아직 준비되지 않은 예외 상황에서는
+        // 원본 contact/event 좌표를 fallback으로 사용한다.
+        marker.position.copy(
+          toThreePosition(
+            point.x,
+            point.y,
+            point.z
+          )
+        )
+      }
 
       group.add(marker)
     })
