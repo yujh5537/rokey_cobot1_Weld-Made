@@ -93,6 +93,7 @@ def _scan_config_dict(config):
         "contact_threshold_n": config.contact_threshold_n,
         "edge_drop_m": config.edge_drop_m,
         "debounce_n": config.debounce_n,
+        "debounce_set": config.debounce_set,
         "over_force_n": config.over_force_n,
         "descend_speed_mps": config.descend_speed_mps,
         "slide_speed_mps": config.slide_speed_mps,

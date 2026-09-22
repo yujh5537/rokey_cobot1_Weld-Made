@@ -5,9 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from contact_scan_interfaces.msg import ScanConfig
+from mqtt_bridge.encoders import encode_scan_config
 from mqtt_bridge.mqtt_bridge import (
-    _safe_ros_callback, _scan_config_from_patch, _scan_result_dedup_key,
-    epoch_ms_to_time, prefixed_topic, serialize_json, strip_topic_prefix,
+    _safe_ros_callback, _scan_config_dict, _scan_config_from_patch,
+    _scan_result_dedup_key, epoch_ms_to_time, prefixed_topic,
+    serialize_json, strip_topic_prefix,
 )
 
 
@@ -33,6 +36,19 @@ def test_scan_config_patch_sets_only_sent_fields():
     assert config.slide_speed_mps == 0.01
     assert config.slide_speed_set is True
     assert config.edge_drop_set is False
+
+def test_unknown_debounce_is_encoded_as_null():
+    config = ScanConfig()
+    config.debounce_n = 0
+    config.debounce_set = False
+
+    out = encode_scan_config(_scan_config_dict(config))
+    assert out["debounce_n"] is None
+
+    config.debounce_set = True
+
+    out = encode_scan_config(_scan_config_dict(config))
+    assert out["debounce_n"] == 0
 
 
 def test_safe_ros_callback_contains_exceptions():

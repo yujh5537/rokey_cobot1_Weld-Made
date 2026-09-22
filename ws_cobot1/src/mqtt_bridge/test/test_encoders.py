@@ -13,7 +13,7 @@ from mqtt_bridge.encoders import (
 def config():
     return {
         "contact_threshold_n": 4.0, "edge_drop_m": 0.0005,
-        "debounce_n": 3, "over_force_n": 30.0,
+        "debounce_n": 3, "debounce_set": True, "over_force_n": 30.0,
         "descend_speed_mps": 0.005, "slide_speed_mps": 0.01,
         "max_descend_m": 0.08, "max_slide_m": 0.15,
         "motion_timeout_s": 30.0, "lift_height_m": 0.05,
