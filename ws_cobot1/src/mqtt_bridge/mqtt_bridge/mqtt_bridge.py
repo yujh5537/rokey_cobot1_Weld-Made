@@ -93,6 +93,7 @@ def _scan_config_dict(config):
         "contact_threshold_n": config.contact_threshold_n,
         "edge_drop_m": config.edge_drop_m,
         "debounce_n": config.debounce_n,
+        "debounce_set": config.debounce_set,
         "over_force_n": config.over_force_n,
         "descend_speed_mps": config.descend_speed_mps,
         "slide_speed_mps": config.slide_speed_mps,
@@ -198,6 +199,11 @@ class MqttBridge(Node):
         self._last_scan_id = ""
         self._scan_phase = ScanState.PHASE_IDLE
         self._pending_stop = []
+
+        self._last_error_scan_id = ""
+        self._last_error_code = ReasonCode.ROBOT_ERROR
+        self._last_error_detail = ""
+
         self._recent_results = []
 
         self.create_subscription(
@@ -412,19 +418,73 @@ class MqttBridge(Node):
         req.reason = data["reason"]
         req.detail = data["detail"]
         future = self._stop_client.call_async(req)
-        future.add_done_callback(partial(self._on_stop_response, data["request_id"]))
+        future.add_done_callback(partial(
+            self._on_stop_response,
+            data["request_id"],
+            self._scan_phase,
+            self._last_scan_id,
+        ))
 
-    def _on_stop_response(self, request_id, future):
+    def _on_stop_response(
+        self,
+        request_id,
+        request_phase,
+        request_scan_id,
+        future,
+    ):
         try:
             response = future.result()
         except Exception as exc:
             self._ack(request_id, False, ReasonCode.ROBOT_ERROR, str(exc))
             return
-        self._ack(request_id, bool(response.accepted), int(response.reason_code), response.detail)
-        if response.accepted:
-            self._pending_stop.append(request_id)
-            if self._scan_phase == ScanState.PHASE_STOPPED:
-                self._finish_stops()
+
+        self._ack(
+            request_id,
+            bool(response.accepted),
+            int(response.reason_code),
+            response.detail,
+        )
+
+        if not response.accepted:
+            return
+
+        idle_phases = (
+            ScanState.PHASE_IDLE,
+            ScanState.PHASE_DONE,
+            ScanState.PHASE_ERROR,
+            ScanState.PHASE_STOPPED,
+        )
+
+        if request_phase in idle_phases:
+            self._command_result(
+                request_id,
+                request_scan_id,
+                True,
+                ReasonCode.STOP_REQUESTED,
+                response.detail,
+            )
+            return
+
+        self._pending_stop.append((request_id, request_scan_id))
+
+        if self._last_scan_id != request_scan_id:
+            return
+
+        if self._scan_phase == ScanState.PHASE_STOPPED:
+            self._finish_stops(
+                request_scan_id,
+                True,
+                ReasonCode.STOP_REQUESTED,
+                "",
+            )
+        elif self._scan_phase == ScanState.PHASE_ERROR:
+            reason_code, detail = self._stop_error(request_scan_id)
+            self._finish_stops(
+                request_scan_id,
+                False,
+                reason_code,
+                detail,
+            )
 
     def _dispatch_set_config(self, body):
         data = decode_scan_set_config(body)
@@ -491,21 +551,65 @@ class MqttBridge(Node):
     def _on_scan_state(self, msg):
         self._scan_phase = msg.phase
         self._last_scan_id = msg.scan_id
+
         data = {
-            "stamp": _time_dict(msg.stamp), "scan_id": msg.scan_id,
-            "phase": msg.phase, "direction": msg.direction,
-            "progress": msg.progress, "progress_total": msg.progress_total,
+            "stamp": _time_dict(msg.stamp),
+            "scan_id": msg.scan_id,
+            "phase": msg.phase,
+            "direction": msg.direction,
+            "progress": msg.progress,
+            "progress_total": msg.progress_total,
             "motion_id": msg.motion_id,
         }
-        self._publish("scan/state", encode_scan_state(data, now_ms()), 1, True)
-        if msg.phase == ScanState.PHASE_STOPPED:
-            self._finish_stops()
 
-    def _finish_stops(self):
-        pending = list(self._pending_stop)
-        self._pending_stop.clear()
-        for request_id in pending:
-            self._command_result(request_id, self._last_scan_id, True, ReasonCode.STOP_REQUESTED, "")
+        self._publish(
+            "scan/state",
+            encode_scan_state(data, now_ms()),
+            1,
+            True,
+        )
+
+        if msg.phase == ScanState.PHASE_STOPPED:
+            self._finish_stops(
+                msg.scan_id,
+                True,
+                ReasonCode.STOP_REQUESTED,
+                "",
+            )
+
+        elif msg.phase == ScanState.PHASE_ERROR:
+            reason_code, detail = self._stop_error(msg.scan_id)
+
+            self._finish_stops(
+                msg.scan_id,
+                False,
+                reason_code,
+                detail,
+            )
+
+    def _stop_error(self, scan_id):
+        if self._last_error_scan_id == scan_id:
+            return self._last_error_code, self._last_error_detail
+
+        return ReasonCode.ROBOT_ERROR, ""
+
+    def _finish_stops(self, scan_id, success, reason_code, detail):
+        remaining = []
+
+        for request_id, pending_scan_id in self._pending_stop:
+            if pending_scan_id != scan_id:
+                remaining.append((request_id, pending_scan_id))
+                continue
+
+            self._command_result(
+                request_id,
+                scan_id,
+                success,
+                reason_code,
+                detail,
+            )
+
+        self._pending_stop = remaining
 
     def _on_scan_result(self, msg):
         result_key = _scan_result_dedup_key(msg)
@@ -517,14 +621,35 @@ class MqttBridge(Node):
         self._publish("scan/result", encode_scan_result(_scan_result_dict(msg), now_ms()), 1, False)
 
     def _on_scan_log(self, msg):
+        if msg.level == ScanLog.LEVEL_ERROR and msg.scan_id:
+            self._last_error_scan_id = msg.scan_id
+            self._last_error_code = (
+                int(msg.code)
+                if int(msg.code) != ReasonCode.OK
+                else ReasonCode.ROBOT_ERROR
+            )
+            self._last_error_detail = msg.message
+
         data = {
-            "stamp": _time_dict(msg.stamp), "scan_id": msg.scan_id,
-            "level": msg.level, "phase": msg.phase, "direction": msg.direction,
-            "motion_id": msg.motion_id, "code": msg.code, "message": msg.message,
-            "frame_id": msg.frame_id, "pose": _pose_dict(msg.pose),
+            "stamp": _time_dict(msg.stamp),
+            "scan_id": msg.scan_id,
+            "level": msg.level,
+            "phase": msg.phase,
+            "direction": msg.direction,
+            "motion_id": msg.motion_id,
+            "code": msg.code,
+            "message": msg.message,
+            "frame_id": msg.frame_id,
+            "pose": _pose_dict(msg.pose),
             "pose_valid": msg.pose_valid,
         }
-        self._publish("scan/log", encode_scan_log(data, now_ms()), 1, False)
+
+        self._publish(
+            "scan/log",
+            encode_scan_log(data, now_ms()),
+            1,
+            False,
+        )
 
     def _on_contact_event(self, msg):
         data = {
