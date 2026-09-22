@@ -2,6 +2,14 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.2.1 (2026-09-22, T41 · PR TBD)
+`mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
+- 실측 종단에서 `/dsr01/joint_states` publisher가 2개임을 확인했다: `/dsr01/joint_state_broadcaster`는 M0609 J1~J6 6축, `/dsr01/joint_state_publisher`는 M0609 6축 + RG2 6축 합성 스냅샷
+- `robot/joints`는 정확히 M0609 6축인 스냅샷만 사용한다. 12축 합성 메시지가 M0609 웹 자세를 번갈아 덮지 않게 한다
+- 새 `robot/gripper_joints`는 합성 스냅샷에서 RG2 6축만 추려 QoS 0 · retain=false로 발행한다
+- 두 토픽 모두 표시 전용이다. 로봇/그리퍼 제어 입력으로 사용하지 않는다
+- 웹 모델은 pinned M0609 URDF의 `link_6 -> tool0` 고정 RPY와 m0609_rg2_bringup의 `tool0 -> rg2_base_link` 장착 RPY를 반영한다
+
 ## v0.2.0 (2026-09-22, T41 · PR TBD)
 `mqtt-schema.md`에 웹 M0609 디지털 트윈 표시용 **`robot/joints`**를 추가했다. 영향: mqtt_bridge · FastAPI(`robot/#` 기존 구독으로 자동 전달) · frontend · mock_publisher.
 - ROS 원본은 Doosan `joint_state_broadcaster`의 `/dsr01/joint_states` (`sensor_msgs/JointState`). mqtt_bridge가 기본 20 Hz로 다운샘플해 QoS 0 · retain=false로 발행한다
