@@ -3,7 +3,11 @@ import { test } from 'node:test'
 import { Group, Vector3, BoxGeometry, Mesh, MeshBasicMaterial } from 'three'
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
-import { buildM0609Model, setRosOrigin } from '../src/robotModel.js'
+import {
+  buildM0609Model,
+  RG2_CLOSED_MASTER_RAD,
+  setRosOrigin,
+} from '../src/robotModel.js'
 import { parseGripperJoints, parseRobotJoints } from '../src/robotJoints.js'
 
 test('URDF fixed-axis pitch/yaw maps local X to base Z', () => {
@@ -13,13 +17,14 @@ test('URDF fixed-axis pitch/yaw maps local X to base Z', () => {
   assert.ok(actual.distanceTo(new Vector3(0, 0, 1)) < 1e-12)
 })
 
-// Independent Rz(yaw) Ry(pitch) Rx(roll) matrix FK from upstream
-// DoosanRobotics/doosan-robot2@6c5f3ba / dsr_description2/urdf/m0609.white.urdf.
-// Tool endpoint: flange [0, 0, 0.25212] m, then (x,z,-y) * 10.
+// Independent Rz(yaw) Ry(pitch) Rx(roll) matrix FK from upstream.
+// RG2 closed finger geometry gives gripper end z=0.2071916184 m;
+// the physical probe extends 13 mm from that end, so the visual probe tip is
+// flange [0, 0, 0.2201916184] m, then (x,z,-y) * 10.
 for (const [q, expected] of [
-  [[0, 0, 0, 0, 0, 0], [0.001509836150225383, 12.866199659608952, -0.06383275132679628]],
-  [[-0.3704, 0.2164, 1.5402, -0.0007, 1.3843, -0.2655], [4.216556844090745, 0.9473771359529615, 1.5752515454675244]],
-  [[0.4, -0.6, 0.8, 0.3, -0.2, 0.1], [-1.3725537021584933, 12.068255498044916, 0.7486825110268509]],
+  [[0, 0, 0, 0, 0, 0], [0.0014448065952319998, 12.54691585023727, -0.06383276457292329]],
+  [[-0.3704, 0.2164, 1.5402, -0.0007, 1.3843, -0.2655], [4.216537988582411, 1.2666607223000756, 1.5748690673243808]],
+  [[0.4, -0.6, 0.8, 0.3, -0.2, 0.1], [-1.3824671104482043, 11.749535102464975, 0.7325211703280426]],
 ]) {
   test(`probe follows six-joint FK: ${q}`, () => {
     const model = buildM0609Model({ loadVisuals: false })
@@ -90,6 +95,31 @@ test('RG2 joint input is parsed independently from arm joints', () => {
     }),
     null
   )
+})
+
+
+test('RG2 visual starts in fixed closed pose', () => {
+  const model = buildM0609Model({ loadVisuals: false })
+
+  const expected = {
+    rg2_finger_joint: RG2_CLOSED_MASTER_RAD,
+    rg2_left_inner_knuckle_joint: -RG2_CLOSED_MASTER_RAD,
+    rg2_left_inner_finger_joint: RG2_CLOSED_MASTER_RAD,
+    rg2_right_outer_knuckle_joint: -RG2_CLOSED_MASTER_RAD,
+    rg2_right_inner_knuckle_joint: -RG2_CLOSED_MASTER_RAD,
+    rg2_right_inner_finger_joint: RG2_CLOSED_MASTER_RAD,
+  }
+
+  for (const [name, positionRad] of Object.entries(expected)) {
+    const ref = model.gripperJointRefs[name]
+    assert.ok(ref)
+    assert.equal(
+      ref.object.rotation[ref.axis],
+      positionRad * ref.sign
+    )
+  }
+
+  model.dispose()
 })
 
 test('COLLADA correction and late-load cleanup work without a browser', async (t) => {
