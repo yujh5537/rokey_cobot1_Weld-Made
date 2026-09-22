@@ -658,24 +658,302 @@ function App() {
 
 
     // 5. 작업대
-    const tableGeometry =
-      new THREE.BoxGeometry(
-        4,
-        0.2,
-        3
+    // 웹 3D 기준:
+    // - 작업대 상판 = workpiece_fixture Z = 0
+    // - 실제 바닥 = 작업대 상판보다 94 mm 아래
+    // - 화면 축척 = 100 mm -> Three.js 1 unit
+    const worktable = new THREE.Group()
+
+    const tableWidth = 4.0
+    const tableDepth = 3.0
+    const tableHeight = 94 * DISPLAY_SCALE
+    const topThickness = 0.12
+    const floorY = -tableHeight
+
+    const topMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0x4f5963,
+        metalness: 0.55,
+        roughness: 0.38,
+      })
+
+    const frameMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0xaab2b9,
+        metalness: 0.7,
+        roughness: 0.32,
+      })
+
+    const footMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0x30363b,
+        metalness: 0.25,
+        roughness: 0.55,
+      })
+
+    // 상판 윗면을 정확히 Y=0에 둔다.
+    const tableTop =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          tableWidth,
+          topThickness,
+          tableDepth
+        ),
+        topMaterial
       )
 
-    const tableMaterial =
-      new THREE.MeshStandardMaterial()
+    tableTop.position.y =
+      -topThickness / 2
 
-    const table = new THREE.Mesh(
-      tableGeometry,
-      tableMaterial
+    worktable.add(tableTop)
+
+    const tableTopEdges =
+      new THREE.LineSegments(
+        new THREE.EdgesGeometry(
+          tableTop.geometry
+        ),
+        new THREE.LineBasicMaterial({
+          color: 0xd9dde1,
+        })
+      )
+
+    tableTopEdges.position.copy(
+      tableTop.position
     )
 
-    table.position.y = -0.1
+    worktable.add(tableTopEdges)
 
-    scene.add(table)
+    // 상판 fixture hole은 시각화용이다.
+    const holeGeometry =
+      new THREE.CircleGeometry(
+        0.035,
+        16
+      )
+
+    const holeMaterial =
+      new THREE.MeshBasicMaterial({
+        color: 0x20262b,
+        side: THREE.DoubleSide,
+      })
+
+    for (
+      let x = -1.5;
+      x <= 1.5;
+      x += 0.5
+    ) {
+      for (
+        let z = -1.0;
+        z <= 1.0;
+        z += 0.5
+      ) {
+        const hole =
+          new THREE.Mesh(
+            holeGeometry,
+            holeMaterial
+          )
+
+        hole.rotation.x =
+          -Math.PI / 2
+
+        hole.position.set(
+          x,
+          0.002,
+          z
+        )
+
+        worktable.add(hole)
+      }
+    }
+
+    // 실제 높이 94 mm를 반영한 프레임/다리.
+    const legSize = 0.14
+
+    const legHeight =
+      tableHeight -
+      topThickness
+
+    const legCenterY =
+      -topThickness -
+      legHeight / 2
+
+    const legPositions = [
+      [-1.7, -1.2],
+      [1.7, -1.2],
+      [-1.7, 1.2],
+      [1.7, 1.2],
+    ]
+
+    legPositions.forEach(
+      ([x, z]) => {
+        const leg =
+          new THREE.Mesh(
+            new THREE.BoxGeometry(
+              legSize,
+              legHeight,
+              legSize
+            ),
+            frameMaterial
+          )
+
+        leg.position.set(
+          x,
+          legCenterY,
+          z
+        )
+
+        worktable.add(leg)
+
+        const foot =
+          new THREE.Mesh(
+            new THREE.CylinderGeometry(
+              0.12,
+              0.12,
+              0.05,
+              24
+            ),
+            footMaterial
+          )
+
+        foot.position.set(
+          x,
+          floorY + 0.025,
+          z
+        )
+
+        worktable.add(foot)
+      }
+    )
+
+    // 하부 프레임.
+    const railHeight = 0.12
+    const railY = floorY + 0.22
+
+    const frontRail =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          3.54,
+          railHeight,
+          0.12
+        ),
+        frameMaterial
+      )
+
+    frontRail.position.set(
+      0,
+      railY,
+      1.2
+    )
+
+    const backRail =
+      frontRail.clone()
+
+    backRail.position.z = -1.2
+
+    const leftRail =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          0.12,
+          railHeight,
+          2.54
+        ),
+        frameMaterial
+      )
+
+    leftRail.position.set(
+      -1.7,
+      railY,
+      0
+    )
+
+    const rightRail =
+      leftRail.clone()
+
+    rightRail.position.x = 1.7
+
+    worktable.add(
+      frontRail,
+      backRail,
+      leftRail,
+      rightRail
+    )
+
+    scene.add(worktable)
+
+    // 작업대 상판보다 실제 바닥이 94 mm 아래에 있다.
+    const floorGrid =
+      new THREE.GridHelper(
+        8,
+        16,
+        0x7f8a93,
+        0xc4c9ce
+      )
+
+    floorGrid.position.y =
+      floorY
+
+    floorGrid.material.transparent =
+      true
+
+    floorGrid.material.opacity =
+      0.32
+
+    scene.add(floorGrid)
+
+
+    // 5-1. M0609 위치 확인용 목업
+    // 실제 URDF/GLTF 모델을 붙이기 전 배치 확인용이다.
+    // 작업대가 M0609의 오른쪽에 보이도록 로봇을 왼쪽에 둔다.
+    const robotGroup =
+      new THREE.Group()
+
+    const robotBase =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          0.32,
+          0.38,
+          0.35,
+          48
+        ),
+        new THREE.MeshStandardMaterial({
+          color: 0xe9edf0,
+          metalness: 0.35,
+          roughness: 0.45,
+        })
+      )
+
+    robotBase.position.y =
+      -0.175
+
+    robotGroup.add(robotBase)
+
+    const robotBody =
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          0.18,
+          0.22,
+          0.65,
+          48
+        ),
+        new THREE.MeshStandardMaterial({
+          color: 0x2c6e9b,
+          metalness: 0.25,
+          roughness: 0.4,
+        })
+      )
+
+    robotBody.position.y =
+      0.325
+
+    robotGroup.add(robotBody)
+
+    // 임시 시각 배치값. 실제 Base↔fixture 관계는 이후 좌표 계약으로 치환한다.
+    robotGroup.position.set(
+      -2.7,
+      0,
+      0
+    )
+
+    scene.add(robotGroup)
 
 
     // 6. 직육면체 부재
