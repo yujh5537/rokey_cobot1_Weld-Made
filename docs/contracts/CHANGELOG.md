@@ -2,6 +2,13 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.2.0 (2026-09-22, T41 · PR TBD)
+`mqtt-schema.md`에 웹 M0609 디지털 트윈 표시용 **`robot/joints`**를 추가했다. 영향: mqtt_bridge · FastAPI(`robot/#` 기존 구독으로 자동 전달) · frontend · mock_publisher.
+- ROS 원본은 Doosan `joint_state_broadcaster`의 `/dsr01/joint_states` (`sensor_msgs/JointState`). mqtt_bridge가 기본 20 Hz로 다운샘플해 QoS 0 · retain=false로 발행한다
+- payload는 `names[]`와 같은 인덱스의 `positions_rad[]`, `stamp_ms`, `published_at_ms`를 가진다. 자세 quaternion 규칙은 그대로이며 관절각만 rad 예외로 추가한다
+- `robot/joints`는 **표시 전용**이다. 웹에서 역으로 로봇 제어에 사용하지 않는다
+- RG2는 현재 탐침 고정 파지 운용이라 웹에서는 고정 자세로 표시한다. RG2 폭 피드백 토픽 계약은 추가하지 않았다
+
 ## v0.1.14 (2026-09-21, 새 탐침 TCP x · y, #137)
 타입 변경 없음. `units-frames.md`의 탐침 TCP x · y 를 옛 탐침 값 (−1.30, 3.71)에서 **(0, 0)** 으로 확정했다. 영향: robot_manager · contact_detector 가 발행하는 모든 Base x · y(컨트롤러 TCP 등록값을 따른다) · `apply_tool_tcp.py` 기본값 · 실기 세션 절차. (v0.1.13 은 #132 에 예약돼 있어 번호가 머지 순서와 다를 수 있다.)
 - **측정**: J6 관절만 +180° 돌려도 팁이 작업대 십자 위에 그대로 있었다(옛 값이면 7.8 mm 옮겨 간다). TCP [0, 0, 252.12] 로 툴 z 축 90° 회전해도 팁이 제자리였다. 새 TCP 로 읽은 홈 팁 x · y 가 홈 플랜지 x · y 와 0.14 mm 안. 눈 정밀도로 약 ±0.25 mm. 원본: `docs/env/tool-tcp-register.md` 9절
