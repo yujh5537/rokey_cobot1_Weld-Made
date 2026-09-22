@@ -196,6 +196,9 @@ function App() {
   // Three.js 접촉점들을 담는 Group
   const contactGroupRef = useRef(null)
 
+  // Three.js scan/result 직육면체를 담는 Group
+  const workpieceGroupRef = useRef(null)
+
   // Three.js 스캔 결과의 일반 모서리를 담는 Group
   const edgeGroupRef = useRef(null)
 
@@ -670,6 +673,22 @@ function App() {
     const topThickness = 0.12
     const floorY = -tableHeight
 
+    // Three.js 장면은 base_link 기준으로 유지한다.
+    // 작업대 상판 원점은 base_to_fixture만큼 이동한
+    // workpiece_fixture 원점에 놓는다.
+    const fixtureOriginThree =
+      BASE_TO_FIXTURE_MM
+        ? toThreePosition(
+            BASE_TO_FIXTURE_MM.x,
+            BASE_TO_FIXTURE_MM.y,
+            BASE_TO_FIXTURE_MM.z
+          )
+        : new THREE.Vector3(0, 0, 0)
+
+    worktable.position.copy(
+      fixtureOriginThree
+    )
+
     const topMaterial =
       new THREE.MeshStandardMaterial({
         color: 0x4f5963,
@@ -888,8 +907,11 @@ function App() {
         0xc4c9ce
       )
 
-    floorGrid.position.y =
-      floorY
+    floorGrid.position.set(
+      fixtureOriginThree.x,
+      fixtureOriginThree.y + floorY,
+      fixtureOriginThree.z
+    )
 
     floorGrid.material.transparent =
       true
@@ -946,35 +968,42 @@ function App() {
 
     robotGroup.add(robotBody)
 
-    // 임시 시각 배치값. 실제 Base↔fixture 관계는 이후 좌표 계약으로 치환한다.
+    // M0609 목업의 기준점은 base_link 원점이다.
+    // 실제 URDF/GLTF 모델을 붙일 때도 같은 원점을 사용한다.
     robotGroup.position.set(
-      -2.7,
+      0,
       0,
       0
     )
 
     scene.add(robotGroup)
 
+    // M0609(base_link)와 작업대(workpiece_fixture)가
+    // 한 화면에 들어오도록 두 원점의 중간을 바라본다.
+    const viewCenter =
+      fixtureOriginThree
+        .clone()
+        .multiplyScalar(0.5)
 
-    // 6. 직육면체 부재
-    const workpieceGeometry =
-      new THREE.BoxGeometry(
-        2,
-        1,
-        1.2
-      )
-
-    const workpieceMaterial =
-      new THREE.MeshStandardMaterial()
-
-    const workpiece = new THREE.Mesh(
-      workpieceGeometry,
-      workpieceMaterial
+    camera.position.set(
+      viewCenter.x + 5,
+      viewCenter.y + 4,
+      viewCenter.z + 6
     )
 
-    workpiece.position.y = 0.5
+    camera.lookAt(viewCenter)
 
-    scene.add(workpiece)
+
+    // 6. scan/result 직육면체 부재
+    // 고정 BoxGeometry 목업은 제거한다.
+    // 최종 형상은 scan/result.vertices 8점으로 동적으로 생성한다.
+    const workpieceGroup =
+      new THREE.Group()
+
+    scene.add(workpieceGroup)
+
+    workpieceGroupRef.current =
+      workpieceGroup
 
 
     // 7. XYZ 좌표축
@@ -1074,6 +1103,7 @@ function App() {
       tipMeshRef.current = null
       trajectoryLineRef.current = null
       contactGroupRef.current = null
+      workpieceGroupRef.current = null
       pathCandidateGroupRef.current = null
       edgeGroupRef.current = null
 
@@ -1185,6 +1215,151 @@ function App() {
     })
 
   }, [contactPoints])
+
+  // =========================
+  // scan/result 직육면체 3D 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!workpieceGroupRef.current) {
+      return
+    }
+
+    const group =
+      workpieceGroupRef.current
+
+    group.position.set(0, 0, 0)
+
+    // 이전 scan/result Mesh를 정리한다.
+    group.children.forEach((child) => {
+      child.geometry?.dispose()
+      child.material?.dispose()
+    })
+
+    group.clear()
+
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
+    // scan/result의 vertices는 workpiece_fixture 기준이므로
+    // 그룹 자체를 base_link상의 fixture 원점으로 이동한다.
+    group.position.copy(
+      toThreePosition(
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
+      )
+    )
+
+    if (
+      scanResult?.success !== true ||
+      scanResult?.box_valid !== true ||
+      !Array.isArray(scanResult.vertices) ||
+      scanResult.vertices.length !== 8
+    ) {
+      return
+    }
+
+    const vertices =
+      scanResult.vertices.map((point) => {
+        const x = point?.x_mm
+        const y = point?.y_mm
+        const z = point?.z_mm
+
+        if (
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          !Number.isFinite(z)
+        ) {
+          return null
+        }
+
+        return toThreePosition(
+          x,
+          y,
+          z
+        )
+      })
+
+    if (
+      vertices.some(
+        (point) => point === null
+      )
+    ) {
+      return
+    }
+
+    // ScanResult.msg 꼭짓점 순서:
+    // 0~3 = 윗면, 4~7 = 아랫면.
+    // BoxGeometry를 새로 만드는 대신 실제 측정 꼭짓점으로
+    // 삼각형 면을 구성한다. 따라서 향후 회전된 꼭짓점이
+    // 들어와도 프론트 렌더러는 그대로 표현할 수 있다.
+    const triangleIndices = [
+      0, 1, 2,
+      0, 2, 3,
+
+      4, 6, 5,
+      4, 7, 6,
+
+      0, 4, 5,
+      0, 5, 1,
+
+      1, 5, 6,
+      1, 6, 2,
+
+      2, 6, 7,
+      2, 7, 3,
+
+      3, 7, 4,
+      3, 4, 0,
+    ]
+
+    const positions = []
+
+    triangleIndices.forEach((index) => {
+      const point = vertices[index]
+
+      positions.push(
+        point.x,
+        point.y,
+        point.z
+      )
+    })
+
+    const geometry =
+      new THREE.BufferGeometry()
+
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(
+        positions,
+        3
+      )
+    )
+
+    geometry.computeVertexNormals()
+
+    const material =
+      new THREE.MeshStandardMaterial({
+        color: 0xd9dde3,
+        metalness: 0.12,
+        roughness: 0.62,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+      })
+
+    const mesh =
+      new THREE.Mesh(
+        geometry,
+        material
+      )
+
+    group.add(mesh)
+
+  }, [scanResult])
+
 
   // =========================
   // 스캔 결과 일반 모서리 3D 갱신
