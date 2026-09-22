@@ -168,6 +168,20 @@ function getTableOriginMm() {
 
 const TABLE_ORIGIN_MM = getTableOriginMm()
 
+// scan/result의 수치 자체는 workpiece_fixture 기준 그대로 유지한다.
+// 3D 표시에서만 fixture의 Z=0(지지면)을 실제 작업대 상판에 붙인다.
+// sim의 base_to_fixture.z=400 mm를 그대로 쓰면 94 mm 작업대 모델과
+// 높이가 달라 결과 형상이 공중에 떠 보이므로 표시 원점만 분리한다.
+const SCAN_RESULT_DISPLAY_ORIGIN_MM = {
+  x:
+    BASE_TO_FIXTURE_MM?.x ??
+    TABLE_ORIGIN_MM.x,
+  y:
+    BASE_TO_FIXTURE_MM?.y ??
+    TABLE_ORIGIN_MM.y,
+  z: TABLE_ORIGIN_MM.z,
+}
+
 function formatScanLogMessage(payload) {
   const parts = []
 
@@ -1355,17 +1369,14 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
-      return
-    }
-
-    // scan/result의 vertices는 workpiece_fixture 기준이므로
-    // 그룹 자체를 base_link상의 fixture 원점으로 이동한다.
+    // scan/result의 vertices는 workpiece_fixture 기준 그대로 사용한다.
+    // 표시할 때만 fixture Z=0을 작업대 상판에 붙여 물체 바닥이
+    // 받침대 위에 정확히 놓이게 한다.
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.x,
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.y,
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.z
       )
     )
 
@@ -1500,15 +1511,11 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
-      return
-    }
-
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.x,
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.y,
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.z
       )
     )
 
@@ -1588,15 +1595,11 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
-      return
-    }
-
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.x,
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.y,
+        SCAN_RESULT_DISPLAY_ORIGIN_MM.z
       )
     )
 
@@ -1788,8 +1791,15 @@ function App() {
         {scanResult?.success === true &&
         !BASE_TO_FIXTURE_MM && (
           <p>
-            작업대 원점 미설정:
-            VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.
+            VITE_BASE_TO_FIXTURE_MM 미설정:
+            결과 X/Y를 작업대 원점 기준으로 표시합니다.
+          </p>
+        )}
+
+        {scanResult?.success === true && (
+          <p>
+            3D 결과 지지면: 작업대 상판
+            (workpiece_fixture Z=0)
           </p>
         )}
 
