@@ -550,7 +550,9 @@ M0609은 공식 URDF의 관절 계층을 Three.js Group으로 구성하고 공�
 - 유효한 6축 데이터가 3초 동안 없으면 **수신 지연 — 마지막 자세 표시**로 바뀐다. 수신 전 영점 자세는 실제 로봇 자세가 아니다.
 - RG2는 고정된 시각화 자세다. 실제 파지 폭은 아직 확인하지 않았으며 손가락 개폐 피드백은 반영하지 않는다.
 - 탐침 끝점은 현재 프로젝트 TCP `[0, 0, 252.12]` mm를 사용한다. 탐침 외형 길이·반경과 작업대 외형은 시각화용이다.
-- 작업대 상판 원점은 `base_to_fixture`를 적용한다. 부재는 유효한 `scan/result.vertices`로 생성한다.
+- 작업대 시각 모델은 실제 설비 위치 `VITE_TABLE_ORIGIN_MM`를 사용한다. 기본값은 실측 `423.56,-186.06,100.503` mm다.
+- `base_to_fixture`는 `scan/result` 좌표를 Base로 옮기는 용도다. sim의 `425,-184,400` mm는 가상 박스 지지면이므로 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
+- 부재는 유효한 `scan/result.vertices`로 생성한다.
 - 실기 TCP 표시와 모델 탐침 끝점의 정렬은 실제 관절·TCP를 함께 수신해 별도로 확인한다.
 
 검증 명령:
@@ -587,7 +589,9 @@ broker가 다른 PC에 있으면 기존 실행 환경의 `broker_host`를 함께
 ```bash
 # Web PC: 기존 FastAPI·Mosquitto는 실행 상태여야 한다.
 cd frontend
-VITE_BASE_TO_FIXTURE_MM=425,-184,400 npm run dev
+VITE_BASE_TO_FIXTURE_MM=425,-184,400 \
+VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
+npm run dev
 ```
 
 관절 경로 확인:
@@ -598,7 +602,23 @@ mosquitto_sub -h 127.0.0.1 -p 1883 -t 'robot/joints' -C 1 -v
 ```
 
 `robot/joints` 수신은 웹 표시용이며 로봇에 모션 명령을 보내지 않는다.
-실기에서는 위 sim fixture 대신 실기 `base_to_fixture` 값을 사용한다.
+
+작업대 높이 기준:
+```text
+M0609 base_link z = 0 mm
+작업대 상판 z    = 100.503 mm
+작업대 실제 높이 = 94 mm
+작업대 바닥 z    = 6.503 mm
+```
+따라서 로봇 베이스와 작업대 발은 거의 같은 바닥 레벨에 놓인다.
+
+실기에서는:
+```bash
+VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503 \
+VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
+npm run dev
+```
+를 사용한다. sim에서는 `VITE_BASE_TO_FIXTURE_MM=425,-184,400`을 유지하되 작업대 시각 모델은 실제 설비 높이를 유지한다.
 
 ---
 
