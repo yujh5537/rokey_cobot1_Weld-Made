@@ -83,7 +83,8 @@ function buildRg2Model(
   parent,
   loadTasks,
   lifetime,
-  loadVisuals
+  loadVisuals,
+  gripperJointRefs
 ) {
   const stlLoader =
     new STLLoader()
@@ -91,9 +92,13 @@ function buildRg2Model(
   const base =
     new THREE.Group()
 
-  // 프로젝트에서 사용하는 RG2 xacro의 고정 장착 자세.
-  base.rotation.z =
-    Math.PI / 2
+  // m0609_rg2_bringup/urdf/onrobot_rg2.xacro:
+  // tool0 -> rg2_base_link fixed origin rpy="1.5708 0 1.5708".
+  setRosOrigin(
+    base,
+    [0, 0, 0],
+    [Math.PI / 2, 0, Math.PI / 2]
+  )
 
   parent.add(base)
 
@@ -147,35 +152,42 @@ function buildRg2Model(
     whiteMaterial
   )
 
-  // 고정 시각화 자세. 실기 파지 폭 피드백을 나타내지는 않는다.
-  const fingerAngle = 0.0
-
   function createFinger(
+    side,
     reflect
   ) {
+    // outer knuckle origin
     const outerOrigin =
       new THREE.Group()
 
-    outerOrigin.position.set(
-      0,
-      reflect * -0.017178,
-      0.125797
+    setRosOrigin(
+      outerOrigin,
+      [0, reflect * -0.017178, 0.125797],
+      [0, 0, reflect < 0 ? Math.PI : 0]
     )
-
-    if (reflect < 0) {
-      outerOrigin.rotation.z =
-        Math.PI
-    }
 
     base.add(outerOrigin)
 
+    // Revolute joint: left=finger_joint(axis -X),
+    // right=right_outer_knuckle_joint(axis +X).
     const outerJoint =
       new THREE.Group()
 
-    outerJoint.rotation.x =
-      -fingerAngle
-
     outerOrigin.add(outerJoint)
+
+    if (side === 'left') {
+      gripperJointRefs.rg2_finger_joint = {
+        object: outerJoint,
+        axis: 'x',
+        sign: -1,
+      }
+    } else {
+      gripperJointRefs.rg2_right_outer_knuckle_joint = {
+        object: outerJoint,
+        axis: 'x',
+        sign: 1,
+      }
+    }
 
     loadStl(
       outerJoint,
@@ -183,58 +195,79 @@ function buildRg2Model(
       whiteMaterial
     )
 
+    // inner finger origin -> +X revolute joint
     const innerFingerOrigin =
       new THREE.Group()
 
-    innerFingerOrigin.position.set(
-      0,
-      -0.039592,
-      0.038177
+    setRosOrigin(
+      innerFingerOrigin,
+      [0, -0.039592, 0.038177],
+      [0, 0, 0]
     )
 
     outerJoint.add(
       innerFingerOrigin
     )
 
-    innerFingerOrigin.rotation.x =
-      fingerAngle
+    const innerFingerJoint =
+      new THREE.Group()
+
+    innerFingerOrigin.add(
+      innerFingerJoint
+    )
+
+    gripperJointRefs[
+      `rg2_${side}_inner_finger_joint`
+    ] = {
+      object: innerFingerJoint,
+      axis: 'x',
+      sign: 1,
+    }
 
     loadStl(
-      innerFingerOrigin,
+      innerFingerJoint,
       'inner_finger.stl',
       darkMaterial
     )
 
+    // inner knuckle origin -> +X revolute joint
     const innerKnuckleOrigin =
       new THREE.Group()
 
-    innerKnuckleOrigin.position.set(
-      0,
-      reflect * -0.007678,
-      0.142297
+    setRosOrigin(
+      innerKnuckleOrigin,
+      [0, reflect * -0.007678, 0.142297],
+      [0, 0, reflect < 0 ? -Math.PI : 0]
     )
-
-    if (reflect < 0) {
-      innerKnuckleOrigin.rotation.z =
-        -Math.PI
-    }
-
-    innerKnuckleOrigin.rotation.x =
-      -fingerAngle
 
     base.add(
       innerKnuckleOrigin
     )
 
+    const innerKnuckleJoint =
+      new THREE.Group()
+
+    innerKnuckleOrigin.add(
+      innerKnuckleJoint
+    )
+
+    gripperJointRefs[
+      `rg2_${side}_inner_knuckle_joint`
+    ] = {
+      object: innerKnuckleJoint,
+      axis: 'x',
+      sign: 1,
+    }
+
     loadStl(
-      innerKnuckleOrigin,
+      innerKnuckleJoint,
       'inner_knuckle.stl',
       whiteMaterial
     )
   }
 
-  createFinger(1)
-  createFinger(-1)
+  createFinger('left', 1)
+  createFinger('right', -1)
 
   // 실기 TCP: flange -> probe tip = [0, 0, 252.12] mm.
   // RG2는 고정 파지이므로 탐침 끝점을 이 TCP에 맞춰 표시한다.
@@ -449,16 +482,33 @@ export function buildM0609Model({ loadVisuals = true } = {}) {
     'MF0609_6_0.dae'
   )
 
+  // Upstream M0609 URDF fixed flange frame:
+  // link_6 -> tool0 rpy="pi -pi/2 0".
+  const tool0 =
+    new THREE.Group()
+
+  setRosOrigin(
+    tool0,
+    [0, 0, 0],
+    [Math.PI, -Math.PI / 2, 0]
+  )
+
+  link6.add(tool0)
+
+  const gripperJointRefs = {}
+
   buildRg2Model(
-    link6,
+    tool0,
     loadTasks,
     lifetime,
-    loadVisuals
+    loadVisuals,
+    gripperJointRefs
   )
 
   return {
     root,
     jointRefs,
+    gripperJointRefs,
     dispose() {
       lifetime.disposed = true
       disposeObject3D(root)
