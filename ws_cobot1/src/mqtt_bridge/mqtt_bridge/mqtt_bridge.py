@@ -18,6 +18,7 @@ from contact_scan_interfaces.srv import ResetSafety, SetConfig, StopScan
 from contact_scan_qos import QOS_EVENT, QOS_HEARTBEAT, QOS_LOG, QOS_SENSOR, QOS_STATE
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 
 from mqtt_bridge.command_guard import CommandGuard
 from mqtt_bridge.decoders import (
@@ -175,6 +176,7 @@ class MqttBridge(Node):
             ("broker_host", "127.0.0.1"), ("broker_port", 1883),
             ("topic_prefix", ""), ("dedup_cache_size", 100),
             ("cmd_expiry_s", 5.0), ("sample_publish_hz", 10.0),
+            ("joint_publish_hz", 20.0), ("joint_state_topic", "/dsr01/joint_states"),
             ("heartbeat_hz", 1.0), ("keepalive_s", 60),
         ):
             self.declare_parameter(name, default)
@@ -183,6 +185,8 @@ class MqttBridge(Node):
         self._port = int(self.get_parameter("broker_port").value)
         self._prefix = normalize_topic_prefix(str(self.get_parameter("topic_prefix").value))
         self._sample_hz = float(self.get_parameter("sample_publish_hz").value)
+        self._joint_hz = float(self.get_parameter("joint_publish_hz").value)
+        self._joint_state_topic = str(self.get_parameter("joint_state_topic").value)
         self._heartbeat_hz = float(self.get_parameter("heartbeat_hz").value)
         self._keepalive = int(self.get_parameter("keepalive_s").value)
 
@@ -195,7 +199,9 @@ class MqttBridge(Node):
         self._mqtt_connected = False
         self._heartbeat_seq = 0
         self._sample_period = 1.0 / self._sample_hz
+        self._joint_period = 1.0 / self._joint_hz
         self._last_sample = 0.0
+        self._last_joint = 0.0
         self._last_scan_id = ""
         self._scan_phase = ScanState.PHASE_IDLE
         self._pending_stop = []
@@ -209,6 +215,15 @@ class MqttBridge(Node):
         self.create_subscription(
             RobotSample, "/robot/sample",
             _safe_ros_callback(self.get_logger(), "/robot/sample", self._on_robot_sample),
+            QOS_SENSOR,
+        )
+        self.create_subscription(
+            JointState, self._joint_state_topic,
+            _safe_ros_callback(
+                self.get_logger(),
+                self._joint_state_topic,
+                self._on_joint_state,
+            ),
             QOS_SENSOR,
         )
         self.create_subscription(
@@ -537,6 +552,41 @@ class MqttBridge(Node):
             "valid": msg.valid, "motion_id": msg.motion_id, "operation": msg.operation,
         }
         self._publish("robot/sample", encode_robot_sample(data, now_ms()), 0, False)
+
+    def _on_joint_state(self, msg):
+        now = time.monotonic()
+        if now - self._last_joint < self._joint_period:
+            return
+        self._last_joint = now
+
+        names = list(msg.name)
+        positions = [float(value) for value in msg.position]
+
+        if not names or len(names) != len(positions):
+            self.get_logger().warning(
+                f"{self._joint_state_topic}: invalid JointState "
+                f"names={len(names)} positions={len(positions)}"
+            )
+            return
+
+        stamp_ms = (
+            int(msg.header.stamp.sec) * 1000
+            + int(msg.header.stamp.nanosec) // 1_000_000
+        )
+
+        self._publish(
+            "robot/joints",
+            {
+                "schema_version": "0.1",
+                "frame_id": "base_link",
+                "names": names,
+                "positions_rad": positions,
+                "stamp_ms": stamp_ms if stamp_ms > 0 else now_ms(),
+                "published_at_ms": now_ms(),
+            },
+            0,
+            False,
+        )
 
     def _on_robot_status(self, msg):
         data = {
