@@ -4,7 +4,7 @@ import { Group, Vector3, BoxGeometry, Mesh, MeshBasicMaterial } from 'three'
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { buildM0609Model, setRosOrigin } from '../src/robotModel.js'
-import { parseRobotJoints } from '../src/robotJoints.js'
+import { parseGripperJoints, parseRobotJoints } from '../src/robotJoints.js'
 
 test('URDF fixed-axis pitch/yaw maps local X to base Z', () => {
   const frame = new Group()
@@ -30,18 +30,66 @@ for (const [q, expected] of [
   })
 }
 
-test('joint input uses names, ignores gripper, and rejects incomplete/bad snapshots', () => {
-  const names = ['joint_6', 'dsr01/joint_2', 'dsr01_joint_1', 'joint_4', 'joint_3', 'joint_5', 'finger_joint']
-  const payload = { names, positions_rad: [0.6, 0.2, 0.1, 0.4, 0.3, 0.5, 0] }
+test('arm joint input accepts only one complete six-axis snapshot', () => {
+  const names = ['joint_6', 'joint_2', 'joint_1', 'joint_4', 'joint_3', 'joint_5']
+  const payload = { names, positions_rad: [0.6, 0.2, 0.1, 0.4, 0.3, 0.5] }
+
   assert.deepEqual(parseRobotJoints(payload), {
-    joint_1: 0.1, joint_2: 0.2, joint_3: 0.3, joint_4: 0.4, joint_5: 0.5, joint_6: 0.6,
+    joint_1: 0.1,
+    joint_2: 0.2,
+    joint_3: 0.3,
+    joint_4: 0.4,
+    joint_5: 0.5,
+    joint_6: 0.6,
   })
-  for (const bad of [null, {}, { names, positions_rad: [] },
-    { names, positions_rad: [NaN, 0, 0, 0, 0, 0, 0] },
-    { names, positions_rad: [null, 0, 0, 0, 0, 0, 0] },
-    { names: names.map(n => n === 'joint_6' ? 'notjoint_6' : n), positions_rad: payload.positions_rad },
-    { names: [...names, 'joint_1'], positions_rad: [...payload.positions_rad, 1] },
-  ]) assert.equal(parseRobotJoints(bad), null)
+
+  for (const bad of [
+    null,
+    {},
+    { names, positions_rad: [] },
+    { names, positions_rad: [NaN, 0, 0, 0, 0, 0] },
+    { names: [...names, 'rg2_finger_joint'], positions_rad: [...payload.positions_rad, 0] },
+    { names: [...names.slice(0, -1), 'joint_1'], positions_rad: payload.positions_rad },
+  ]) {
+    assert.equal(
+      parseRobotJoints(bad),
+      null
+    )
+  }
+})
+
+test('RG2 joint input is parsed independently from arm joints', () => {
+  const payload = {
+    names: [
+      'rg2_finger_joint',
+      'rg2_left_inner_knuckle_joint',
+      'rg2_left_inner_finger_joint',
+      'rg2_right_outer_knuckle_joint',
+      'rg2_right_inner_knuckle_joint',
+      'rg2_right_inner_finger_joint',
+    ],
+    positions_rad: [0.2, -0.2, 0.2, -0.2, -0.2, 0.2],
+  }
+
+  assert.deepEqual(
+    parseGripperJoints(payload),
+    Object.fromEntries(
+      payload.names.map(
+        (name, index) => [
+          name,
+          payload.positions_rad[index],
+        ]
+      )
+    )
+  )
+
+  assert.equal(
+    parseGripperJoints({
+      names: ['rg2_finger_joint'],
+      positions_rad: [0],
+    }),
+    null
+  )
 })
 
 test('COLLADA correction and late-load cleanup work without a browser', async (t) => {
