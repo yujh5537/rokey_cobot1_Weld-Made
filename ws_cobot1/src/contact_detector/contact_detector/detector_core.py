@@ -5,7 +5,9 @@
   2. 접촉 발생(CONTACT): OP_DESCEND 중 |F - F0| 가 임계를 넘는 샘플이 연속 N 회면 확정한다
   3. 과대 외력(OVER_FORCE): 모든 동작에서 원시 |F| 로 판정한다. 영점에 의존하지 않는다
   4. 접촉 소실(EDGE): OP_SLIDE 중 누르는 힘이 확인된 뒤, TCP z 가 최근 구간의 추세선보다
-     edge_drop_m 넘게 내려간 샘플이 연속 N 회면 확정한다 (BRD 4.1.2 의 주 신호)
+     edge_drop_m 넘게 내려간 샘플이 연속 N 회면 확정한다 (BRD 4.1.2 의 주 신호).
+     EdgeConfig.force_drop_n 이 있으면 **Fz 가 최근 구간 중앙값보다 force_drop_n 넘게 떨어진 샘플이 연속 N 회**여도
+     확정한다(#128, 외력 감소 = BRD 4.1.2 의 보조 신호). 둘 중 먼저 확정된 것을 낸다
 
 EDGE 를 "밀기 시작 z 대비 누적 하강량"으로 재지 않는 이유 — 모서리가 아닌데도 z 가 내려가는 경우가 셋 있다:
   - SLIDE 는 접촉면 위 틈(recontact_margin_m)에서 시작해 목표 힘이 그 틈을 메운다 (계약 7.3)
@@ -34,6 +36,7 @@ EDGE 를 "밀기 시작 z 대비 누적 하강량"으로 재지 않는 이유 �
 단위: m · N · s. 수치(임계 · 횟수)는 전부 DetectorConfig 로 받는다. 이 파일에 기본값을 두지 않는다.
 """
 import math
+import statistics
 from dataclasses import dataclass
 from collections import deque
 from typing import Deque, List, Optional, Tuple
@@ -98,6 +101,14 @@ class EdgeConfig:
     arm_still_window_s: Optional[float] = None
     arm_still_m: Optional[float] = None
     arm_travel_m: Optional[float] = None
+    # 힘 꺾임 (#128). 셋 다 있으면 켠다. 판정을 켠 뒤 [t - force_window_s, t - force_lag_s] 의 원시 Fz 중앙값보다
+    # force_drop_n 넘게 낮은 샘플이 연속 debounce_n 회면 EDGE. F0 를 쓰지 않는다(밀기 중 치우침과 무관하게 '꺾임'만 본다).
+    # 2026-09-21 실기: 모서리를 벗어나면 Fz 가 0.4 s 안에 약 2 N 떨어진다. z 는 일정 속도로 떨어져 추세선이 따라간다
+    force_drop_n: Optional[float] = None
+    force_window_s: Optional[float] = None
+    force_lag_s: Optional[float] = None
+    force_settle_s: float = 0.0     # SLIDE 첫 샘플부터 이만큼은 힘 꺾임을 보지 않는다. 순응이 켜지며 누름이 풀리는 동안
+                                    # Fz 가 1 s 가까이 떨어진다(9/21 오전 9.8 → 0.7 N). z 로 켜기는 그 사이에 켜질 수 있다
 
     def __post_init__(self):
         if not (self.edge_drop_m > 0 and self.arm_force_n > 0 and self.trend_window_s > 0
@@ -105,6 +116,14 @@ class EdgeConfig:
             raise ValueError('edge_drop_m, arm_force_n, trend_window_s, max_gap_s 는 0 보다 커야 한다')
         if self.debounce_n < 1 or self.trend_min_samples < 2:
             raise ValueError('debounce_n 은 1 이상, trend_min_samples 는 2 이상이어야 한다')
+        force = (self.force_drop_n, self.force_window_s, self.force_lag_s)
+        if any(v is not None for v in force):
+            if not all(v is not None and math.isfinite(v) and v > 0 for v in force):
+                raise ValueError('force_drop_n, force_window_s, force_lag_s 는 셋 다 0 보다 커야 한다')
+            if self.force_lag_s >= self.force_window_s:
+                raise ValueError('force_lag_s 는 force_window_s 보다 작아야 한다')
+        if not (math.isfinite(self.force_settle_s) and self.force_settle_s >= 0):
+            raise ValueError('force_settle_s 는 0 이상이어야 한다')
         still = (self.arm_still_window_s, self.arm_still_m, self.arm_travel_m)
         if any(v is not None for v in still):
             if not all(v is not None and math.isfinite(v) and v > 0 for v in still):
@@ -113,6 +132,10 @@ class EdgeConfig:
     @property
     def arm_by_z(self) -> bool:
         return self.arm_still_window_s is not None
+
+    @property
+    def by_force(self) -> bool:
+        return self.force_drop_n is not None
 
 
 @dataclass(frozen=True)
@@ -134,6 +157,7 @@ class Detection:
     debounce_count: int
     z_drop_m: Optional[float] = None   # EDGE 만. first_sample 에서 추세선보다 내려간 양 (편향 보정의 δ)
     hold: bool = False                 # CONTACT 만. 이동 기준 없이 올린 임계로 확정했다(측정 품질이 낮다)
+    edge_signal: Optional[str] = None  # EDGE 만. 'z'(추세선 하강) 또는 'force'(Fz 꺾임)
 
     @property
     def debounce_delay_s(self) -> float:
@@ -222,6 +246,10 @@ class ContactDetector:
         self._edge_armed = False                     # 이 동작에서 누름이 확인됐다
         self._edge_latched = False                   # 한 motion_id 에서 EDGE 는 1 회만
         self._edge_first_drop: Optional[float] = None
+        self._force_run = _Run()
+        self._force_first_drop: Optional[float] = None
+        self._force_ref: Deque[Tuple[float, float]] = deque()   # 힘 꺾임: 판정을 켠 뒤의 (시각, 원시 Fz)
+        self._slide_start_t: Optional[float] = None            # 이 SLIDE 의 첫 샘플 시각 (force_stamp)
         self._last_edge_t: Optional[float] = None
         self._pending: Deque[Tuple[float, float]] = deque()   # 아직 추세선에 넣지 않은 최근 샘플
         self._trend = (_Trend(edge_config.trend_window_s, edge_config.trend_min_samples)
@@ -239,6 +267,10 @@ class ContactDetector:
         self._edge_armed = False
         self._edge_latched = False
         self._edge_first_drop = None
+        self._force_run.reset()
+        self._force_first_drop = None
+        self._force_ref.clear()
+        self._slide_start_t = None
         self._last_edge_t = None
         self._pending.clear()
         if self._trend:
@@ -376,6 +408,8 @@ class ContactDetector:
             return None
 
         t, z = sample.pose_stamp, sample.position[2]
+        if self._slide_start_t is None:
+            self._slide_start_t = sample.force_stamp
         # 공백이면 추세선 · 대기 버퍼 · 연속 횟수를 즉시 버린다. 대기 버퍼를 지난 뒤에 알아차리면
         # 그사이 공백 이전의 추세로 판정하게 되고, 공백 동안 일어난 하강을 한 번에 EDGE 로 확정한다
         # (Virtual 실측 342 ms 공백, 2026-09-20). 판정이 몇 샘플 늦어지는 대신 틀린 좌표를 내지 않는다
@@ -384,6 +418,8 @@ class ContactDetector:
             self._pending.clear()
             self._edge_run.reset()
             self._arm_points.clear()
+            self._force_run.reset()
+            self._force_ref.clear()
             self.trend_gap = True
         self._last_edge_t = t
 
@@ -407,11 +443,55 @@ class ContactDetector:
                 self._edge_latched = False           # CONTACT 와 같은 이유 (motion_id 0 = 동작 경계를 모른다)
         elif count == 1:
             self._edge_first_drop = drop
-        if self._edge_latched or count < cfg.debounce_n:
+        force_count = self._update_force_break(sample, cfg, drop)
+        if self._edge_latched:
             return None
-        self._edge_latched = True
-        return Detection(TYPE_EDGE, sample, self._edge_run.first, self.force_delta(sample), count,
-                         z_drop_m=self._edge_first_drop)
+        if count >= cfg.debounce_n:
+            self._edge_latched = True
+            return Detection(TYPE_EDGE, sample, self._edge_run.first, self.force_delta(sample), count,
+                             z_drop_m=self._edge_first_drop, edge_signal='z')
+        if force_count >= cfg.debounce_n:
+            self._edge_latched = True
+            return Detection(TYPE_EDGE, sample, self._force_run.first, self.force_delta(sample), force_count,
+                             z_drop_m=self._force_first_drop, edge_signal='force')
+        return None
+
+    def _update_force_break(self, sample: Sample, cfg: EdgeConfig, drop: Optional[float]) -> int:
+        """힘 꺾임 조건의 연속 횟수. 꺼져 있으면 0. 조건이 성립하는 동안은 기준 구간에 넣지 않는다(기준을 얼린다)."""
+        if not cfg.by_force:
+            return 0
+        t, fz = sample.force_stamp, sample.force[2]
+        while self._force_ref and self._force_ref[0][0] < t - cfg.force_window_s:
+            self._force_ref.popleft()
+        ref = [f for ft, f in self._force_ref if ft <= t - cfg.force_lag_s]
+        settled = self._slide_start_t is not None and t - self._slide_start_t >= cfg.force_settle_s
+        below = (settled and len(ref) >= self.edge_config.trend_min_samples
+                 and fz < statistics.median(ref) - cfg.force_drop_n)
+        count = self._force_run.update(below, sample)
+        if count == 0:
+            self._force_ref.append((t, fz))
+        elif count == 1:
+            # 편향 보정의 δ. 힘이 먼저 꺾이므로 이 순간의 z 하강은 작다(실기 0.1 mm 안팎). 추세선이 없으면 None
+            self._force_first_drop = None if drop is None else max(drop, 0.0)
+        return count
+
+    def _pressing(self, sample: Sample, cfg: EdgeConfig) -> bool:
+        """EDGE 판정을 켤지. 힘(|F - F0|) 또는 z(멈춤 + x · y 이동)로 본다."""
+        if not cfg.arm_by_z:
+            return self._arm_run.update(self.force_delta(sample) > cfg.arm_force_n, sample) >= cfg.debounce_n
+        # z 로 켜기(#109): 하강용 F0 를 밀기에 쓰면 옆 이동 이력 때문에 닿기 전에도 |F - F0| 가 수 N 이라 힘 조건이
+        # 곧바로 켜진다. 틈을 다 메우면 z 가 멈추므로 그것을 본다. 힘 제어를 켜는 동안에는 팁이 떠 있는데 z 도
+        # 멈춰 있어서, x · y 가 실제로 움직이고 있는지도 같이 본다
+        t = sample.pose_stamp
+        self._arm_points.append((t, sample.position))
+        while self._arm_points and self._arm_points[0][0] < t - cfg.arm_still_window_s:
+            self._arm_points.popleft()
+        first_t, first_p = self._arm_points[0]
+        if len(self._arm_points) < cfg.debounce_n or t - first_t < 0.75 * cfg.arm_still_window_s:
+            return False
+        zs = [p[2] for _, p in self._arm_points]
+        travel = math.hypot(sample.position[0] - first_p[0], sample.position[1] - first_p[1])
+        return max(zs) - min(zs) <= cfg.arm_still_m and travel >= cfg.arm_travel_m
 
     def _pressing(self, sample: Sample, cfg: EdgeConfig) -> bool:
         """EDGE 판정을 켤지. 힘(|F - F0|) 또는 z(멈춤 + x · y 이동)로 본다."""

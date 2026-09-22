@@ -75,6 +75,11 @@ PARAMS = {
     'edge_arm_still_window_s': Parameter.Type.DOUBLE,  # > 0 이면 EDGE 판정을 z 로 켠다(edge_arm_force_n 대신)
     'edge_arm_still_m': Parameter.Type.DOUBLE,
     'edge_arm_travel_m': Parameter.Type.DOUBLE,
+    # 힘 꺾임 EDGE (#128)
+    'edge_force_drop_n': Parameter.Type.DOUBLE,        # > 0 이면 켠다: Fz 가 최근 구간 중앙값보다 이만큼 넘게 떨어진 채 debounce_n 회
+    'edge_force_window_s': Parameter.Type.DOUBLE,      # 중앙값을 내는 구간
+    'edge_force_lag_s': Parameter.Type.DOUBLE,         # 구간에서 가장 최근 이만큼은 뺀다(꺾이는 중인 샘플이 기준을 끌어내리지 않게)
+    'edge_force_settle_s': Parameter.Type.DOUBLE,      # SLIDE 시작 뒤 이만큼은 보지 않는다(순응이 켜지며 누름이 풀리는 구간)
 }
 
 # source = 'sim' 일 때만 필요한 파라미터
@@ -160,6 +165,7 @@ class ContactDetectorNode(Node):
     @staticmethod
     def _configs(v):
         by_z = v['edge_arm_still_window_s'] > 0
+        by_force = v['edge_force_drop_n'] > 0
         tare = TareConfig(v['tare_min_samples'], v['tare_max_std_n'], v['tare_max_force_n'])
         return (
             DetectorConfig(v['contact_threshold_n'], v['debounce_n'], v['over_force_n'], v['over_force_debounce_n']),
@@ -168,7 +174,11 @@ class ContactDetectorNode(Node):
                        max_gap_s=v['stale_age_ms'] * 1e-3,
                        arm_still_window_s=v['edge_arm_still_window_s'] if by_z else None,
                        arm_still_m=v['edge_arm_still_m'] if by_z else None,
-                       arm_travel_m=v['edge_arm_travel_m'] if by_z else None),
+                       arm_travel_m=v['edge_arm_travel_m'] if by_z else None,
+                       force_drop_n=v['edge_force_drop_n'] if by_force else None,
+                       force_window_s=v['edge_force_window_s'] if by_force else None,
+                       force_lag_s=v['edge_force_lag_s'] if by_force else None,
+                       force_settle_s=v['edge_force_settle_s']),
             DescendRefConfig(v['descend_ref_window_s'], v['descend_ref_lag_s'], v['descend_ref_min_samples'],
                              v['descend_hold_threshold_n'], v['descend_ref_settle_s'])
             if v['descend_ref_window_s'] > 0 else None,
@@ -263,6 +273,11 @@ class ContactDetectorNode(Node):
         if gap:
             self.warn('trend_gap', '샘플 공백으로 EDGE 추세선을 버리고 다시 쌓는다. '
                                    '그동안 접촉 소실을 볼 수 없다')
+        for detection in detections:
+            if detection.type == TYPE_EDGE:
+                self.get_logger().info(
+                    f'EDGE({detection.edge_signal}): 판정 좌표 x={detection.first_sample.position[0]:.5f} '
+                    f'y={detection.first_sample.position[1]:.5f} z={detection.first_sample.position[2]:.5f} m')
         for event in events:
             self.publisher.publish(event)
 
