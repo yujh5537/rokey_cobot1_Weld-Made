@@ -16,6 +16,7 @@ FastAPI WebSocket `/ws`를 통해 MQTT 데이터를 수신한다.
 
 - `scan/state`
 - `robot/sample`
+- `robot/joints`
 - `contact/event`
 - `scan/result`
 - `scan/log`
@@ -148,13 +149,40 @@ PUBLISHED
 
 Three.js를 사용해 다음 정보를 표시한다.
 
-- 작업대 목업
-- 직육면체 부재 목업
+- 실제 Doosan M0609 visual mesh
+- M0609 J1~J6 실시간 관절 자세
+- OnRobot RG2 visual mesh(탐침 고정 파지 자세)
+- TCP [0, 0, 252.12] mm 기준 탐침 시각화
+- 작업대(상판 기준 실제 높이 94 mm)
+- `scan/result.vertices` 기반 동적 부재 Mesh
 - 현재 TCP 팁 위치
 - TCP 이동 궤적
 - 접촉점
 - `scan/result.edges` 일반 모서리
 - `scan/result.path_candidates` 외곽 엣지·경로 후보
+
+3D 화면 조작:
+
+- 좌클릭 드래그: 회전
+- 마우스 휠: 확대·축소
+- 우클릭 드래그: 이동
+- `OrbitControls` damping 적용
+
+M0609 관절 데이터 흐름:
+
+```text
+/dsr01/joint_states
+  → mqtt_bridge (20 Hz)
+  → MQTT robot/joints
+  → FastAPI robot/# 구독
+  → WebSocket
+  → React
+  → Three.js joint_1~joint_6
+```
+
+M0609 visual mesh는 DoosanRobotics/doosan-robot2의 `m0609_white` COLLADA를 사용하고, RG2 visual mesh는 ABC-iRobotics/onrobot-ros2의 RG2 STL을 사용한다. 현재 웹은 이 공개 원격 asset을 읽으므로 브라우저에서 GitHub raw asset 접근이 가능해야 한다.
+
+RG2는 이번 MVP에서 탐침을 계속 고정 파지하므로 finger feedback을 별도 MQTT 계약으로 만들지 않고 고정 자세로 렌더링한다.
 
 표시 구분:
 
