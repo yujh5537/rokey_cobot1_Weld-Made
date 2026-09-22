@@ -144,6 +144,8 @@ robot_manager:
     slow_call_warn_s: 0.15           # 이보다 늦은 두산 서비스 응답을 이름 · 시간과 함께 남긴다(#130). 0 이면 끈다
     moving_eps_m: 0.0002             # 이 창 안에서 이만큼 움직이면 이동 중
     moving_window_s: 0.3
+    moved_min_m: 0.001               # 동작 방향으로 이만큼 넘게 가야 "움직였다"(도착 판정용) [m]. SLIDE 는 x · y 만 본다.
+                                     #   힘 제어를 켤 때 z 0.3~0.5 mm 움직임을 출발로 보지 않는다(9/22 실기 1083)
     slide_mode: force                # sim 은 힘 제어 밀기를 유지한다. Virtual 의 외력은 0 근처라 스텝 모드(멈춰서 힘 읽기)를
                                      #   돌릴 수 없다. 스텝 모드는 순수 모듈 시험(test_step_slide.py)과 실기로 검증한다 (real.yaml)
 

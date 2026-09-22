@@ -72,6 +72,16 @@ def travelled_m(start_position_m, current_position_m):
     return math.dist(start_position_m, current_position_m)
 
 
+def lateral_m(start_position_m, current_position_m):
+    """시작점에서 지금까지의 x · y 거리 [m]. 한쪽이라도 모르면 0.0. SLIDE 의 "움직였다" 판정용이다.
+
+    힘 제어를 켜면 팁이 z 로 0.3~0.5 mm 움직인다(9/22 실기). 이것을 밀기 출발로 보면 안 된다.
+    """
+    if start_position_m is None or current_position_m is None:
+        return 0.0
+    return math.dist(start_position_m[:2], current_position_m[:2])
+
+
 def drop_exceeded(start_z_m, current_z_m, drop_limit_m):
     """SLIDE 하강 제한(계약 7.2 1차 감시). 기준은 SLIDE 첫 샘플의 z다."""
     if start_z_m is None or current_z_m is None:
