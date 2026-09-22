@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { buildM0609Model, disposeObject3D } from './robotModel.js'
-import { parseGripperJoints, parseRobotJoints } from './robotJoints.js'
+import { parseRobotJoints } from './robotJoints.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -235,7 +235,6 @@ function App() {
   // 실제 M0609 모델과 joint_1~joint_6 회전 Group.
   const robotModelRef = useRef(null)
   const robotJointRefs = useRef({})
-  const robotGripperJointRefs = useRef({})
 
   // Three.js에서 현재 TCP 팁 Mesh를 참조한다.
   const tipMeshRef = useRef(null)
@@ -279,8 +278,6 @@ function App() {
   // M0609 joint state. /dsr01/joint_states -> MQTT robot/joints.
   const [jointPositions, setJointPositions] = useState({})
   const [jointStatus, setJointStatus] = useState('수신 대기')
-  const [gripperJointPositions, setGripperJointPositions] = useState({})
-  const [gripperJointStatus, setGripperJointStatus] = useState('수신 대기')
   const [robotModelStatus, setRobotModelStatus] = useState('LOADING')
 
   // 현재 로봇 TCP 팁 위치
@@ -479,7 +476,6 @@ function App() {
 
     const websocket = new WebSocket(wsUrl)
     let jointTimeout
-    let gripperJointTimeout
 
 
     // WebSocket 연결 성공
@@ -555,30 +551,8 @@ function App() {
           }
         }
 
-        if (topic === 'robot/gripper_joints') {
-          const nextGripperPositions =
-            parseGripperJoints(payload)
-
-          if (nextGripperPositions) {
-            setGripperJointPositions(
-              nextGripperPositions
-            )
-            setGripperJointStatus(
-              '실시간 수신 중'
-            )
-
-            window.clearTimeout(
-              gripperJointTimeout
-            )
-
-            gripperJointTimeout =
-              window.setTimeout(() => {
-                setGripperJointStatus(
-                  '수신 지연 — 마지막 자세 표시'
-                )
-              }, 3000)
-          }
-        }
+        // RG2는 탐침 고정 파지용이므로 웹에서는 항상 닫힌 자세로 표시한다.
+        // robot/gripper_joints가 들어와도 시각 자세를 덮어쓰지 않는다.
 
         // robot/sample
         if (
@@ -689,9 +663,7 @@ function App() {
 
       setWsConnected(false)
       window.clearTimeout(jointTimeout)
-      window.clearTimeout(gripperJointTimeout)
       setJointStatus('연결 끊김 — 마지막 자세 표시')
-      setGripperJointStatus('연결 끊김 — 마지막 자세 표시')
       addLog('FastAPI WebSocket 연결 종료')
     }
 
@@ -708,7 +680,6 @@ function App() {
     // React 컴포넌트 종료 시 연결 정리
     return () => {
       window.clearTimeout(jointTimeout)
-      window.clearTimeout(gripperJointTimeout)
       websocket.onopen = null
       websocket.onmessage = null
       websocket.onclose = null
@@ -1039,9 +1010,6 @@ function App() {
     robotJointRefs.current =
       robotModel.jointRefs
 
-    robotGripperJointRefs.current =
-      robotModel.gripperJointRefs
-
     scene.add(
       robotModel.root
     )
@@ -1259,30 +1227,6 @@ function App() {
     )
   }, [jointPositions])
 
-
-  // =========================
-  // RG2 관절 실시간 갱신
-  // =========================
-
-  useEffect(() => {
-    Object.entries(
-      gripperJointPositions
-    ).forEach(
-      ([name, positionRad]) => {
-        const ref =
-          robotGripperJointRefs.current[name]
-
-        if (!ref) {
-          return
-        }
-
-        ref.object.rotation[
-          ref.axis
-        ] =
-          positionRad * ref.sign
-      }
-    )
-  }, [gripperJointPositions])
 
 
   // =========================
@@ -1803,8 +1747,7 @@ function App() {
         </p>
 
         <p>
-          RG2 관절 수신:{' '}
-          {Object.keys(gripperJointPositions).length} / 6 — {gripperJointStatus}
+          RG2 자세: 닫힘 고정 · 탐침 돌출 13 mm
         </p>
 
         {tipPose ? (
@@ -2030,7 +1973,7 @@ function App() {
         <h2>3D 화면</h2>
 
         <p>좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
-        <p>RG2는 /dsr01/joint_states의 합성 관절값을 별도 수신해 손가락 자세를 갱신합니다.</p>
+        <p>RG2는 탐침을 놓치지 않도록 닫힌 고정 자세로 표시하며, 그리퍼 끝에서 탐침 끝까지 13 mm로 렌더링합니다.</p>
         {robotModelStatus === 'LOADING' && <p>로봇 모델을 불러오는 중입니다.</p>}
         {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
           <p role="alert">일부 로봇 모델을 불러오지 못했습니다. GitHub 모델 파일 접근을 확인한 뒤 새로고침하세요.</p>
