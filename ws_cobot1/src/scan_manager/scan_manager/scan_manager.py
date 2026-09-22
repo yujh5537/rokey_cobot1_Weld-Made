@@ -1074,6 +1074,15 @@ class ScanManager(Node):
             if isinstance(planned, scan_resume.Refusal):
                 return planned
 
+            # 재시작의 첫 모션도 지금 어디 있는지를 알아야 보낼 수 있다(계약 7.6). **접수 때** 막는다 —
+            # 실행 중에 실패하면 실패 기록에 resumed_at 이 찍혀 다시 이을 기회가 사라진다.
+            # 여기서 거절하면 기록이 그대로 남아, 샘플이 돌아온 뒤 다시 RESUME 할 수 있다
+            if self.current_pose(planned.params.pose_max_age_s) is None:
+                return scan_resume.Refusal(
+                    Reason.NOT_SUPPORTED,
+                    '지금 TCP 위치를 모른다(/robot/sample 의 유효 pose 가 없거나 오래됐다). '
+                    '재시작의 첫 모션 목표를 만들 수 없다 — 샘플이 돌아온 뒤 다시 RESUME 한다')
+
             job = _Job(
                 scan_id, planned.params, conversions.config_to_msg(planned.config),
                 planned.started_at)
@@ -1414,7 +1423,7 @@ class _NodePorts(Ports):
         return self._node.wait_still(self._params.stop_confirm_timeout_s)
 
     def current_pose(self):
-        return self._node.current_pose(self._params.home_pose_max_age_s)
+        return self._node.current_pose(self._params.pose_max_age_s)
 
     def damage_suspect_reason(self):
         """직전 실패가 손상 의심 사유였는가 (계약 7.5 ②).
@@ -1422,7 +1431,8 @@ class _NodePorts(Ports):
         상태 기계의 failure 는 다음 START 까지 남는다. 안전복귀는 그 실패 뒤에 오는 명령이므로
         여기서 보는 것이 맞다. 정상 중지(STOPPED)에는 failure 가 없어 "" 다 — 평소 경로는 그대로다.
         """
-        return _damage_suspect_reason(self._node.state_machine.failure)
+        return _damage_suspect_reason(
+            self._node.state_machine.failure, self._node.safety_reason_code())
 
     def tare(self):
         node, p = self._node, self._params

@@ -302,7 +302,7 @@ scan_manager:
     # 안전복귀(계약 7.5)가 "지금 TCP 위치를 안다"고 보는 /robot/sample 나이의 한도 [s].
     # 넘으면 올리지도 HOME 하지도 않고 NOT_SUPPORTED 로 끝낸다 — 사람이 펜던트로 조그한다.
     # 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
-    home_pose_max_age_s: 1.0      # robot_manager 실측 약 43 Hz(23 ms) 의 40 배 이상. 정지 중 687 ms 공백 기록(#130)보다 크게 둔다
+    pose_max_age_s: 1.0      # robot_manager 실측 약 43 Hz(23 ms) 의 40 배 이상. 정지 중 687 ms 공백 기록(#130)보다 크게 둔다
 
 # mqtt_bridge:                       # (병후)
 #   ros__parameters:

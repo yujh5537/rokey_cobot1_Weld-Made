@@ -104,11 +104,11 @@ T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig
 ⑤ OP_HOME
 ```
 - **①** `OVER_FORCE(400)` · `DROP_LIMIT(205)` · `OUT_OF_WORKSPACE(402)`로 끝났으면 탐침 · 부재가 상했을 수 있다. 눈으로 확인하고 **사람이 펜던트로 조그**한다. 접촉이 원인이 아닌 실패(`TIMEOUT` · `NO_CONTACT` · `SAMPLE_STALE` · `ROBOT_ERROR` …)는 막지 않는다 — 전부 막으면 복귀 수단이 사라진다. 정상 중지(STOPPED)에는 실패 사유가 없으므로 평소 경로는 그대로다.
-- **②** `/robot/sample`의 마지막 유효 pose가 없거나 `home_pose_max_age_s`보다 오래되면 "모른다"로 본다. 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
+- **②** `/robot/sample`의 마지막 유효 pose가 없거나 `pose_max_age_s`보다 오래되면 "모른다"로 본다. 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
 - **③** 올림은 **지금 자세를 그대로** 목표로 준다. `search_origin_pose`(TBD일 수 있다)에 기대지 않고, 닿아 있을 수 있는 자리에서 자세를 돌리지도 않는다.
 - **④** 2026-09-21 실기에서 **올림이 실패했는데 HOME이 나간 사례가 2회** 있었다(#130).
 - 올림도 HOME과 같이 **안전 래치를 보지 않는다**. `/robot/status` 끊김은 여전히 막는다.
-- 이 절차는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s` · **`lift_height_m` · `move_speed_mps` · `home_pose_max_age_s`**를 본다. 측정 · 보정 파라미터는 보지 않는다.
+- 이 절차는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s` · **`lift_height_m` · `move_speed_mps` · `pose_max_age_s`**를 본다. 측정 · 보정 파라미터는 보지 않는다.
 - **스캔 마무리 복귀(7.4절)는 이 절차가 아니다.** 그쪽은 측정이 끝난 뒤 자기 정지 좌표로 올린다. robot_manager의 스텝 모드 안의 1 mm 들기(`step_lift_m`)도 다른 것이다.
 - **J6 −204.84°의 실제 회전 방향은 실기에서 사람이 확인한다**(아직 확인되지 않았다).
 
@@ -127,7 +127,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 두 테스트 모두 `ROS_DOMAIN_ID`를 따로 잡고 가짜 `/robot/execute_motion` · `/contact/tare` · `/robot/stop` 서버와 가짜 `/contact/event` · `/robot/status` · `/safety/status` 발행기를 같은 프로세스에 띄운다. 로봇 · 드라이버 · Virtual Mode를 쓰지 않는다.
 
 ## 파라미터
-값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s` · `lift_height_m` · `move_speed_mps` · `home_pose_max_age_s`만 본다(측정 · 보정 파라미터가 비었다고 홈 복귀를 막지 않는다. 뒤의 셋은 계약 7.5의 수직 올림에 쓴다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
+값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s` · `lift_height_m` · `move_speed_mps` · `pose_max_age_s`만 본다(측정 · 보정 파라미터가 비었다고 홈 복귀를 막지 않는다. 뒤의 셋은 계약 7.5의 수직 올림에 쓴다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
 
 | 이름 | 형 | 필수 | 범위 | 뜻 |
 |---|---|---|---|---|

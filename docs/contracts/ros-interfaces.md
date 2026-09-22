@@ -746,16 +746,32 @@ EDGE_SEARCH 4/4
 ```
 | 멈추는 조건 | 판정 | 결과 |
 |---|---|---|
-| ① 위치 불명 | `/robot/sample`의 마지막 유효 pose가 없거나 `home_pose_max_age_s`보다 오래됨 | `NOT_SUPPORTED(107)`. 사람이 펜던트로 조그한다 |
-| ② 손상 의심 | 직전 실패의 `reason_code`가 `OVER_FORCE(400)` · `DROP_LIMIT(205)` · `OUT_OF_WORKSPACE(402)` | `NOT_SUPPORTED(107)`. 탐침 · 부재를 눈으로 보고 사람이 조그한다 |
+| ① 위치 불명 | `/robot/sample`의 마지막 유효 pose가 없거나 `pose_max_age_s`보다 오래됨 | `NOT_SUPPORTED(107)`. 사람이 펜던트로 조그한다 |
+| ② 손상 의심 | 직전 실패의 `reason_code`, **또는 지금 걸려 있는 래치의 사유**가 `OVER_FORCE(400)` · `DROP_LIMIT(205)` · `OUT_OF_WORKSPACE(402)` | `NOT_SUPPORTED(107)`. 탐침 · 부재를 눈으로 보고 사람이 조그한다 |
 | ④ 올림 실패 | 올림이 `TARGET_REACHED`가 아님(정지 · 시간 초과 · 오류) | 그 사유로 끝낸다. **HOME 을 보내지 않는다** |
 
-- 올림도 HOME 과 같이 **안전 래치를 보지 않는다**(래치 때문에 돌아오지 못하면 안 된다).
+- 올림도 HOME 과 같이 **안전 래치를 보지 않는다**(래치 때문에 돌아오지 못하면 안 된다). ②가 보는 것은 래치가 걸렸다는 사실이 아니라 **래치의 사유**다. 사유가 손상 의심 셋이 아니면 래치 중이어도 복귀한다.
+- **요청하지 않은 정지의 사유는 `Result.reason_code`에서 읽는다 [v0.1.16].** safety_monitor 는 `/robot/stop`의 `reason`에 사유(205 · 400)를 싣고, robot_manager 는 그것을 `ExecuteMotion.Result.reason_code`로 돌려준다(사유가 없으면 `STOP_REQUESTED`). 판정은 `Result.reason_code` → `/safety/status`의 래치 사유 → `ROBOT_ERROR(204)` 순으로 본다. `/safety/status`의 도착 순서에 기대면 사유가 204 로 뭉개지고, 래치에만 기대면 사람이 먼저 `/safety/reset`을 누른 순간 같은 일이 생긴다.
 - 올림의 자세는 지금 자세를 그대로 목표로 준다. `search_origin_pose`(TBD일 수 있다)에 기대지 않는다.
 - 멈춘 경우 `ScanLog` · `ReturnHome.Result.detail`에 사유를 남긴다. **자동으로 다른 명령을 부르지 않는다.**
 - 스캔 마무리 복귀(위 7.4)는 이 절차가 아니다. 그쪽은 측정이 끝난 뒤 자기 정지 좌표로 올린다.
 - `step` 모드 SLIDE 안의 1 mm 들기(`step_lift_m`)도 이 절차가 아니다. 그것은 한 스텝 안의 동작이다.
 - **J6 −204.84°의 실제 회전 방향은 실기에서 사람이 확인한다**(아직 확인되지 않았다).
+
+### 7.6 재시작(`/scan/resume`)의 첫 모션 **[v0.1.16]**
+재시작의 첫 모션은 **지금 TCP 가 어디 있는지를 알고 나서** 보낸다. 기록된 중단 좌표를 목표로 쓰지 않는다.
+
+`OP_MOVE_TO`는 절대 좌표다. 중단 뒤에 사람이 펜던트로 옮겼거나, 애초에 정지를 확인하지 못했다면(`STOP_UNCONFIRMED(407)`) 기록 좌표는 지금 위치가 아니다. 그 좌표를 목표로 주면 **낮은 높이에서 기록 좌표로 되돌아가는 수평 이동**이 된다.
+
+| 시점 | 판정 | 결과 |
+|---|---|---|
+| RESUME 접수 | `/robot/sample`의 마지막 유효 pose가 없거나 `pose_max_age_s`보다 오래됨 | `NOT_SUPPORTED(107)`로 **거절**한다. 기록은 그대로 남아 샘플이 돌아온 뒤 다시 RESUME 할 수 있다 |
+| 첫 모션 직전 | 접수와 실행 사이에 위치를 잃음 | 그 사유로 실패한다(사람이 조그하고 새 START) |
+
+- 올림은 7.5 ③과 같은 **수직 올림**이다: 지금 자리에서 x · y 와 자세를 바꾸지 않고 z 만 `lift_height_m` 올린다. 팁이 무언가에 닿아 있어도 옆으로 끌지 않는다.
+- `pose_max_age_s`는 안전복귀와 **같은 파라미터**다. 두 경로가 같은 신선도 규칙을 쓴다.
+- 이 규칙은 `STOPPED` 재시작과 `ERROR` 재시작(5.3절 허용 목록)에 **모두** 적용된다.
+- 올린 뒤의 절차(무접촉 tare → 기준 원점 x · y 로 이동 → 첫 접촉 z + `recontact_margin_m`까지 저속 하강)는 7.3절 방향 전환과 같다.
 
 ---
 

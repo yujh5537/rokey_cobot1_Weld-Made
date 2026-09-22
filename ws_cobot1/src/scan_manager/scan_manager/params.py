@@ -116,7 +116,7 @@ SPECS: Tuple[ParamSpec, ...] = (
               '/safety/status 가 끊긴 것으로 보는 한도. 발행 주기의 여러 배로 둔다'),
     ParamSpec('robot_status_timeout_s', DOUBLE, True, positive,
               '/robot/status 가 끊긴 것으로 보는 한도. 발행 주기의 여러 배로 둔다'),
-    ParamSpec('home_pose_max_age_s', DOUBLE, True, positive,
+    ParamSpec('pose_max_age_s', DOUBLE, True, positive,
               '안전복귀(계약 7.5)가 "지금 위치를 안다"고 보는 /robot/sample 나이의 한도'),
     ParamSpec('result_frame_id', STRING, False, _non_empty_text,
               'ScanResult 의 프레임(가칭)', default='workpiece_fixture'),
@@ -165,7 +165,7 @@ class ScanParams:
     server_wait_timeout_s: float
     safety_status_timeout_s: float
     robot_status_timeout_s: float
-    home_pose_max_age_s: float
+    pose_max_age_s: float
     result_frame_id: str
     motion_frame_id: str
     direction_order: Tuple[Direction, ...]
@@ -275,7 +275,7 @@ HOME_PARAM_NAMES = (
     'robot_status_timeout_s',
     # 계약 7.5(v0.1.16): 안전복귀는 HOME 전에 수직으로 올린다. 그 올림에 필요한 값들이다.
     # search_origin_pose 는 넣지 않는다 — 올림은 지금 자세를 그대로 쓴다(그 값은 TBD 일 수 있다)
-    'lift_height_m', 'move_speed_mps', 'home_pose_max_age_s')
+    'lift_height_m', 'move_speed_mps', 'pose_max_age_s')
 
 
 @dataclass(frozen=True)
@@ -287,7 +287,7 @@ class HomeParams:
     robot_status_timeout_s: float
     lift_height_m: float
     move_speed_mps: float
-    home_pose_max_age_s: float
+    pose_max_age_s: float
 
 
 def check_home(values: Mapping[str, object]) -> ParamCheck:

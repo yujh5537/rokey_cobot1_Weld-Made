@@ -153,6 +153,17 @@ def _failed(code, detail) -> MotionVerdict:
     return MotionVerdict(VerdictKind.FAILED, int(code), detail)
 
 
+#: 정지 Result 에 실려 오지만 '왜 멈췄는지'를 말해 주지 않는 코드. 이것뿐이면 사유를 모르는 것이다
+GENERIC_STOP_CODES = frozenset({
+    int(Reason.OK), int(Reason.STOP_REQUESTED), int(Reason.CANCELED)})
+
+
+def stop_cause(reason_code) -> int:
+    """요청하지 않은 정지의 Result.reason_code 중 실패 사유로 쓸 수 있는 것만 돌려준다 (없으면 0)."""
+    code = int(reason_code or 0)
+    return 0 if code in GENERIC_STOP_CODES else code
+
+
 def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bool,
              safety_reason_code: int = 0) -> MotionVerdict:
     """모션 하나의 결과를 판정한다.
@@ -175,10 +186,14 @@ def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bo
     if reason in (MotionReason.STOP_REQUESTED, MotionReason.CANCELED):
         if stop_requested:
             return MotionVerdict(VerdictKind.STOPPED, int(Reason.STOP_REQUESTED), result.detail)
-        # 이 노드가 요청하지 않은 정지(예: safety_monitor 의 /robot/stop). Result 의 코드는
-        # STOP_REQUESTED · CANCELED 라서 실패 사유로 쓰지 않는다(작업 중지로 읽힌다).
+        # 이 노드가 요청하지 않은 정지(예: safety_monitor 의 /robot/stop).
+        # **Result.reason_code 를 먼저 쓴다.** safety_monitor 는 /robot/stop 에 사유(205 · 400)를
+        # 싣고 robot_manager 가 그것을 Result.reason_code 로 돌려준다(정지 요청을 보관했다가
+        # `reason_code or STOP_REQUESTED`). 그래서 /safety/status 의 도착 순서와 무관하게 사유가
+        # 남는다 — 래치만 보면 사람이 먼저 /safety/reset 을 누른 순간 204 로 샌다.
+        # 사유가 없는 정지(0 · STOP_REQUESTED · CANCELED)일 때만 래치 → ROBOT_ERROR 로 내려간다
         return _failed(
-            safety_reason_code or Reason.ROBOT_ERROR,
+            stop_cause(result.reason_code) or safety_reason_code or Reason.ROBOT_ERROR,
             f'{request.label}: 요청하지 않은 정지 {reason.name} '
             f'(reason_code={result.reason_code}, {result.detail})')
 
@@ -271,7 +286,7 @@ class Ports:
     def current_pose(self) -> Optional[Tuple[Position, Orientation]]:
         """지금 TCP 가 어디에 어떤 자세로 있는가. **모르면 None** (계약 7.5 ①).
 
-        /robot/sample 의 마지막 유효 pose 다. 오래됐거나(home_pose_max_age_s) 유효 샘플을 한 번도
+        /robot/sample 의 마지막 유효 pose 다. 오래됐거나(pose_max_age_s) 유효 샘플을 한 번도
         받지 못했으면 None 이다. 모르는 좌표를 0 으로 채우지 않는다(CLAUDE.md 규칙 4).
         """
         raise NotImplementedError
@@ -580,6 +595,17 @@ class ResumeRunner(ScanRunner):
 
     def _search(self):
         plan = self._resume
+        # 재시작의 첫 모션은 **지금 어디 있는지**를 알고 나서 보낸다 (계약 7.6).
+        # 기록된 중단 좌표는 목표로 쓰지 않는다 — MOVE_TO 는 절대 좌표라, 중단 뒤에 사람이
+        # 펜던트로 옮겼거나 애초에 정지를 확인하지 못한 경우(STOP_UNCONFIRMED) 낮은 높이에서
+        # 기록 좌표로 되돌아가는 수평 이동이 된다. 안전복귀(7.5 ①)와 같은 규칙을 쓴다
+        pose = self._ports.current_pose()
+        if pose is None:
+            raise _Fail(Reason.NOT_SUPPORTED,
+                        '재시작 중단: 지금 TCP 위치를 모른다(유효 샘플 없음 또는 오래됨). '
+                        '첫 모션 목표를 만들 수 없다 — 사람이 펜던트로 조그하고 새 START 를 한다')
+        position, orientation = pose
+
         if plan.first_contact_z is None:
             self._resume_before_top()
             self._find_edges(self._order, self._find_top())
@@ -587,7 +613,9 @@ class ResumeRunner(ScanRunner):
 
         remaining = self._order[len(plan.confirmed):]
         if remaining:
-            lift = self._plan.lift(plan.position, label='resume_lift')
+            # 기록 좌표(plan.position)가 아니라 지금 자리에서 수직으로 올린다. x · y 와 자세를
+            # 바꾸지 않으므로, 팁이 무언가에 닿아 있어도 옆으로 끌지 않는다
+            lift = self._plan.vertical_lift(position, orientation, label='resume_lift')
             self._execute(lift)
             self._settle_and_tare()
         self._notify(Signal.RESUME_READY)
@@ -637,14 +665,29 @@ DAMAGE_SUSPECT_CODES = (
 )
 
 
-def damage_suspect_reason(failure) -> str:
-    """이 실패 뒤에 자동복귀를 막아야 하는가. 막아야 하면 사람이 읽는 사유, 아니면 ""."""
-    if failure is None:
-        return ''
+def _suspect_label(reason_code) -> str:
     for code, label in DAMAGE_SUSPECT_CODES:
-        if int(failure.reason_code) == int(code):
-            return (f'{label}({int(code)})로 끝났다. 탐침 · 부재가 상했을 수 있어 자동복귀하지 '
-                    f'않는다. 눈으로 확인하고 펜던트로 조그한다: {failure.detail}')
+        if int(reason_code or 0) == int(code):
+            return label
+    return ''
+
+
+def damage_suspect_reason(failure, latched_reason_code: int = 0) -> str:
+    """이 실패 뒤에 자동복귀를 막아야 하는가. 막아야 하면 사람이 읽는 사유, 아니면 "".
+
+    두 곳을 본다. ① 실패 사유 ② **지금 걸려 있는 안전 래치의 사유**. ②가 필요한 이유는
+    실패 기록이 사유를 놓칠 수 있기 때문이다(래치가 도착하기 전에 판정이 끝나 ROBOT_ERROR 로
+    남는 경우). 래치를 막는 것이 아니다 — 래치 자체는 안전복귀를 막지 않는다(T10). 막는 것은 **사유**다.
+    """
+    if failure is not None:
+        label = _suspect_label(failure.reason_code)
+        if label:
+            return (f'{label}({int(failure.reason_code)})로 끝났다. 탐침 · 부재가 상했을 수 '
+                    f'있어 자동복귀하지 않는다. 눈으로 확인하고 펜던트로 조그한다: {failure.detail}')
+    label = _suspect_label(latched_reason_code)
+    if label:
+        return (f'{label}({int(latched_reason_code)})로 안전 래치가 걸려 있다. 탐침 · 부재가 '
+                f'상했을 수 있어 자동복귀하지 않는다. 눈으로 확인하고 펜던트로 조그한다')
     return ''
 
 

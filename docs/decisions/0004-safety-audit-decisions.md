@@ -107,7 +107,7 @@ BRD 9장의 "작업 중지 반응 시간 1초 이내"는 **물리 정지**를 �
   9장 TBD 2건 해소. `contact_scan_interfaces` 의 `ReasonCode.msg` · `RobotStatus.msg`.
 - 코드: scan_manager(`state_machine` · `resume` · `sequence` · `params` · `result_store` · 노드),
   safety_monitor(`safety_core` · 노드), robot_manager(기준 z · 상태 필드), mqtt_bridge(인코더).
-- 설정: real.yaml(`sample_stale_ms` 500 · `drop_limit_margin_m` · `home_pose_max_age_s` · 12 N 주석 정정),
+- 설정: real.yaml(`sample_stale_ms` 500 · `drop_limit_margin_m` · `pose_max_age_s` · 12 N 주석 정정),
   sim.yaml(같은 키).
 - 시험: 경계값(5 mm · 9 mm · 500 ms) · 기준 z 일치 · 재시작 허용 목록 · 안전복귀 분기 · 설정 동기화.
 - **실기로만 확인할 수 있는 것**: 물리 정지 1 s, 기준 z 통일 뒤의 실제 여유, 안전복귀 올림 · J6 회전 방향,

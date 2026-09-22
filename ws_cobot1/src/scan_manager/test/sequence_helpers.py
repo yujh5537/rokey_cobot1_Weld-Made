@@ -57,7 +57,7 @@ VALUES = {
     # 정상 경로는 이 한도 근처에도 가지 않는다. 끊김을 시험하는 테스트만 make_rig(...) 로 짧게 덮어쓴다.
     'safety_status_timeout_s': 5.0,
     'robot_status_timeout_s': 2.0,
-    'home_pose_max_age_s': 1.0,
+    'pose_max_age_s': 1.0,
 }
 SCAN_ID = '20260920-120000-0001'
 READY = Conditions(robot_connected=True, safety_latched=False, **FRESH_STATUS)

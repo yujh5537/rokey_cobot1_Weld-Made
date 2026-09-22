@@ -150,6 +150,6 @@ def test_step_press_stays_inside_the_first_drop_limit():
 def test_home_return_params_exist(file_name):
     """안전복귀는 HOME 전에 수직으로 올린다. 그 올림에 필요한 값이 없으면 /scan/home 이 거절된다."""
     scan = _params(file_name)['scan_manager']
-    for name in ('lift_height_m', 'move_speed_mps', 'home_pose_max_age_s', 'motion_timeout_s'):
+    for name in ('lift_height_m', 'move_speed_mps', 'pose_max_age_s', 'motion_timeout_s'):
         assert name in scan, f'{file_name}: scan_manager.{name} 이 없다'
         assert scan[name] > 0 and math.isfinite(scan[name]), f'{file_name}: {name} = {scan[name]}'

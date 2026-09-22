@@ -497,6 +497,82 @@ def test_classify_a_failure_is_not_hidden_by_a_stop_request(result, code):
     assert (verdict.kind, verdict.reason_code) == (VerdictKind.FAILED, code)
 
 
+@pytest.mark.parametrize('stop_code, latched, expected', [
+    # safety_monitor 가 /robot/stop 에 실은 사유가 Result.reason_code 로 돌아온다. 그것이 1순위다
+    # latched=0 은 사람이 /safety/reset 을 먼저 누른 경우다. 래치만 보면 여기서 204 로 샌다
+    (205, 0, Reason.DROP_LIMIT),
+    (400, 0, Reason.OVER_FORCE),
+    # Result 가 사유를 모르면 그때 래치를 본다
+    (200, 205, Reason.DROP_LIMIT),
+    (201, 400, Reason.OVER_FORCE),
+    (0, 205, Reason.DROP_LIMIT),
+    # 둘 다 없으면 그제서야 ROBOT_ERROR
+    (200, 0, Reason.ROBOT_ERROR),
+    (0, 0, Reason.ROBOT_ERROR),
+])
+def test_classify_unrequested_stop_prefers_the_result_reason_code(stop_code, latched, expected):
+    """요청하지 않은 정지의 사유는 Result.reason_code → 래치 → ROBOT_ERROR 순으로 본다 (계약 7.5)."""
+    result = MotionResult(reason=MotionReason.STOP_REQUESTED, reason_code=stop_code)
+    verdict = classify(SLIDE, result, stop_requested=False, safety_reason_code=latched)
+    assert (verdict.kind, verdict.reason_code) == (VerdictKind.FAILED, expected)
+
+
+def test_classify_our_own_stop_is_still_a_stop_even_with_a_reason_code():
+    """우리가 요청한 중지는 그대로 STOPPED 다. 1순위 규칙이 이것을 실패로 바꾸면 안 된다."""
+    result = MotionResult(reason=MotionReason.STOP_REQUESTED, reason_code=205)
+    verdict = classify(SLIDE, result, stop_requested=True, safety_reason_code=205)
+    assert (verdict.kind, verdict.reason_code) == (VerdictKind.STOPPED, Reason.STOP_REQUESTED)
+
+
+@pytest.mark.parametrize('code', [Reason.OVER_FORCE, Reason.DROP_LIMIT, Reason.OUT_OF_WORKSPACE])
+def test_damage_suspect_also_reads_the_current_latch(code):
+    """실패 기록이 사유를 놓쳐 204 로 남아도, 래치 사유가 손상 의심이면 자동복귀를 막는다."""
+    failure = Failure(int(Reason.ROBOT_ERROR), 'detail', Phase.EDGE_SEARCH)
+    assert damage_suspect_reason(failure) == ''            # 실패만 보면 못 막는다
+    assert damage_suspect_reason(failure, int(code))       # 래치를 같이 보면 막는다
+    assert damage_suspect_reason(None, int(code))          # 실패 기록이 아예 없어도 막는다
+
+
+@pytest.mark.parametrize('code', [Reason.SAFETY_LATCHED, Reason.HB_EXPIRED, Reason.SAMPLE_STALE])
+def test_a_latch_that_is_not_a_damage_reason_does_not_block_the_home_return(code):
+    """막는 것은 래치가 걸렸다는 사실이 아니라 **사유**다 (T10: 래치는 안전복귀를 막지 않는다)."""
+    assert damage_suspect_reason(None, int(code)) == ''
+
+
+def test_run_home_refuses_when_only_the_latch_says_damage(params):
+    """기록은 204 인데 래치가 400 인 경우. 종단으로 막히는지 본다."""
+    ports = home_ports(params)
+    ports.damage_reason = damage_suspect_reason(
+        Failure(int(Reason.ROBOT_ERROR), 'detail', Phase.EDGE_SEARCH), int(Reason.OVER_FORCE))
+    outcome = run_home(MotionPlanner(params), ports)
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.NOT_SUPPORTED
+    assert ports.requests == []                            # 올림도 보내지 않는다
+
+
+def test_resume_lifts_from_where_the_robot_is_now_not_from_the_record(ports, params):
+    """계약 7.6: 중단 뒤 사람이 옮겼으면 기록 좌표로 되돌아가면 안 된다."""
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    recorded = ports.position
+    moved = (recorded[0] + 0.03, recorded[1] - 0.02, recorded[2] + 0.01)
+    ports.position = moved                                 # 사람이 펜던트로 조그했다
+    mark = len(ports.requests)
+    resume(ports, params)
+    lift = next(r for _, r in ports.requests[mark:] if r.label == 'resume_lift')
+    assert lift.target_position[:2] == moved[:2]           # 지금 자리의 x · y 다
+    assert lift.target_position[2] == pytest.approx(moved[2] + params.lift_height_m)
+    assert lift.target_position[:2] != recorded[:2]        # 기록 좌표가 아니다
+
+
+def test_resume_refuses_when_the_position_is_unknown(ports, params):
+    """위치를 모르면 첫 모션을 보내지 않는다 (계약 7.6). 절대 좌표 이동은 눈을 감고 하는 것이다."""
+    stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
+    ports.position = None
+    mark = len(ports.requests)
+    outcome = resume(ports, params)
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == Reason.NOT_SUPPORTED
+    assert ports.requests[mark:] == []                     # 모션이 한 번도 나가지 않는다
+
+
 def test_failure_during_stop_ends_in_error_not_stopped(ports, params):
     def over_force_while_stopping(_request):
         ports.request_stop()
@@ -577,8 +653,9 @@ def test_resume_preparation_lifts_then_confirms_still_then_tares_before_it_is_re
     stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
     mark = len(ports.trace)
     resume(ports, params)
-    head = ports.trace[mark:mark + 5]
+    head = ports.trace[mark:mark + 6]
     assert head == [
+        ('current_pose',),                                # 7.6: 어디 있는지 먼저 묻는다
         ('execute', 'resume_lift'), ('wait_still',), ('tare',),
         ('notify', Signal.RESUME_READY), ('execute', 'to_origin_xy')]
 
@@ -607,7 +684,8 @@ def test_resume_from_preparing_starts_over_from_the_origin(ports, params):
     stopped_at(ports, params, 1)
     mark = len(ports.trace)
     resume(ports, params)
-    assert ports.trace[mark] == ('notify', Signal.RESUME_READY)   # 준비할 것이 없다. PREPARING 이 기준점 · tare 를 한다
+    assert ports.trace[mark] == ('current_pose',)                 # 7.6: 첫 모션 전에 위치부터 확인한다
+    assert ports.trace[mark + 1] == ('notify', Signal.RESUME_READY)  # 준비할 것이 없다. PREPARING 이 기준점 · tare 를 한다
     assert ports.labels_since_resume()[:2] == ['to_origin', 'descend']
 
 
@@ -615,7 +693,8 @@ def test_resume_from_the_descent_goes_back_up_and_tares_in_the_air(ports, params
     stopped_at(ports, params, 2)
     mark = len(ports.trace)
     resume(ports, params)
-    assert ports.trace[mark:mark + 5] == [
+    assert ports.trace[mark:mark + 6] == [
+        ('current_pose',),                                # 7.6: 어디 있는지 먼저 묻는다
         ('execute', 'to_origin'), ('wait_still',), ('tare',),
         ('notify', Signal.RESUME_READY), ('execute', 'descend')]
 

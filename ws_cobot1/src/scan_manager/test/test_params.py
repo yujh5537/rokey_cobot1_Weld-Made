@@ -132,5 +132,5 @@ def test_home_needs_only_its_own_parameters():
     assert not result.ok and result.missing == (
         'stop_confirm_timeout_s', 'robot_status_timeout_s',
         # 계약 7.5(v0.1.16): 안전복귀는 HOME 전에 수직으로 올린다
-        'lift_height_m', 'move_speed_mps', 'home_pose_max_age_s')
+        'lift_height_m', 'move_speed_mps', 'pose_max_age_s')
     assert any(problem.startswith('motion_timeout_s = ') for problem in result.invalid)
