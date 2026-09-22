@@ -133,6 +133,8 @@ robot_manager:
                                      #   다르다. 이 값을 넘으면 TARGET_REACHED 가 아니라
                                      #   ROBOT_ERROR 다. 출발값이고 실기에서 확정한다 (#73)
     arrival_grace_s: 1.0             # 명령 후 이 시간 안에 안 움직이면 도착으로 본다 [s]
+    slide_restart_max: 1             # SLIDE 가 arrival_grace_s 안에 옆으로 출발하지 않으면 옆 이동 명령을 다시 보내는 횟수(#153).
+                                     #   9/22 실기: 힘 제어를 켠 뒤 보낸 amovel 을 드라이버가 32 회 중 8 회 실행하지 않았다. 0 = 다시 보내지 않음
     release_force_time_s: 0.3        # release_force 의 강성 제어 전환 시간 [s] (0~1.0).
                                      #   0 이면 즉시 전환이라 참조 외력이 점프한다
                                      #   (두산 매뉴얼 5.1.4 알아두기). 실기에서 확인한다
