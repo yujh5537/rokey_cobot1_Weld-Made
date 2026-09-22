@@ -63,6 +63,9 @@ function getCommandLabel(commandTopic) {
     case 'cmd/scan/resume':
       return '재시작'
 
+    case 'cmd/safety/reset':
+      return '안전 해제'
+
     default:
       return commandTopic ?? '-'
   }
@@ -458,6 +461,52 @@ function App() {
 
   function handleResume() {
     sendScanCommand('resume')
+  }
+
+
+  async function handleSafetyReset() {
+    try {
+      const response = await fetch(
+        '/commands/safety/reset',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            payload: {},
+          }),
+        }
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}`
+        )
+      }
+
+      console.log(
+        '[COMMAND]',
+        'safety/reset',
+        result
+      )
+
+      addLog(
+        `안전 해제 명령 전송: ${result.status}`
+      )
+
+    } catch (error) {
+      console.error(
+        '[COMMAND] safety/reset error:',
+        error
+      )
+
+      addLog(
+        '안전 해제 명령 전송 실패'
+      )
+    }
   }
 
 
@@ -1692,6 +1741,10 @@ function App() {
 
         <button onClick={handleResume}>
           재시작
+        </button>
+
+        <button onClick={handleSafetyReset}>
+          안전 해제
         </button>
 
       </section>
