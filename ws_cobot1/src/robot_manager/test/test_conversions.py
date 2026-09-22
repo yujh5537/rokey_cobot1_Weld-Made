@@ -83,7 +83,7 @@ def test_tool_force_rejects_bad_values(force):
 # ---- 이동 판정 (motion_state) ------------------------------------------------
 from collections import deque  # noqa: E402
 
-from robot_manager.motion_state import is_moving, trim  # noqa: E402
+from robot_manager.motion_state import has_moved, is_moving, trim  # noqa: E402
 
 
 def window(*points):
@@ -120,3 +120,21 @@ def test_stale_points_are_dropped_then_unknown_means_moving():
     trim(points, now_s=5.0, window_s=0.3)              # 5초간 새 위치가 없었다
     assert len(points) == 0
     assert is_moving(points, 0.0002) is True           # 모르면 이동 중
+
+
+def test_unknown_position_is_not_counted_as_having_moved():
+    """샘플 공백 뒤 모르는 상태는 "움직였다"가 아니다. 출발 전 도착 판정을 막는다 (9/22 실기 943)."""
+    assert has_moved(window(), 0.0002) is False
+    assert has_moved(window((0.0, (0.4, 0.0, 0.2))), 0.0002) is False
+    # 공백 뒤 갓 들어온 두 점: is_moving 은 모르니 True 지만, 움직임이 확인된 것은 아니다
+    gap = window((1.00, (0.4, 0.0, 0.2)), (1.02, (0.4, 0.0, 0.2)))
+    assert is_moving(gap, 0.0002, 0.3) is True
+    assert has_moved(gap, 0.0002) is False
+
+
+def test_confirmed_displacement_counts_as_having_moved():
+    """점이 몇 개 없어도 eps 넘게 떨어져 있으면 움직인 것이 확인된 것이다."""
+    points = window((1.00, (0.4, 0.0, 0.2)), (1.05, (0.4003, 0.0, 0.2)))
+    assert has_moved(points, 0.0002) is True
+    still = window((0.0, (0.4, 0.0, 0.2)), (0.1, (0.4, 0.0, 0.2)), (0.2, (0.4, 0.0, 0.20005)))
+    assert has_moved(still, 0.0002) is False
