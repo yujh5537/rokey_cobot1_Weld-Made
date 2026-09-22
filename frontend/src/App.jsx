@@ -168,20 +168,6 @@ function getTableOriginMm() {
 
 const TABLE_ORIGIN_MM = getTableOriginMm()
 
-// scan/result의 수치 자체는 workpiece_fixture 기준 그대로 유지한다.
-// 3D 표시에서만 fixture의 Z=0(지지면)을 실제 작업대 상판에 붙인다.
-// sim의 base_to_fixture.z=400 mm를 그대로 쓰면 94 mm 작업대 모델과
-// 높이가 달라 결과 형상이 공중에 떠 보이므로 표시 원점만 분리한다.
-const SCAN_RESULT_DISPLAY_ORIGIN_MM = {
-  x:
-    BASE_TO_FIXTURE_MM?.x ??
-    TABLE_ORIGIN_MM.x,
-  y:
-    BASE_TO_FIXTURE_MM?.y ??
-    TABLE_ORIGIN_MM.y,
-  z: TABLE_ORIGIN_MM.z,
-}
-
 function formatScanLogMessage(payload) {
   const parts = []
 
@@ -249,10 +235,6 @@ function App() {
   // 실제 M0609 모델과 joint_1~joint_6 회전 Group.
   const robotModelRef = useRef(null)
   const robotJointRefs = useRef({})
-
-  // RG2에 고정된 실제 시각 탐침 끝점(probe_tip).
-  // contact/event가 들어온 순간의 이 위치를 노란 접촉점으로 스냅샷한다.
-  const visualProbeTipRef = useRef(null)
 
   // Three.js에서 현재 TCP 팁 Mesh를 참조한다.
   const tipMeshRef = useRef(null)
@@ -606,41 +588,15 @@ function App() {
           topic === 'contact/event' &&
           payload.pose
         ) {
-          // 계약상의 contact/event pose는 원본 좌표/로그용으로 그대로 보관한다.
-          // 노란 접촉점의 3D 위치는 이벤트 수신 순간 실제 RG2 시각 탐침 끝
-          // (probe_tip)을 스냅샷한다. 따라서 flange/TCP 표시 오프셋과 무관하게
-          // 접촉 구체가 항상 탐침 끝에서 생성된다.
-          let probeTipSnapshot = null
-          const visualProbeTip =
-            visualProbeTipRef.current
-
-          if (visualProbeTip) {
-            visualProbeTip.updateWorldMatrix(
-              true,
-              false
-            )
-
-            const worldPosition =
-              new THREE.Vector3()
-
-            visualProbeTip.getWorldPosition(
-              worldPosition
-            )
-
-            probeTipSnapshot = {
-              x: worldPosition.x,
-              y: worldPosition.y,
-              z: worldPosition.z,
-            }
-          }
-
+          // contact/event pose는 판정 순간의 탐침 TCP 좌표(base_link)다.
+          // scan/result도 이 접촉점들로 계산되므로 노란 접촉점은 이 원본 좌표를 쓴다.
+          // 이벤트 수신 시점의 현재 로봇 자세를 다시 읽으면 통신 지연만큼 어긋난다.
           const newContactPoint = {
             eventId: payload.event_id,
             frameId: payload.frame_id,
             x: payload.pose.x_mm,
             y: payload.pose.y_mm,
             z: payload.pose.z_mm,
-            probeTipSnapshot,
           }
 
           setContactPoints((prevPoints) => {
@@ -1057,11 +1013,6 @@ function App() {
     robotJointRefs.current =
       robotModel.jointRefs
 
-    visualProbeTipRef.current =
-      robotModel.root.getObjectByName(
-        'probe_tip'
-      )
-
     scene.add(
       robotModel.root
     )
@@ -1243,7 +1194,6 @@ function App() {
 
       robotModelRef.current = null
       robotJointRefs.current = {}
-      visualProbeTipRef.current = null
 
       tipMeshRef.current = null
       trajectoryLineRef.current = null
@@ -1373,32 +1323,14 @@ function App() {
           material
         )
 
-      const snapshot =
-        point.probeTipSnapshot
-
-      if (
-        snapshot &&
-        Number.isFinite(snapshot.x) &&
-        Number.isFinite(snapshot.y) &&
-        Number.isFinite(snapshot.z)
-      ) {
-        // probe_tip의 world 좌표는 이미 Three.js scene 좌표다.
-        marker.position.set(
-          snapshot.x,
-          snapshot.y,
-          snapshot.z
+      // 판정 순간의 실제 탐침 TCP 좌표. scan/result를 만든 원본과 같은 좌표다.
+      marker.position.copy(
+        toThreePosition(
+          point.x,
+          point.y,
+          point.z
         )
-      } else {
-        // 모델이 아직 준비되지 않은 예외 상황에서는
-        // 원본 contact/event 좌표를 fallback으로 사용한다.
-        marker.position.copy(
-          toThreePosition(
-            point.x,
-            point.y,
-            point.z
-          )
-        )
-      }
+      )
 
       group.add(marker)
     })
@@ -1427,14 +1359,17 @@ function App() {
 
     group.clear()
 
-    // scan/result의 vertices는 workpiece_fixture 기준 그대로 사용한다.
-    // 표시할 때만 fixture Z=0을 작업대 상판에 붙여 물체 바닥이
-    // 받침대 위에 정확히 놓이게 한다.
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
+    // scan/result는 workpiece_fixture 기준이고 접촉점/궤적은 base_link 기준이다.
+    // ROS와 같은 base_to_fixture 평행이동을 그대로 적용해 한 좌표계에 겹친다.
     group.position.copy(
       toThreePosition(
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.x,
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.y,
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.z
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
       )
     )
 
@@ -1569,11 +1504,15 @@ function App() {
 
     group.clear()
 
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
     group.position.copy(
       toThreePosition(
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.x,
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.y,
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.z
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
       )
     )
 
@@ -1653,11 +1592,15 @@ function App() {
 
     group.clear()
 
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
     group.position.copy(
       toThreePosition(
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.x,
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.y,
-        SCAN_RESULT_DISPLAY_ORIGIN_MM.z
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
       )
     )
 
@@ -1849,15 +1792,15 @@ function App() {
         {scanResult?.success === true &&
         !BASE_TO_FIXTURE_MM && (
           <p>
-            VITE_BASE_TO_FIXTURE_MM 미설정:
-            결과 X/Y를 작업대 원점 기준으로 표시합니다.
+            작업대 원점 미설정:
+            VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.
           </p>
         )}
 
         {scanResult?.success === true && (
           <p>
-            3D 결과 지지면: 작업대 상판
-            (workpiece_fixture Z=0)
+            3D 좌표: contact/event · robot/sample은 base_link,
+            scan/result는 base_to_fixture로 base_link에 정렬
           </p>
         )}
 
