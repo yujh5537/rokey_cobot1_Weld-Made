@@ -8,6 +8,7 @@ from conftest import FIXTURE_SCAN_ID
 from conftest import PARAM_VALUES
 from conftest import write_result
 from weld_manager.params import check
+from weld_manager.weld_path import line_range_problem
 from weld_manager.weld_path import LINES
 from weld_manager.weld_path import load_scan
 from weld_manager.weld_path import NoScanResult
@@ -18,6 +19,7 @@ from weld_manager.weld_path import quaternion_from_axes
 from weld_manager.weld_path import quaternion_to_zyz_deg
 from weld_manager.weld_path import rotate
 from weld_manager.weld_path import ScanInput
+from weld_manager.weld_path import tip_retreat
 from weld_manager.weld_path import tool_frame
 from weld_manager.weld_path import weave_points
 
@@ -124,16 +126,71 @@ M1 = {
 }
 
 
-@pytest.mark.parametrize('index', range(8), ids=lambda i: LINES[i].name)
-def test_m1_poses(index):
+# D22 로 세로선의 축 방향 물러남이 3 mm → s′ = (3 + 2) / sin45° − 2 ≈ 5.071 mm 가 됐다. 세로선 TCP 목표는 M1 표보다
+# 툴 축 뒤로 약 2.07 mm 더 물러난다(수평 −1.04 · −1.04, 위 +1.46 mm). 아래는 그 값을 따로 계산해 둔 것이다.
+D22_VERTICAL = {
+    'L4': ([375.9445, -201.2855, 181.5888], [375.9445, -201.2855, 105.5918]),
+    'L5': ([464.5655, -201.2855, 181.5888], [464.5655, -201.2855, 105.5918]),
+    'L6': ([464.5655, -112.0645, 181.5888], [464.5655, -112.0645, 105.5918]),
+    'L7': ([375.9445, -112.0645, 181.5888], [375.9445, -112.0645, 105.5918]),
+}
+
+
+def _m1_plan(index):
     params = with_(weave_amplitude_m=0.0)   # M1 은 위빙 없는 선의 양 끝이다
-    plan, _ = plan_line(box_scan(M1_CUBE), index, params)
-    start_mm, end_mm, zyz = M1[plan.name]
-    p_start, p_end = plan.path[0], plan.path[-2]    # path = [p0, pN, P_ret]
-    assert close([v * 1000.0 for v in p_start], start_mm, 0.006)   # 표는 0.01 로 반올림
-    assert close([v * 1000.0 for v in p_end], end_mm, 0.006)
+    return plan_line(box_scan(M1_CUBE), index, params)[0]
+
+
+@pytest.mark.parametrize('index', range(8), ids=lambda i: LINES[i].name)
+def test_m1_orientation(index):
+    plan = _m1_plan(index)
     got = quaternion_to_zyz_deg(plan.orientation)
-    assert all(angle_diff(g, w) < 0.006 for g, w in zip(got, zyz)), got
+    assert all(angle_diff(g, w) < 0.006 for g, w in zip(got, M1[plan.name][2])), got
+
+
+@pytest.mark.parametrize('index', range(4), ids=lambda i: LINES[i].name)
+def test_m1_top_lines_positions_unchanged_by_d22(index):
+    # 윗면선은 툴 축 ⊥ 이음선(k = 1)이라 D22 의 s′ 이 standoff 그대로다 → M1 표와 같다
+    plan = _m1_plan(index)
+    start_mm, end_mm, _ = M1[plan.name]
+    assert close([v * 1000.0 for v in plan.path[0]], start_mm, 0.006)   # 표는 0.01 로 반올림
+    assert close([v * 1000.0 for v in plan.path[-2]], end_mm, 0.006)    # path = [p0, pN, P_ret]
+
+
+@pytest.mark.parametrize('index', range(4, 8), ids=lambda i: LINES[i].name)
+def test_m1_vertical_lines_follow_d22_not_m1(index):
+    plan = _m1_plan(index)
+    top_mm, bottom_mm = D22_VERTICAL[plan.name]
+    assert close([v * 1000.0 for v in plan.path[0]], top_mm, 0.001)
+    assert close([v * 1000.0 for v in plan.path[-2]], bottom_mm, 0.001)
+    # M1 표(축 방향 3 mm)와는 툴 축 방향으로 s′ − 3 ≈ 2.071 mm 떨어져 있다
+    m1_top = M1[plan.name][0]
+    assert math.isclose(math.dist([v * 1000.0 for v in plan.path[0]], m1_top), 2.071, abs_tol=0.01)
+
+
+@pytest.mark.parametrize('index', range(8), ids=lambda i: LINES[i].name)
+def test_sphere_surface_to_seam_is_standoff_on_every_line(index):
+    """D22 의 뜻 그대로: 구 중심(= TCP − r·d) 에서 이음선까지 거리 − r = standoff_m (위빙 없는 두 끝)."""
+    params = with_(weave_amplitude_m=0.0)
+    scan = box_scan(M1_CUBE)
+    plan = _m1_plan(index)
+    d = rotate(plan.orientation, (0.0, 0.0, 1.0))
+    s, e = (scan.to_base(p) for p in plan.seam_fixture)
+    t = [b - a for a, b in zip(s, e)]
+    t = [c / math.hypot(*t) for c in t]
+    for tcp in (plan.path[0], plan.path[-2]):
+        center = [p - params.tip_radius_m * di for p, di in zip(tcp, d)]
+        rel = [c - a for c, a in zip(center, s)]
+        along = sum(r * ti for r, ti in zip(rel, t))
+        gap = math.dist(rel, [along * ti for ti in t]) - params.tip_radius_m
+        assert math.isclose(gap, params.standoff_m, abs_tol=1e-12), gap
+
+
+def test_tip_retreat_values():
+    top = tool_frame(LINES[0].t, LINES[0].n_out, math.radians(45.0), 0.0)
+    vertical = tool_frame(LINES[4].t, LINES[4].n_out, math.radians(45.0), 0.0)
+    assert math.isclose(tip_retreat(top, LINES[0].t, 0.003, 0.002), 0.003, abs_tol=1e-12)
+    assert math.isclose(tip_retreat(vertical, LINES[4].t, 0.003, 0.002), 0.005 / R2 - 0.002, abs_tol=1e-12)
 
 
 # ---- 위빙 (4절) ----
@@ -199,7 +256,7 @@ def test_path_length_without_weave(params):
 
 def test_fixture_plan_all_lines(fixture_store, params):
     scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
-    plan = plan_weld(scan, 0, params)
+    plan = plan_weld(scan, 0, 7, params)
     assert sorted(plan.lines) == list(range(8)) and len(plan.seams) == 8
     # Base = 작업대 + 그 스캔의 base_to_fixture (0.425, −0.184, 0.4)
     assert scan.base_to_fixture == (0.425, -0.184, 0.4)
@@ -210,33 +267,72 @@ def test_fixture_plan_all_lines(fixture_store, params):
 
 
 def test_start_line_skips_earlier_lines(fixture_store, params):
-    plan = plan_weld(load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES), 5, params)
+    plan = plan_weld(load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES), 5, 7, params)
     assert sorted(plan.lines) == [5, 6, 7] and len(plan.seams) == 8
+
+
+def test_end_line_limits_plan(fixture_store, params):
+    scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
+    assert sorted(plan_weld(scan, 1, 2, params).lines) == [1, 2]
+    plan = plan_weld(scan, 0, 3, params)
+    assert sorted(plan.lines) == [0, 1, 2, 3] and plan.end_line == 3 and len(plan.seams) == 8
+
+
+def test_tilt_zero_on_l0_only_is_allowed(fixture_store):
+    # README 통합 순서 3: "tilt 0 · weave 0 으로 L0 만" = start_line 0 · end_line 0 (D28)
+    scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
+    plan = plan_weld(scan, 0, 0, with_(tilt_deg=0.0, weave_amplitude_m=0.0))
+    assert sorted(plan.lines) == [0]
+    assert close(rotate(plan.lines[0].orientation, (0.0, 0.0, 1.0)), (0.0, 0.0, -1.0), 1e-12)
+
+
+@pytest.mark.parametrize('start, end, ok', [
+    (0, 7, True), (0, 0, True), (7, 7, True), (3, 2, False), (0, 8, False), (8, 8, False), (-1, 3, False),
+])
+def test_line_range(start, end, ok):
+    assert (line_range_problem(start, end) is None) == ok
+
+
+def test_tool_profile_side_violation_on_vertical_line(fixture_store):
+    # 45°, s′ ≈ 5.07 mm: 핑거(u 12 mm) 반폭이 (5.07 + 12)·tan45 ≈ 17.07 mm 이상이면 옆면에 닿는다
+    scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
+    wide = with_(tool_profile_r_m=[0.002, 0.006, 0.0175])
+    with pytest.raises(PathRejected, match='L4: .*옆면'):
+        plan_weld(scan, 0, 7, wide)
+    # 윗면선만이면 핑거가 아무리 넓어도 부재와 겹칠 수 없다
+    assert sorted(plan_weld(scan, 0, 3, wide).lines) == [0, 1, 2, 3]
+
+
+def test_tool_profile_table_violation_on_steep_tilt(fixture_store):
+    # 60° 에서는 옆면은 통과해도(R 20 < (3.77 + 12)·tan60 ≈ 27.3) 세로선 아래 끝에서 핑거가 작업대로 내려간다
+    scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
+    with pytest.raises(PathRejected, match='L4: .*작업대'):
+        plan_weld(scan, 0, 7, with_(tilt_deg=60.0, tool_profile_r_m=[0.002, 0.006, 0.020]))
 
 
 def test_tilt_zero_rejects_when_vertical_lines_are_included(fixture_store):
     scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
     with pytest.raises(PathRejected, match='L4'):
-        plan_weld(scan, 0, with_(tilt_deg=0.0))
+        plan_weld(scan, 0, 7, with_(tilt_deg=0.0))
 
 
 def test_workspace_margin_rejects(fixture_store):
     # 접근점은 모서리에서 대각선 바깥으로 (3 + 30)·sin45 ≈ 23 mm → 여유 10 mm 면 밖이다
     scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
     with pytest.raises(PathRejected, match='workspace_margin'):
-        plan_weld(scan, 0, with_(workspace_margin_m=0.010))
+        plan_weld(scan, 0, 7, with_(workspace_margin_m=0.010))
 
 
 def test_bottom_margin_taller_than_box_rejects(fixture_store):
     scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)   # 상자 높이 약 40 mm
     with pytest.raises(PathRejected):
-        plan_weld(scan, 0, with_(bottom_margin_m=0.050))
+        plan_weld(scan, 0, 7, with_(bottom_margin_m=0.050))
 
 
 def test_start_line_out_of_range_is_programming_error(fixture_store, params):
     scan = load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
     with pytest.raises(ValueError):
-        plan_weld(scan, 8, params)
+        plan_weld(scan, 8, 8, params)
 
 
 # ---- 결과 읽기 (5.1절) ----

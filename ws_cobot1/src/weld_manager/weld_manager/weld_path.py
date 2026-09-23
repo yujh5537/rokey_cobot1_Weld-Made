@@ -10,9 +10,11 @@
   `base_to_fixture` 는 **그 스캔의 `node_params` 값**을 쓴다. yaml 의 현재 값이 아니다(스캔 뒤 바뀌었으면 틀린 곳으로 간다).
 - 길이 m, 각 rad, 자세 quaternion (x, y, z, w). 두산 ZYZ(deg)는 robot_manager 가 바꾼다. 여기의 ZYZ 함수는 로그 · 시험용이다.
 
-계약에 대한 가정(병후 확인 대기, PR #184 코멘트). 바뀌면 표시한 함수 하나만 고친다.
-- 스탠드오프는 툴 축 뒤로(−d) standoff_m 이다 → tip_offset()
-- 위빙 방향은 normalize(t × d) 이고 tool_roll_deg 와 무관하다 → ToolFrame.weave
+PR #184 리뷰로 정해진 것
+- D22: standoff_m 은 팁 구 표면 ↔ 이음선 최단거리다. 축 방향 물러남 s′ 은 선 방향에 따라 다르다 → tip_retreat()
+- D23 · D28: 세로선은 툴 외형(tool_profile_u_m · tool_profile_r_m)이 옆면 · 작업대와 겹치지 않는지 본다 → tool_profile_problem()
+- D24: tool_roll_deg 는 선별 배열이고, 위빙 방향 normalize(t × d) 는 roll 과 무관하다 → ToolFrame.weave
+- D28: start_line ~ end_line 만 계획한다 → plan_weld()
 """
 
 from dataclasses import dataclass
@@ -166,9 +168,18 @@ def tool_frame(t: Vec3, n_out: Vec3, tilt_rad: float, roll_rad: float) -> ToolFr
     return ToolFrame(x=x, y=y, z=d, weave=x0)
 
 
-def tip_offset(frame: ToolFrame, standoff_m: float) -> Vec3:
-    """weld-motion.md 3절: 팁은 이음선에서 툴 축 뒤로(−d) standoff 만큼 물러난다. (병후 확인 대기: 정의가 바뀌면 여기만)"""
-    return _scale(frame.z, -standoff_m)
+def tip_retreat(frame: ToolFrame, t: Vec3, standoff_m: float, tip_radius_m: float) -> float:
+    """weld-motion.md 3절(D22): 구 표면 ↔ 이음선 = standoff_m 이 되는 축 방향 물러남 s′.
+
+    k = sqrt(1 − (d · t̂)²)   툴 축과 이음선이 이루는 각의 sin. 윗면선 1, 세로선 sin θ
+    s′ = (standoff_m + r) / k − r
+    TCP 는 구 중심에서 d 방향으로 r 인 점(수직 자세의 최하단점)이라, 구 중심 = TCP − r·d 이고
+    구 중심 ↔ 이음선 거리 = (s′ + r)·k = standoff_m + r 이다.
+    """
+    k = math.sqrt(max(0.0, 1.0 - _dot(frame.z, t) ** 2))
+    if k < 1e-6:
+        raise PathRejected('툴 축이 이음선과 평행해 스탠드오프를 정할 수 없다')
+    return (standoff_m + tip_radius_m) / k - tip_radius_m
 
 
 def weave_points(start: Vec3, end: Vec3, offset: Vec3, weave: Vec3,
@@ -331,15 +342,42 @@ class LinePlan:
         return sum(_norm(_sub(b, a)) for a, b in zip(points, points[1:]))
 
 
+def tool_profile_problem(spec: 'LineSpec', retreat_m: float, bottom_tcp_z: float,
+                         scan: 'ScanInput', params: WeldParams) -> Optional[str]:
+    """weld-motion.md 5절 툴 외형 검사(D23). 세로선만 본다. 윗면선은 툴 전체가 이등분 축 뒤라 겹칠 수 없다.
+
+    툴 외형 (u, R): 팁에서 축 방향 뒤로 u 부터 다음 u 전까지 축에서 가장 멀리 뻗은 반폭이 R 이하.
+    두 조건 모두 u 가 작을수록 불리하므로 각 구간의 시작 u 에서만 본다.
+      옆면:   R < (s′ + u) · tan θ          (부재 쪽으로 뻗은 부분이 모서리선 바깥에 있다)
+      작업대: z_TCP + u · cos θ − R · sin θ ≥ support_z   (세로선 아래 끝, 작업대 좌표)
+    """
+    if not spec.vertical:
+        return None
+    theta = params.tilt_rad
+    for u, r in params.tool_profile:
+        if not r < (retreat_m + u) * math.tan(theta):
+            return (f'툴 외형 (u {u * 1000:.1f} mm, R {r * 1000:.1f} mm) 이 옆면에 닿는다: '
+                    f'R < (s′ {retreat_m * 1000:.2f} + u) · tan {params.tilt_deg:g}° 이어야 한다')
+        lowest = bottom_tcp_z + u * math.cos(theta) - r * math.sin(theta)
+        if lowest < scan.support_z - _EPS:
+            return (f'툴 외형 (u {u * 1000:.1f} mm, R {r * 1000:.1f} mm) 이 작업대에 닿는다: '
+                    f'가장 낮은 점 z {lowest * 1000:.2f} mm < support_z {scan.support_z * 1000:.2f} mm')
+    return None
+
+
 def plan_line(scan: ScanInput, index: int, params: WeldParams) -> Tuple[LinePlan, Tuple[Vec3, ...]]:
-    """(LinePlan, 작업영역 검사용 작업대 좌표 점들)."""
+    """(LinePlan, 작업영역 검사용 작업대 좌표 점들). 툴 외형이 겹치면 PathRejected."""
     spec = LINES[index]
     start, end = seam(scan, index, params.bottom_margin_m)
     try:
-        frame = tool_frame(spec.t, spec.n_out, params.tilt_rad, params.tool_roll_rad)
+        frame = tool_frame(spec.t, spec.n_out, params.tilt_rad, params.tool_roll_rad(index))
+        retreat_m = tip_retreat(frame, spec.t, params.standoff_m, params.tip_radius_m)
     except PathRejected as error:
         raise PathRejected(f'{spec.name}: {error}') from None
-    offset = tip_offset(frame, params.standoff_m)
+    offset = _scale(frame.z, -retreat_m)
+    problem = tool_profile_problem(spec, retreat_m, end[2] + offset[2], scan, params)
+    if problem:
+        raise PathRejected(f'{spec.name}: {problem}')
     points = weave_points(start, end, offset, frame.weave,
                           params.weave_amplitude_m, params.weave_pitch_m)
     back = _scale(frame.z, -params.approach_m)            # 툴 축 뒤로
@@ -376,28 +414,40 @@ def workspace_problem(scan: ScanInput, points: Sequence[Vec3], params: WeldParam
 class WeldPlan:
     scan_id: str
     start_line: int
+    end_line: int
     seams: Tuple[Tuple[Vec3, Vec3], ...]   # 8 선 전부(작업대 좌표). WeldResult.lines[i].seam
-    lines: Dict[int, LinePlan]             # start_line ~ 7 만
+    lines: Dict[int, LinePlan]             # start_line ~ end_line 만
     base_to_fixture: Vec3
     z_safe_base: float                     # 선 사이 이동 높이 (Base z)
 
 
-def plan_weld(scan: ScanInput, start_line: int, params: WeldParams) -> WeldPlan:
-    """start_line 부터 8 선의 계획. 작업영역 밖 · 자세를 정할 수 없으면 PathRejected(→ 604).
+def line_range_problem(start_line: int, end_line: int) -> Optional[str]:
+    """5.1절 LINE_OUT_OF_RANGE(603): start · end 가 0~7 이고 start ≤ end."""
+    last = LINE_COUNT - 1
+    if not (0 <= start_line <= last and 0 <= end_line <= last):
+        return f'start_line {start_line} · end_line {end_line} 은 0~{last} 이어야 한다'
+    if end_line < start_line:
+        return f'end_line {end_line} 이 start_line {start_line} 보다 작다'
+    return None
 
-    start_line 범위(603)는 호출 측이 먼저 거른다(5.1절 순서). 여기서 범위 밖이면 프로그램 오류다.
+
+def plan_weld(scan: ScanInput, start_line: int, end_line: int, params: WeldParams) -> WeldPlan:
+    """start_line ~ end_line 선의 계획(D28). 작업영역 밖 · 자세를 정할 수 없음 · 툴 외형 겹침은 PathRejected(→ 604).
+
+    선 범위(603)는 호출 측이 line_range_problem() 으로 먼저 거른다(5.1절 순서). 여기서 범위 밖이면 프로그램 오류다.
     """
-    if not 0 <= start_line < LINE_COUNT:
-        raise ValueError(f'start_line {start_line} 이 0~{LINE_COUNT - 1} 밖이다')
+    problem = line_range_problem(start_line, end_line)
+    if problem:
+        raise ValueError(problem)
     seams = tuple(seam(scan, i, params.bottom_margin_m) for i in range(LINE_COUNT))
     lines = {}
-    for index in range(start_line, LINE_COUNT):
+    for index in range(start_line, end_line + 1):
         plan, fixture_targets = plan_line(scan, index, params)
         problem = workspace_problem(scan, fixture_targets, params)
         if problem:
             raise PathRejected(f'{plan.name}: {problem}')
         lines[index] = plan
     return WeldPlan(
-        scan_id=scan.scan_id, start_line=start_line, seams=seams, lines=lines,
+        scan_id=scan.scan_id, start_line=start_line, end_line=end_line, seams=seams, lines=lines,
         base_to_fixture=scan.base_to_fixture,
         z_safe_base=scan.to_base((0.0, 0.0, scan.z_top + params.travel_clearance_m))[2])
