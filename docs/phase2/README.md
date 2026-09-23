@@ -46,6 +46,7 @@
 | D27 | 9/29 단계: 윗면 4 선 = 반드시 성공, 세로선 · 위빙 = 조건부 |
 | D28 | `RunWeld.end_line` 추가(기본 7, 생략 불가). 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` |
 | D29 | weld_manager 는 속도 상한을 검사하지 않는다. 상한은 robot_manager `path_max_speed_mps` → 604 |
+| D30 | 시작 때 팁이 z_safe 아래면 거절하지 않고 수직 상승 뒤 시작. 자세 허용치 `orientation_tolerance_deg` 는 여유 있게(15°) |
 
 **계약 작성 중 드러난 것 → 2026-09-23 병후 결정**
 - **`move_periodic` 은 직선 이동과 겹쳐 실행되지 않는다**(dsr_msgs2 `MovePeriodic.srv` 는 제자리 주기 운동). 위빙은 **지그재그 경유점**으로 만들고 robot_manager 가 `ExecutePath` 로 지난다 — **채택(D19)**. 실행은 `move_spline_task` 또는 `move_line` 반복 중 실기에서 되는 것으로.

@@ -91,7 +91,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | 용접 | `ExecutePath` waypoints = [p_0 … p_N, P_ret(i)] | `weld_speed_mps` |
 | 후퇴 | `OP_MOVE_TO` → (P_ret(i).x, y, **z_safe**, q_i) | `travel_speed_mps` |
 
-- 첫 선 앞: 홈에서 접근 1 로 바로 간다(자세가 홈 → q_0 으로 보간된다. 이동 중 자세 변화는 z_safe 위에서만 일어난다).
+- 첫 선 앞: 홈에서 접근 1 로 바로 간다(자세가 홈 → q_0 으로 보간된다. 이동 중 자세 변화는 z_safe 위에서만 일어난다). **시작 때 팁이 z_safe 아래면**(`/robot/sample` 로 확인. 앞 작업이 중간에 멈춘 자리 등) 거절하지 않고 **먼저 같은 x · y · 현재 자세로 z_safe 까지 수직 상승**(`OP_MOVE_TO`, `travel_speed_mps`)한 뒤 접근 1 로 간다(D30). 기울인 자세로 부재 옆에 서 있던 경우 상승 중 툴 뒤쪽이 부재를 스칠 수 있으므로, 관제자는 시작 전 화면의 팁 위치를 본다.
 - 선 사이: 후퇴(i) → 접근 1(i+1). 두 점 모두 z_safe 위라 부재를 가로질러도 된다.
 - 마지막 선 뒤: 후퇴 → `OP_HOME`(마무리 복귀, DONE 에 포함).
 - 세로선의 P_ret 는 바닥 근처(받침대 + `bottom_margin_m` + approach 의 수직 성분)다. 거기서 z_safe 로 곧장 올라가는 경로는 모서리에서 대각선 바깥으로 `(standoff_m + approach_m)·sin θ` 떨어져 있다(3 + 30 mm, 45° 면 약 23 mm).
@@ -107,7 +107,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 |---|---|---|---|
 | `weld_speed_mps` | 0.010 | 용접선 위 속도 | ○ |
 | `travel_speed_mps` | 0.050 | 선 사이(z_safe) 이동 속도 | ○ |
-| `approach_speed_mps` | 0.020 | 접근 2 · 후퇴 속도 | |
+| `approach_speed_mps` | 0.020 | 접근 2(접근점 → 첫 경유점 방향 하강) 속도. 후퇴점(P_ret)은 ExecutePath 의 마지막 경유점이라 `weld_speed_mps` 로 물러나고, 그 뒤 z_safe 상승은 `travel_speed_mps` 다(5절 표) | |
 | `standoff_m` | 0.003 | 스탠드오프 | ○ |
 | `weave_amplitude_m` | 0.002 | 위빙 진폭 | ○ |
 | `weave_pitch_m` | 0.004 | 위빙 반주기 | ○ |
@@ -121,6 +121,10 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `bottom_margin_m` | 0.005 | 세로선 끝 = support_z + 이 값 | |
 | `workspace_margin_m` | 0.100 | 부재 밖 허용 범위 (x · y) | |
 | `path_tolerance_m` | 0.003 | ExecutePath 마지막 점 도착 허용치 (D18 ±3 mm) | |
+| `orientation_tolerance_deg` | 15.0 | 각 이동 뒤 `Result.pose` 자세와 목표 자세의 각 차이 허용치. 넘으면 `ROBOT_ERROR(204)` + detail. 0 = 끔. 여유 있게 크게 둔다(병후) | |
+| `server_wait_timeout_s` | 2.0 | 상대 서버(robot_manager)의 미기동 판단. scan_manager 와 같은 이름 · 뜻 | |
+| `stop_confirm_timeout_s` | 5.0 | 정지 완료(`connected && !moving`)를 기다리는 한도. scan_manager 와 같다 | |
+| `sample_timeout_s` | 1.0 | 시작 시 `/robot/sample` 을 기다리는 한도. 넘으면 `NO_SAMPLE(307)` | |
 | `motion_timeout_s` | 120.0 | 단위 goal 제한 | |
 | `result_dir` | data | scan_manager 와 같은 값이어야 한다 (result_store 를 읽는다). 현지의 `result_dir` 절대경로 · sim/real 분리 PR 이 들어오면 그 값으로 바꾼다(`""` = 최신 성공 결과가 sim 결과를 고르지 않게) | |
 | `result_frame_id` · `motion_frame_id` | workpiece_fixture · base_link | 1차와 같다 | |

@@ -37,7 +37,7 @@
 | `/weld/run` | `RunWeld` | weld_manager | mqtt_bridge | 용접 시작 |
 | `/weld/home` | `ReturnHome` | weld_manager | mqtt_bridge | 안전복귀(1차 타입 재사용). `OP_HOME` 을 robot_manager 에 보낸다 |
 | `/robot/execute_path` | `ExecutePath` | robot_manager | weld_manager | 경유점 경로 1개 |
-| `/robot/execute_motion` | `ExecuteMotion` | robot_manager | scan_manager · **weld_manager** (추가) | 접근 · 후퇴 · 안전 높이 이동은 `OP_MOVE_TO`, 홈은 `OP_HOME` |
+| `/robot/execute_motion` | `ExecuteMotion` | robot_manager | scan_manager · **weld_manager** (추가) | 접근 · 안전 높이 이동은 `OP_MOVE_TO`, 홈은 `OP_HOME`. goal 의 `scan_id` 자리에 **`weld_id`** 를 싣는다(필드 이름은 그대로) |
 
 ## 3. 메시지 (msg)
 
@@ -144,7 +144,7 @@ bool accepted               # 접수. 정지 완료는 /weld/state.phase == STOP
 uint16 reason_code
 string detail
 ```
-- 휴지 phase(IDLE · DONE · ERROR · STOPPED)에서는 `accepted=false`, `BUSY` 가 아니라 **`OK` 로 "멈출 것이 없다"** 를 돌려준다(1차 StopScan 과 같은 규칙).
+- 휴지 phase(IDLE · DONE · ERROR · STOPPED)에서는 `accepted=false`, `BUSY` 가 아니라 **`OK` 로 "멈출 것이 없다"** 를 돌려준다(1차 StopScan 과 같은 규칙). 이때 **`/robot/stop` 을 부르지 않는다** — 그 순간 돌고 있을지 모르는 스캔을 세우지 않기 위해서다.
 
 ## 5. 액션 (action)
 
@@ -177,7 +177,8 @@ WeldState state
 | `scan_id` 의 `result.json` 이 없다 · `success=false` · `box_valid=false` · `""` 인데 성공 결과가 하나도 없다 | `NO_SCAN_RESULT(602)` |
 | `start_line > 7` · `end_line > 7` · `end_line < start_line` | `LINE_OUT_OF_RANGE(603)` |
 | `config_override` 범위 밖 (속도 < `weld_speed_min_mps` 포함) | `INVALID_VALUE(102)` |
-| `/robot/sample` 이 없다 | `NO_SAMPLE(307)` |
+| `/robot/sample` 이 `sample_timeout_s` 안에 없다 | `NO_SAMPLE(307)` |
+| (거절 아님) 팁이 z_safe 아래 | 먼저 같은 x · y 로 z_safe 까지 수직 상승 뒤 시작(D30, `weld-motion.md` 5절) |
 | 무접촉 \|F\| > `tool_check_max_force_n`(출발값 6.0, contact_detector 의 `tare_max_force_n` 과 같은 근거) | `TOOL_REG_SUSPECT(302)` |
 | 생성한 경로가 작업영역 밖, 또는 세로선 툴 외형 검사(`tool_profile_u_m` · `tool_profile_r_m`, `weld-motion.md` 5절) 실패 | `PATH_REJECTED(604)` |
 
