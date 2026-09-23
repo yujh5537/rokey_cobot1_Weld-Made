@@ -29,7 +29,7 @@
 ### 2.1 Topic
 | 이름 | 타입 | 발행 | 구독 | QoS | 의미 |
 |---|---|---|---|---|---|
-| `/robot/sample` | `RobotSample` | robot_manager | contact_detector · safety_monitor · mqtt_bridge | SENSOR | TCP pose + 외력 + 실행 중 동작. 50 Hz 설계 목표. **scan_manager는 구독하지 않는다** |
+| `/robot/sample` | `RobotSample` | robot_manager | contact_detector · safety_monitor · mqtt_bridge · **scan_manager [v0.1.16]** | SENSOR | TCP pose + 외력 + 실행 중 동작. 50 Hz 설계 목표. scan_manager는 **마지막 유효 pose만** 들고 있다가 안전복귀(7.5 ①) · 재시작(7.6)의 첫 모션 목표를 만들 때 쓴다. 측정 · 판정에는 쓰지 않는다(그쪽은 `ExecuteMotion` Result의 pose가 계속 기준이다) |
 | `/robot/status` | `RobotStatus` | robot_manager | scan_manager · safety_monitor · mqtt_bridge | STATE | 연결 · 동작 · 오류 · 제어 상태. 정지 완료 확인의 근거. 변경 시 + 주기 |
 | `/contact/event` | `ContactEvent` | contact_detector · **robot_manager**(스텝 모드 SLIDE 의 EDGE 만, 7.2절 · v0.1.15) | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE 판정. 판정 확정 즉시 1회 |
 | `/scan/state` | `ScanState` | scan_manager | contact_detector · safety_monitor · mqtt_bridge | STATE | 단계 · 방향 · 진행 n/4. 변경 시 + 주기 |
@@ -124,7 +124,7 @@ string detail
 - `moving`의 근거(드라이버 상태 필드 vs 속도 0)는 TBD(실PC 확인).
 - **누름 힘 세 값의 구분 [v0.1.16].** `slide_target_force_n`은 `DR_FC_MOD_REL`이라 "설정한 증분"이지 실제 누름이 아니다. 그래서 `force` 모드에서는 세 값을 **각각** 싣는다: ① `slide_force_setpoint_n`(설정 증분) ② `slide_force_baseline_n`(SLIDE 를 시작한 시점의 기준 Fz) ③ `slide_force_estimate_n`(① + ②, **추정**). ③을 실측으로 표시하면 안 된다 — 힘 제어 중의 조회 Fz는 참고값이다. 모르는 값은 0이 아니라 NaN이다(1장).
 - **`step` 모드에서는 ①②③이 전부 NaN이다.** 스텝 모드는 REL 힘 제어를 켜지 않으므로 그 세 값은 제어 목표가 아니다. 대신 목표 누름 띠를 `step_press_lo_n` · `step_press_hi_n`으로 싣는다(7.2절). `slide_mode`가 어느 쪽인지 말해 준다.
-- SLIDE 가 아닐 때(대기 · 다른 `operation`)도 `slide_mode`는 지금 설정된 방식을 싣는다. 힘 값 여섯 개는 그 SLIDE 가 실제로 도는 동안에만 채워진다.
+- **채워지는 시점이 값마다 다르다 [v0.1.16].** `slide_mode` · `slide_force_setpoint_n`(force) · `step_press_lo_n` · `step_press_hi_n`(step)은 **SLIDE 가 아닐 때도 지금 설정을 싣는다** — 파라미터에서 바로 읽는 값이라 대기 중에도 "지금 이렇게 눌리도록 설정돼 있다"를 보여 준다. `slide_force_baseline_n` · `slide_force_estimate_n` **둘만** 그 SLIDE 가 도는 동안 채워진다 — 기준 Fz 는 SLIDE 가 시작돼야 잡히고, 추정 합은 그 기준이 있어야 나온다. 기준을 모르면 합도 내지 않는다(둘 다 NaN).
 
 ### 3.3 ContactEvent.msg **[v0.1 변경: `source` · `debounce_count` 추가, 무효 `z_drop_m`은 NaN]**
 ```
@@ -768,7 +768,9 @@ EDGE_SEARCH 4/4
 | RESUME 접수 | `/robot/sample`의 마지막 유효 pose가 없거나 `pose_max_age_s`보다 오래됨 | `NOT_SUPPORTED(107)`로 **거절**한다. 기록은 그대로 남아 샘플이 돌아온 뒤 다시 RESUME 할 수 있다 |
 | 첫 모션 직전 | 접수와 실행 사이에 위치를 잃음 | 그 사유로 실패한다(사람이 조그하고 새 START) |
 
-- 올림은 7.5 ③과 같은 **수직 올림**이다: 지금 자리에서 x · y 와 자세를 바꾸지 않고 z 만 `lift_height_m` 올린다. 팁이 무언가에 닿아 있어도 옆으로 끌지 않는다.
+- **재시작이 로봇을 움직인다면 그 첫 모션은 수직 올림이다.** 7.5 ③과 같다: 지금 자리에서 x · y 와 자세를 바꾸지 않고 z 만 `lift_height_m` 올린다. 팁이 무언가에 닿아 있어도 옆으로 끌지 않는다.
+  - 윗면을 확정하기 전에 끝난 작업(준비 중 · 하강 중)도 같다. 그 뒤의 기준 원점 이동은 목표 z 가 더 높아 경로가 단조 상승이지만, 직선이라 **출발 순간부터 옆으로 가는 성분**이 있다. 하강 중 중지는 팁이 윗면에 닿아 있을 수 있어 그대로 옮기면 긁는다.
+  - 재시작이 로봇을 움직이지 않는 경우(측정이 다 끝나 형상 계산만 남은 경우)에는 올림도 없다.
 - `pose_max_age_s`는 안전복귀와 **같은 파라미터**다. 두 경로가 같은 신선도 규칙을 쓴다.
 - 이 규칙은 `STOPPED` 재시작과 `ERROR` 재시작(5.3절 허용 목록)에 **모두** 적용된다.
 - 올린 뒤의 절차(무접촉 tare → 기준 원점 x · y 로 이동 → 첫 접촉 z + `recontact_margin_m`까지 저속 하강)는 7.3절 방향 전환과 같다.

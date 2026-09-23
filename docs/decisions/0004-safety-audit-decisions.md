@@ -1,6 +1,7 @@
 # ADR-0004: 안전 감사 후 팀 결정 10건
 
-- 날짜: 2026-09-22 / 결정한 사람: 병후 / 상태: 채택
+- 날짜: 2026-09-22 / 결정한 사람: **팀 합의(9/22 회의)** / 상태: 채택
+- 후속 합의: 2026-09-23 PR #161 리뷰(#132 처리 · M1 보류 · 재시작 첫 모션 · 정지 사유 판정)
 
 ## 배경
 
@@ -100,11 +101,40 @@ BRD 9장의 "작업 중지 반응 시간 1초 이내"는 **물리 정지**를 �
 다시 구성해 해결했다. **수치는 바꾸지 않는다** — 확정된 새 실측값이 레포 · 이슈 · PR 어디에도 없다.
 없는 값을 추측해 넣지 않는다. 실측이 나오면 `units-frames.md` 와 real.yaml 을 같은 PR 에서 고친다.
 
+## 후속 합의 (2026-09-23, PR #161 리뷰)
+
+**결정 5 에 딸린 #132 힘 꺾임 EDGE — (a) 꺼 둔 채 문서에 명시한다.**
+지금 실기 기본은 `step` 모드이고 `force` 는 sim 경로다. `edge_force_drop_n` 은 꺼 둔다(0.0).
+코드 제거(대안 c)는 하지 않는다 — `force` 모드는 계약에 남아 있고 sim 이 쓴다. 지금 지우면 되돌리기가
+비싸다. 편향 보정 확인 뒤 `force` 전용으로 켜는 길(대안 b)도 막지 않는다. **`force` 모드를 영구히
+금지하는 결정이 아니다.**
+
+**M1 (tare 허용치 `tare_tolerance_n` 0.3 → 0.5 N) — 보류한다.**
+지금 올릴 근거가 없다. 감사 M1 의 데이터가 전부 0.3 아래다 — 9/20 CSV RMS 중앙 0.047 N · 최대 0.199 N,
+9/21 tare 3 회 0.143 · 0.214 · 0.110 N. 허용치는 **`TARE_UNSTABLE` 이 실제로 난 세션에서만** 올리고,
+그때의 RMS 와 날짜를 yaml 주석에 같이 남긴다.
+
+**재시작의 첫 모션 — 지금 위치 기준으로 바꾼다(계약 7.6 신설).**
+기록된 중단 좌표를 절대 좌표 목표로 쓰고 있었다. `STOP_UNCONFIRMED(407)` 은 정의상 정지를 확인하지
+못한 것이라 기록 좌표가 지금 자리가 아닐 개연성이 허용 3 코드 중 가장 높다. 안전복귀(7.5 ①)와 같은
+규칙을 쓰고, 위치를 모르면 **RESUME 접수 때 거절한다**(실행 중에 실패하면 실패 기록에 `resumed_at` 이
+찍혀 다시 이을 기회가 사라진다). `home_pose_max_age_s` 는 두 경로가 함께 쓰므로 `pose_max_age_s` 로
+이름을 바꿨다.
+
+**요청하지 않은 정지의 사유 — `Result.reason_code` 를 먼저 읽는다.**
+`/safety/status` 의 도착 순서에 기대면 사유가 `ROBOT_ERROR(204)` 로 뭉개져 손상 의심 판정이 새어
+나갔다. safety_monitor 가 `/robot/stop` 의 `reason` 에 205 · 400 을 싣고 robot_manager 가 그것을
+`Result.reason_code` 로 돌려주므로 도착 순서와 무관해진다. 래치 사유도 같이 보지만 그것만으로는
+부족하다 — 사람이 `/scan/home` 전에 `/safety/reset` 을 누르면 다시 204 로 샌다.
+
+**별도 PR 로 뺀 것.** 재접촉 검증(결정 1 을 대체하는 설계 변경) · M7(정지 요청 우선 처리) ·
+M11(HOME 도착 관절각 검증). 주제가 서로 다르고, 이 PR 이 이미 크다.
+
 ## 영향 (바뀌는 계약·코드·시험)
 
 - 계약: `ros-interfaces.md` v0.1.16 — 3.2(RobotStatus 6필드) · 3.3(디바운스 정의) · 5.2 · 5.3 ·
   6.1(407) · 6.3(500 ms 예외) · 7.1(정지 KPI 둘) · 7.2(여유 · 기준 z · 12 N vs 30 N) · 7.5(안전복귀, 신설) ·
-  9장 TBD 2건 해소. `contact_scan_interfaces` 의 `ReasonCode.msg` · `RobotStatus.msg`.
+  7.6(재시작 첫 모션, 신설) · 9장 TBD 2건 해소. 2.1 표(scan_manager 의 `/robot/sample` 구독). `contact_scan_interfaces` 의 `ReasonCode.msg` · `RobotStatus.msg`.
 - 코드: scan_manager(`state_machine` · `resume` · `sequence` · `params` · `result_store` · 노드),
   safety_monitor(`safety_core` · 노드), robot_manager(기준 z · 상태 필드), mqtt_bridge(인코더).
 - 설정: real.yaml(`sample_stale_ms` 500 · `drop_limit_margin_m` · `pose_max_age_s` · 12 N 주석 정정),

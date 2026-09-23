@@ -607,7 +607,7 @@ class ResumeRunner(ScanRunner):
         position, orientation = pose
 
         if plan.first_contact_z is None:
-            self._resume_before_top()
+            self._resume_before_top(position, orientation)
             self._find_edges(self._order, self._find_top())
             return
 
@@ -626,7 +626,14 @@ class ResumeRunner(ScanRunner):
                 self._execute(request)
             self._find_edges(remaining, plan.first_contact_z)
 
-    def _resume_before_top(self):
+    def _resume_before_top(self, position, orientation):
+        """윗면을 확정하기 전에 끝난 작업을 잇는다. 여기서도 첫 모션은 수직 올림이다 (계약 7.6).
+
+        to_origin 은 기준 원점으로 가는 **직선**이다. 목표 z 가 더 높아 경로는 단조 상승이지만,
+        출발 순간부터 옆으로 가는 성분이 있다. 하강 중에 멈춘 경우 팁이 윗면에 닿아 있을 수 있으므로
+        (아래 주석 그대로) 그대로 옆으로 가면 긁는다. 먼저 수직으로 띄우고 나서 옮긴다.
+        """
+        self._execute(self._plan.vertical_lift(position, orientation, label='resume_lift'))
         if self._resume.phase is Phase.PREPARING:
             self._notify(Signal.RESUME_READY)
             self._prepare()

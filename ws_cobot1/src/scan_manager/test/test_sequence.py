@@ -563,6 +563,22 @@ def test_resume_lifts_from_where_the_robot_is_now_not_from_the_record(ports, par
     assert lift.target_position[:2] != recorded[:2]        # 기록 좌표가 아니다
 
 
+@pytest.mark.parametrize('n', [1, 2])
+def test_resume_before_the_top_lifts_vertically_before_moving_sideways(ports, params, n):
+    """계약 7.6: to_origin 은 직선이라 출발부터 옆으로 간다. 팁이 닿아 있으면 긁는다.
+
+    n=1 준비 중 중지 · n=2 하강 중 중지. 둘 다 첫 모션이 수직 올림이어야 한다.
+    """
+    stopped_at(ports, params, n)
+    here = ports.position
+    mark = len(ports.requests)
+    resume(ports, params)
+    first = ports.requests[mark][1]
+    assert first.label == 'resume_lift'
+    assert first.target_position[:2] == here[:2]          # x · y 를 바꾸지 않는다
+    assert first.target_position[2] == pytest.approx(here[2] + params.lift_height_m)
+
+
 def test_resume_refuses_when_the_position_is_unknown(ports, params):
     """위치를 모르면 첫 모션을 보내지 않는다 (계약 7.6). 절대 좌표 이동은 눈을 감고 하는 것이다."""
     stopped_at(ports, params, NORMAL_LABELS.index('slide_POS_X') + 1)
@@ -685,16 +701,18 @@ def test_resume_from_preparing_starts_over_from_the_origin(ports, params):
     mark = len(ports.trace)
     resume(ports, params)
     assert ports.trace[mark] == ('current_pose',)                 # 7.6: 첫 모션 전에 위치부터 확인한다
-    assert ports.trace[mark + 1] == ('notify', Signal.RESUME_READY)  # 준비할 것이 없다. PREPARING 이 기준점 · tare 를 한다
-    assert ports.labels_since_resume()[:2] == ['to_origin', 'descend']
+    assert ports.trace[mark + 1] == ('execute', 'resume_lift')    # 7.6: 움직인다면 첫 모션은 수직 올림
+    assert ports.trace[mark + 2] == ('notify', Signal.RESUME_READY)  # 그 뒤엔 준비할 것이 없다. PREPARING 이 기준점 · tare 를 한다
+    assert ports.labels_since_resume()[:3] == ['resume_lift', 'to_origin', 'descend']
 
 
 def test_resume_from_the_descent_goes_back_up_and_tares_in_the_air(ports, params):
     stopped_at(ports, params, 2)
     mark = len(ports.trace)
     resume(ports, params)
-    assert ports.trace[mark:mark + 6] == [
+    assert ports.trace[mark:mark + 7] == [
         ('current_pose',),                                # 7.6: 어디 있는지 먼저 묻는다
+        ('execute', 'resume_lift'),                       # 7.6: 옆으로 옮기기 전에 띄운다
         ('execute', 'to_origin'), ('wait_still',), ('tare',),
         ('notify', Signal.RESUME_READY), ('execute', 'descend')]
 
