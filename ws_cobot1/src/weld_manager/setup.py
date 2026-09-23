@@ -22,5 +22,9 @@ setup(
             'pytest',
         ],
     },
-    # 노드 실행 파일(console_scripts)은 노드 모듈을 만드는 단계(P2-4)에서 더한다
+    entry_points={
+        'console_scripts': [
+            'weld_manager = weld_manager.weld_manager:main',
+        ],
+    },
 )

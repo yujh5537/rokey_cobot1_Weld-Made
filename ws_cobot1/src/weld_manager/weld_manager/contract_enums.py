@@ -76,6 +76,8 @@ class Reason(IntEnum):
     CANCELED = 201
     TIMEOUT = 203
     ROBOT_ERROR = 204
+    TOOL_REG_SUSPECT = 302   # 시작 때 무접촉 |F| 가 크다(툴 미등록 의심, 5.1절)
+    NO_SAMPLE = 307          # 시작 때 /robot/sample 이 없다(5.1절)
     OVER_FORCE = 400
     SAMPLE_STALE = 403
     ROBOT_STATUS_LOST = 404
