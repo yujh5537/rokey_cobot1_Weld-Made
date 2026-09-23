@@ -37,3 +37,21 @@ def is_moving(positions, eps_m, window_s=None, min_span_ratio=0.5):
         return True
     first = positions[0][1]
     return any(math.dist(first, pos) > eps_m for _, pos in positions)
+
+
+def has_moved(positions, eps_m):
+    """창 안에서 실제로 `eps_m`보다 움직인 것이 **위치로 확인됐는가**. 모르면 False.
+
+    `is_moving`과 반대 방향으로 안전하다. 동작 감시가 "한 번이라도 움직였다"를 기록할 때 쓴다.
+    `is_moving`의 "모르면 True"를 그대로 쓰면 샘플 공백 한 번이 "움직였다"로 남고, 로봇이 아직
+    출발하기 전(힘 제어를 켜는 중 · 드라이버 지연)에 창이 다시 차면 "멈췄다"가 되어 도착으로 판정된다.
+
+    2026-09-22 실기: 밀기 732 · 847 · 943 이 0.1~0.7 mm 만 가고 "최대 거리까지 접촉 소실 없음"으로
+    끝났다. 하강 728 은 0.1 s 만에 끝났는데 로봇은 36 s 를 더 내려가 접촉 판정 없이
+    과대 외력(15.6 N)으로 멈췄다.
+    """
+    points = list(positions)   # 다른 콜백이 덧붙이는 중에도 한 번에 복사한다
+    if len(points) < 2:
+        return False
+    first = points[0][1]
+    return any(math.dist(first, pos) > eps_m for _, pos in points)
