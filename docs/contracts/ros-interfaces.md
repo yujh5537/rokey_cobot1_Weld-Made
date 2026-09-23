@@ -30,6 +30,7 @@
 | 이름 | 타입 | 발행 | 구독 | QoS | 의미 |
 |---|---|---|---|---|---|
 | `/robot/sample` | `RobotSample` | robot_manager | contact_detector · safety_monitor · mqtt_bridge | SENSOR | TCP pose + 외력 + 실행 중 동작. 50 Hz 설계 목표. **scan_manager는 구독하지 않는다** |
+| `/dsr01/joint_states` | `sensor_msgs/JointState` | 두산 `joint_state_broadcaster` · `joint_state_publisher` | mqtt_bridge | SENSOR | **표시 전용** M0609/RG2 관절 원본. mqtt_bridge가 발행원별 스냅샷을 분리해 MQTT `robot/joints` · `robot/gripper_joints`로 전달한다. 로봇 제어 입력으로 사용하지 않는다 |
 | `/robot/status` | `RobotStatus` | robot_manager | scan_manager · safety_monitor · mqtt_bridge | STATE | 연결 · 동작 · 오류 · 제어 상태. 정지 완료 확인의 근거. 변경 시 + 주기 |
 | `/contact/event` | `ContactEvent` | contact_detector · **robot_manager**(스텝 모드 SLIDE 의 EDGE 만, 7.2절 · v0.1.15) | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE 판정. 판정 확정 즉시 1회 |
 | `/scan/state` | `ScanState` | scan_manager | contact_detector · safety_monitor · mqtt_bridge | STATE | 단계 · 방향 · 진행 n/4. 변경 시 + 주기 |
@@ -657,7 +658,7 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 
 두 감시의 기준(값과 기준 z)이 다르면 1차보다 2차가 먼저 걸려 래치부터 걸린다. 그래서 값도 기준도 같게 둔다.
 
-**SLIDE 스텝 모드 [v0.1.15].** robot_manager 파라미터 `slide_mode`(계약 이름 아님)가 `step`이면 `OP_SLIDE`는 순응 · 힘 제어를 켜지 않고 **위치 제어로 한 스텝(`step_coarse_m`) 가고 멈춘 뒤** 외력을 여러 샘플 평균내 판단한다. 누르는 힘 ΔFz를 `[step_follow_lo_n, step_follow_hi_n]`으로 유지하도록 z를 `step_z_m`씩 조절하고, 힘이 빠지면 최근 접촉 높이보다 `step_drop_m` 아래까지 내려가 본 뒤에도 `step_follow_lo_n` 미만일 때만 접촉 소실로 본다(`step_release_n`은 처음 누를 때의 닿음 기준. 모서리를 넘은 팁이 모서리 각에 걸려 남기는 1~2 N이 이 값을 넘나들기 때문). 최근 접촉 높이는 `step_follow_lo_n` 이상으로 누른 자리만으로 정한다. 그 뒤 `step_fine_m` 스텝으로 다시 긁어 모서리를 다듬는다(9/17 tactile_probe 프로토타입).
+**SLIDE 스텝 모드 [v0.1.15].** robot_manager 파라미터 `slide_mode`(계약 이름 아님)가 `step`이면 `OP_SLIDE`는 순응 · 힘 제어를 켜지 않고 **위치 제어로 한 스텝(`step_coarse_m`) 가고 멈춘 뒤** 외력을 여러 샘플 평균내 판단한다. 누르는 힘 ΔFz를 `[step_follow_lo_n, step_follow_hi_n]`으로 유지하도록 z를 `step_z_m`씩 조절하고, 힘이 빠지면 최근 접촉 높이보다 `step_drop_m` 아래까지 내려가 본 뒤에도 `step_follow_lo_n` 미만일 때만 접촉 소실로 본다. `step_release_n`은 처음 누를 때의 닿음 기준이며 **real은 2026-09-23 실기에서 2.5 N으로 조정**했다. 1.5 N에서는 F0 치우침으로 윗면보다 약 1.4 mm 위에서 거짓 접촉이 발생해 −y가 `no_contact(204)`로 실패했고, 방향별 F0z는 −0.45~+1.40 N이었다(#167, #179). 모서리 소실 기준은 `step_follow_lo_n` 3.0 N이다. 최근 접촉 높이는 `step_follow_lo_n` 이상으로 누른 자리만으로 정한다. 그 뒤 `step_fine_m` 스텝으로 다시 긁어 모서리를 다듬는다(9/17 tactile_probe 프로토타입).
 - **EDGE는 robot_manager가 확정한다.** `/contact/event`에 `TYPE_EDGE`를 낸다: `source = "robot_step"`, `event_id`는 contact_detector와 겹치지 않도록 2³² 이상, `pose.position` = (소실 지점 x · y, 최근 접촉 높이 z), `z_drop_m` = 소실을 확인하려고 더 내려간 깊이(항상 `z_drop_valid = true`), `force_delta_n` = 소실 판정 순간의 |ΔF|, `debounce_count = 1`. 짝 맞추기(`Result.event_id`, 5.4절)와 scan_manager 절차는 그대로다.
 - 스텝 모드 SLIDE 중 contact_detector의 EDGE는 robot_manager가 정지에 쓰지 않는다. `OVER_FORCE`(1차 · 2차)와 하강 제한(기준 = SLIDE 첫 샘플 z)은 그대로 산다. `step_press_max_m + step_drop_m < drop_limit_m`이어야 한다.
 - 시작 자리에서 스스로 `step_press_max_m`까지 내려가 누르므로, 7.3절의 방향 전환 뒤 `recontact_margin_m` 위에서 출발해도 닿는다. 멈춘 상태에서 판정하므로 편향 보정(BRD 4.2.4)의 속도 × 지연 항은 0이어야 한다 — scan_manager가 `slide_speed_mps`를 편향 보정에 그대로 넘기는 것은 후속 이슈다.
