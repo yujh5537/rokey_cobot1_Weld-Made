@@ -226,7 +226,9 @@ function App() {
   // FastAPI WebSocket 연결 상태
   const [wsConnected, setWsConnected] = useState(false)
 
-  // safety/status 래치 상태. 안전 해제 버튼은 latched=true일 때만 활성화한다.
+  // safety/status 수신 여부와 래치 상태.
+  // 상태를 아직 모를 때는 안전 해제 버튼을 막지 않는다.
+  const [safetyStatusSeen, setSafetyStatusSeen] = useState(false)
   const [safetyLatched, setSafetyLatched] = useState(false)
 
   // 현재 로봇 TCP 팁 위치
@@ -411,7 +413,9 @@ function App() {
 
 
   async function handleSafetyReset() {
-    if (!safetyLatched) {
+    // 래치가 아님을 확인한 경우에만 요청을 막는다.
+    // 아직 safety/status를 못 받은 상태에서는 reset 요청을 허용한다.
+    if (safetyStatusSeen && !safetyLatched) {
       return
     }
 
@@ -601,6 +605,7 @@ function App() {
 
         // safety/status
         if (topic === 'safety/status') {
+          setSafetyStatusSeen(true)
           setSafetyLatched(payload.latched === true)
         }
 
@@ -1165,11 +1170,13 @@ function App() {
 
         <button
           onClick={handleSafetyReset}
-          disabled={!safetyLatched}
+          disabled={safetyStatusSeen && !safetyLatched}
           title={
-            safetyLatched
-              ? '안전 래치를 해제합니다.'
-              : '안전 래치 상태에서만 사용할 수 있습니다.'
+            !safetyStatusSeen
+              ? '안전 상태 미수신: 안전 해제 명령을 시도할 수 있습니다.'
+              : safetyLatched
+                ? '안전 래치를 해제합니다.'
+                : '안전 래치가 걸려 있지 않습니다.'
           }
         >
           안전 해제
