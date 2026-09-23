@@ -74,12 +74,12 @@ python3 docs/env/weld_pose_check.py --real-ok --vel 10 --file docs/test-reports/
 | | | | |
 
 ## M4. 경유점 이동 방식 (학민)
-`ExecutePath`(P1)를 `move_spline_task` 한 번으로 할지 `move_line` 반복(radius blend)으로 할지 정한다. **큐브 위 100 mm 공중**에서 지그재그 11 점(진행 4 mm 간격 · 좌우 ±2 mm), 10 mm/s. 자세는 수직(홈 자세) 그대로.
+`ExecutePath`(P1)의 `path_mode` 두 가지(`line` = 점마다 amovel 정지, `spline` = `move_spline_task` 한 번)를 실제 호출로 확인한다. **"`move_line` + radius 블렌딩"은 시험하지 않는다**: 드라이버가 ASYNC 에서 radius 를 버린다(`dsr_controller2.cpp` 464행, 현지 소스 확인 2026-09-24). **소스 확인에 그치지 말고 호출 확인까지 한다**(병후): 아래 표를 Virtual 과 실기 각각 채운다. **큐브 위 100 mm 공중**에서 지그재그 11 점(진행 4 mm 간격 · 좌우 ±2 mm), 10 mm/s. 자세는 수직(홈 자세) 그대로.
 
 | 방식 | 서비스 success · 응답 지연 | 점 사이에서 멈추나 | `get_robot_state` MOVING 유지 | `move_stop` 즉시 정지 | 마지막 점 오차 (mm) | 판정 |
 |---|---|---|---|---|---|---|
 | `move_spline_task` ASYNC (`pos` = Float64MultiArray ×11, `pos_cnt` 11, `opt` 0 → 1 도 시도) | | | | | | |
-| `move_line` ×11 ASYNC 연속 호출, radius 2 mm | | | | | | |
+| `move_spline_task` ASYNC, 100 점 · 101 점 (배열 한도 `MAX_SPLINE_POINT` 100, 컨트롤러가 `pos_cnt` 검사 안 함 — 101 은 **Virtual 에서만**, 실기 금지) | | | | | | |
 | `move_line` ×11 SYNC, radius 0 (정지 허용) | | | | | | |
 
 - Virtual 에서 먼저(에뮬레이터가 `move_spline_task` 를 받는지). 실기에서 한 번은 본다 — 에뮬레이터와 다를 수 있다.
