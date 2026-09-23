@@ -264,28 +264,20 @@ base_link 좌표
 Web에서는 다음 Vite 환경변수로 값을 전달한다.
 
 ```env
-VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006
 ```
 
 실기 기준:
 
 ```text
-X = 423.56 mm
-Y = -186.06 mm
-Z = 100.503 mm
+X = 420.255 mm
+Y = -156.675 mm
+Z = 95.006 mm
 ```
 
-sim 통합 검증도 2026-09-22부터 실측 작업대 원점과 같은 좌표를 사용한다.
+실기는 계약 v0.1.18의 위 좌표를 사용한다. sim은 `contact_scan_bringup/config/sim.yaml`의 `base_to_fixture`를 유지하며, 화면 정렬 때문에 sim yaml의 모션·홈·fixture 값을 바꾸지 않는다. sim 실행에서 별도 변환이 필요하면 해당 실행 환경의 `VITE_BASE_TO_FIXTURE_MM`로 명시한다.
 
-```text
-X = 423.56 mm
-Y = -186.06 mm
-Z = 100.503 mm
-```
-
-따라서 `robot/sample`(탐침 TCP 궤적), `contact/event`(판정 순간 탐침 접촉점),
-`scan/result`(접촉점으로 계산한 형상)이 모두 같은 base_link 장면에서 일치한다.
-프론트에서 sim 결과만 임의로 위/아래로 이동하지 않는다.
+따라서 `robot/sample`(탐침 TCP 궤적), `contact/event`(판정 순간 탐침 접촉점), `scan/result`(접촉점으로 계산한 형상)는 **해당 실행 모드의 `base_to_fixture`**를 기준으로 같은 base_link 장면에 배치한다.
 
 `search_origin_pose`와 `base_to_fixture`는 같은 값이 아니므로
 서로 대체해서 사용하지 않는다.
@@ -303,7 +295,7 @@ frontend/.env.local
 파일을 만들고 실기 실행 시 다음 값을 설정한다.
 
 ```env
-VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006
 ```
 
 `.env.local`은 `*.local` 규칙으로 Git에 포함되지 않는다.
@@ -513,9 +505,9 @@ Z = 50 mm
 이고 실기 `base_to_fixture`를 적용하면 Base 기준:
 
 ```text
-X = 423.56 mm
-Y = -186.06 mm
-Z = 150.503 mm
+X = 420.255 mm
+Y = -156.675 mm
+Z = 145.006 mm
 ```
 
 가 된다.
@@ -552,7 +544,7 @@ M0609은 공식 URDF의 관절 계층을 Three.js Group으로 구성하고 공�
 - 유효한 6축 데이터가 3초 동안 없으면 **수신 지연 — 마지막 자세 표시**로 바뀐다. 수신 전 영점 자세는 실제 로봇 자세가 아니다.
 - RG2는 실기 탐침 파지 고정 시각화 자세다. 기준 joint 크기는 `0.7213960652668464 rad`(약 41.3°)이고 부호는 `[+,-,+,-,-,+]`이다. velocity 0, effort 40.0으로 읽힌 실기 상태이며, 실시간 손가락 개폐 피드백은 화면 자세에 반영하지 않는다.
 - 탐침은 **보이는 RG2 jaw 최외곽 끝면 → 탐침 최하단 끝 = 13 mm** 실측값으로 표시한다. 실기 파지각에서 pinned RG2 mesh의 jaw 끝면 z를 기준으로 시작하므로 탐침이 그리퍼 내부로 파고들지 않는다. 기존 flange→TCP 252.12 mm와 controller kinematic gripper height는 탐침 돌출 시작점으로 사용하지 않는다.
-- 작업대 시각 모델은 실제 설비 위치 `VITE_TABLE_ORIGIN_MM`를 사용한다. 기본값은 실측 `423.56,-186.06,100.503` mm다.
+- 작업대 시각 모델은 실제 설비 위치 `VITE_TABLE_ORIGIN_MM`를 사용한다. 기본값은 계약 v0.1.18 실측 `420.255,-156.675,95.006` mm다.
 - `base_to_fixture`는 `scan/result`의 계약상 Base 변환값이다. sim의 `425,-184,400` mm는 가상 박스 지지면이므로 실제 높이 94 mm 작업대 자체의 위치로 사용하지 않는다.
 - 3D에서 부재·일반 모서리·경로 후보는 X/Y는 `base_to_fixture`, Z=0 지지면은 작업대 상판에 맞춰 표시한다. 따라서 sim 결과도 작업대 위에 놓이지만 원본 `scan/result` 수치는 수정하지 않는다.
 - 부재는 유효한 `scan/result.vertices`로 생성한다.
@@ -592,8 +584,8 @@ broker가 다른 PC에 있으면 기존 실행 환경의 `broker_host`를 함께
 ```bash
 # Web PC: 기존 FastAPI·Mosquitto는 실행 상태여야 한다.
 cd frontend
-VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503 \
-VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006 \
+VITE_TABLE_ORIGIN_MM=420.255,-156.675,95.006 \
 npm run dev
 ```
 
@@ -609,19 +601,19 @@ mosquitto_sub -h 127.0.0.1 -p 1883 -t 'robot/joints' -C 1 -v
 작업대 높이 기준:
 ```text
 M0609 base_link z = 0 mm
-작업대 상판 z    = 100.503 mm
+작업대 상판 z    = 95.006 mm
 작업대 실제 높이 = 94 mm
-작업대 바닥 z    = 6.503 mm
+작업대 바닥 z    = 1.006 mm
 ```
 따라서 로봇 베이스와 작업대 발은 거의 같은 바닥 레벨에 놓인다.
 
 실기에서는:
 ```bash
-VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503 \
-VITE_TABLE_ORIGIN_MM=423.56,-186.06,100.503 \
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006 \
+VITE_TABLE_ORIGIN_MM=420.255,-156.675,95.006 \
 npm run dev
 ```
-를 사용한다. 현재 sim 통합 검증도 같은 fixture 좌표를 사용한다. `contact/event`의 노란 접촉점과 `robot/sample`의 파란 탐침 궤적, `scan/result` 형상은 별도 표시 보정 없이 같은 좌표계에서 겹쳐야 한다.
+를 사용한다. sim은 `sim.yaml`의 fixture 값을 유지한다. `contact/event`의 노란 접촉점과 `robot/sample`의 파란 탐침 궤적, `scan/result` 형상은 실행 모드에 맞는 `VITE_BASE_TO_FIXTURE_MM`을 사용해 같은 좌표계에서 겹쳐야 한다.
 
 ---
 
