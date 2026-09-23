@@ -1,7 +1,7 @@
 """자체 노드 5개를 입력원(source)에 맞는 파라미터 파일로 띄운다 (US-07).
 
   ros2 launch contact_scan_bringup bringup.launch.py source:=sim
-  ros2 launch contact_scan_bringup bringup.launch.py source:=robot_force broker_host:=172.24.0.51
+  ros2 launch contact_scan_bringup bringup.launch.py source:=robot_force broker_host:=<웹 PC 주소>
 
 - 두산 드라이버(sodvir / sodreal)는 여기서 띄우지 않는다. 별도 터미널에서 사람이 띄운다.
 - MQTT 브로커 주소는 환경별 값이므로 yaml 에 고정하지 않고 broker_host 실행 인자로 전달한다.
