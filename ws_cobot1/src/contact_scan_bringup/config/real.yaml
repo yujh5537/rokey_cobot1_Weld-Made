@@ -285,5 +285,4 @@ scan_manager:
 
 mqtt_bridge:
   ros__parameters:
-    broker_host: "172.24.0.51"
     broker_port: 1883
