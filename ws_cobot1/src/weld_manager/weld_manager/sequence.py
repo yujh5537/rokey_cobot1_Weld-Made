@@ -281,9 +281,10 @@ class WeldRunner(_Runner):
     """
 
     def __init__(self, ports: Ports, plan: WeldPlan, params: WeldParams, weld_id: str, frame_id: str,
-                 orientation_tolerance_rad: Optional[float] = None):
+                 orientation_tolerance_rad: Optional[float] = None, start_pose: Optional[Pose] = None):
         super().__init__(ports, params, 1, True, orientation_tolerance_rad)
         self._plan = plan
+        self._start_pose = start_pose       # 시작 때 팁 자리(Base, /robot/sample). D30 수직 상승의 출발점
         self._weld_id = weld_id
         self._frame_id = frame_id
         self._started_at: Optional[Stamp] = None
@@ -307,6 +308,8 @@ class WeldRunner(_Runner):
                 self._notify(Signal.APPROACH, line=index)
                 self._current = index
                 self._lines[index] = replace(self._lines[index], started_at=self._ports.now())
+                if index == self._plan.start_line:
+                    self._lift_to_z_safe()
                 self._move_to(f'{line.name} 접근 1', line.approach1, line.orientation, p.travel_speed_mps)
                 self._move_to(f'{line.name} 접근 2', line.approach2, line.orientation, p.approach_speed_mps)
                 self._notify(Signal.WELD)
@@ -316,7 +319,7 @@ class WeldRunner(_Runner):
                     path_length_m=line.path_length_m, path_tolerance_m=p.path_tolerance_m,
                     timeout_s=p.motion_timeout_s))
                 self._notify(Signal.RETREAT)
-                # 5절 표: 후퇴는 travel_speed_mps (6절 표의 approach_speed_mps "후퇴" 와 어긋난다 — 병후 확인 대기)
+                # 5절 표 · 6절(38b55e8): P_ret 까지는 경로(weld_speed), 그 뒤 z_safe 상승은 travel_speed
                 self._move_to(f'{line.name} 후퇴', line.retreat, line.orientation, p.travel_speed_mps)
                 self._lines[index] = replace(
                     self._lines[index], status=LineStatus.DONE, finished_at=self._ports.now())
@@ -334,6 +337,25 @@ class WeldRunner(_Runner):
             return self._finish_stop()
         except _Fail as failure:
             return self._finish_fail(failure)
+
+    def _lift_to_z_safe(self) -> None:
+        """D30: 시작 때 팁이 z_safe 아래면 같은 x · y · 현재 자세로 z_safe 까지 수직 상승한다(거절하지 않는다).
+
+        첫 접근 1 은 지금 자리에서 z_safe 위의 점으로 곧장 가는 직선이라, 부재 높이 아래에서 출발하면 그 직선이
+        부재를 가로지를 수 있다. 자세를 바꾸지 않으므로 순수한 이동이다(제자리 회전의 거짓 도착이 없다).
+        올릴 거리가 path_tolerance_m 이내면 보내지 않는다 — 거의 제자리인 목표는 robot_manager 가 유예 뒤에야 끝낸다.
+        기울인 자세로 부재 옆에 서 있었다면 상승 중 툴 뒤쪽이 부재를 스칠 수 있다. 막지 않는다(관제자 확인, 5절).
+        """
+        pose = self._start_pose
+        if pose is None:
+            return
+        z_safe = self._plan.z_safe_base
+        x, y, z = pose.position
+        if z >= z_safe - self._params.path_tolerance_m:
+            return
+        self._ports.log('warn', f'시작 자리 z {z * 1000:.1f} mm 가 z_safe {z_safe * 1000:.1f} mm 아래다. '
+                                '같은 x · y 로 먼저 올린다(D30)', pose.position)
+        self._move_to('시작 상승', (x, y, z_safe), pose.orientation, self._params.travel_speed_mps)
 
     # ---- 마무리 ----
 

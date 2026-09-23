@@ -394,14 +394,9 @@ class WeldManager(Node):
             plan = plan_weld(scan_input, request.start_line, request.end_line, p)
         except PathRejected as error:
             return Reason.PATH_REJECTED, str(error)
-        tip_z = sample.pose.position.z
-        if tip_z < plan.z_safe_base - p.path_tolerance_m:
-            # 5절: 첫 선 앞은 지금 자리에서 접근 1(z_safe)로 곧장 간다. 부재 높이 아래에서 출발하면 그 직선이
-            # 부재를 가로지를 수 있다. 홈이라고 가정하지 않는다
-            return (Reason.PATH_REJECTED,
-                    f'지금 팁 z {tip_z * 1000:.1f} mm 가 z_safe {plan.z_safe_base * 1000:.1f} mm 아래다. '
-                    '안전복귀(/weld/home 또는 /scan/home)로 먼저 올린다')
-        return p, plan, weld_record.new_weld_id(datetime.now())
+        # 팁이 z_safe 아래여도 거절하지 않는다. 러너가 먼저 수직 상승한다(D30). 홈이라고 가정하지 않는다
+        start_pose = Pose(conversions.position_of(sample.pose), conversions.orientation_of(sample.pose))
+        return p, plan, weld_record.new_weld_id(datetime.now()), start_pose
 
     def _execute_run(self, goal_handle):
         request = goal_handle.request
@@ -409,7 +404,7 @@ class WeldManager(Node):
         checked = self._start_problem(request)
         if not isinstance(checked[0], weld_params.WeldParams):
             return self._reject(goal_handle, result, *checked)
-        params, plan, weld_id = checked
+        params, plan, weld_id, start_pose = checked
         job = _Job(weld_id, plan.scan_id, params, plan)
         with self._job_lock:
             if self.state_machine.is_busy:     # 검사와 접수 사이에 다른 명령이 들어왔다
@@ -426,7 +421,7 @@ class WeldManager(Node):
         ports = _NodePorts(self, job)
         try:
             outcome = WeldRunner(ports, plan, params, weld_id, params.result_frame_id,
-                                 params.orientation_tolerance_rad).run()
+                                 params.orientation_tolerance_rad, start_pose).run()
         except _Closing:
             outcome = None
         except Exception as exc:

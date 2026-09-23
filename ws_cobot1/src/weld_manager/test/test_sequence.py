@@ -126,7 +126,8 @@ def scan(fixture_store):
     return load_scan(fixture_store, FIXTURE_SCAN_ID, **FRAMES)
 
 
-def run(scan, script=None, start=0, end=7, after=None, tolerance=None, on_notify=None, **param_changes):
+def run(scan, script=None, start=0, end=7, after=None, tolerance=None, on_notify=None, start_pose=None,
+        **param_changes):
     p = params(**param_changes)
     plan = plan_weld(scan, start, end, p)
     sm = WeldStateMachine()
@@ -134,7 +135,7 @@ def run(scan, script=None, start=0, end=7, after=None, tolerance=None, on_notify
     ports = FakePorts(sm, script)
     ports.after = after or {}
     ports.on_notify = on_notify or {}
-    outcome = WeldRunner(ports, plan, p, WELD_ID, 'workpiece_fixture', tolerance).run()
+    outcome = WeldRunner(ports, plan, p, WELD_ID, 'workpiece_fixture', tolerance, start_pose).run()
     return outcome, ports, plan
 
 
@@ -187,6 +188,53 @@ def test_middle_range_skips_both_sides(scan):
     outcome, _, _ = run(scan, start=2, end=4)
     S, D = LineStatus.SKIPPED, LineStatus.DONE
     assert statuses(outcome.record) == [S, S, D, D, D, S, S, S]
+
+
+# ---- 시작 상승 (D30) ----
+
+LOW = Pose((0.46, -0.21, 0.43), Q_TILT)      # 부재 옆 낮은 자리, 기울인 자세 (sim 픽스처 z_safe ≈ 0.4899)
+
+
+def test_start_below_z_safe_lifts_straight_up_first(scan):
+    outcome, ports, plan = run(scan, start_pose=LOW)
+    assert outcome.kind is OutcomeKind.DONE and len(ports.calls) == 35
+    lift = ports.calls[0][1]
+    assert lift.label == '시작 상승' and lift.kind is MotionKind.MOVE_TO
+    assert lift.target[:2] == LOW.position[:2] and math.isclose(lift.target[2], plan.z_safe_base)
+    assert lift.orientation == LOW.orientation            # 자세를 바꾸지 않는다(순수 이동)
+    assert lift.speed == params().travel_speed_mps
+    assert ports.calls[1][1].label == 'L0 접근 1'
+    assert any('D30' in message for _, message in ports.logs)
+
+
+def test_start_above_z_safe_does_not_lift(scan):
+    # sim 픽스처(base_to_fixture z 0.4)의 z_safe ≈ 0.49 m 보다 높은 자리. HOME_POSE(실기 홈 팁 0.294 m)는 여기선 낮다
+    outcome, ports, _ = run(scan, start_pose=Pose((0.425, -0.184, 0.60), (0.0, 1.0, 0.0, 0.0)))
+    assert len(ports.calls) == 34 and ports.calls[0][1].label == 'L0 접근 1'
+
+
+def test_start_just_below_z_safe_within_tolerance_does_not_lift(scan):
+    plan = plan_weld(scan, 0, 7, params())
+    near = Pose((0.46, -0.21, plan.z_safe_base - params().path_tolerance_m / 2), Q_TILT)
+    outcome, ports, _ = run(scan, start_pose=near)
+    assert ports.calls[0][1].label == 'L0 접근 1'
+
+
+def test_start_lift_failure_ends_there(scan):
+    outcome, ports, _ = run(scan, {1: MotionResult(reason=MR.OVER_FORCE, reason_code=400)}, start_pose=LOW)
+    assert outcome.kind is OutcomeKind.FAILED and len(ports.calls) == 1
+    assert outcome.record.lines[0].status is LineStatus.FAILED
+
+
+def test_start_lift_stopped(scan):
+    outcome, ports, _ = run(scan, stop_during(1), start_pose=LOW)
+    assert outcome.kind is OutcomeKind.STOPPED and len(ports.calls) == 1
+
+
+def test_lift_only_before_the_first_line(scan):
+    outcome, ports, _ = run(scan, start=2, end=3, start_pose=LOW)
+    labels = [r.label for _, r in ports.calls]
+    assert labels.count('시작 상승') == 1 and labels[1] == 'L2 접근 1'
 
 
 # ---- 중지 (/weld/stop) ----

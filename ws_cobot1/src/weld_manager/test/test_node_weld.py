@@ -188,7 +188,6 @@ def _reject_cases():
         ('slow_override', {}, {'override': {'weld_speed_mps': 0.001}}, 102),
         ('no_sample', {'publish_sample': False}, {}, 307),
         ('tool_force', {'force': (0.0, 0.0, -12.0)}, {}, 302),
-        ('below_z_safe', {'position': (0.425, -0.184, 0.45)}, {}, 604),
         ('tilt_zero_vertical', {}, {'override': {'tilt_deg': 0.0}}, 604),
     ]
 
@@ -212,6 +211,21 @@ def test_start_rejections(make, name, fake_attrs, run_kwargs, code):
     assert h.fake.goals == []               # 로봇을 움직이지 않았다
     assert h.phase().name == 'IDLE'          # phase 도 바뀌지 않았다
     assert all(line.status == WeldLine.STATUS_NOT_ATTEMPTED for line in result.result.lines)
+
+
+def test_start_below_z_safe_lifts_first(make):
+    # D30: 거절하지 않고 같은 x · y · 현재 자세로 z_safe 까지 올린 뒤 시작한다
+    h = make()
+    h.fake.position = (0.46, -0.21, 0.43)
+    time.sleep(0.2)
+    result = h.run(start=0, end=0)
+    assert result.success, result.detail
+    lift = h.fake.goals[0][1]
+    assert h.fake.kinds()[:2] == ['MOVE_TO', 'MOVE_TO'] and len(h.fake.goals) == 1 + 4 + 2
+    p = lift.target.position
+    assert (round(p.x, 6), round(p.y, 6)) == (0.46, -0.21) and abs(p.z - 0.48986501464843746) < 1e-9
+    q = lift.target.orientation
+    assert (q.x, q.y, q.z, q.w) == (0.0, 1.0, 0.0, 0.0)      # 가짜의 지금 자세 그대로
 
 
 def test_tilt_zero_l0_only_is_accepted(make):
