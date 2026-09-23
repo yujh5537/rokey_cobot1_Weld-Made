@@ -1,4 +1,4 @@
-"""파라미터 검사: 누락 · 범위 · 덮어쓰기 (weld-motion.md 6절, weld-ros-interfaces.md 3.1절)."""
+"""파라미터 검사: 누락 · 범위 · 덮어쓰기 (weld-motion.md 6절, weld-ros-interfaces.md 3.1절 · 6장)."""
 
 import math
 
@@ -13,9 +13,12 @@ from weld_manager.params import SPECS
 def test_all_values_pass(param_values):
     result = check(param_values)
     assert result.ok, result.describe()
-    assert result.params.result_frame_id == 'workpiece_fixture'   # 이름표만 기본값이 있다
-    assert result.params.motion_frame_id == 'base_link'
-    assert math.isclose(result.params.tilt_rad, math.pi / 4)
+    params = result.params
+    assert params.result_frame_id == 'workpiece_fixture'   # 이름표만 기본값이 있다
+    assert params.motion_frame_id == 'base_link'
+    assert math.isclose(params.tilt_rad, math.pi / 4)
+    assert params.tool_roll_deg == (0.0,) * 8 and params.tool_roll_rad(3) == 0.0
+    assert params.tool_profile == ((0.0, 0.002), (0.003, 0.006), (0.012, 0.015))
 
 
 def test_motion_numbers_have_no_code_default():
@@ -23,6 +26,13 @@ def test_motion_numbers_have_no_code_default():
     defaults = [spec.name for spec in SPECS if spec.default is not None]
     assert sorted(defaults) == ['motion_frame_id', 'result_frame_id']
     assert all(spec.required for spec in SPECS if spec.default is None)
+
+
+def test_speed_upper_bound_is_not_ours(param_values):
+    # D29: 상한은 robot_manager 의 path_max_speed_mps 가 거른다. weld_manager 에는 그 이름이 없다
+    assert 'path_max_speed_mps' not in {spec.name for spec in SPECS}
+    param_values['travel_speed_mps'] = 5.0
+    assert check(param_values).ok
 
 
 def test_missing_values_are_listed_not_filled(param_values):
@@ -35,39 +45,55 @@ def test_missing_values_are_listed_not_filled(param_values):
 
 @pytest.mark.parametrize('name, value', [
     ('tilt_deg', 80.1), ('tilt_deg', -1.0), ('standoff_m', 0.0), ('weld_speed_mps', 0.0),
-    ('weave_amplitude_m', -0.001), ('approach_m', float('nan')), ('tool_roll_deg', float('inf')),
+    ('weave_amplitude_m', -0.001), ('approach_m', float('nan')), ('tip_radius_m', 0.0),
     ('bottom_margin_m', -0.001), ('result_dir', ''), ('weld_speed_mps', True),
+    ('tool_roll_deg', [0.0] * 7), ('tool_roll_deg', [0.0] * 7 + [float('inf')]), ('tool_roll_deg', 0.0),
+    ('tool_profile_u_m', []), ('tool_profile_u_m', [0.0, 0.012, 0.003]),
+    ('tool_profile_u_m', [0.0, 0.003, 0.003]), ('tool_profile_u_m', [-0.001, 0.003, 0.012]),
+    ('tool_profile_r_m', [0.002, 0.0, 0.015]), ('tool_check_max_force_n', 0.0),
 ])
 def test_out_of_range(param_values, name, value):
     param_values[name] = value
     result = check(param_values)
     assert not result.ok
-    assert any(line.startswith(name) for line in result.invalid)
+    assert any(line.startswith(name) for line in result.invalid), result.invalid
 
 
 @pytest.mark.parametrize('name, value', [
     ('weave_amplitude_m', 0.0), ('weave_pitch_m', 0.0), ('tilt_deg', 0.0), ('tilt_deg', 80.0),
-    ('tool_roll_deg', -30.0), ('bottom_margin_m', 0.0),
+    ('tool_roll_deg', [-30.0, 0, 0, 0, 0, 0, 0, 60.0]), ('bottom_margin_m', 0.0),
 ])
 def test_zero_and_bounds_are_values(param_values, name, value):
     param_values[name] = value
     assert check(param_values).ok
 
 
-def test_speed_above_path_max_is_rejected(param_values):
-    param_values['travel_speed_mps'] = 0.101
+@pytest.mark.parametrize('name', ['weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps'])
+def test_speed_below_minimum_is_rejected(param_values, name):
+    # #152 거짓 도착: 이동 판정(약 0.67 mm/s)보다 느리면 "멈춤"으로 보인다
+    param_values[name] = 0.001
     result = check(param_values)
     assert not result.ok
-    assert 'path_max_speed_mps' in result.invalid[0]
+    assert 'weld_speed_min_mps' in result.invalid[0]
+
+
+def test_profile_arrays_must_have_same_length(param_values):
+    param_values['tool_profile_r_m'] = [0.002, 0.006]
+    result = check(param_values)
+    assert not result.ok and '길이가 같아야' in result.invalid[0]
 
 
 def test_override_applies_to_job_only(param_values):
-    before = dict(param_values)
+    before = {k: list(v) if isinstance(v, list) else v for k, v in param_values.items()}
     override = {'tilt_deg': 30.0, 'weave_amplitude_m': 0.0}
     result = check(param_values, override)
     assert result.ok
     assert result.params.tilt_deg == 30.0 and result.params.weave_amplitude_m == 0.0
     assert param_values == before and override == {'tilt_deg': 30.0, 'weave_amplitude_m': 0.0}
+
+
+def test_override_below_minimum_speed_is_rejected(param_values):
+    assert not check(param_values, {'weld_speed_mps': 0.001}).ok
 
 
 def test_override_problems():

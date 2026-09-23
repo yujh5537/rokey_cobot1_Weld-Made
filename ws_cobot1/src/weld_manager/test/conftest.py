@@ -20,13 +20,15 @@ FIXTURE = (_SRC.parents[1] / 'docs' / 'phase2' / 'fixtures'
 FIXTURE_SCAN_ID = '20260921-131938-1493'
 
 # weld-motion.md 6절 출발값 (시험용 입력. 제품 값은 yaml 에 있다)
+# 툴 외형은 M2 실측 전이라 시험용 임의값이다: 팁 구 · 탐침 몸통 · 핑거(팁 뒤 12 mm 부터)
 PARAM_VALUES = dict(
     weld_speed_mps=0.010, travel_speed_mps=0.050, approach_speed_mps=0.020,
-    standoff_m=0.003, weave_amplitude_m=0.002, weave_pitch_m=0.004,
-    tilt_deg=45.0, tool_roll_deg=0.0, approach_m=0.030, travel_clearance_m=0.050,
-    bottom_margin_m=0.005, workspace_margin_m=0.100, path_tolerance_m=0.003,
-    motion_timeout_s=120.0, path_max_speed_mps=0.100, state_publish_period_s=1.0,
-    scan_state_timeout_s=5.0, result_dir='data',
+    weld_speed_min_mps=0.002, standoff_m=0.003, tip_radius_m=0.002,
+    weave_amplitude_m=0.002, weave_pitch_m=0.004, tilt_deg=45.0, tool_roll_deg=[0.0] * 8,
+    tool_profile_u_m=[0.0, 0.003, 0.012], tool_profile_r_m=[0.002, 0.006, 0.015],
+    approach_m=0.030, travel_clearance_m=0.050, bottom_margin_m=0.005, workspace_margin_m=0.100,
+    path_tolerance_m=0.003, motion_timeout_s=120.0, tool_check_max_force_n=6.0,
+    state_publish_period_s=1.0, scan_state_timeout_s=5.0, result_dir='data',
 )
 
 
