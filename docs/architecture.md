@@ -51,7 +51,7 @@ flowchart LR
   SF -- "safety status" --> SM
   SF -- "safety status" --> BR
 ```
-scan_manager는 측정 · 판정에 `/robot/sample`을 쓰지 않는다 — 중단 위치는 `ExecuteMotion` Result의 정지 pose다. 다만 **마지막 유효 pose 하나는 구독해 들고 있다 [v0.1.17]**: 안전복귀(계약 7.5 ①)와 재시작(7.6)의 첫 모션은 "지금 어디 있는지"를 알아야 목표를 만들 수 있고, 기록된 좌표는 그때 로봇이 있는 자리가 아닐 수 있기 때문이다. 이름 · 필드 · QoS는 `docs/contracts/ros-interfaces.md`, MQTT는 `docs/contracts/mqtt-schema.md`.
+scan_manager는 측정 · 판정에 `/robot/sample`을 쓰지 않는다 — 중단 위치는 `ExecuteMotion` Result의 정지 pose다. 다만 **마지막 유효 pose 하나는 구독해 들고 있다 [v0.1.19]**: 안전복귀(계약 7.5 ①)와 재시작(7.6)의 첫 모션은 "지금 어디 있는지"를 알아야 목표를 만들 수 있고, 기록된 좌표는 그때 로봇이 있는 자리가 아닐 수 있기 때문이다. 이름 · 필드 · QoS는 `docs/contracts/ros-interfaces.md`, MQTT는 `docs/contracts/mqtt-schema.md`.
 
 ## 노드 책임과 담당
 | 구성요소 | 책임 | 담당 |

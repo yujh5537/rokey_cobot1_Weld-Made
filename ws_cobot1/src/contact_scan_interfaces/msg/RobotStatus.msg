@@ -8,7 +8,7 @@ bool force_ctrl_active      # 힘 제어(set_desired_force) 켜짐
 uint32 motion_id            # 실행 중인 goal. 없으면 0
 uint8 operation             # RobotSample.OP_* 와 같은 값
 
-# SLIDE 의 누름 목표. 서로 다른 세 값을 섞지 않으려고 따로 싣는다 (v0.1.17)
+# SLIDE 의 누름 목표. 서로 다른 세 값을 섞지 않으려고 따로 싣는다 (v0.1.19)
 string slide_mode                 # 'force' = 순응 · 힘 제어(REL), 'step' = 위치 제어 스텝. 그 밖은 ''
 float64 slide_force_setpoint_n    # force 모드 설정 증분 힘(DR_FC_MOD_REL). step 모드 · 모름이면 NaN
 float64 slide_force_baseline_n    # 이번 SLIDE 를 시작한 시점의 기준 Fz. 모르면 NaN

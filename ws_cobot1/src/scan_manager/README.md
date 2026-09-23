@@ -53,7 +53,7 @@ T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig
 | `REASON_TIMEOUT` · `REASON_OVER_FORCE` | `TIMEOUT(203)` · `OVER_FORCE(400)` |
 | `REASON_ROBOT_ERROR` · `REASON_REJECTED` | Result의 `reason_code` 그대로(`DROP_LIMIT(205)` 포함) |
 
-중지 경로: 정지 완료 확인(`Ports.wait_still`, 요청보다 뒤에 찍힌 `/robot/status`) → `record_stop` → `STOP_CONFIRMED`. 확인하지 못하면 **`STOP_UNCONFIRMED(407)`** 로 ERROR다(v0.1.17). 404 와 섞지 않는다 — 404 는 "상태가 안 온다", 407 은 "정지를 요청했는데 완료를 확인하지 못했다"이고, 재시작 허용 여부를 사유로 판단하므로 갈려 있어야 한다.
+중지 경로: 정지 완료 확인(`Ports.wait_still`, 요청보다 뒤에 찍힌 `/robot/status`) → `record_stop` → `STOP_CONFIRMED`. 확인하지 못하면 **`STOP_UNCONFIRMED(407)`** 로 ERROR다(v0.1.19). 404 와 섞지 않는다 — 404 는 "상태가 안 온다", 407 은 "정지를 요청했는데 완료를 확인하지 못했다"이고, 재시작 허용 여부를 사유로 판단하므로 갈려 있어야 한다.
 중단 위치(`Interruption.pose`)는 **로봇이 마지막으로 멈춘 자리**다: 그 모션의 `Result.pose`, 보내지 않은 goal(중지가 먼저 접수됨)이면 그 앞 모션의 `Result.pose`, 재시작 뒤 모션을 하나도 보내지 않고 다시 중지됐으면 직전 중지의 좌표. `Result.pose`가 채워지지 않았으면 `null`이다(추측하지 않는다).
 
 ## 재시작 (`resume.py` · `sequence.ResumeRunner`)
@@ -91,9 +91,9 @@ T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig
 - 거절된 재시작은 `RESUMING`에 들어가지 않는다(판정 → 기록 읽기 → 계획을 **접수 전에** 끝낸다). 다만 위의 되돌림(IDLE → STOPPED · ERROR)은 거절과 무관하게 일어난다. 전이가 아니라 기록에 있는 사실이다.
 
 **알려진 한계.** **재시작**은 여전히 현재 TCP 좌표를 보지 않는다. 첫 모션이 기록된 중단 좌표 기준의 절대 `OP_MOVE_TO`라서, 중지 뒤에 누가 조그 · 직접 교시로 옮겼다면 그 좌표 위로 직선 이동한다. 중지 뒤에 로봇을 손으로 옮겼다면 재시작하지 말고 안전복귀 → 새 작업으로 한다. 현재 좌표와 중단 좌표를 **비교**하는 것은 아직 팀 안건이다.
-(v0.1.17부터 노드는 `/robot/sample`을 구독해 마지막 유효 pose를 들고 있다. 그 값은 **안전복귀의 올림 목표**에만 쓴다 — 아래 "안전복귀". 측정값의 출처는 여전히 판정 좌표(`ContactEvent`)다.)
+(v0.1.19부터 노드는 `/robot/sample`을 구독해 마지막 유효 pose를 들고 있다. 그 값은 **안전복귀의 올림 목표**에만 쓴다 — 아래 "안전복귀". 측정값의 출처는 여전히 판정 좌표(`ContactEvent`)다.)
 
-## 안전복귀 (`/scan/home`, 계약 7.5 · v0.1.17 결정 7)
+## 안전복귀 (`/scan/home`, 계약 7.5 · v0.1.19 결정 7)
 사람이 요청한다. 중지 · 실패가 자동으로 부르지 않는다(CLAUDE.md 규칙 3).
 
 ```
@@ -324,9 +324,9 @@ stateDiagram-v2
 | 마무리 HOMING 중에 중지된 작업(7.4절) | `NO_RESUMABLE_SCAN` |
 | goal의 `scan_id`가 중단된 작업과 다르다 | `NO_RESUMABLE_SCAN` |
 | 중지 뒤에 안전복귀(`HOME`)를 접수했다(끝까지 갔는지와 무관, 5.3절) | `NOT_SUPPORTED` |
-| ERROR인데 실패 사유가 **재시작 허용 목록 밖**이다(계약 9장, v0.1.17) | `NOT_SUPPORTED` |
+| ERROR인데 실패 사유가 **재시작 허용 목록 밖**이다(계약 9장, v0.1.19) | `NOT_SUPPORTED` |
 
-**ERROR 뒤의 재시작 (v0.1.17 결정 1).** `ERROR`로 끝난 작업은 **허용 목록에 있는 사유일 때만** `/safety/reset` 뒤 `/scan/resume`을 받는다.
+**ERROR 뒤의 재시작 (v0.1.19 결정 1).** `ERROR`로 끝난 작업은 **허용 목록에 있는 사유일 때만** `/safety/reset` 뒤 `/scan/resume`을 받는다.
 - 허용: `SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)`. 셋 다 **측정값이 오염되지 않는** 사유다 — 샘플 · 상태가 끊겼거나 정지 완료를 확인하지 못했을 뿐, 탐침이 무언가에 세게 닿지 않았다.
 - 불허: `OVER_FORCE(400)` · `DROP_LIMIT(205)` · 알 수 없는 오류(`ROBOT_ERROR`) · **목록에 없는 새 사유**(allowlist라 저절로 허용되지 않는다). 안전 점검 · 복귀 뒤 **새 START**만 가능하다.
 - **자동 재개는 없다.** 사람이 `/safety/reset`을 하고 `/scan/resume`을 보내야 한다. 조건이 아직 참이면 reset이 `CONDITION_ACTIVE(406)`로 거절되고, 래치가 남아 있으면 resume도 `SAFETY_LATCHED(103)`로 거절된다.

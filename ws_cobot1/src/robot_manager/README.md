@@ -59,7 +59,7 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
   `TYPE_OVER_FORCE` 는 대조 없이 항상 정지한다.
 - **취소**: 취소 접수와 실제 정지 완료는 다르다. `move_stop` 뒤 `moving` 이 false 가 될 때까지 기다린 다음 결과를 돌려준다.
 - **SLIDE 하강 제한**: 기준 z 보다 `drop_limit_m` 를 **초과**해 내려가면 정지하고 `DROP_LIMIT`(205) 로 끝낸다(계약 7.2 1차 감시. 정확히 한계면 걸리지 않는다).
-  - **기준 z = 이 노드가 `operation = OP_SLIDE` 로 발행한 첫 유효 샘플의 z** 다(v0.1.17). safety_monitor(2차)가 잡는 것과 **같은 메시지의 같은 값**이다. 실행 직전의 마지막 위치를 쓰면 순응을 켜며 z 가 약 0.7 mm 올라온 만큼 두 기준이 어긋나고, 그러면 2차의 여유가 의미를 잃는다.
+  - **기준 z = 이 노드가 `operation = OP_SLIDE` 로 발행한 첫 유효 샘플의 z** 다(v0.1.19). safety_monitor(2차)가 잡는 것과 **같은 메시지의 같은 값**이다. 실행 직전의 마지막 위치를 쓰면 순응을 켜며 z 가 약 0.7 mm 올라온 만큼 두 기준이 어긋나고, 그러면 2차의 여유가 의미를 잃는다.
   - 첫 `OP_SLIDE` 샘플이 나가기 전까지는 실행 직전의 마지막 위치를 임시 기준으로 쓴다. **감시를 끄지 않는다.**
   - 2차(safety_monitor)는 같은 기준 z 에 `drop_limit_margin_m` 를 더한 값에서 걸린다(real · sim 모두 1차 5 mm · 2차 9 mm). 1차 = 정상 동작의 제한, 2차 = 최후 방어선 + 래치.
   - 스텝 모드에서도 **매 대기마다** 1차를 본다. 설정 검사가 `step_press_max_m + step_drop_m < drop_limit_m` 을 강제한다.
@@ -93,7 +93,7 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
 
 계약 이름(`slide_target_force_n` · `drop_limit_m`)의 값은 `contact_scan_bringup/config/*.yaml`에 둔다(T05, 현지). `slide_target_force_n` 과 `home_joint_deg` 는 yaml 에 값이 들어와야 SLIDE · HOME 이 동작한다.
 
-## SLIDE 누름 목표를 상태에 싣는다 (계약 3.2, v0.1.17 결정 4)
+## SLIDE 누름 목표를 상태에 싣는다 (계약 3.2, v0.1.19 결정 4)
 
 `slide_target_force_n` 은 `DR_FC_MOD_REL` 이라 **"설정한 증분"** 이지 실제 누름이 아니다. 실제 누름은 SLIDE 가
 어디서 시작하느냐에 따라 달라진다(9/22 실기 방향별 1.5~8.6 N). 그래서 세 값을 한 자리에 섞지 않고 `RobotStatus` 에

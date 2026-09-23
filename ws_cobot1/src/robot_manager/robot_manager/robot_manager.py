@@ -494,7 +494,7 @@ class RobotManager(Node):
         self.sample_pub.publish(msg)
 
     def latch_slide_start_z(self, msg, position):
-        """1차 하강 제한의 기준 z 를 **이 샘플**로 잡는다 (계약 7.2, v0.1.17).
+        """1차 하강 제한의 기준 z 를 **이 샘플**로 잡는다 (계약 7.2, v0.1.19).
 
         safety_monitor(2차)는 `operation` 이 OP_SLIDE 로 바뀐 첫 유효 샘플의 z 를 기준으로 쓴다.
         1차가 "실행 직전의 마지막 위치"를 쓰면 둘이 어긋난다 — 순응 제어를 켜면 z 가 약 0.7 mm
@@ -555,7 +555,7 @@ class RobotManager(Node):
             'setpoint_n', 'baseline_n', 'estimate_n', 'press_lo_n', 'press_hi_n'))
 
     def slide_press(self):
-        """SLIDE 의 누름 목표 (계약 3.2, v0.1.17). 모르는 값은 0 이 아니라 NaN 이다 (규칙 4).
+        """SLIDE 의 누름 목표 (계약 3.2, v0.1.19). 모르는 값은 0 이 아니라 NaN 이다 (규칙 4).
 
         **세 값은 서로 다른 것이다.** `slide_target_force_n` 은 DR_FC_MOD_REL 이라 "설정한 증분"이고,
         실제 누름은 SLIDE 가 어디서 시작하느냐에 따라 달라진다(9/22 실기 방향별 1.5~8.6 N). 그래서

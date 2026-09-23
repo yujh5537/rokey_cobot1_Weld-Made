@@ -413,7 +413,7 @@ def refusal_of(record, params, **kwargs):
     return planned
 
 
-# ---- ERROR 재시작 허용 목록 (계약 5.3 · 9장, v0.1.17 결정 1) ----
+# ---- ERROR 재시작 허용 목록 (계약 5.3 · 9장, v0.1.19 결정 1) ----
 
 def failed_record(params, result_dir, reason_code, at_request=SLIDE_POS_X):
     """at_request 번째 모션이 그 사유로 실패해 ERROR 로 끝난 기록."""

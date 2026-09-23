@@ -64,7 +64,7 @@ def test_state_publish_period_positive(file_name):
     assert _params(file_name)['scan_manager']['state_publish_period_s'] > 0
 
 
-# ---- 하강 제한 1차 · 2차 (계약 7.2, v0.1.17) ----
+# ---- 하강 제한 1차 · 2차 (계약 7.2, v0.1.19) ----
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
 def test_second_stage_drop_limit_is_behind_the_first(file_name):

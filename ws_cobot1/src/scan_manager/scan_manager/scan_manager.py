@@ -1000,7 +1000,7 @@ class ScanManager(Node):
         def run():
             # 재시작의 사실을 남기지 못하면(디스크 오류 등) 로봇을 움직이기 전에 끝낸다.
             # ERROR 를 잇는 재시작은 남길 곳이 다르다: 실패 기록에 찍는다(FAILED 는 Interruption 을
-            # 남기지 않는다. 계약 9장 허용 목록, v0.1.17)
+            # 남기지 않는다. 계약 9장 허용 목록, v0.1.19)
             self._write(
                 self._store.record_failure_resume if resumption.from_failure
                 else self._store.record_resume, job.scan_id)

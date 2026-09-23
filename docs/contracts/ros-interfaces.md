@@ -1,6 +1,6 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 최근 구간 평균(이동 기준), 밀기는 z 로 판정 켜기 · 타입 변경 없음) · **v0.1.13**(2026-09-21, #128, 힘 꺾임 EDGE 추가(기본 꺼짐) · 타입 변경 없음) · **v0.1.15**(2026-09-22, SLIDE 스텝 모드: robot_manager가 EDGE를 확정해 `/contact/event`를 낸다 · 타입 변경 없음) · **v0.1.16**(2026-09-23, #130: real 의 `sample_stale_ms` 300 → 500 · 타입 변경 없음) · **v0.1.17**(2026-09-23, T06 감사 후 팀 결정 10건: ERROR 재시작 허용 목록 · 하강 제한 2차 여유 · 안전복귀 경로 · 정지 KPI 분리 · 디바운스 정의. **타입 변경 있음**: `ReasonCode.STOP_UNCONFIRMED(407)` 추가, `RobotStatus`에 SLIDE 누름 목표 6개 추가). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 최근 구간 평균(이동 기준), 밀기는 z 로 판정 켜기 · 타입 변경 없음) · **v0.1.13**(2026-09-21, #128, 힘 꺾임 EDGE 추가(기본 꺼짐) · 타입 변경 없음) · **v0.1.15**(2026-09-22, SLIDE 스텝 모드: robot_manager가 EDGE를 확정해 `/contact/event`를 낸다 · 타입 변경 없음) · **v0.1.16**(2026-09-23, #130: real 의 `sample_stale_ms` 300 → 500 · 타입 변경 없음) · **v0.1.19**(2026-09-23, T06 감사 후 팀 결정 10건: ERROR 재시작 허용 목록 · 하강 제한 2차 여유 · 안전복귀 경로 · 정지 KPI 분리 · 디바운스 정의. **타입 변경 있음**: `ReasonCode.STOP_UNCONFIRMED(407)` 추가, `RobotStatus`에 SLIDE 누름 목표 6개 추가). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
@@ -29,7 +29,7 @@
 ### 2.1 Topic
 | 이름 | 타입 | 발행 | 구독 | QoS | 의미 |
 |---|---|---|---|---|---|
-| `/robot/sample` | `RobotSample` | robot_manager | contact_detector · safety_monitor · mqtt_bridge · **scan_manager [v0.1.17]** | SENSOR | TCP pose + 외력 + 실행 중 동작. 50 Hz 설계 목표. scan_manager는 **마지막 유효 pose만** 들고 있다가 안전복귀(7.5 ①) · 재시작(7.6)의 첫 모션 목표를 만들 때 쓴다. 측정 · 판정에는 쓰지 않는다(그쪽은 `ExecuteMotion` Result의 pose가 계속 기준이다) |
+| `/robot/sample` | `RobotSample` | robot_manager | contact_detector · safety_monitor · mqtt_bridge · **scan_manager [v0.1.19]** | SENSOR | TCP pose + 외력 + 실행 중 동작. 50 Hz 설계 목표. scan_manager는 **마지막 유효 pose만** 들고 있다가 안전복귀(7.5 ①) · 재시작(7.6)의 첫 모션 목표를 만들 때 쓴다. 측정 · 판정에는 쓰지 않는다(그쪽은 `ExecuteMotion` Result의 pose가 계속 기준이다) |
 | `/robot/status` | `RobotStatus` | robot_manager | scan_manager · safety_monitor · mqtt_bridge | STATE | 연결 · 동작 · 오류 · 제어 상태. 정지 완료 확인의 근거. 변경 시 + 주기 |
 | `/contact/event` | `ContactEvent` | contact_detector · **robot_manager**(스텝 모드 SLIDE 의 EDGE 만, 7.2절 · v0.1.15) | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE 판정. 판정 확정 즉시 1회 |
 | `/scan/state` | `ScanState` | scan_manager | contact_detector · safety_monitor · mqtt_bridge | STATE | 단계 · 방향 · 진행 n/4. 변경 시 + 주기 |
@@ -98,7 +98,7 @@ uint8 operation                     # 실행 중인 goal 의 종류. 없으면 O
 - `motion_id` · `operation`은 **robot_manager가 자기가 실행 중인 goal의 값을 직접 찍는다.** goal을 수락한 시점부터 Result를 돌려줄 때까지 유지하고, 그 밖에는 `0` / `OP_NONE`이다.
 - 구독자는 `valid=false`이거나 `now − max(pose_stamp, force_stamp)`가 최신성 한계(`stale_age_ms` / `sample_stale_ms`)를 넘으면 그 샘플을 버린다.
 
-### 3.2 RobotStatus.msg **[v0.1 변경: `force_ctrl_active` · `motion_id` · `operation` 추가 / v0.1.17: SLIDE 누름 목표 6개 추가]**
+### 3.2 RobotStatus.msg **[v0.1 변경: `force_ctrl_active` · `motion_id` · `operation` 추가 / v0.1.19: SLIDE 누름 목표 6개 추가]**
 ```
 builtin_interfaces/Time stamp
 bool connected              # dsr_controller2 서비스 응답 가능
@@ -110,7 +110,7 @@ bool force_ctrl_active      # 힘 제어(set_desired_force) 켜짐
 uint32 motion_id            # 실행 중인 goal. 없으면 0
 uint8 operation             # RobotSample.OP_* 와 같은 값
 
-# SLIDE 의 누름 목표. 서로 다른 세 값을 섞지 않으려고 따로 싣는다 (v0.1.17)
+# SLIDE 의 누름 목표. 서로 다른 세 값을 섞지 않으려고 따로 싣는다 (v0.1.19)
 string slide_mode                 # 'force' = 순응 · 힘 제어(REL), 'step' = 위치 제어 스텝. 그 밖은 ''
 float64 slide_force_setpoint_n    # force 모드 설정 증분 힘(DR_FC_MOD_REL). step 모드 · 모름이면 NaN
 float64 slide_force_baseline_n    # 이번 SLIDE 를 시작한 시점의 기준 Fz. 모르면 NaN
@@ -122,9 +122,9 @@ string detail
 ```
 - 모든 종료 경로(정상 · 취소 · 정지 · 예외)에서 `compliance_active`와 `force_ctrl_active`가 **둘 다 false**로 돌아가야 한다(BRD 4.5.2).
 - `moving`의 근거(드라이버 상태 필드 vs 속도 0)는 TBD(실PC 확인).
-- **누름 힘 세 값의 구분 [v0.1.17].** `slide_target_force_n`은 `DR_FC_MOD_REL`이라 "설정한 증분"이지 실제 누름이 아니다. 그래서 `force` 모드에서는 세 값을 **각각** 싣는다: ① `slide_force_setpoint_n`(설정 증분) ② `slide_force_baseline_n`(SLIDE 를 시작한 시점의 기준 Fz) ③ `slide_force_estimate_n`(① + ②, **추정**). ③을 실측으로 표시하면 안 된다 — 힘 제어 중의 조회 Fz는 참고값이다. 모르는 값은 0이 아니라 NaN이다(1장).
+- **누름 힘 세 값의 구분 [v0.1.19].** `slide_target_force_n`은 `DR_FC_MOD_REL`이라 "설정한 증분"이지 실제 누름이 아니다. 그래서 `force` 모드에서는 세 값을 **각각** 싣는다: ① `slide_force_setpoint_n`(설정 증분) ② `slide_force_baseline_n`(SLIDE 를 시작한 시점의 기준 Fz) ③ `slide_force_estimate_n`(① + ②, **추정**). ③을 실측으로 표시하면 안 된다 — 힘 제어 중의 조회 Fz는 참고값이다. 모르는 값은 0이 아니라 NaN이다(1장).
 - **`step` 모드에서는 ①②③이 전부 NaN이다.** 스텝 모드는 REL 힘 제어를 켜지 않으므로 그 세 값은 제어 목표가 아니다. 대신 목표 누름 띠를 `step_press_lo_n` · `step_press_hi_n`으로 싣는다(7.2절). `slide_mode`가 어느 쪽인지 말해 준다.
-- **채워지는 시점이 값마다 다르다 [v0.1.17].** `slide_mode` · `slide_force_setpoint_n`(force) · `step_press_lo_n` · `step_press_hi_n`(step)은 **SLIDE 가 아닐 때도 지금 설정을 싣는다** — 파라미터에서 바로 읽는 값이라 대기 중에도 "지금 이렇게 눌리도록 설정돼 있다"를 보여 준다. `slide_force_baseline_n` · `slide_force_estimate_n` **둘만** 그 SLIDE 가 도는 동안 채워진다 — 기준 Fz 는 SLIDE 가 시작돼야 잡히고, 추정 합은 그 기준이 있어야 나온다. 기준을 모르면 합도 내지 않는다(둘 다 NaN).
+- **채워지는 시점이 값마다 다르다 [v0.1.19].** `slide_mode` · `slide_force_setpoint_n`(force) · `step_press_lo_n` · `step_press_hi_n`(step)은 **SLIDE 가 아닐 때도 지금 설정을 싣는다** — 파라미터에서 바로 읽는 값이라 대기 중에도 "지금 이렇게 눌리도록 설정돼 있다"를 보여 준다. `slide_force_baseline_n` · `slide_force_estimate_n` **둘만** 그 SLIDE 가 도는 동안 채워진다 — 기준 Fz 는 SLIDE 가 시작돼야 잡히고, 추정 합은 그 기준이 있어야 나온다. 기준을 모르면 합도 내지 않는다(둘 다 NaN).
 
 ### 3.3 ContactEvent.msg **[v0.1 변경: `source` · `debounce_count` 추가, 무효 `z_drop_m`은 NaN]**
 ```
@@ -175,7 +175,7 @@ uint8 debounce_count        # 판정을 확정한 연속 횟수
 - **측정 좌표는 `debounce_n`을 바꿔도 움직이지 않는다.** 확정 샘플의 좌표를 쓰면 디바운스 동안 더 움직인 만큼 측정값이 밀린다(50 Hz · 5 mm/s · N=3 이면 0.2 mm, N=5 면 0.4 mm. **계산값이고 실측이 아니다**). 그렇게 두면 `debounce_n` 하나가 오검출 억제와 측정 편향을 같이 바꾸어, 디바운스를 튜닝할 때마다 편향 보정 상수를 다시 재야 한다.
 - CONTACT · EDGE · OVER_FORCE에 같은 정의를 쓴다.
 
-**디바운스가 실제로 세는 것 [v0.1.17, C-7]** — `debounce_n`은 **연속 샘플 수**이지 독립된 측정 횟수가 아니다. 혼동하지 않게 사실을 적어 둔다.
+**디바운스가 실제로 세는 것 [v0.1.19, C-7]** — `debounce_n`은 **연속 샘플 수**이지 독립된 측정 횟수가 아니다. 혼동하지 않게 사실을 적어 둔다.
 - `get_tool_force`의 값은 약 10 Hz(약 94 ms)로만 갱신된다(`docs/env/api-check-log.md`). robot_manager는 그보다 빠르게(설정 50 Hz, 실기 실측 약 43 Hz) 조회해 발행하므로, **소비 측은 같은 값을 여러 샘플 연속으로 받는다.**
 - 그래서 현행 `debounce_n = 3`은 사실상 "측정 1회 + 약 44 ms 대기"다. 잡음을 거르는 효과는 크지 않고 판정이 그만큼 늦는다.
 - 그래도 **현행을 유지한다**(팀 결정 2026-09-22, 결정 9). 실기에서 이 값으로 검증된 기록이 있고, 바꾸면 임계 · 편향 보정을 다시 재야 한다.
@@ -459,7 +459,7 @@ geometry_msgs/Pose pose
 string frame_id
 ```
 - 모션 진행 중에는 거절한다. 먼저 `/scan/stop`.
-- **경로는 7.5절이다 [v0.1.17]**: 위치 확인 → 손상 의심 확인 → 수직 올림 → 도착 확인 → `OP_HOME`. 위치를 모르거나 올림이 실패하면 HOME 을 보내지 않고 `NOT_SUPPORTED(107)`로 끝낸다(사람이 펜던트로 조그한다).
+- **경로는 7.5절이다 [v0.1.19]**: 위치 확인 → 손상 의심 확인 → 수직 올림 → 도착 확인 → `OP_HOME`. 위치를 모르거나 올림이 실패하면 HOME 을 보내지 않고 `NOT_SUPPORTED(107)`로 끝낸다(사람이 펜던트로 조그한다).
 - 안전 래치는 이 명령을 막지 않는다. `/robot/status` 끊김은 막는다(끊긴 로봇으로는 복귀 모션 자체가 불가능하다).
 
 ### 5.3 Resume.action
@@ -478,7 +478,7 @@ ScanState state
 - 기존 측정값을 유지하고 중단 방향부터 잇는다. `scan_id`를 유지한다(새 작업 아님).
 - 거절: `NO_RESUMABLE_SCAN` · `SAFETY_LATCHED` · `BUSY` · `ROBOT_DISCONNECTED` · `NOT_SUPPORTED`.
 - **홈 안전복귀를 거친 뒤의 재접근 절차는 TBD**(BRD 6장). 확정 전까지 그 경우는 `NOT_SUPPORTED`로 거절한다. v0.1의 재시작은 "중지한 위치에서 재개"만 지원한다.
-- **`ERROR`로 끝난 작업의 재시작 [v0.1.17, 9장]**: 실패 사유가 허용 목록(`SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)`)에 있을 때만 받는다. 그 밖의 사유(`OVER_FORCE` · `DROP_LIMIT` · 알 수 없는 오류 · 목록에 없는 새 사유)는 `NOT_SUPPORTED`로 거절하고, 안전 점검 뒤 **새 START** 만 가능하다. 사람이 먼저 `/safety/reset`을 해야 하며(자동 재개 없음), 래치 · 상태 최신성 관문은 그대로 본다.
+- **`ERROR`로 끝난 작업의 재시작 [v0.1.19, 9장]**: 실패 사유가 허용 목록(`SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)`)에 있을 때만 받는다. 그 밖의 사유(`OVER_FORCE` · `DROP_LIMIT` · 알 수 없는 오류 · 목록에 없는 새 사유)는 `NOT_SUPPORTED`로 거절하고, 안전 점검 뒤 **새 START** 만 가능하다. 사람이 먼저 `/safety/reset`을 해야 하며(자동 재개 없음), 래치 · 상태 최신성 관문은 그대로 본다.
 
 ### 5.4 ExecuteMotion.action **[v0.1 변경: `OP_*` 번호 · `OP_HOME` 용도]**
 ```
@@ -576,7 +576,7 @@ builtin_interfaces/Duration elapsed
 | | 404 | `ROBOT_STATUS_LOST` | 로봇 상태 미수신 |
 | | 405 | `HB_EXPIRED` | 웹 heartbeat 만료 |
 | | 406 | `CONDITION_ACTIVE` | 래치 해제 요청 시 조건이 아직 참 |
-| | 407 | `STOP_UNCONFIRMED` | 정지를 요청했지만 완료(`connected && !moving`)를 확인하지 못함 **[v0.1.17 추가]** |
+| | 407 | `STOP_UNCONFIRMED` | 정지를 요청했지만 완료(`connected && !moving`)를 확인하지 못함 **[v0.1.19 추가]** |
 | 5xx 형상 | 500 | `INVALID_SHAPE` | 폭 0 이하 · 높이 음수 |
 | | 501 | `INSUFFICIENT_POINTS` | 5점 미확보 |
 
@@ -672,7 +672,7 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 | ② 접촉 · 엣지 · 과대 외력 판정 | `/contact/event` → robot_manager 자체 정지 | 없음 | `ExecuteMotion.Result` + `/robot/status` |
 | ③ 안전 이상 | safety_monitor → `/robot/stop` (웹 경유 없음) | `StopRobot.accepted` | `/robot/status` → `SafetyStatus.stop_confirmed` |
 
-**정지 KPI 두 가지 [v0.1.17].** 하나로 묶지 않는다. 접촉 중에는 43 N/mm × 3 mm/s = 약 129 N/s라 3 N에서 탐침이 밀리는 43 N까지 **0.31 s**다. 그래서 물리 정지에 3 s를 허용하는 표현은 두지 않는다.
+**정지 KPI 두 가지 [v0.1.19].** 하나로 묶지 않는다. 접촉 중에는 43 N/mm × 3 mm/s = 약 129 N/s라 3 N에서 탐침이 밀리는 43 N까지 **0.31 s**다. 그래서 물리 정지에 3 s를 허용하는 표현은 두지 않는다.
 
 | KPI | 재는 구간 | 목표 | 재는 법 |
 |---|---|---|---|
@@ -685,11 +685,11 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 | 대상 | 1차 | 2차 |
 |---|---|---|
 | 과대 외력 `over_force_n` | contact_detector `TYPE_OVER_FORCE` → robot_manager 즉시 정지 | safety_monitor 독립 감시 → `/robot/stop` + 래치 |
-| 하강 제한 `drop_limit_m` **[v0.1 변경 / v0.1.17 여유]** | robot_manager가 SLIDE 안에서 즉시 정지 · 순응 해제. 기준 z = `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**. 한계 = `drop_limit_m`. `REASON_ROBOT_ERROR` + `DROP_LIMIT(205)` | safety_monitor가 **같은 기준 z**로 감시. 한계 = `drop_limit_m + drop_limit_margin_m` → `/robot/stop` + 래치 |
+| 하강 제한 `drop_limit_m` **[v0.1 변경 / v0.1.19 여유]** | robot_manager가 SLIDE 안에서 즉시 정지 · 순응 해제. 기준 z = `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**. 한계 = `drop_limit_m`. `REASON_ROBOT_ERROR` + `DROP_LIMIT(205)` | safety_monitor가 **같은 기준 z**로 감시. 한계 = `drop_limit_m + drop_limit_margin_m` → `/robot/stop` + 래치 |
 
 **기준 z는 두 감시가 같아야 한다.** 기준이 다르면 여유가 의미를 잃는다. 실기에서 순응 제어를 켜면 z가 약 0.7 mm 올라오므로, "실행 직전의 마지막 위치"와 "SLIDE 첫 샘플"은 같은 값이 아니다. robot_manager는 **자기가 `operation = OP_SLIDE`로 발행한 첫 유효 샘플의 z**를 기준으로 잡는다 — safety_monitor가 잡는 것과 같은 메시지의 같은 값이다. 그 샘플이 오기 전에는 실행 직전의 마지막 위치를 임시 기준으로 쓴다(감시를 끄지 않는다).
 
-**여유(`drop_limit_margin_m`) [v0.1.17].** 이전 규칙은 "값도 기준도 같게"였다. 그러면 잡음 한 샘플로도 2차가 먼저 걸려 **1차가 정상 동작인데 래치부터 걸린다**(#53). 그래서 2차만 여유만큼 뒤로 둔다.
+**여유(`drop_limit_margin_m`) [v0.1.19].** 이전 규칙은 "값도 기준도 같게"였다. 그러면 잡음 한 샘플로도 2차가 먼저 걸려 **1차가 정상 동작인데 래치부터 걸린다**(#53). 그래서 2차만 여유만큼 뒤로 둔다.
 - `drop_limit_m`은 **여전히 두 노드가 같은 값**이다(6.4절의 쌍 검사와 `SetConfig` P03 전파는 그대로다). 여유는 safety_monitor 전용 파라미터이며 **계약 이름이 아니고 `ScanConfig`에도 없다.** 그래서 `SetConfig`로 두 노드의 `drop_limit_m`을 같은 값으로 다시 덮어도 여유는 사라지지 않는다.
 - 역할: 1차 = 정상 동작의 제한(넘으면 그 SLIDE 를 실패로 끝낸다). 2차 = 1차가 막지 못했을 때의 최후 방어선(정지 + 래치).
 - 경계는 **초과**다. 정확히 한계값이면 걸리지 않는다(1차 `drop > drop_limit_m`, 2차 `drop > drop_limit_m + drop_limit_margin_m`).
@@ -700,7 +700,7 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 **SLIDE 스텝 모드 [v0.1.15].** robot_manager 파라미터 `slide_mode`(계약 이름 아님)가 `step`이면 `OP_SLIDE`는 순응 · 힘 제어를 켜지 않고 **위치 제어로 한 스텝(`step_coarse_m`) 가고 멈춘 뒤** 외력을 여러 샘플 평균내 판단한다. 누르는 힘 ΔFz를 `[step_follow_lo_n, step_follow_hi_n]`으로 유지하도록 z를 `step_z_m`씩 조절하고, 힘이 빠지면 최근 접촉 높이보다 `step_drop_m` 아래까지 내려가 본 뒤에도 `step_follow_lo_n` 미만일 때만 접촉 소실로 본다(`step_release_n`은 처음 누를 때의 닿음 기준. 모서리를 넘은 팁이 모서리 각에 걸려 남기는 1~2 N이 이 값을 넘나들기 때문). 최근 접촉 높이는 `step_follow_lo_n` 이상으로 누른 자리만으로 정한다. 그 뒤 `step_fine_m` 스텝으로 다시 긁어 모서리를 다듬는다(9/17 tactile_probe 프로토타입).
 - **EDGE는 robot_manager가 확정한다.** `/contact/event`에 `TYPE_EDGE`를 낸다: `source = "robot_step"`, `event_id`는 contact_detector와 겹치지 않도록 2³² 이상, `pose.position` = (소실 지점 x · y, 최근 접촉 높이 z), `z_drop_m` = 소실을 확인하려고 더 내려간 깊이(항상 `z_drop_valid = true`), `force_delta_n` = 소실 판정 순간의 |ΔF|, `debounce_count = 1`. 짝 맞추기(`Result.event_id`, 5.4절)와 scan_manager 절차는 그대로다.
 - 스텝 모드 SLIDE 중 contact_detector의 EDGE는 robot_manager가 정지에 쓰지 않는다. `OVER_FORCE`(1차 · 2차)와 하강 제한(기준 = SLIDE 첫 샘플 z)은 그대로 산다. `step_press_max_m + step_drop_m < drop_limit_m`이어야 한다.
-- **`step_max_force_n`(12 N)과 `over_force_n`(30 N)은 다른 것이다 [v0.1.17].** 12 N은 스텝 알고리즘이 "이 정도면 뭔가 잘못됐다"고 보고 **스스로 들고 중단**하는 보수적 운용 한계이며, robot_manager 안에서만 쓰는 로컬 보호다. 30 N은 contact_detector · safety_monitor의 전역 안전 정지 · 래치 한계다(6.4절의 쌍 검사 대상). 12 N을 30 N으로 올리지 않는다 — 올리면 스텝 모드의 자체 보호가 사라진다.
+- **`step_max_force_n`(12 N)과 `over_force_n`(30 N)은 다른 것이다 [v0.1.19].** 12 N은 스텝 알고리즘이 "이 정도면 뭔가 잘못됐다"고 보고 **스스로 들고 중단**하는 보수적 운용 한계이며, robot_manager 안에서만 쓰는 로컬 보호다. 30 N은 contact_detector · safety_monitor의 전역 안전 정지 · 래치 한계다(6.4절의 쌍 검사 대상). 12 N을 30 N으로 올리지 않는다 — 올리면 스텝 모드의 자체 보호가 사라진다.
 - 시작 자리에서 스스로 `step_press_max_m`까지 내려가 누르므로, 7.3절의 방향 전환 뒤 `recontact_margin_m` 위에서 출발해도 닿는다. 멈춘 상태에서 판정하므로 편향 보정(BRD 4.2.4)의 속도 × 지연 항은 0이어야 한다 — scan_manager가 `slide_speed_mps`를 편향 보정에 그대로 넘기는 것은 후속 이슈다.
 - 한 방향에 약 50~70 s(0.5 mm마다 멈춤). `motion_timeout_s`를 그만큼 둔다. Virtual에서는 외력이 0 근처라 돌릴 수 없다(sim은 `force`).
 
@@ -733,7 +733,7 @@ EDGE_SEARCH 4/4
 | 실패 · 중단으로 끝난 작업 | 자동 복귀하지 않는다 |
 | 결과 중복 | `/scan/result`(GEOMETRY 끝)와 `RunScan.Result.result`(DONE)는 같은 내용이다. mqtt_bridge가 **`(scan_id, stamp)`** 로 한 번만 반영한다. 재시작은 `scan_id`를 유지하므로(5.3절) 중단 시의 부분 결과와 재시작 뒤의 최종 결과가 같은 `scan_id`로 두 번 나간다. 키가 `scan_id`뿐이면 나중 결과가 버려진다. scan_manager는 발행할 때마다 `stamp`를 새로 찍는다 |
 
-### 7.5 안전복귀(`/scan/home`)의 경로 **[v0.1.17]**
+### 7.5 안전복귀(`/scan/home`)의 경로 **[v0.1.19]**
 관제자의 안전복귀는 **올림이 성공했을 때만** HOME 으로 간다. 이전에는 `OP_HOME` 하나만 보냈고, 2026-09-21 실기에서 **올림이 실패했는데 HOME 이 나간 사례가 2회** 있었다(#130). 탐침이 부재에 닿은 채 관절 복귀가 나가면 탐침 · 부재가 상한다.
 
 ```
@@ -751,14 +751,14 @@ EDGE_SEARCH 4/4
 | ④ 올림 실패 | 올림이 `TARGET_REACHED`가 아님(정지 · 시간 초과 · 오류) | 그 사유로 끝낸다. **HOME 을 보내지 않는다** |
 
 - 올림도 HOME 과 같이 **안전 래치를 보지 않는다**(래치 때문에 돌아오지 못하면 안 된다). ②가 보는 것은 래치가 걸렸다는 사실이 아니라 **래치의 사유**다. 사유가 손상 의심 셋이 아니면 래치 중이어도 복귀한다.
-- **요청하지 않은 정지의 사유는 `Result.reason_code`에서 읽는다 [v0.1.17].** safety_monitor 는 `/robot/stop`의 `reason`에 사유(205 · 400)를 싣고, robot_manager 는 그것을 `ExecuteMotion.Result.reason_code`로 돌려준다(사유가 없으면 `STOP_REQUESTED`). 판정은 `Result.reason_code` → `/safety/status`의 래치 사유 → `ROBOT_ERROR(204)` 순으로 본다. `/safety/status`의 도착 순서에 기대면 사유가 204 로 뭉개지고, 래치에만 기대면 사람이 먼저 `/safety/reset`을 누른 순간 같은 일이 생긴다.
+- **요청하지 않은 정지의 사유는 `Result.reason_code`에서 읽는다 [v0.1.19].** safety_monitor 는 `/robot/stop`의 `reason`에 사유(205 · 400)를 싣고, robot_manager 는 그것을 `ExecuteMotion.Result.reason_code`로 돌려준다(사유가 없으면 `STOP_REQUESTED`). 판정은 `Result.reason_code` → `/safety/status`의 래치 사유 → `ROBOT_ERROR(204)` 순으로 본다. `/safety/status`의 도착 순서에 기대면 사유가 204 로 뭉개지고, 래치에만 기대면 사람이 먼저 `/safety/reset`을 누른 순간 같은 일이 생긴다.
 - 올림의 자세는 지금 자세를 그대로 목표로 준다. `search_origin_pose`(TBD일 수 있다)에 기대지 않는다.
 - 멈춘 경우 `ScanLog` · `ReturnHome.Result.detail`에 사유를 남긴다. **자동으로 다른 명령을 부르지 않는다.**
 - 스캔 마무리 복귀(위 7.4)는 이 절차가 아니다. 그쪽은 측정이 끝난 뒤 자기 정지 좌표로 올린다.
 - `step` 모드 SLIDE 안의 1 mm 들기(`step_lift_m`)도 이 절차가 아니다. 그것은 한 스텝 안의 동작이다.
 - **J6 −204.84°의 실제 회전 방향은 실기에서 사람이 확인한다**(아직 확인되지 않았다).
 
-### 7.6 재시작(`/scan/resume`)의 첫 모션 **[v0.1.17]**
+### 7.6 재시작(`/scan/resume`)의 첫 모션 **[v0.1.19]**
 재시작의 첫 모션은 **지금 TCP 가 어디 있는지를 알고 나서** 보낸다. 기록된 중단 좌표를 목표로 쓰지 않는다.
 
 `OP_MOVE_TO`는 절대 좌표다. 중단 뒤에 사람이 펜던트로 옮겼거나, 애초에 정지를 확인하지 못했다면(`STOP_UNCONFIRMED(407)`) 기록 좌표는 지금 위치가 아니다. 그 좌표를 목표로 주면 **낮은 높이에서 기록 좌표로 되돌아가는 수평 이동**이 된다.
@@ -796,8 +796,8 @@ T01 회의에서 **담당 · 기한 없이 TBD로 두기로** 했다. 정해지�
   safety_monitor의 `stop_confirmed` 시점이 같이 바뀐다. 값을 고칠 때는 전원에게 알린다.**
 - 순응 · 힘 제어 **해제 호출이 실패했을 때** 무엇을 보고하는가(`ExecuteMotion.Result.compliance_released` · `reason_code` · `RobotStatus`의 두 플래그). 5.4절의 "항상 true 여야 한다"는 목표이며 실패 경로는 정해지지 않았다
 - 정지 시 `move_stop` → 순응 · 힘 제어 해제의 순서(4.1절). 순응이 켜진 채 급정지할 때의 반동을 실기에서 확인한 뒤 확정한다
-- ~~홈 복귀 경로 · 순서~~ → **7.5절에서 정했다**(v0.1.17, 결정 7): 위치 확인 → 손상 의심 확인 → 수직 올림 → 도착 확인 → HOME. 중단 위치 재접근 절차는 여전히 TBD다
-- ~~이상 상태별 재시작 허용 조건~~ → **아래에서 정했다**(v0.1.17, 결정 1). `ERROR`로 끝난 작업은 **허용 목록에 있는 사유일 때만** `/safety/reset` 뒤 `/scan/resume`을 받는다.
+- ~~홈 복귀 경로 · 순서~~ → **7.5절에서 정했다**(v0.1.19, 결정 7): 위치 확인 → 손상 의심 확인 → 수직 올림 → 도착 확인 → HOME. 중단 위치 재접근 절차는 여전히 TBD다
+- ~~이상 상태별 재시작 허용 조건~~ → **아래에서 정했다**(v0.1.19, 결정 1). `ERROR`로 끝난 작업은 **허용 목록에 있는 사유일 때만** `/safety/reset` 뒤 `/scan/resume`을 받는다.
   - 허용: `SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)`. 셋 다 **측정값이 오염되지 않는** 사유다
   - 불허: `OVER_FORCE(400)` · `DROP_LIMIT(205)` · 충돌 · 탐침 · 부재 손상 가능성 · 알 수 없는 오류 · **목록에 없는 새 사유**. 안전 점검 · 복귀 뒤 **새 START** 만 가능하다(`NOT_SUPPORTED(107)`)
   - **자동 재개는 없다.** 사람이 `/safety/reset`을 하고 `/scan/resume`을 보내야 한다. 안전 조건이 아직 참이면 reset 이 거절되고(`CONDITION_ACTIVE(406)`), 래치가 남아 있으면 resume 도 거절된다(`SAFETY_LATCHED(103)`)
