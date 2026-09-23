@@ -228,6 +228,10 @@ class Motion:
         self.start_position = None
         self.start_z = None
         self.moved = False              # 한 번이라도 움직였는가 (도착 판정용)
+        self.sent_s = None              # 이동 명령 응답을 받은 시각. 도착 유예(arrival_grace_s)는 여기서부터 잰다
+        self.restarts = 0               # SLIDE 옆 이동 명령을 다시 보낸 횟수 (#153)
+        self.moving_now = True          # 감시 루프가 방금 위치로 본 "지금 움직이는가". 모르면 True
+        self.force_released_s = None    # 정지하며 힘 제어를 먼저 푼 시각. release_all 이 순응 해제 전 남은 램프만 기다린다
         self.compliance_on = False
         self.force_on = False
         self.event = None               # 정지 사유가 된 ContactEvent
@@ -250,6 +254,7 @@ class RobotManager(Node):
         # (2026-09-20 확인, docs/env/api-check-log.md). 그래서 위치 변화로 본다.
         self.declare_parameter('moving_eps_m', 0.0002)
         self.declare_parameter('moving_window_s', 0.3)
+        self.declare_parameter('moved_min_m', 0.001)
         # 계약 이름 (ros-interfaces.md 6.4). 값은 contact_scan_bringup/config/*.yaml 에 둔다
         # 아래 셋은 기본값을 두지 않는다. yaml 에 없으면 기동하지 않는다 (CLAUDE.md 규칙 7,
         # 현지 리뷰 PR #73). 특히 drop_limit_m 은 계약 7.2 가 safety_monitor 와 같은 값을
@@ -268,6 +273,7 @@ class RobotManager(Node):
         self.declare_parameter('feedback_period_s', 0.1)
         # 명령 후 이 시간 안에 움직이기 시작하지 않으면 도착으로 본다 (병후 리뷰, PR #73)
         self.declare_parameter('arrival_grace_s', 1.0)
+        self.declare_parameter('move_restart_max', 1)
         # OP_MOVE_TO 도착 판정 허용치. 멈춘 것과 도착한 것은 다르다 (병후 리뷰, PR #73)
         self.declare_parameter('arrival_tolerance_m', Parameter.Type.DOUBLE)
         # release_force 의 전환 시간. 0 이면 즉시 전환이라 해제 순간 참조 외력이 점프한다
@@ -284,6 +290,7 @@ class RobotManager(Node):
         self.service_timeout_s = float(self.get_parameter('service_timeout_s').value)
         self.moving_eps_m = float(self.get_parameter('moving_eps_m').value)
         self.moving_window_s = float(self.get_parameter('moving_window_s').value)
+        self.moved_min_m = float(self.get_parameter('moved_min_m').value)
         sample_hz = float(self.get_parameter('sample_rate_hz').value)
         status_hz = float(self.get_parameter('status_rate_hz').value)
         if sample_hz <= 0.0 or status_hz <= 0.0:
@@ -674,6 +681,7 @@ class RobotManager(Node):
                     '순응 · 힘 제어를 켜지 못했다')
         if not self.send_move(motion):
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, '이동 명령 실패')
+        motion.sent_s = self.now_s()
         return self.watch(goal_handle, motion)
 
     def send_move(self, motion):
@@ -751,14 +759,26 @@ class RobotManager(Node):
             now = self.now_s()
             elapsed = now - motion.started_s
             position = self.last_pose[2] if self.last_pose else None
-            if self.moving:
+            # "움직였는가"와 "지금 움직이는가"를 같은 순간의 위치 목록 하나로 본다.
+            # - 움직였는가: 위치로 확인된 이동만. self.moving 은 모르면 True 라 샘플 공백 한 번이 "움직였다"로
+            #   남고 출발 전에 도착으로 판정된다 (9/22 실기 728 · 732 · 847 · 943)
+            # - 지금 움직이는가: 상태 타이머가 갱신한 self.moving 은 최대 한 주기 늦다. 출발 순간 위치로는
+            #   이미 움직였는데 self.moving 은 아직 False 라 "움직였다 + 멈췄다 = 도착"이 된다 (9/22 1061 · 1062)
+            points = deque(self.positions)   # 샘플 콜백이 덧붙이는 중에도 한 번에 복사한다
+            motion_state.trim(points, now, self.moving_window_s)
+            motion.moving_now = motion_state.is_moving(points, self.moving_eps_m, self.moving_window_s)
+            # - 움직였다는 것은 동작 방향으로 moved_min_m 넘게 간 것이다. SLIDE 는 힘 제어를 켜는 동안 z 로
+            #   0.3~0.5 mm 움직이는데, 옆 이동 명령이 늦으면 그 사이 멈춘 순간이 도착이 된다 (9/22 1083)
+            travel = (motions.lateral_m if goal.operation == RobotSample.OP_SLIDE
+                      else motions.travelled_m)(motion.start_position, position)
+            if motion_state.has_moved(points, self.moving_eps_m) and travel > self.moved_min_m:
                 motion.moved = True
             if now >= next_feedback:
                 next_feedback = now + feedback_period
                 self.publish_feedback(goal_handle, motion, elapsed)
 
             if goal_handle.is_cancel_requested:
-                stopped, why = self.stop_robot('Action 취소')
+                stopped, why = self.stop_robot('Action 취소', motion)
                 if not stopped:   # 취소를 접수했다고 멈춘 것이 아니다 (병후 리뷰, PR #73)
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'Action 취소. {why}')
@@ -766,7 +786,7 @@ class RobotManager(Node):
             request = self.take_stop_request()
             if request is not None:
                 reason_code, detail = request
-                stopped, why = self.stop_robot(f'정지 요청 ({detail})')
+                stopped, why = self.stop_robot(f'정지 요청 ({detail})', motion)
                 if not stopped:   # 접수했다고 멈춘 것이 아니다 (계약 4.1)
                     # 확인 못 했으니 되돌려 놓는다. 동작 없음 경로(stop_idle)와 같은 약속이다:
                     # 멈췄는지 모르는 로봇에 다음 goal 을 보내지 않는다 (#113). 안전복귀(OP_HOME)만은
@@ -781,12 +801,12 @@ class RobotManager(Node):
                 return self.stop_for_event(motion)
             if goal.operation == RobotSample.OP_SLIDE and motions.drop_exceeded(
                     motion.start_z, position[2] if position else None, drop_limit):
-                stopped, why = self.stop_robot('하강 제한 초과')
+                stopped, why = self.stop_robot('하강 제한 초과', motion)
                 return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.DROP_LIMIT,
                         f'SLIDE 하강 제한 {drop_limit} m 초과'
                         + ('' if stopped else f'. {why}'))
             if elapsed > timeout_s:
-                stopped, why = self.stop_robot('제한 시간 초과')
+                stopped, why = self.stop_robot('제한 시간 초과', motion)
                 if not stopped:
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'{timeout_s:.1f} s 안에 끝나지 않았다. {why}')
@@ -795,7 +815,23 @@ class RobotManager(Node):
             if not self.connected:
                 return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_DISCONNECTED,
                         '로봇 연결이 끊겼다')
-            if self.arrived(motion, elapsed):
+            # 유예는 수락이 아니라 이동 명령을 보낸 뒤부터 잰다. 수락 → 실행 대기 · 힘 제어 켜기 · move 서비스
+            # 응답에 1 s 넘게 걸리면 로봇이 출발하기도 전에 유예가 끝나 도착으로 판정된다
+            # (9/22 실기 1022: 감시 시작 0.26 s 만에 "접촉 없음", 로봇은 그 0.02 s 뒤 출발해 감시 없이 하강)
+            since_sent = now - (motion.sent_s or motion.started_s)
+            # 유예가 지나도록 출발하지 않았으면 도착이 아니라 "명령이 실행되지 않았다"다.
+            # 드라이버가 amovel 을 실행하지 않는 일이 있다.
+            #  - SLIDE: 힘 제어를 켠 뒤 보낸 명령이 9/22 실기 32 회 중 8 회 실행되지 않았다 (#153)
+            #  - MOVE_TO: 9/23 실기 12:52, 모서리 뒤 올림(50 mm)이 86 ms 만에 끝나고 한 걸음도 가지 않았다.
+            #    도착 허용치(arrival_tolerance_m) 검사가 잡아 ROBOT_ERROR 로 끝났지만, 다시 보내면 이어갈 수 있다
+            if (not motion.moved and not self.moving and not motion.moving_now
+                    and since_sent > float(self.param('arrival_grace_s'))
+                    and self.not_started(motion)):
+                failed = self.restart_move(motion)
+                if failed is not None:
+                    return failed
+                continue
+            if self.arrived(motion, since_sent):
                 return self.finished_without_event(motion)
 
     def step_params(self, goal):
@@ -869,6 +905,50 @@ class RobotManager(Node):
         self.event_pub.publish(event)
         return event
 
+
+    def not_started(self, motion):
+        """다시 보낼 만한 "출발하지 않음"인가.
+
+        MOVE_TO 는 목표에 이미 닿아 있으면(0 mm 이동 명령) 움직이지 않는 것이 정상이다.
+        그래서 아직 허용치 밖에 있을 때만 "출발하지 않았다"로 본다. 위치를 모르면 다시 보내지 않는다
+        (모르는 상태에서 이동 명령을 또 보내지 않는다).
+        SLIDE 는 목표 자세가 없으므로 그대로 본다.
+        """
+        op = motion.goal.operation
+        if op == RobotSample.OP_SLIDE:
+            return True
+        if op != RobotSample.OP_MOVE_TO:
+            return False
+        gap = self.distance_to_target(motion)
+        return gap is not None and gap > float(self.param('arrival_tolerance_m'))
+
+    def restart_move(self, motion):
+        """출발하지 않은 이동 명령을 다시 보낸다. 다시 보냈으면 None, 끝내야 하면 결과.
+
+        먼저 move_stop 으로 남은 명령을 비운다. 첫 명령이 늦게 출발하면 두 명령이 겹쳐 두 번 갈 수 있다.
+        순응 · 힘 제어는 켠 채 둔다(윗면을 누르고 있어야 한다). 해제는 기존대로 finally 의 release_all 이 한다.
+        """
+        limit = int(self.param('move_restart_max'))
+        what = '밀기' if motion.goal.operation == RobotSample.OP_SLIDE else '이동'
+        if motion.restarts >= limit:
+            stopped, why = self.stop_robot(f'{what} 출발 실패', motion)
+            detail = (f'{what}가 출발하지 않았다: 이동 명령 {motion.restarts + 1} 번 모두 '
+                      f'{self.param("arrival_grace_s")} s 안에 움직이지 않았다')
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    detail + ('' if stopped else f'. {why}'))
+        motion.restarts += 1
+        self.get_logger().warning(
+            f'{what}가 {self.param("arrival_grace_s")} s 안에 출발하지 않았다. '
+            f'이동 명령을 다시 보낸다 ({motion.restarts}/{limit})')
+        if not self.call_sync(self.srv_clients['move_stop'], dsr_client.move_stop_request(), 'move_stop'):
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    f'{what} 재출발 전 move_stop 응답 없음')
+        if not self.send_move(motion):
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    f'{what} 재출발 이동 명령 실패')
+        motion.sent_s = self.now_s()
+        return None
+
     def arrived(self, motion, elapsed):
         """로봇이 멈췄으면 명령한 만큼 갔다고 본다.
 
@@ -878,7 +958,7 @@ class RobotManager(Node):
         **멈춘 것과 도착한 것은 다르다.** 여기서는 "멈췄다"만 판정하고, 목표에 실제로
         닿았는지는 `finished_without_event`가 본다 (병후 리뷰, PR #73).
         """
-        if self.moving:
+        if self.moving or motion.moving_now:   # 어느 한쪽이라도 움직인다면 기다린다
             return False
         return motion.moved or elapsed > float(self.param('arrival_grace_s'))
 
@@ -916,14 +996,14 @@ class RobotManager(Node):
     def stop_for_event(self, motion):
         event = motion.event
         if event.type == ContactEvent.TYPE_OVER_FORCE:
-            stopped, why = self.stop_robot('과대 외력')
+            stopped, why = self.stop_robot('과대 외력', motion)
             if not stopped:
                 return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                         f'과대 외력 {event.force_delta_n:.2f} N. {why}')
             return (ExecuteMotion.Result.REASON_OVER_FORCE, ReasonCode.OVER_FORCE,
                     f'과대 외력 {event.force_delta_n:.2f} N')
         stopped, why = self.stop_robot(
-            '접촉' if event.type == ContactEvent.TYPE_CONTACT else '접촉 소실')
+            '접촉' if event.type == ContactEvent.TYPE_CONTACT else '접촉 소실', motion)
         if not stopped:
             # 정지를 확인하지 못했는데 정상 코드로 돌려주면 scan_manager 는 STOPPED 로 가고
             # 로봇은 아직 움직인다. 계약 4.1 의 "접수와 정지 완료는 다르다" (병후 리뷰, PR #73)
@@ -1013,7 +1093,7 @@ class RobotManager(Node):
         if stopped:
             self.clear_stop_request(entry)
 
-    def stop_robot(self, why):
+    def stop_robot(self, why, motion=None):
         """move_stop 뒤 실제로 멈출 때까지 기다린다. 접수와 정지 완료는 다르다(계약 4.1).
 
         `(정지 확인됨, 사유)`를 돌려준다. 확인하지 못했으면 호출한 쪽이 결과를
@@ -1026,6 +1106,11 @@ class RobotManager(Node):
         self.get_logger().info(f'정지: {why}')
         accepted = self.call_sync(self.srv_clients['move_stop'], dsr_client.move_stop_request(),
                                   'move_stop')
+        # SLIDE 는 멈춤을 기다리기 전에 힘 제어부터 푼다. move_stop 은 옆 이동만 세우고, 힘 제어는 목표 힘을
+        # 채우려 계속 누른다. 모서리를 벗어난 뒤면 받칠 면이 없어 팁이 내려가고 멈춤이 확인되지 않는다
+        # (9/22 실기 1123: 옆 이동은 0.12 s 에 섰는데 z 가 2.5 mm/s 로 1.7 s 동안 2.8 mm 내려가 정지 확인 실패)
+        if motion is not None and motion.force_on:
+            self.release_force_early(motion)
         deadline = self.now_s() + float(self.param('stop_settle_s'))
         while self.moving and self.now_s() < deadline:
             time.sleep(LOOP_PERIOD_S)
@@ -1038,6 +1123,17 @@ class RobotManager(Node):
             detail = 'move_stop 응답은 없었으나 움직임은 멈췄다'
             self.get_logger().warn(detail)
         return True, ''  
+
+    def release_force_early(self, motion):
+        """정지 중에 힘 제어만 먼저 푼다. 순응은 release_all 이 램프가 끝난 뒤 푼다."""
+        ramp_s = float(self.param('release_force_time_s'))
+        if self.call_sync(self.srv_clients['force_off'], dsr_client.force_off_request(ramp_s),
+                          'release_force'):
+            motion.force_on = False
+            motion.force_released_s = self.now_s()
+            self.force_ctrl_active = False
+        else:
+            self.get_logger().error('정지 중 release_force 실패. release_all 에서 다시 부른다')
 
     def release_all(self, motion):
         """순응 · 힘 제어 해제. 모든 종료 경로에서 부른다(CLAUDE.md 규칙 2).
@@ -1062,6 +1158,11 @@ class RobotManager(Node):
             # 이 대기는 어떤 락도 잡지 않은 채 Action 스레드에서만 돈다. 샘플 타이머는 따로 돈다
             if motion.compliance_on:
                 time.sleep(ramp_s)
+        if motion is not None and motion.compliance_on and motion.force_released_s is not None:
+            # 정지하며 힘 제어를 먼저 풀었다. 램프가 아직 안 끝났으면 남은 만큼만 기다린다
+            left = float(self.param('release_force_time_s')) - (self.now_s() - motion.force_released_s)
+            if left > 0:
+                time.sleep(left)
         if motion is not None and motion.compliance_on:
             if self.call_sync(self.srv_clients['compliance_off'], dsr_client.compliance_off_request(),
                               'release_compliance_ctrl'):

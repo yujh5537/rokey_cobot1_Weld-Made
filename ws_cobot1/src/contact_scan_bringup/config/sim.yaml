@@ -132,6 +132,10 @@ robot_manager:
                                      #   다르다. 이 값을 넘으면 TARGET_REACHED 가 아니라
                                      #   ROBOT_ERROR 다. 출발값이고 실기에서 확정한다 (#73)
     arrival_grace_s: 1.0             # 명령 후 이 시간 안에 안 움직이면 도착으로 본다 [s]
+    move_restart_max: 1              # 이동 명령이 arrival_grace_s 안에 출발하지 않으면 move_stop 뒤 같은 명령을 다시 보내는 최대 횟수.
+                                     #   0 이면 끈다. SLIDE 와 MOVE_TO 에 쓴다(MOVE_TO 는 아직 도착 허용치 밖일 때만).
+                                     #   9/22 실기: 힘 제어를 켠 뒤 보낸 amovel 을 드라이버가 32 회 중 8 회 실행하지 않았다(#153).
+                                     #   9/23 실기 12:52: 모서리 뒤 올림(50 mm)이 86 ms 만에 끝나고 한 걸음도 가지 않아 통합 스캔이 중단됐다
     release_force_time_s: 0.3        # release_force 의 강성 제어 전환 시간 [s] (0~1.0).
                                      #   0 이면 즉시 전환이라 참조 외력이 점프한다
                                      #   (두산 매뉴얼 5.1.4 알아두기). 실기에서 확인한다
@@ -143,6 +147,8 @@ robot_manager:
     slow_call_warn_s: 0.15           # 이보다 늦은 두산 서비스 응답을 이름 · 시간과 함께 남긴다(#130). 0 이면 끈다
     moving_eps_m: 0.0002             # 이 창 안에서 이만큼 움직이면 이동 중
     moving_window_s: 0.3
+    moved_min_m: 0.001               # 동작 방향으로 이만큼 넘게 가야 "움직였다"(도착 판정용) [m]. SLIDE 는 x · y 만 본다.
+                                     #   힘 제어를 켤 때 z 0.3~0.5 mm 움직임을 출발로 보지 않는다(9/22 실기 1083)
     slide_mode: force                # sim 은 힘 제어 밀기를 유지한다. Virtual 의 외력은 0 근처라 스텝 모드(멈춰서 힘 읽기)를
                                      #   돌릴 수 없다. 스텝 모드는 순수 모듈 시험(test_step_slide.py)과 실기로 검증한다 (real.yaml)
 
