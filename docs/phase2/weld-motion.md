@@ -71,8 +71,8 @@ weave_amplitude_m == 0 또는 weave_pitch_m == 0 → [S + o, E' + o] 두 점 (�
 ```
 
 - w 는 t̂ 와 d 에 모두 수직이라 "진행 방향과 수직으로, 두 면을 가로질러" 흔든다.
-- 출발값 진폭 2 mm · 반주기 4 mm → 80 mm 선에 경유점 21 개, 경로 길이는 직선의 약 1.38 배(110.8 mm). 10 mm/s 면 선당 약 11 s. 접근 · 후퇴 · goal 4 개를 더하면 **8 선 약 2.5 분, 경유점마다 멈추면 약 4 분**(현지 계산. 발표 시간표용. 스캔 약 7 분은 별도).
-- robot_manager 가 경유점을 `move_spline_task`(한 번 호출, 부드러움) 로 지나든 `move_line` 을 잇든(radius 로 blend) 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. 선택은 학민(D14 · D19). 오늘 실기 M4 에서 둘 중 되는 것을 본다.
+- 출발값 진폭 2 mm · 반주기 4 mm → 80 mm 선에 경유점 21 개(+ 후퇴점 1, 한도 100 안), 경로 길이는 직선의 약 1.38 배(110.8 mm). 10 mm/s 면 선당 약 11 s. 접근 · 후퇴 · goal 4 개를 더하면 **spline 8 선 약 2.5 분, line(점마다 정지) 약 4 분**(현지 계산. 발표 시간표용. 스캔 약 7 분은 별도).
+- robot_manager 가 경유점을 어떻게 지나는지는 `path_mode` 로 고른다(D31): **`line`(기본, 점마다 amovel + 도착 판정, 점마다 정지)** / **`spline`(`move_spline_task` 한 번, 실기 확인 뒤)**. 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. "`move_line` + radius 블렌딩"은 비동기에서 radius 가 버려져 없다(현지 소스 확인). 경유점은 한 선에 최대 100 개(spline 배열 한도).
 
 ## 5. 접근 · 후퇴 · 선 사이 이동
 
@@ -131,7 +131,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `state_publish_period_s` | 1.0 | /weld/state 주기 | |
 | `scan_state_timeout_s` | 5.0 | /scan/state 가 이보다 오래됐으면 시작 거절 | |
 
-robot_manager 쪽: `path_max_points`(출발값 200) · `path_max_speed_mps`(0.100, 넘으면 604) · **`path_min_z_m`**(Base z 하한, 경유점 하나라도 아래면 604. 출발값 0.100 = 작업대 0.095 + 테이프 0.002 + 여유 0.003) · `path_acc_ratio`(4.0, 단위 1/s: 가속 [mm/s²] = 이 값 × 속도 [mm/s], 1차 `move_line_request` 의 `acc = 4 × vel` 과 같음).
+robot_manager 쪽: `path_mode`(`line` | `spline`, 기본 `line`) · `path_max_points`(출발값 **100**, spline 배열 한도) · `path_max_speed_mps`(0.100, 넘으면 604) · **`path_min_z_m`**(Base z 하한, 경유점 하나라도 아래면 604. 출발값 0.100 = 작업대 0.095 + 테이프 0.002 + 여유 0.003) · `path_acc_ratio`(4.0, 단위 1/s: 가속 [mm/s²] = 이 값 × 속도 [mm/s], 1차 `move_line_request` 의 `acc = 4 × vel` 과 같음).
 
 ## 7. 오늘 실기에서 정해야 하는 것
 

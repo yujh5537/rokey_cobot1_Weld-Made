@@ -12,10 +12,10 @@ weld_manager 가 만든 경유점 목록(지그재그 위빙 포함)을 로봇�
 ## 계약 (확정)
 - `docs/phase2/weld-ros-interfaces.md` 5.2 `ExecutePath.action`, 2.1(`RobotSample.operation = OP_WELD_PATH(5)`), 2.2(`/robot/stop` requester `'weld_manager'`).
 - goal 거절 · 종료 사유 · 도착 판정 규칙은 5.2 절의 글머리표 그대로.
-- 파라미터(robot_manager): `path_max_points`(200) · `path_max_speed_mps`(0.100) · **`path_min_z_m`**(Base z 하한, 출발값 real 0.100 / sim 은 sim 박스 밑면 0.400 + 여유) · `path_acc_ratio`(4.0, 1/s). `real.yaml` · `sim.yaml` 에 주석과 함께. 순응 · 힘 제어 검사는 내부 플래그(안전망).
+- 파라미터(robot_manager): `path_mode`(line) · `path_max_points`(100) · `path_max_speed_mps`(0.100) · **`path_min_z_m`**(Base z 하한, 출발값 real 0.100 / sim 은 sim 박스 밑면 0.400 + 여유) · `path_acc_ratio`(4.0, 1/s). `real.yaml` · `sim.yaml` 에 주석과 함께. 순응 · 힘 제어 검사는 내부 플래그(안전망).
 
 ## 초기 설계 (출발점, 바꿔도 됨)
-- `dsr_client.py`: `move_spline_task_request(posx_list, speed_mps)` 추가(`MoveSplineTask`: `pos` 는 `Float64MultiArray[]`, `pos_cnt`, `vel/acc [mm/s, deg/s]`, `ref=DR_BASE`, `mode=ABS`, `opt=CONST(1)` 검토, `sync_type=ASYNC`). M4 에서 spline 이 안 되면 `move_line_request` 를 radius 로 잇는다(`radius` 인자 추가).
+- `path_mode` 파라미터(`line` | `spline`, 기본 `line`, D31). **`line`**: 점마다 기존 `move_line_request`(amovel) + 도착 판정 반복(점마다 정지). **`spline`**: `dsr_client.py` 에 `move_spline_task_request(posx_list, speed_mps)` 추가(`MoveSplineTask`: `pos` 는 `Float64MultiArray[]`, `pos_cnt` ≤ 100, `vel/acc [mm/s, deg/s]`, `ref=DR_BASE`, `mode=ABS`, `opt=CONST(1)` 검토, `sync_type=ASYNC`). **"`move_line` + radius" 는 쓰지 않는다**(ASYNC 에서 radius 가 버려진다. `dsr_controller2.cpp` 464행). **소스 확인에 그치지 말고 호출 확인까지**: Virtual 과 실기(#186 M4)에서 `move_spline_task` ASYNC 가 실제로 success 를 주고 이동하는지, `get_robot_state` 가 MOVING 을 유지하는지, `move_stop` 이 듣는지, 100 점 근처 · 초과에서 어떻게 되는지를 `docs/env/api-check-log.md` 에 적는다.
 - `motions.py`: `path_to_posx_list(waypoints, frame)`(quaternion→ZYZ 는 `pose_to_posx_mm_deg` 재사용), `path_length_m`, `progress_along_path(position, waypoints)` → (waypoint_index, distance) — 순수 함수, pytest.
 - `robot_manager.py`: 두 번째 ActionServer `/robot/execute_path`. **`self.motion`(현재 goal 자리)을 공유**해 BUSY 판정. `run_motion` 의 watch 루프를 재사용하되 종료 조건은 "마지막 점 근처 + 정지"만. 이벤트 대조는 OVER_FORCE 만. `RobotSample.operation` 에 5 를 싣는다(`reject_reason` 의 `op > OP_HOME` 은 그대로 — ExecuteMotion 에 5 가 오면 거절).
 - `motion_state.py`: `operation` 에 WELD_PATH 추가.
