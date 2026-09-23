@@ -59,7 +59,7 @@ float64 tilt_deg              # 툴 축이 연직에서 바깥으로 기우는 �
 bool    tilt_set
 ```
 - `RunWeld.config_override` 로 받은 값은 그 작업에만 적용한다. 파라미터는 바꾸지 않는다(1차 SetConfig 전파는 쓰지 않는다).
-- 범위 밖(속도 < `weld_speed_min_mps` · > `path_max_speed_mps`, 진폭 < 0, tilt 0~80° 밖) 이면 `INVALID_VALUE(102)`.
+- 범위 밖(속도 < `weld_speed_min_mps`, 진폭 < 0, tilt 0~80° 밖) 이면 `INVALID_VALUE(102)`. **속도 상한은 weld_manager 가 검사하지 않는다**(D29): 상한의 주인은 robot_manager(`path_max_speed_mps`)이고, 넘는 값은 첫 `ExecutePath` 에서 `PATH_REJECTED(604)` 로 끝난다(그 전의 접근 이동 두 번은 `travel_speed_mps` · `approach_speed_mps` 로 나간다). 1차도 같다: scan_manager 는 하한(> 0)만 보고 robot_manager 가 `speed <= 0` 을 거절했다.
 
 ### 3.2 WeldState.msg
 ```

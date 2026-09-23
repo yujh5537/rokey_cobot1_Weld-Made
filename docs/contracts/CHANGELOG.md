@@ -39,7 +39,7 @@
 - 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름, 의석) · 새 노드 weld_manager · 웹
 - `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
 - 리뷰 반영(2026-09-23 저녁): 학민 — robot_manager `path_min_z_m` · 순응 검사 근거 · `path_acc_ratio` 단위. 의석 — 토픽별 `schema_version` · null 단독 규칙 · 브리지 표 PR 을 P1 앞에. 현지 — 스탠드오프 정의(구 표면 ↔ 이음선) · 세로선 툴 외형 검사 · 미요청 정지 = ERROR · 오래된 `/weld/state` 무시 · roll 선별 배열 · `/robot/sample` 구독 · 속도 하한. 자체 노드 6 개(1장 · `.claude/rules/ros2-nodes.md` 예외)
-- 현지 2차(2026-09-23 밤): `RunWeld.end_line` · `WeldResult.end_line` 추가("L0 만" 시험을 계약상 가능하게) · 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m`
+- 현지 2차(2026-09-23 밤): `RunWeld.end_line` · `WeldResult.end_line` 추가("L0 만" 시험을 계약상 가능하게) · 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` · weld_manager 는 속도 상한을 검사하지 않는다(D29, 3.1)
 
 ## v0.1.15 (2026-09-22, SLIDE 스텝 모드)
 타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가). `ContactEvent.msg` · 2.1 메시지 정의의 `source` 주석에 `robot_step` 을 더했다(주석만, 타입 · 빌드 영향 없음).
