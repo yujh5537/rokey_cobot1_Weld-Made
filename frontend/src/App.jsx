@@ -132,9 +132,9 @@ const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
 // sim의 base_to_fixture.z=400 mm는 가상 박스 지지면이므로
 // 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
 const DEFAULT_TABLE_ORIGIN_MM = {
-  x: 423.56,
-  y: -186.06,
-  z: 100.503,
+  x: 420.255,
+  y: -156.675,
+  z: 95.006,
 }
 
 function getTableOriginMm() {
