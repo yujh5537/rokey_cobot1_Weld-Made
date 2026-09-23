@@ -8,6 +8,7 @@ string detail
 string frame_id                # seam · stop_pose 의 프레임 ('workpiece_fixture')
 geometry_msgs/Vector3 base_to_fixture   # 이 결과가 쓴 작업대 원점의 Base 좌표 (m). 웹이 Base 샘플과 겹쳐 그릴 때 쓴다
 uint8 start_line
+uint8 end_line
 WeldLine[8] lines
 WeldConfig config              # 적용 설정 스냅샷 (전부 *_set=true)
 builtin_interfaces/Time started_at

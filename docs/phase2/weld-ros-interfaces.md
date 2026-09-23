@@ -120,6 +120,7 @@ string detail
 string frame_id                # seam · stop_pose 의 프레임 ('workpiece_fixture')
 geometry_msgs/Vector3 base_to_fixture   # 이 결과가 쓴 작업대 원점의 Base 좌표 (m). 웹이 Base 샘플과 겹쳐 그릴 때 쓴다
 uint8 start_line
+uint8 end_line
 WeldLine[8] lines
 WeldConfig config              # 적용 설정 스냅샷 (전부 *_set=true)
 builtin_interfaces/Time started_at
@@ -153,6 +154,7 @@ string detail
 string request_id
 string scan_id              # 용접할 스캔 결과. "" = result_store 의 가장 최근 성공 결과
 uint8 start_line            # 0~7. 이 선부터 순서대로. 앞 선은 SKIPPED
+uint8 end_line              # 0~7, start_line 이상. 이 선까지. 뒤 선은 SKIPPED. 웹 기본값 7 (goal 에서 0 이면 "0번 선까지"다 — 생략이 아니다)
 bool use_override
 WeldConfig config_override
 ---
@@ -173,13 +175,15 @@ WeldState state
 | `/safety/status.latched` | `SAFETY_LATCHED(103)` |
 | `/robot/status` 없음 · `connected=false` | `ROBOT_DISCONNECTED(104)` |
 | `scan_id` 의 `result.json` 이 없다 · `success=false` · `box_valid=false` · `""` 인데 성공 결과가 하나도 없다 | `NO_SCAN_RESULT(602)` |
-| `start_line > 7` | `LINE_OUT_OF_RANGE(603)` |
+| `start_line > 7` · `end_line > 7` · `end_line < start_line` | `LINE_OUT_OF_RANGE(603)` |
 | `config_override` 범위 밖 (속도 < `weld_speed_min_mps` 포함) | `INVALID_VALUE(102)` |
 | `/robot/sample` 이 없다 | `NO_SAMPLE(307)` |
 | 무접촉 \|F\| > `tool_check_max_force_n`(출발값 6.0, contact_detector 의 `tare_max_force_n` 과 같은 근거) | `TOOL_REG_SUSPECT(302)` |
-| 생성한 경로가 작업영역 밖, 또는 세로선 툴 외형 검사 실패(`weld-motion.md` 5절) | `PATH_REJECTED(604)` |
+| 생성한 경로가 작업영역 밖, 또는 세로선 툴 외형 검사(`tool_profile_u_m` · `tool_profile_r_m`, `weld-motion.md` 5절) 실패 | `PATH_REJECTED(604)` |
 
+- `end_line` 은 **생략할 수 없다**(uint8 의 0 은 "L0 까지"다). mqtt_bridge 가 payload 에 없으면 7 을 넣는다. `start_line..end_line` 밖의 선은 `SKIPPED`. "tilt 0 으로 L0 만"은 `start_line=0 · end_line=0`.
 - `scan_id == ""` 이면 **result_store 의 가장 최근(`scan_id` 사전순) `success=true` 결과**다. 진행 중 기록(progress.json)만 있는 작업은 후보가 아니다.
+- `WeldResult.success` 는 `start_line..end_line` 의 선이 전부 DONE 일 때다.
 - Result 의 `success` 는 마무리 홈 복귀까지 포함한다. `result.success` 는 용접선만 본다(1차 RunScan 과 같은 구분).
 
 ### 5.2 ExecutePath.action

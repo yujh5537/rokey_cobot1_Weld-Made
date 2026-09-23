@@ -31,7 +31,7 @@ weld_manager/
     test_node_weld.py   가짜 robot_manager(scan_manager/test/fake_peers.py 참고) 로 8 선 종단 · 거절 사유 표 · 중지 · 배타(scan/state 활성)
 ```
 - 자세 계산은 `docs/phase2/measurements-20260923.md` M1 표의 숫자와 `docs/env/weld_pose_check.py --dry-run`(PR #186) 과 같아야 한다 — 테스트로 고정. **단 스탠드오프는 D22 정의**(구 표면 ↔ 이음선, 세로선 축 방향 ≈ 5.07 mm)라 세로선 좌표는 M1 표(축 방향 3 mm)와 다르다. 그 차이도 테스트로 적는다.
-- 현지 리뷰(#184)로 계약에 들어간 것: 스탠드오프 정의(D22) · 세로선 툴 외형 검사 `tool_profile_m`(D23, 이름은 P2 설계에서 확정해 계약 PR 로) · `tool_roll_deg[8]`(D24) · 미요청 정지 = ERROR(D25) · `/robot/sample` 구독(시작 시 위치 · 툴 등록) · `weld_speed_min_mps` · 안전복귀 전 −d 물러남.
+- 현지 리뷰(#184)로 계약에 들어간 것: 스탠드오프 정의(D22) · 세로선 툴 외형 검사 `tool_profile_u_m` · `tool_profile_r_m`(D23 · D28) · `RunWeld.end_line`(D28) · `tool_roll_deg[8]`(D24) · 미요청 정지 = ERROR(D25) · `/robot/sample` 구독(시작 시 위치 · 툴 등록) · `weld_speed_min_mps` · 안전복귀 전 −d 물러남.
 - ExecuteMotion goal 은 1차 `scan_manager/conversions.py` 의 `MotionRequest → goal` 을 참고(자세 quaternion 그대로, `frame_id=motion_frame_id`).
 - `/weld/state` 발행 · 파일 쓰기는 scan_manager 처럼 쓰기 스레드 1 개 (`result_store/README.md` 마지막 절).
 - `contact_scan_bringup`: `bringup.launch.py` 에 weld_manager 추가(노드 6 개), `sim.yaml` · `real.yaml` 에 `weld_manager:` 절(출발값은 `weld-motion.md` 6절, **주석에 근거**).

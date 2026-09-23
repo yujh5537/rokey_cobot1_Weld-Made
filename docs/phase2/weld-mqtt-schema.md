@@ -6,7 +6,7 @@
 
 | 방향 | 토픽 | QoS | retain | 대응 ROS | 내용 |
 |---|---|---|---|---|---|
-| 웹 → ROS | `cmd/weld/start` | 1 | false | `/weld/run` goal | 용접 시작 |
+| 웹 → ROS | `cmd/weld/start` | 1 | false | `/weld/run` goal | 용접 시작 (`scan_id` · `start_line` · `end_line` · `config`) |
 | 웹 → ROS | `cmd/weld/stop` | 1 | false | `/weld/stop` | 용접 중지 (**만료 검사 제외**, `cmd/scan/stop` 과 같다) |
 | 웹 → ROS | `cmd/weld/home` | 1 | false | `/weld/home` goal | 안전복귀 |
 | ROS → 웹 | `weld/state` | 1 | **true** | `/weld/state` | 단계 · 선 번호 · 진행 |
@@ -32,7 +32,8 @@
   "session_id": "web-…",
   "payload": {
     "scan_id": "",              // "" = 가장 최근 성공 스캔
-    "start_line": 0,            // 0~7
+    "start_line": 0,            // 0~7. 없으면 0
+    "end_line": 7,              // 0~7, start_line 이상. 없으면 7 (mqtt_bridge 가 채운다). "L0 만" = start 0 · end 0
     "config": {                 // 선택. 있는 키만 *_set=true 로 실린다 (mm · mm/s · deg)
       "weld_speed_mm_s": 10.0,
       "travel_speed_mm_s": 50.0,
@@ -79,6 +80,7 @@
   "frame_id": "workpiece_fixture",
   "base_to_fixture_mm": {"x": 420.255, "y": -156.675, "z": 95.006},
   "start_line": 0,
+  "end_line": 7,
   "lines": [
     {
       "index": 0,

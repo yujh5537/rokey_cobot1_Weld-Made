@@ -19,7 +19,7 @@
 | L6 | 10 | v2 → v6 (모서리 x⁺ y⁺) | −z | (+1, +1, 0)/√2 |
 | L7 | 11 | v3 → v7 (모서리 x⁻ y⁺) | −z | (−1, +1, 0)/√2 |
 
-- **순서**: L0 → L1 → L2 → L3 (윗면 루프) → L4 → L5 → L6 → L7 (세로, 위 → 아래). `start_line` 부터 시작하고 앞은 `SKIPPED`.
+- **순서**: L0 → L1 → L2 → L3 (윗면 루프) → L4 → L5 → L6 → L7 (세로, 위 → 아래). `start_line` 부터 `end_line` 까지, 밖은 `SKIPPED`.
 - **세로선의 끝**은 `v(i+4)` 가 아니라 **`z = support_z + bottom_margin_m`** 이다(받침대에 닿지 않는다. `support_z` 는 측정값이 아니라 파라미터라 신뢰하지 않는다). `WeldLine.seam` 에는 이 짧아진 선을 싣는다.
 - 코너마다 정지한다(blend 없음, D8). 윗면 루프의 코너에서도 자세가 바뀌므로 어차피 정지가 필요하다.
 
@@ -96,7 +96,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 - 마지막 선 뒤: 후퇴 → `OP_HOME`(마무리 복귀, DONE 에 포함).
 - 세로선의 P_ret 는 바닥 근처(받침대 + `bottom_margin_m` + approach 의 수직 성분)다. 거기서 z_safe 로 곧장 올라가는 경로는 모서리에서 대각선 바깥으로 `(standoff_m + approach_m)·sin θ` 떨어져 있다(3 + 30 mm, 45° 면 약 23 mm).
 - **작업영역 검사**(weld_manager): 모든 목표 z ≥ `support_z + bottom_margin_m` (작업대 좌표), x · y 는 부재에서 `workspace_margin_m` 안. 벗어나면 `PATH_REJECTED(604)` 로 시작을 거절한다. safety_monitor 는 작업영역을 보지 않는다(`OUT_OF_WORKSPACE` 미구현). robot_manager 는 Base z 하한(`path_min_z_m`) 하나를 수락 시점에 더 본다(두 겹, `weld-ros-interfaces.md` 5.2).
-- **툴 외형 검사**(weld_manager, D23, 현지 리뷰 2): 윗면선(L0~L3)은 툴의 모든 점이 이등분 축 뒤쪽이라 부재와 겹칠 수 없다(roll · 핑거 폭 무관). **세로선(L4~L7)은 부재가 팁 위로도 z_top 까지 있어** 탐침 몸통 · 홀더 · RG2 핑거가 옆면이나 작업대에 닿을 수 있다. 툴 외형을 파라미터 `tool_profile_m`(팁에서 축 방향 뒤로 u 인 자리의 부재 쪽 최대 반폭 R, `[[u, R], …]` 쌍 목록. 값은 M2 캘리퍼 실측, 이름은 현지가 P2 설계에서 확정)로 받아 세로선마다 검사한다:
+- **툴 외형 검사**(weld_manager, D23, 현지 리뷰 2): 윗면선(L0~L3)은 툴의 모든 점이 이등분 축 뒤쪽이라 부재와 겹칠 수 없다(roll · 핑거 폭 무관). **세로선(L4~L7)은 부재가 팁 위로도 z_top 까지 있어** 탐침 몸통 · 홀더 · RG2 핑거가 옆면이나 작업대에 닿을 수 있다. 툴 외형을 파라미터 **`tool_profile_u_m` · `tool_profile_r_m`**(같은 길이의 두 배열. u = 팁에서 축 방향 뒤 거리, R = 그 자리에서 축에서 가장 멀리 뻗은 반폭. ROS 2 파라미터는 중첩 배열이 안 돼 두 배열로 둔다. 값은 M2 캘리퍼 실측, 현지 확정)로 받아 세로선마다 검사한다:
   - 옆면: 모든 (u, R) 에 대해 **R < (s′ + u) · tan θ**. tilt 0 이면 tan θ = 0 이라 세로선은 항상 실패한다 — **"tilt 0" 시험은 L0 에만 쓴다**.
   - 작업대: 툴의 가장 낮은 점 **z_TCP + u · cos θ − R · sin θ ≥ support_z**(작업대 좌표) 를 세로선 아래 끝에서 검사한다.
   - 어기면 `PATH_REJECTED(604)` 로 시작을 거절하고 detail 에 어느 선 · 어느 (u, R) 인지 적는다. 로봇을 움직이기 전의 계산만이다.
@@ -114,7 +114,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `tilt_deg` | 45.0 | 기울임 | ○ |
 | `tool_roll_deg` | [0 × 8] | 선별 툴 축 둘레 회전(도달성 · 핑거 방향 조정, D24) | |
 | `tip_radius_m` | 0.002 | 팁 구 반지름. scan_manager 와 같은 값(스탠드오프 정의, 3절) | |
-| `tool_profile_m` | (M2 실측) | 툴 외형 `[[u, R], …]` (5절 외형 검사). 이름은 P2 에서 확정 | |
+| `tool_profile_u_m` · `tool_profile_r_m` | (M2 실측) | 툴 외형: 팁 뒤 거리 u 와 그 자리의 최대 반폭 R, 같은 길이 두 배열 (5절 외형 검사) | |
 | `weld_speed_min_mps` | 0.002 | 용접 · 접근 속도 하한. robot_manager 의 이동 판정(0.3 s · 0.2 mm ≈ 0.67 mm/s)보다 커야 한다(#152 거짓 도착) | |
 | `approach_m` | 0.030 | 접근 · 후퇴 거리 | |
 | `travel_clearance_m` | 0.050 | z_safe = z_top + 이 값 | |
