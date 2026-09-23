@@ -37,10 +37,13 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 # 설치하므로 같은 이름으로는 설치할 수 없다(CMake 타깃 중복). 다른 모듈 이름으로 둔다.
 ament_python_install_package(contact_scan_qos)
 
+# 테스트용 ROS_DOMAIN_ID 를 고르는 공용 헬퍼(#126). 네 패키지의 conftest 가 쓴다.
+ament_python_install_package(contact_scan_testing)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   # colcon test 는 이 패키지 자신의 install 환경을 source 하지 않는다. 설치된 결과물을 직접 가리킨다.
-  foreach(_test test_constants test_qos test_contract_sync)
+  foreach(_test test_constants test_qos test_contract_sync test_domain_isolation)
     ament_add_pytest_test(${_test} test/${_test}.py
       APPEND_ENV PYTHONPATH=${CMAKE_INSTALL_PREFIX}/${PYTHON_INSTALL_DIR}
       APPEND_LIBRARY_DIRS ${CMAKE_INSTALL_PREFIX}/lib

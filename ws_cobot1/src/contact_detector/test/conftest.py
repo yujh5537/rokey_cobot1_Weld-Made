@@ -1,4 +1,9 @@
-"""ROS 를 source 하지 않은 셸에서도 `python3 -m pytest src/contact_detector/test` 가 돌게 한다."""
+"""ROS 를 source 하지 않은 셸에서도 `python3 -m pytest src/contact_detector/test` 가 돌게 한다.
+
+그리고 노드 테스트(test_node.py)를 **다른 테스트 프로세스 · 떠 있는 노드 · 실기와 분리한다.**
+2026-09-22 16:03 에 이 패키지의 테스트가 `ROS_DOMAIN_ID=30` · `SUBNET` 셸에서 돌아
+실기의 `/contact/event` 에 가짜 이벤트를 넣었다(#126).
+"""
 
 from pathlib import Path
 import sys
@@ -6,6 +11,17 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# 노드 테스트를 다른 테스트 프로세스 · 떠 있는 Virtual · 실기와 분리한다(#126).
+# rclpy.init() 전에 정해야 하므로 import 시점에 건다. 헬퍼는 contact_scan_interfaces 가
+# 설치하지만, ROS 를 source 하지 않은 셸에서도 돌게 소스 경로를 대비로 둔다.
+try:
+    from contact_scan_testing import apply_isolated_ros_env  # noqa: E402
+except ImportError:  # pragma: no cover - ROS 를 source 하지 않은 셸
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'contact_scan_interfaces'))
+    from contact_scan_testing import apply_isolated_ros_env  # noqa: E402
+
+apply_isolated_ros_env()
 
 from contact_detector.detector_core import DetectorConfig  # noqa: E402
 from contact_detector.detector_core import OP_DESCEND  # noqa: E402
