@@ -284,8 +284,12 @@ scan_manager:
                                      #   PR #80 의 2.25 mm 는 홀더 안으로 밀린 탐침으로 잰 값이라 무효다(units-frames.md v0.1.11). 새 탐침으로 다시 잰다
                                      #   스칼라 하나, 방향당 값((추정 폭 - 캘리퍼 폭) / 2). 검출점이 진행 방향으로 더 나간 거리가 + 이고,
                                      #   geometry_estimator 가 그만큼 진행 방향 반대로 뺀다(README, PR #75)
-    result_dir: data                 # result_store 경로. 상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이다
-                                     #   ws_cobot1 에서 launch 하면 ws_cobot1/data (gitignore). 실기 PC 에만 남은 기록은 없는 기록이다
+    result_dir: ~/scan_results/real  # result_store 경로. **절대경로로 둔다**(#187): 상대 경로는 노드를 띄운 셸의
+                                     #   현재 디렉터리 기준이라 9/23 실기에서 ~/data 와 ws_cobot1/data 로 갈렸다.
+                                     #   sim 과 real 을 나눈다 — weld_tracer 가 '가장 최근 결과'를 고르므로
+                                     #   섞이면 sim 박스 좌표를 실기가 따라갈 수 있다(현지).
+                                     #   scan_manager 가 expanduser 하므로 ~ 를 쓸 수 있다. test_config 가 검사한다.
+                                     #   실기 PC 에만 남은 기록은 없는 기록이다(conventions.md)
     result_frame_id: workpiece_fixture    # ScanResult 의 프레임(가칭)
     motion_frame_id: base_link            # ExecuteMotion goal 의 프레임(가칭)
     direction_order: [POS_X, NEG_X, POS_Y, NEG_Y]   # 모서리 탐색 순서. 기동할 때만 읽는다
