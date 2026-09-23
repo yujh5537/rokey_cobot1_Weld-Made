@@ -1065,7 +1065,7 @@ def _slide_node(monkeypatch, restart_max=1):
     from rclpy.action import GoalResponse
 
     node = RobotManager(parameter_overrides=PARAMS + [
-        Parameter('slide_restart_max', Parameter.Type.INTEGER, restart_max)])
+        Parameter('move_restart_max', Parameter.Type.INTEGER, restart_max)])
     node.connected = True
     start = (0.42, -0.18, 0.1808)
     node.last_pose = (Pose(), Time(), start)
@@ -1205,5 +1205,66 @@ def test_stopping_without_force_control_does_not_release(ros, monkeypatch):
         motion = Motion(_descend_goal(), node.now_s())
         stopped, _ = node.stop_robot('접촉', motion)
         assert stopped and calls == ['move_stop']
+    finally:
+        node.destroy_node()
+
+
+def _move_to_node(monkeypatch, target, restart_max=1):
+    """드라이버 없이 MOVE_TO 를 돌린다. 이동 명령 · 드라이버 호출을 기록한다."""
+    from contact_scan_interfaces.action import ExecuteMotion
+    from geometry_msgs.msg import Pose
+    from builtin_interfaces.msg import Time
+    from rclpy.action import GoalResponse
+
+    node = RobotManager(parameter_overrides=PARAMS + [
+        Parameter('move_restart_max', Parameter.Type.INTEGER, restart_max)])
+    node.connected = True
+    start = (0.42, -0.18, 0.1808)
+    node.last_pose = (Pose(), Time(), start)
+    goal = ExecuteMotion.Goal(motion_id=8, operation=RobotSample.OP_MOVE_TO,
+                              frame_id='base_link', speed=0.03)
+    goal.target.position.x, goal.target.position.y, goal.target.position.z = target
+    goal.target.orientation.w = 1.0
+    assert node.on_goal_request(goal) == GoalResponse.ACCEPT
+    node.moving = False
+    rec = {'sent': [], 'calls': [], 'finished': [], 'start': start, 'goal': goal}
+    monkeypatch.setattr(node, 'send_move', lambda motion: rec['sent'].append(node.now_s()) or True)
+    monkeypatch.setattr(node, 'call_sync', lambda client, request, label: rec['calls'].append(label) or True)
+    monkeypatch.setattr(node, 'set_state', lambda *args: None)
+    monkeypatch.setattr(node, 'finished_without_event', lambda motion: rec['finished'].append(node.now_s()) or (
+        ExecuteMotion.Result.REASON_TARGET_REACHED, ReasonCode.OK, ''))
+    return node, rec
+
+
+def test_move_to_that_never_started_is_sent_again(ros, monkeypatch):
+    """MOVE_TO 가 유예 안에 출발하지 않으면 move_stop 뒤 같은 명령을 다시 보낸다 (9/23 실기 12:52).
+
+    모서리 뒤 올림(50 mm)이 86 ms 만에 끝나고 한 걸음도 가지 않아 통합 스캔이 중단됐다.
+    도착 허용치 검사가 ROBOT_ERROR 로 잡아 주지만, 다시 보내면 그 자리에서 이어갈 수 있다.
+    """
+    from robot_manager import robot_manager as rm
+
+    node, rec = _move_to_node(monkeypatch, (0.42, -0.18, 0.2308))   # 50 mm 위
+    try:
+        monkeypatch.setattr(rm.motion_state, 'is_moving', lambda *a, **k: False)
+        monkeypatch.setattr(rm.motion_state, 'has_moved', lambda *a, **k: False)
+        node.execute_motion(FakeGoalHandle(rec['goal']))
+        assert len(rec['sent']) == 2, '출발하지 않은 이동 명령을 한 번 다시 보낸다'
+        assert 'move_stop' in rec['calls'], '다시 보내기 전에 남은 명령을 비운다'
+    finally:
+        node.destroy_node()
+
+
+def test_move_to_already_at_target_is_not_sent_again(ros, monkeypatch):
+    """목표에 이미 닿아 있으면(0 mm 이동) 안 움직이는 것이 정상이라 다시 보내지 않는다."""
+    from robot_manager import robot_manager as rm
+
+    node, rec = _move_to_node(monkeypatch, (0.42, -0.18, 0.1808))   # 지금 자리
+    try:
+        monkeypatch.setattr(rm.motion_state, 'is_moving', lambda *a, **k: False)
+        monkeypatch.setattr(rm.motion_state, 'has_moved', lambda *a, **k: False)
+        node.execute_motion(FakeGoalHandle(rec['goal']))
+        assert len(rec['sent']) == 1, '허용치 안이면 다시 보내지 않는다'
+        assert rec['finished'], '도착으로 끝난다'
     finally:
         node.destroy_node()

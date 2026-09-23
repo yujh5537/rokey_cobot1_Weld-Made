@@ -273,7 +273,7 @@ class RobotManager(Node):
         self.declare_parameter('feedback_period_s', 0.1)
         # 명령 후 이 시간 안에 움직이기 시작하지 않으면 도착으로 본다 (병후 리뷰, PR #73)
         self.declare_parameter('arrival_grace_s', 1.0)
-        self.declare_parameter('slide_restart_max', 1)
+        self.declare_parameter('move_restart_max', 1)
         # OP_MOVE_TO 도착 판정 허용치. 멈춘 것과 도착한 것은 다르다 (병후 리뷰, PR #73)
         self.declare_parameter('arrival_tolerance_m', Parameter.Type.DOUBLE)
         # release_force 의 전환 시간. 0 이면 즉시 전환이라 해제 순간 참조 외력이 점프한다
@@ -819,11 +819,15 @@ class RobotManager(Node):
             # 응답에 1 s 넘게 걸리면 로봇이 출발하기도 전에 유예가 끝나 도착으로 판정된다
             # (9/22 실기 1022: 감시 시작 0.26 s 만에 "접촉 없음", 로봇은 그 0.02 s 뒤 출발해 감시 없이 하강)
             since_sent = now - (motion.sent_s or motion.started_s)
-            # SLIDE 가 유예가 지나도록 옆으로 출발하지 않았으면 도착이 아니라 "명령이 실행되지 않았다"다.
-            # 힘 제어를 켠 뒤 보낸 amovel 을 드라이버가 실행하지 않는 일이 있다 (9/22 실기 32 회 중 8 회, #153)
-            if (goal.operation == RobotSample.OP_SLIDE and not motion.moved and not self.moving
-                    and not motion.moving_now and since_sent > float(self.param('arrival_grace_s'))):
-                failed = self.restart_slide(motion)
+            # 유예가 지나도록 출발하지 않았으면 도착이 아니라 "명령이 실행되지 않았다"다.
+            # 드라이버가 amovel 을 실행하지 않는 일이 있다.
+            #  - SLIDE: 힘 제어를 켠 뒤 보낸 명령이 9/22 실기 32 회 중 8 회 실행되지 않았다 (#153)
+            #  - MOVE_TO: 9/23 실기 12:52, 모서리 뒤 올림(50 mm)이 86 ms 만에 끝나고 한 걸음도 가지 않았다.
+            #    도착 허용치(arrival_tolerance_m) 검사가 잡아 ROBOT_ERROR 로 끝났지만, 다시 보내면 이어갈 수 있다
+            if (not motion.moved and not self.moving and not motion.moving_now
+                    and since_sent > float(self.param('arrival_grace_s'))
+                    and self.not_started(motion)):
+                failed = self.restart_move(motion)
                 if failed is not None:
                     return failed
                 continue
@@ -902,29 +906,46 @@ class RobotManager(Node):
         return event
 
 
-    def restart_slide(self, motion):
-        """출발하지 않은 SLIDE 의 옆 이동 명령을 다시 보낸다. 다시 보냈으면 None, 끝내야 하면 결과.
+    def not_started(self, motion):
+        """다시 보낼 만한 "출발하지 않음"인가.
+
+        MOVE_TO 는 목표에 이미 닿아 있으면(0 mm 이동 명령) 움직이지 않는 것이 정상이다.
+        그래서 아직 허용치 밖에 있을 때만 "출발하지 않았다"로 본다. 위치를 모르면 다시 보내지 않는다
+        (모르는 상태에서 이동 명령을 또 보내지 않는다).
+        SLIDE 는 목표 자세가 없으므로 그대로 본다.
+        """
+        op = motion.goal.operation
+        if op == RobotSample.OP_SLIDE:
+            return True
+        if op != RobotSample.OP_MOVE_TO:
+            return False
+        gap = self.distance_to_target(motion)
+        return gap is not None and gap > float(self.param('arrival_tolerance_m'))
+
+    def restart_move(self, motion):
+        """출발하지 않은 이동 명령을 다시 보낸다. 다시 보냈으면 None, 끝내야 하면 결과.
 
         먼저 move_stop 으로 남은 명령을 비운다. 첫 명령이 늦게 출발하면 두 명령이 겹쳐 두 번 갈 수 있다.
         순응 · 힘 제어는 켠 채 둔다(윗면을 누르고 있어야 한다). 해제는 기존대로 finally 의 release_all 이 한다.
         """
-        limit = int(self.param('slide_restart_max'))
+        limit = int(self.param('move_restart_max'))
+        what = '밀기' if motion.goal.operation == RobotSample.OP_SLIDE else '이동'
         if motion.restarts >= limit:
-            stopped, why = self.stop_robot('밀기 출발 실패', motion)
-            detail = (f'밀기가 출발하지 않았다: 옆 이동 명령 {motion.restarts + 1} 번 모두 '
+            stopped, why = self.stop_robot(f'{what} 출발 실패', motion)
+            detail = (f'{what}가 출발하지 않았다: 이동 명령 {motion.restarts + 1} 번 모두 '
                       f'{self.param("arrival_grace_s")} s 안에 움직이지 않았다')
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                     detail + ('' if stopped else f'. {why}'))
         motion.restarts += 1
         self.get_logger().warning(
-            f'SLIDE 가 {self.param("arrival_grace_s")} s 안에 출발하지 않았다. '
-            f'옆 이동 명령을 다시 보낸다 ({motion.restarts}/{limit})')
+            f'{what}가 {self.param("arrival_grace_s")} s 안에 출발하지 않았다. '
+            f'이동 명령을 다시 보낸다 ({motion.restarts}/{limit})')
         if not self.call_sync(self.srv_clients['move_stop'], dsr_client.move_stop_request(), 'move_stop'):
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
-                    '밀기 재출발 전 move_stop 응답 없음')
+                    f'{what} 재출발 전 move_stop 응답 없음')
         if not self.send_move(motion):
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
-                    '밀기 재출발 이동 명령 실패')
+                    f'{what} 재출발 이동 명령 실패')
         motion.sent_s = self.now_s()
         return None
 

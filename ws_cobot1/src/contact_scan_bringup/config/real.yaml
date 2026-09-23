@@ -142,8 +142,10 @@ robot_manager:
     arrival_grace_s: 1.0             # 명령 후 이 시간 안에 안 움직이면 도착으로 본다 [s]
     motion_timeout_s: 120.0          # goal.timeout 이 0 일 때(손으로 보낸 goal, t25_all.sh) 쓰는 제한 [s]. 스텝 모드 SLIDE 는
                                      #   한 방향에 50~70 s 라 코드 기본 60 이면 끊긴다. scan_manager 의 motion_timeout_s 와 같은 값
-    slide_restart_max: 1             # SLIDE 가 arrival_grace_s 안에 옆으로 출발하지 않으면 옆 이동 명령을 다시 보내는 횟수(#153).
-                                     #   9/22 실기: 힘 제어를 켠 뒤 보낸 amovel 을 드라이버가 32 회 중 8 회 실행하지 않았다. 0 = 다시 보내지 않음
+    move_restart_max: 1              # 이동 명령이 arrival_grace_s 안에 출발하지 않으면 move_stop 뒤 같은 명령을 다시 보내는 최대 횟수.
+                                     #   0 이면 끈다. SLIDE 와 MOVE_TO 에 쓴다(MOVE_TO 는 아직 도착 허용치 밖일 때만).
+                                     #   9/22 실기: 힘 제어를 켠 뒤 보낸 amovel 을 드라이버가 32 회 중 8 회 실행하지 않았다(#153).
+                                     #   9/23 실기 12:52: 모서리 뒤 올림(50 mm)이 86 ms 만에 끝나고 한 걸음도 가지 않아 통합 스캔이 중단됐다
     release_force_time_s: 0.3        # release_force 의 강성 제어 전환 시간 [s] (0~1.0).
                                      #   0 이면 즉시 전환이라 참조 외력이 점프한다
                                      #   (두산 매뉴얼 5.1.4 알아두기). 실기에서 확인한다
