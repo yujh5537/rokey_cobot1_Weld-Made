@@ -7,7 +7,7 @@
 |---|---|---|---|---|
 | 두산 API (posx, get_tool_force) | mm | deg (ZYZ 오일러) | N · N·m | mm/s |
 | ROS 내부 (자체 인터페이스) | **m** | **rad · 자세는 quaternion** | **N · N·m** | m/s |
-| MQTT·웹 | **mm** | **각도 값을 싣지 않음. 자세는 quaternion** (화면에 deg가 필요하면 웹이 변환) | N · N·m | mm/s |
+| MQTT·웹 | **mm** | **자세는 quaternion. 표시 전용 예외로 `robot/joints.positions_rad` · `robot/gripper_joints.positions_rad`는 rad** (화면에 deg가 필요하면 웹이 변환) | N · N·m | mm/s |
 
 변환 위치: 두산↔ROS는 **robot_manager**, ROS↔웹은 **mqtt_bridge**. 그 외에서는 변환하지 않는다.
 

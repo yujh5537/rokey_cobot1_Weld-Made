@@ -16,6 +16,7 @@ FastAPI WebSocket `/ws`를 통해 MQTT 데이터를 수신한다.
 
 - `scan/state`
 - `robot/sample`
+- `robot/joints`
 - `contact/event`
 - `scan/result`
 - `scan/log`
@@ -148,13 +149,40 @@ PUBLISHED
 
 Three.js를 사용해 다음 정보를 표시한다.
 
-- 작업대 목업
-- 직육면체 부재 목업
+- 실제 Doosan M0609 visual mesh
+- M0609 J1~J6 실시간 관절 자세
+- OnRobot RG2 visual mesh(실기 탐침 파지 고정 자세, ±0.721396 rad)
+- 그리퍼 끝에서 탐침 끝까지 13 mm 실측 기준 시각화
+- 작업대(상판 기준 실제 높이 94 mm)
+- `scan/result.vertices` 기반 동적 부재 Mesh
 - 현재 TCP 팁 위치
 - TCP 이동 궤적
 - 접촉점
 - `scan/result.edges` 일반 모서리
 - `scan/result.path_candidates` 외곽 엣지·경로 후보
+
+3D 화면 조작:
+
+- 좌클릭 드래그: 회전
+- 마우스 휠: 확대·축소
+- 우클릭 드래그: 이동
+- `OrbitControls` damping 적용
+
+M0609 관절 데이터 흐름:
+
+```text
+/dsr01/joint_states
+  → mqtt_bridge (20 Hz)
+  → MQTT robot/joints
+  → FastAPI robot/# 구독
+  → WebSocket
+  → React
+  → Three.js joint_1~joint_6
+```
+
+M0609 visual mesh는 DoosanRobotics/doosan-robot2의 `m0609_white` COLLADA를 사용하고, RG2 visual mesh는 ABC-iRobotics/onrobot-ros2의 RG2 STL을 사용한다. 현재 웹은 이 공개 원격 asset을 읽으므로 브라우저에서 GitHub raw asset 접근이 가능해야 한다.
+
+RG2는 이번 MVP에서 탐침을 계속 고정 파지하므로 웹에서는 실기에서 읽은 탐침 파지 자세를 고정 렌더링한다. 기준값은 `/dsr01/joint_states`에서 읽은 `finger_joint=+0.7213960652668464 rad`이며, mimic 부호 패턴 `[+,-,+,-,-,+]`을 적용한다. 이 값은 URDF 기본값이 아니라 실제 그리퍼 드라이버가 읽은 탐침 파지 상태다. `robot/gripper_joints`가 들어와도 웹 시각 자세는 덮어쓰지 않는다.
 
 표시 구분:
 
@@ -236,26 +264,20 @@ base_link 좌표
 Web에서는 다음 Vite 환경변수로 값을 전달한다.
 
 ```env
-VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006
 ```
 
 실기 기준:
 
 ```text
-X = 423.56 mm
-Y = -186.06 mm
-Z = 100.503 mm
+X = 420.255 mm
+Y = -156.675 mm
+Z = 95.006 mm
 ```
 
-sim 기준:
+실기는 계약 v0.1.18의 위 좌표를 사용한다. sim은 `contact_scan_bringup/config/sim.yaml`의 `base_to_fixture`를 유지하며, 화면 정렬 때문에 sim yaml의 모션·홈·fixture 값을 바꾸지 않는다. sim 실행에서 별도 변환이 필요하면 해당 실행 환경의 `VITE_BASE_TO_FIXTURE_MM`로 명시한다.
 
-```text
-X = 425 mm
-Y = -184 mm
-Z = 400 mm
-```
-
-실기와 sim의 값이 다르므로 실행 환경에 맞는 값을 사용해야 한다.
+따라서 `robot/sample`(탐침 TCP 궤적), `contact/event`(판정 순간 탐침 접촉점), `scan/result`(접촉점으로 계산한 형상)는 **해당 실행 모드의 `base_to_fixture`**를 기준으로 같은 base_link 장면에 배치한다.
 
 `search_origin_pose`와 `base_to_fixture`는 같은 값이 아니므로
 서로 대체해서 사용하지 않는다.
@@ -273,7 +295,7 @@ frontend/.env.local
 파일을 만들고 실기 실행 시 다음 값을 설정한다.
 
 ```env
-VITE_BASE_TO_FIXTURE_MM=423.56,-186.06,100.503
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006
 ```
 
 `.env.local`은 `*.local` 규칙으로 Git에 포함되지 않는다.
@@ -483,9 +505,9 @@ Z = 50 mm
 이고 실기 `base_to_fixture`를 적용하면 Base 기준:
 
 ```text
-X = 423.56 mm
-Y = -186.06 mm
-Z = 150.503 mm
+X = 420.255 mm
+Y = -156.675 mm
+Z = 145.006 mm
 ```
 
 가 된다.
@@ -508,32 +530,90 @@ workpiece_fixture → base_link 평행 이동 적용
 
 ---
 
-## 3D 목업 주의사항
+## T41 시각화 범위와 검증
 
-현재 화면의 작업대와 직육면체 부재 Mesh는
-UI 개발을 위한 고정 목업이다.
+M0609은 공식 URDF의 관절 계층을 Three.js Group으로 구성하고 공식 visual mesh를
+불러온다. URDFLoader 패키지를 사용하지 않으며 관절 원점과 축은
+`src/robotModel.js`에 정의한다. M0609 asset은 upstream commit
+`6c5f3ba622bfa9d6f9cffebf21fa44f57db55b48`에 고정한다.
 
-```text
-작업대 목업
-직육면체 부재 목업
+- URDF 고정축 RPY는 Three.js `ZYX`로 적용한다.
+- Z_UP COLLADA에 로더가 추가한 Y-up 변환을 해제한다. ROS → Three 축 변환은 로봇 root에서 한 번만 수행한다.
+- `robot/joints`의 관절 이름으로 J1~J6를 대응시킨다. 순서 변경과 `dsr01/`, `dsr01_` prefix를 허용한다.
+- 이름 중복, 누락, 비유한 각도가 있는 스냅샷은 적용하지 않는다. 비로봇팔 관절은 무시한다.
+- 유효한 6축 데이터가 3초 동안 없으면 **수신 지연 — 마지막 자세 표시**로 바뀐다. 수신 전 영점 자세는 실제 로봇 자세가 아니다.
+- RG2는 실기 탐침 파지 고정 시각화 자세다. 기준 joint 크기는 `0.7213960652668464 rad`(약 41.3°)이고 부호는 `[+,-,+,-,-,+]`이다. velocity 0, effort 40.0으로 읽힌 실기 상태이며, 실시간 손가락 개폐 피드백은 화면 자세에 반영하지 않는다.
+- 탐침은 **보이는 RG2 jaw 최외곽 끝면 → 탐침 최하단 끝 = 13 mm** 실측값으로 표시한다. 실기 파지각에서 pinned RG2 mesh의 jaw 끝면 z를 기준으로 시작하므로 탐침이 그리퍼 내부로 파고들지 않는다. 기존 flange→TCP 252.12 mm와 controller kinematic gripper height는 탐침 돌출 시작점으로 사용하지 않는다.
+- 작업대 시각 모델은 실제 설비 위치 `VITE_TABLE_ORIGIN_MM`를 사용한다. 기본값은 계약 v0.1.18 실측 `420.255,-156.675,95.006` mm다.
+- `base_to_fixture`는 `scan/result`의 계약상 Base 변환값이다. sim의 `425,-184,400` mm는 가상 박스 지지면이므로 실제 높이 94 mm 작업대 자체의 위치로 사용하지 않는다.
+- 3D에서 부재·일반 모서리·경로 후보는 X/Y는 `base_to_fixture`, Z=0 지지면은 작업대 상판에 맞춰 표시한다. 따라서 sim 결과도 작업대 위에 놓이지만 원본 `scan/result` 수치는 수정하지 않는다.
+- 부재는 유효한 `scan/result.vertices`로 생성한다.
+- 실기 TCP 표시와 모델 탐침 끝점의 정렬은 실제 관절·TCP를 함께 수신해 별도로 확인한다.
+
+검증 명령:
+
+```bash
+cd frontend
+npm ci
+node --test test/robot.test.mjs
+npm run lint
+npm run build
 ```
 
-은 실제 `base_link`의 절대 위치에 맞춰 배치된 디지털 트윈이 아니다.
+회귀 테스트는 독립적인 URDF 행렬 계산과 3개 자세의 탐침 끝점을 비교하고,
+관절 이름 매핑·잘못된 입력·모델 로딩 완료 전 화면 종료를 검증한다.
+실기 ROS 및 화면 종단 검증과 구분한다.
 
-반면 다음 데이터는 실제 전달 좌표를 기반으로 표시한다.
+실행 (기존 T41 checkout, sim 예):
 
-```text
-robot/sample
-contact/event
-scan/result.edges
-scan/result.path_candidates
+```bash
+# Main PC: 기존 ROS_DOMAIN_ID와 discovery 설정을 유지한 터미널
+source /opt/ros/jazzy/setup.bash
+cd ws_cobot1
+colcon build --packages-up-to mqtt_bridge --symlink-install
+source install/setup.bash
+# 기존 mqtt_bridge를 종료한 뒤 한 인스턴스만 실행한다.
+ros2 run mqtt_bridge mqtt_bridge --ros-args \
+  -p joint_state_topic:=/dsr01/joint_states \
+  -p joint_publish_hz:=20.0
 ```
 
-따라서 `base_to_fixture`를 적용하면 실시간 좌표 데이터가
-화면의 고정 목업과 떨어져 보일 수 있다.
+broker가 다른 PC에 있으면 기존 실행 환경의 `broker_host`를 함께 전달한다.
+기존 통합 launch를 쓰는 경우에는 재빌드 후 해당 launch를 재시작하면 된다.
 
-이는 현재 목업 단계에서는 정상이며,
-실제 장비 배치와 동일한 3D 모델 정렬은 별도 작업 범위다.
+```bash
+# Web PC: 기존 FastAPI·Mosquitto는 실행 상태여야 한다.
+cd frontend
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006 \
+VITE_TABLE_ORIGIN_MM=420.255,-156.675,95.006 \
+npm run dev
+```
+
+관절 경로 확인:
+
+```bash
+ros2 topic echo /dsr01/joint_states --once
+mosquitto_sub -h 127.0.0.1 -p 1883 -t 'robot/joints' -C 1 -v
+```
+
+`robot/joints` 수신은 웹 표시용이며 로봇에 모션 명령을 보내지 않는다.
+
+작업대 높이 기준:
+```text
+M0609 base_link z = 0 mm
+작업대 상판 z    = 95.006 mm
+작업대 실제 높이 = 94 mm
+작업대 바닥 z    = 1.006 mm
+```
+따라서 로봇 베이스와 작업대 발은 거의 같은 바닥 레벨에 놓인다.
+
+실기에서는:
+```bash
+VITE_BASE_TO_FIXTURE_MM=420.255,-156.675,95.006 \
+VITE_TABLE_ORIGIN_MM=420.255,-156.675,95.006 \
+npm run dev
+```
+를 사용한다. sim은 `sim.yaml`의 fixture 값을 유지한다. `contact/event`의 노란 접촉점과 `robot/sample`의 파란 탐침 궤적, `scan/result` 형상은 실행 모드에 맞는 `VITE_BASE_TO_FIXTURE_MM`을 사용해 같은 좌표계에서 겹쳐야 한다.
 
 ---
 
