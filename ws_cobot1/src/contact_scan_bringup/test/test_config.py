@@ -64,7 +64,7 @@ def test_state_publish_period_positive(file_name):
     assert _params(file_name)['scan_manager']['state_publish_period_s'] > 0
 
 
-# ---- 하강 제한 1차 · 2차 (계약 7.2, v0.1.19) ----
+# ---- 하강 제한 1차 · 2차 (계약 7.2, v0.1.21) ----
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
 def test_second_stage_drop_limit_is_behind_the_first(file_name):
@@ -83,12 +83,16 @@ def test_second_stage_drop_limit_is_behind_the_first(file_name):
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
-def test_decided_drop_limits_are_5mm_and_9mm(file_name):
-    """팀 결정(2026-09-22, 결정 2): 1차 5 mm · 2차 9 mm. 되돌리면 이 시험이 알려 준다."""
+def test_decided_drop_limits_are_5mm_and_10mm(file_name):
+    """팀 결정(2026-09-23): 1차 5 mm · 2차 10 mm. 되돌리면 이 시험이 알려 준다.
+
+    10 은 간섭 거리 D = 12 mm(그리퍼 밖 탐침 길이, 자 실측)보다 2 mm 작다.
+    9 mm(2026-09-22)는 근거 없이 정한 값이었다. 근거와 되돌릴 조건은 real.yaml 주석.
+    """
     params = _params(file_name)
     assert params['robot_manager']['drop_limit_m'] == pytest.approx(0.005)
     assert params['safety_monitor']['drop_limit_m'] == pytest.approx(0.005)
-    assert params['safety_monitor']['drop_limit_margin_m'] == pytest.approx(0.004)
+    assert params['safety_monitor']['drop_limit_margin_m'] == pytest.approx(0.005)
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)

@@ -641,7 +641,7 @@ class FailureRecord:
     pose 는 실패한 ExecuteMotion 의 정지 좌표(Result.pose)다. Interruption.pose 와 같은 규칙으로,
     Result 를 못 받았거나 Result.pose 가 채워지지 않았으면 None 이다. 모르는 좌표를 0 으로 채우지 않는다.
 
-    resumed_at 은 이 실패에서 재시작을 접수한 시각이다(계약 9장의 허용 목록, v0.1.19). Interruption 의
+    resumed_at 은 이 실패에서 재시작을 접수한 시각이다(계약 9장의 허용 목록, v0.1.21). Interruption 의
     같은 이름과 같은 뜻이며, 같은 실패로 두 번 재시작하지 않게 막는다. None = 아직 재시작하지 않았다.
     """
 

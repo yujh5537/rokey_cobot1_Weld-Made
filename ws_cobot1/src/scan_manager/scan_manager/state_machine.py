@@ -62,7 +62,7 @@ ACTIVE_PHASES = frozenset({
 RESUMABLE_PHASES = frozenset({
     Phase.PREPARING, Phase.TOP_SEARCH, Phase.EDGE_SEARCH, Phase.GEOMETRY,
 })
-# ERROR 로 끝난 작업에서 /safety/reset 뒤 RESUME 을 허용하는 실패 사유 (계약 5.3 · 9장, v0.1.19).
+# ERROR 로 끝난 작업에서 /safety/reset 뒤 RESUME 을 허용하는 실패 사유 (계약 5.3 · 9장, v0.1.21).
 #
 # **허용 목록이다.** 여기 없는 사유는 전부 불허다 — 새 사유가 생겼을 때 저절로 허용되지 않는다.
 # 셋의 공통점은 **측정값이 오염되지 않는다**는 것이다: 샘플이 끊겼거나(403) 로봇 상태가 끊겼거나(404)
@@ -376,7 +376,7 @@ class ScanStateMachine:
 
         if command is Command.RESUME:
             if phase is Phase.ERROR and not failure_is_resumable(self._failure):
-                # 허용 목록 밖이다. 안전 점검 · 복귀 뒤 새 START 만 가능하다 (계약 9장, v0.1.19)
+                # 허용 목록 밖이다. 안전 점검 · 복귀 뒤 새 START 만 가능하다 (계약 9장, v0.1.21)
                 code = None if self._failure is None else self._failure.reason_code
                 return Reason.NOT_SUPPORTED, (
                     f'오류 사유 {code} 는 재시작 허용 목록에 없다. 안전 점검 뒤 새 START 로 시작한다'
@@ -460,7 +460,7 @@ class ScanStateMachine:
                     raise ValueError('FAILED 에는 0 이 아닌 reason_code 가 필요하다')
                 failure = Failure(int(reason_code), detail, phase)
                 self._failure = failure
-                # 재개 지점은 **허용 목록에 있는 사유일 때만** 남긴다 (계약 9장, v0.1.19).
+                # 재개 지점은 **허용 목록에 있는 사유일 때만** 남긴다 (계약 9장, v0.1.21).
                 # 그 밖에는 지운다 — 남겨 두면 허용 판정이 한 겹만 틀려도 오염된 기준으로 재개한다.
                 # 실패한 그 단계가 곧 재개 지점이다(중지와 달리 FAILED 는 _resume_phase 를 세우는
                 # 경로를 거치지 않는다). 마무리 HOMING 은 RESUMABLE_PHASES 에 없어 저절로 빠진다.

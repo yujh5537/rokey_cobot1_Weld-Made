@@ -545,7 +545,7 @@ class MqttBridge(Node):
             "compliance_active": msg.compliance_active,
             "force_ctrl_active": msg.force_ctrl_active,
             "motion_id": msg.motion_id, "operation": msg.operation, "detail": msg.detail,
-            # SLIDE 누름 목표 (계약 3.2, v0.1.19). 셋은 서로 다른 값이라 합치지 않는다
+            # SLIDE 누름 목표 (계약 3.2, v0.1.21). 셋은 서로 다른 값이라 합치지 않는다
             "slide_mode": msg.slide_mode,
             "slide_force_setpoint_n": msg.slide_force_setpoint_n,
             "slide_force_baseline_n": msg.slide_force_baseline_n,

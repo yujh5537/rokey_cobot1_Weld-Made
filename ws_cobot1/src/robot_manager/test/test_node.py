@@ -1270,7 +1270,7 @@ def test_move_to_already_at_target_is_not_sent_again(ros, monkeypatch):
         node.destroy_node()
 
 
-# ---- 1차 하강 제한의 기준 z (계약 7.2, v0.1.19 결정 2) ----
+# ---- 1차 하강 제한의 기준 z (계약 7.2, v0.1.21 결정 2) ----
 
 def _sample_with(node, z, operation, valid=True):
     """finish() 가 발행하는 샘플 한 건을 흉내 내 기준 z 잡기만 돌린다."""
@@ -1329,7 +1329,7 @@ def test_slide_reference_z_ignores_invalid_and_non_slide_samples(ros):
 def test_first_stage_stops_above_five_millimetres(ros, monkeypatch):
     """1차는 drop_limit_m(5 mm)를 **초과**할 때 멈춘다. 정확히 5 mm 는 초과가 아니다.
 
-    2차(safety_monitor)의 9 mm 보다 먼저 걸리는 것이 이 구간의 요점이다.
+    2차(safety_monitor)의 10 mm 보다 먼저 걸리는 것이 이 구간의 요점이다.
     """
     from contact_scan_interfaces.action import ExecuteMotion
     from robot_manager import motions
@@ -1354,7 +1354,7 @@ def test_first_stage_stops_above_five_millimetres(ros, monkeypatch):
         node.destroy_node()
 
 
-# ---- SLIDE 누름 목표 세 값 (계약 3.2, v0.1.19 결정 4) ----
+# ---- SLIDE 누름 목표 세 값 (계약 3.2, v0.1.21 결정 4) ----
 
 def test_force_mode_status_separates_the_three_press_values(ros, monkeypatch):
     """설정 증분 · 시작 기준 · 추정 합을 섞지 않는다. 합은 **추정**이다."""

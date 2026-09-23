@@ -40,7 +40,7 @@ REASON_CODES_V0_1 = {
     'ROBOT_STATUS_LOST': 404,
     'HB_EXPIRED': 405,
     'CONDITION_ACTIVE': 406,
-    'STOP_UNCONFIRMED': 407,   # v0.1.19 추가 (계약 9장의 재시작 허용 목록)
+    'STOP_UNCONFIRMED': 407,   # v0.1.21 추가 (계약 9장의 재시작 허용 목록)
     'INVALID_SHAPE': 500,
     'INSUFFICIENT_POINTS': 501,
 }
