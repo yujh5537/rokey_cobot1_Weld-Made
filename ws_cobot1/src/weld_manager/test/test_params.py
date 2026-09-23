@@ -25,17 +25,17 @@ def test_motion_numbers_have_no_code_default():
     # 규칙 7: 모션 수치는 yaml 에만 둔다. 기본값이 있는 것은 프레임 이름표뿐이다
     defaults = [spec.name for spec in SPECS if spec.default is not None]
     assert sorted(defaults) == ['motion_frame_id', 'result_frame_id']
-    optional = [spec.name for spec in SPECS if not spec.required and spec.default is None]
-    assert optional == ['orientation_tolerance_deg']   # 없으면 기능을 끄는 선택 항목 하나뿐
-    assert all(spec.required for spec in SPECS if spec.default is None and spec.name not in optional)
+    assert all(spec.required for spec in SPECS if spec.default is None)
 
 
-def test_orientation_tolerance_is_off_when_absent(param_values):
+def test_orientation_tolerance_zero_turns_it_off(param_values):
+    # 6절 표(38b55e8): 출발값 15°, 0 = 끔. 없으면 다른 수치처럼 START 를 거절한다
     params = check(param_values).params
-    assert params.orientation_tolerance_deg is None and params.orientation_tolerance_rad is None
-    params = check({**param_values, 'orientation_tolerance_deg': 1.0}).params
-    assert math.isclose(params.orientation_tolerance_rad, math.radians(1.0))
-    assert not check({**param_values, 'orientation_tolerance_deg': 0.0}).ok
+    assert math.isclose(params.orientation_tolerance_rad, math.radians(15.0))
+    assert check({**param_values, 'orientation_tolerance_deg': 0.0}).params.orientation_tolerance_rad is None
+    assert not check({**param_values, 'orientation_tolerance_deg': -1.0}).ok
+    del param_values['orientation_tolerance_deg']
+    assert check(param_values).missing == ('orientation_tolerance_deg',)
 
 
 def test_speed_upper_bound_is_not_ours(param_values):
