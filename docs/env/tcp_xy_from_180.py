@@ -12,7 +12,11 @@ x · y 가 틀려도 드러나지 않는다. 툴 z축(= J6 축, TCP 자세 [0,0,
    팁이 표시에서 벗어난다. 벗어난 거리가 등록 TCP x · y 오차의 두 배다
 3. **Base x · y 평행 이동만으로** 팁을 다시 표시 중심 위에 맞춘다(자세 · 높이는 건드리지 않는다)
    → `python3 docs/env/probe_point.py --label xy_180 --file <세션>/tcp_xy.csv`
-4. `python3 docs/env/tcp_xy_from_180.py <세션>/tcp_xy.csv --tcp -1.30 3.71 252.12`
+4. `python3 docs/env/tcp_xy_from_180.py <세션>/tcp_xy.csv --tcp 0 0 252.12`
+   (`--tcp` 는 **두 점을 찍을 때 등록돼 있던** 값이다. 지금 등록값은 `[0, 0, 252.12]` 다)
+
+2026-09-21 19 시에 이 방법으로 새 탐침의 x · y 를 (0, 0) 으로 확정했다(#137). 기록은
+`docs/env/tool-tcp-register.md` 9절에 있다 — 그 절이 근거로 인용하는 스크립트가 이 파일이다.
 
 원리: 등록 TCP t0 로 읽은 팁 좌표 P' = F + R t0, 실제 팁 = F + R t 가 두 자세에서 같은 점이면
 P2' − P1' = (R1 − R2)(t − t0). 툴 z축 회전은 z 성분을 구속하지 않으므로 x · y 만 최소제곱으로 푼다.
