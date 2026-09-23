@@ -2,6 +2,9 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.1.16 (2026-09-23, #130 최신성 한계)
+**타입 변경 없음.** real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다(6.3절). 6.3 의 "한계를 올리기 전에 원인을 없앤다"는 원칙의 **예외**이며, 이유 · 남는 위험(687 ms 공백) · 되돌릴 조건을 6.3 과 real.yaml 주석에 같이 남겼다. 코드 기본값과 sim 값은 바꾸지 않았다(sim 은 이미 500). 영향: safety_monitor(실기 값만).
+
 ## v0.1.15 (2026-09-22, SLIDE 스텝 모드)
 타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가). `ContactEvent.msg` · 2.1 메시지 정의의 `source` 주석에 `robot_step` 을 더했다(주석만, 타입 · 빌드 영향 없음).
 - 9/22 실기: 힘 제어 밀기는 방향별 실제 누름이 1.5~8.6 N(같은 6 N 설정), 방향 전환 뒤 떠서 모서리를 놓침(#155), 가짜 EDGE(#154), 옆 이동 명령 누락(#153), 가짜 도착(#152). 뿌리가 같다 — 움직이는 중에 힘을 읽고 누름을 힘 제어에 맡긴다
