@@ -1,0 +1,9 @@
+# StopWeld.srv  (/weld/stop)
+string request_id           # MQTT cmd/weld/stop 의 request_id
+string requester            # 'mqtt_bridge'
+uint16 reason               # 웹 요청은 STOP_REQUESTED
+string detail
+---
+bool accepted               # 접수. 정지 완료는 /weld/state.phase == STOPPED
+uint16 reason_code
+string detail

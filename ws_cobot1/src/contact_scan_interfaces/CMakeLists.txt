@@ -21,15 +21,22 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/WebHeartbeat.msg"
   "msg/ScanConfig.msg"
   "msg/ReasonCode.msg"
+  "msg/WeldConfig.msg"
+  "msg/WeldState.msg"
+  "msg/WeldLine.msg"
+  "msg/WeldResult.msg"
   "srv/StopRobot.srv"
   "srv/StopScan.srv"
   "srv/TareForce.srv"
   "srv/SetConfig.srv"
   "srv/ResetSafety.srv"
+  "srv/StopWeld.srv"
   "action/RunScan.action"
   "action/ReturnHome.action"
   "action/Resume.action"
   "action/ExecuteMotion.action"
+  "action/RunWeld.action"
+  "action/ExecutePath.action"
   DEPENDENCIES builtin_interfaces geometry_msgs action_msgs
 )
 

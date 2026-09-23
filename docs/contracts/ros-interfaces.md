@@ -1,5 +1,7 @@
 # ROS 인터페이스 계약
 
+> **[v0.2.0, 2026-09-23] phase 2(용접) 인터페이스는 `docs/phase2/weld-ros-interfaces.md` 에 있다.** 이 문서에는 phase 2 가 기존 타입에 더한 것만 표시했다: `OP_WELD_PATH=5`(RobotSample · ExecuteMotion 상수) · ReasonCode 6xx. `test_contract_sync` 는 두 문서를 합쳐 검사한다.
+
 상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 최근 구간 평균(이동 기준), 밀기는 z 로 판정 켜기 · 타입 변경 없음) · **v0.1.13**(2026-09-21, #128, 힘 꺾임 EDGE 추가(기본 꺼짐) · 타입 변경 없음) · **v0.1.15**(2026-09-22, SLIDE 스텝 모드: robot_manager가 EDGE를 확정해 `/contact/event`를 낸다 · 타입 변경 없음) · **v0.1.16**(2026-09-23, #130: real 의 `sample_stale_ms` 300 → 500 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
@@ -85,6 +87,7 @@ uint8 OP_MOVE_TO=1
 uint8 OP_DESCEND=2
 uint8 OP_SLIDE=3
 uint8 OP_HOME=4
+uint8 OP_WELD_PATH=5                # ExecutePath 실행 중 (phase 2). ExecuteMotion goal 에는 쓰지 않는다
 
 uint64 sample_id                    # robot_manager 발급, 발행마다 +1
 string frame_id                     # pose · wrench 의 기준 프레임 ('base_link' 가칭)
@@ -466,6 +469,7 @@ uint8 OP_MOVE_TO=1          # 지정 좌표로 이동. 접촉 판정 없음
 uint8 OP_DESCEND=2          # -z 저속 하강. CONTACT 로 정상 종료
 uint8 OP_SLIDE=3            # 윗면을 누른 채 수평 이동. EDGE 로 정상 종료
 uint8 OP_HOME=4             # 홈위치(파라미터 home_pose)로 이동
+uint8 OP_WELD_PATH=5        # goal 에는 쓰지 않는다 (ExecutePath 실행 중 표시용, phase 2). 받으면 거절
 uint8 DIR_NONE=0            # ScanState.DIR_* 와 같은 값
 uint8 DIR_POS_X=1
 uint8 DIR_NEG_X=2
@@ -557,6 +561,11 @@ builtin_interfaces/Duration elapsed
 | | 406 | `CONDITION_ACTIVE` | 래치 해제 요청 시 조건이 아직 참 |
 | 5xx 형상 | 500 | `INVALID_SHAPE` | 폭 0 이하 · 높이 음수 |
 | | 501 | `INSUFFICIENT_POINTS` | 5점 미확보 |
+| 6xx 용접 (phase 2) | 600 | `SCAN_ACTIVE` | 스캔이 진행 중이라 용접 시작 거절 |
+| | 601 | `WELD_ACTIVE` | 용접이 진행 중이라 스캔 시작 · 재시작 거절 |
+| | 602 | `NO_SCAN_RESULT` | 용접할 스캔 결과가 없거나 무효 |
+| | 603 | `LINE_OUT_OF_RANGE` | `start_line` 이 0~7 밖 |
+| | 604 | `PATH_REJECTED` | robot_manager 가 경로를 거절 (점 수 · 속도 · 프레임 · 작업영역) |
 
 geometry_estimator 내부 오류 문자열은 scan_manager가 매핑한다: `GEOM_MISSING_POINT` → 501, `GEOM_NONPOSITIVE_WIDTH` · `GEOM_NEGATIVE_HEIGHT` → 500. 원문은 `detail`에 넣는다.
 

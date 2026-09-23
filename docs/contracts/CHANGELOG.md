@@ -33,6 +33,12 @@
 ## v0.1.16 (2026-09-23, #130 최신성 한계)
 **타입 변경 없음.** real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다(6.3절). 6.3 의 "한계를 올리기 전에 원인을 없앤다"는 원칙의 **예외**이며, 이유 · 남는 위험(687 ms 공백) · 되돌릴 조건을 6.3 과 real.yaml 주석에 같이 남겼다. 코드 기본값과 sim 값은 바꾸지 않았다(sim 은 이미 500). 영향: safety_monitor(실기 값만).
 
+## v0.2.0 (2026-09-23, phase 2 용접 인터페이스, docs/phase2)
+**타입 추가**(`WeldConfig` · `WeldState` · `WeldLine` · `WeldResult` · `StopWeld` · `RunWeld` · `ExecutePath`)와 **기존 타입의 상수 추가**(`RobotSample` · `ExecuteMotion` 에 `OP_WELD_PATH=5`, ReasonCode 6xx 5 개). 기존 필드는 바꾸지 않았다. 전문과 동작 규칙은 `docs/phase2/weld-ros-interfaces.md`, MQTT 는 `docs/phase2/weld-mqtt-schema.md`, 모션 정의는 `docs/phase2/weld-motion.md`.
+- **왜**: 1차(스캔) 완료 뒤 2차 프로젝트 "스캔 결과로 용접 모션"을 같은 레포 · 같은 인터페이스 패키지에서 진행한다(병후, 2026-09-23). phase 2 는 기존 계약 · BRD 의 구속을 받지 않지만, 타입 동기화 검사(`test_contract_sync`)와 ReasonCode 번호 규칙(추가만, 변경 없음)은 그대로 쓴다
+- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름) · 새 노드 weld_manager · 웹
+- `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
+
 ## v0.1.15 (2026-09-22, SLIDE 스텝 모드)
 타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가). `ContactEvent.msg` · 2.1 메시지 정의의 `source` 주석에 `robot_step` 을 더했다(주석만, 타입 · 빌드 영향 없음).
 - 9/22 실기: 힘 제어 밀기는 방향별 실제 누름이 1.5~8.6 N(같은 6 N 설정), 방향 전환 뒤 떠서 모서리를 놓침(#155), 가짜 EDGE(#154), 옆 이동 명령 누락(#153), 가짜 도착(#152). 뿌리가 같다 — 움직이는 중에 힘을 읽고 누름을 힘 제어에 맡긴다
