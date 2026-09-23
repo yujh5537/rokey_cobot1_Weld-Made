@@ -132,7 +132,7 @@ M11(HOME 도착 관절각 검증). 주제가 서로 다르고, 이 PR 이 이미
 
 ## 영향 (바뀌는 계약·코드·시험)
 
-- 계약: `ros-interfaces.md` v0.1.16 — 3.2(RobotStatus 6필드) · 3.3(디바운스 정의) · 5.2 · 5.3 ·
+- 계약: `ros-interfaces.md` v0.1.17 — 3.2(RobotStatus 6필드) · 3.3(디바운스 정의) · 5.2 · 5.3 ·
   6.1(407) · 6.3(500 ms 예외) · 7.1(정지 KPI 둘) · 7.2(여유 · 기준 z · 12 N vs 30 N) · 7.5(안전복귀, 신설) ·
   7.6(재시작 첫 모션, 신설) · 9장 TBD 2건 해소. 2.1 표(scan_manager 의 `/robot/sample` 구독). `contact_scan_interfaces` 의 `ReasonCode.msg` · `RobotStatus.msg`.
 - 코드: scan_manager(`state_machine` · `resume` · `sequence` · `params` · `result_store` · 노드),

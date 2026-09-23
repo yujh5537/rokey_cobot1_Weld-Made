@@ -148,7 +148,7 @@ def restoration_from(record) -> Tuple[Optional[Restoration], str]:
     resume_phase = point.phase if resumable else None
     moved_since_stop = record.home_return_since_resume_point
     if phase is Phase.ERROR and not failure_resume_refusal(record):
-        # 허용 목록의 사유로 ERROR 가 된 작업이다. 재개 지점은 실패가 난 단계다(계약 9장, v0.1.16).
+        # 허용 목록의 사유로 ERROR 가 된 작업이다. 재개 지점은 실패가 난 단계다(계약 9장, v0.1.17).
         # 중지 기록이 아니라 실패 기록에서 만든다 — FAILED 는 Interruption 을 남기지 않는다.
         resume_phase = failure.phase
         moved_since_stop = False       # 위 판정이 안전복귀를 이미 걸러 냈다
@@ -181,7 +181,7 @@ def plan_resume(record, *, result_file_exists: bool, direction_order) -> Union[R
     if phase not in (Phase.STOPPED, Phase.ERROR):
         return _refuse(f'{scan_id} 의 기록이 STOPPED · ERROR 가 아니다(phase={phase.name})')
     if from_failure:
-        # ERROR 로 끝난 작업(계약 9장 허용 목록, v0.1.16). 재개 지점 · 중단 좌표를 중지 기록이
+        # ERROR 로 끝난 작업(계약 9장 허용 목록, v0.1.17). 재개 지점 · 중단 좌표를 중지 기록이
         # 아니라 실패 기록에서 만든다 — FAILED 는 Interruption 을 남기지 않는다
         why = failure_resume_refusal(record)
         if why:

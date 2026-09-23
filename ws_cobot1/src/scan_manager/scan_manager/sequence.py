@@ -434,7 +434,7 @@ class _Runner:
 
     def _finish_stop(self, during_final_homing: bool) -> RunOutcome:
         if not self._ports.wait_still():
-            # 사유를 ROBOT_STATUS_LOST(404) 와 섞지 않는다 (계약 6.1, v0.1.16). 404 는 "상태가
+            # 사유를 ROBOT_STATUS_LOST(404) 와 섞지 않는다 (계약 6.1, v0.1.17). 404 는 "상태가
             # 안 온다"이고 이것은 "정지를 요청했는데 완료를 확인하지 못했다"다. 재시작 허용 여부를
             # 사유로 판단하므로(계약 9장) 사유가 갈려 있어야 한다. 둘 다 허용 목록에는 있다
             return self._finish_fail(_Fail(
@@ -659,7 +659,7 @@ class ResumeRunner(ScanRunner):
         return self._ports.compute_geometry()
 
 
-# 자동 안전복귀를 하지 않는 실패 사유 (계약 7.5 ②, v0.1.16).
+# 자동 안전복귀를 하지 않는 실패 사유 (계약 7.5 ②, v0.1.17).
 #
 # 여기까지 온 실패는 탐침이 무언가에 세게 닿은 뒤다. 탐침 · 부재가 상했을 수 있고, 그 상태로 관절
 # 복귀(OP_HOME)를 보내면 끌고 간다. 사람이 눈으로 보고 펜던트로 조그한다.

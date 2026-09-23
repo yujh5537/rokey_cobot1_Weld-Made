@@ -237,7 +237,7 @@ class ResultStore:
         return self._mutate(scan_id, apply)
 
     def record_failure_resume(self, scan_id: str) -> ScanRecord:
-        """ERROR 로 끝난 작업의 재시작을 접수했다 (계약 9장의 허용 목록, v0.1.16).
+        """ERROR 로 끝난 작업의 재시작을 접수했다 (계약 9장의 허용 목록, v0.1.17).
 
         중지의 record_resume 과 짝이다. 같은 실패로 두 번 재시작하지 않게 실패 기록에 시각을 찍는다.
         로봇을 움직이기 **전에** 부른다 — 사실을 남기지 못하면 움직이지 않는다.

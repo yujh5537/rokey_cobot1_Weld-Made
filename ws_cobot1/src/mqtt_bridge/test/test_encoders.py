@@ -123,7 +123,7 @@ def test_config_ack_heartbeat_connection():
 
 
 def robot_status(**changes):
-    """계약 3.2 (v0.1.16). SLIDE 누름 목표 6개를 포함한다."""
+    """계약 3.2 (v0.1.17). SLIDE 누름 목표 6개를 포함한다."""
     return {
         "stamp": {"sec": 1, "nanosec": 0}, "connected": True, "moving": True,
         "error": False, "error_code": 0,

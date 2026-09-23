@@ -199,7 +199,7 @@ robot_manager:
     step_release_n: 1.5              # ΔFz 가 이 아래면 접촉이 약함 / 소실 [N]. 정지 잡음 ±0.5 N 의 3 배
     step_follow_lo_n: 3.0            # 누름 하한 [N]. 이보다 약하면 z 를 더 내린다
     step_follow_hi_n: 7.0            # 누름 상한 [N]. 이보다 세면 z 를 올린다
-    step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. **전역 과대 외력과 다른 것이다** (계약 7.2, v0.1.16):
+    step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. **전역 과대 외력과 다른 것이다** (계약 7.2, v0.1.17):
                                      #   12 N = 스텝 알고리즘이 스스로 들고 중단하는 보수적 **운용** 한계(robot_manager 안에서만 쓴다)
                                      #   30 N = contact_detector · safety_monitor 의 전역 **안전** 정지 · 래치 한계(over_force_n, 쌍 검사 대상)
                                      #   12 를 30 으로 올리지 않는다 — 올리면 스텝 모드의 자체 보호가 사라진다

@@ -118,7 +118,7 @@ def test_failure_goes_to_error_and_never_homes(phase):
     assert sm.phase is Phase.ERROR
 
 
-# ---- ERROR 재시작 허용 목록 (계약 5.3 · 9장, v0.1.16 결정 1) ----
+# ---- ERROR 재시작 허용 목록 (계약 5.3 · 9장, v0.1.17 결정 1) ----
 
 # 목록 밖의 사유. 물리적 위험 · 알 수 없는 오류 · 아직 목록에 없는 것
 NOT_RESUMABLE_CODES = (

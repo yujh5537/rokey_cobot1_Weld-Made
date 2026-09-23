@@ -21,7 +21,7 @@
 | 상태 최신성 | `/robot/status` 가 `robot_status_timeout_ms` 넘게 없음 | `ROBOT_STATUS_LOST(404)` | 〃 |
 
 - **하강 제한의 기준 z = `operation` 이 `OP_SLIDE` 로 바뀐 첫 샘플의 z**(계약 7.2). 1차(robot_manager)와 **기준 z 는 같다** — robot_manager 도 자기가 `OP_SLIDE` 로 발행한 첫 유효 샘플의 z 를 쓴다(같은 메시지의 같은 값). 방향이 바뀌어 SLIDE 를 다시 시작하면 기준도 다시 잡는다
-- **한계는 1차보다 여유만큼 뒤다** (v0.1.16 결정 2, #53): 2차 = `drop_limit_m + drop_limit_margin_m`. real · sim 모두 1차 5 mm · 2차 9 mm.
+- **한계는 1차보다 여유만큼 뒤다** (v0.1.17 결정 2, #53): 2차 = `drop_limit_m + drop_limit_margin_m`. real · sim 모두 1차 5 mm · 2차 9 mm.
   - 1차 = 정상 동작의 제한(넘으면 그 SLIDE 를 실패로 끝낸다). 2차 = 1차가 막지 못했을 때의 최후 방어선(정지 + 래치)
   - `drop_limit_m` 자체는 두 노드가 **같은 값**이고 쌍 검사 대상이다. `drop_limit_margin_m` 은 이 노드 전용이며 계약 이름이 아니다 — `ScanConfig` 에 없어 SetConfig 전파 대상이 아니므로, SetConfig 가 두 노드의 `drop_limit_m` 을 같은 값으로 덮어써도 여유는 남는다
   - **9 mm 의 근거**: 탐침 길이를 손으로 재어 정한 간섭 없는 안전 거리(상한)다. 여유 4 mm 는 9 에서 1차 5 를 뺀 값이다. 하한 — 1차 정지의 하강 오버슈트가 여유를 넘으면 1차가 정상 정지할 때마다 2차가 래치된다 — 은 실기 미확인이다
@@ -54,7 +54,7 @@
 - `over_force_n` 은 contact_detector 와, `drop_limit_m` 은 robot_manager 와 **같은 값**이어야 한다(계약 7.2). `contact_scan_bringup/test/test_config.py` 가 CI 에서 검사한다
 - 래치는 파라미터로 풀 수 없다
 
-## 이슈 #53 (1차 · 2차 동시 래치) — 결정됨 (2026-09-22, 계약 v0.1.16 결정 2)
+## 이슈 #53 (1차 · 2차 동시 래치) — 결정됨 (2026-09-22, 계약 v0.1.17 결정 2)
 옛 규칙("값도 기준도 같게")에서는 `DROP_LIMIT` 이 날 때마다 2차 래치도 **같은 샘플에서** 걸렸다. 1차가 정상 동작해 SLIDE 를 실패로 끝냈을 뿐인데 래치가 남아 다음 작업 시작이 막혔다.
 
 **결정**: 기준 z 는 1차와 같게 두고, **2차만 `drop_limit_margin_m` 만큼 뒤로** 둔다(1차 5 mm · 2차 9 mm).

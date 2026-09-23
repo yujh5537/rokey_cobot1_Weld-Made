@@ -51,5 +51,5 @@ def test_name_table_matches_interface(name, table, msg, prefix):
 
 
 def test_reason_names_covers_stop_unconfirmed():
-    """계약 v0.1.16 에서 늘어난 코드. 정지 미확인을 웹에 알리는 유일한 경로다."""
+    """계약 v0.1.17 에서 늘어난 코드. 정지 미확인을 웹에 알리는 유일한 경로다."""
     assert REASON_NAMES[ReasonCode.STOP_UNCONFIRMED] == 'STOP_UNCONFIRMED'

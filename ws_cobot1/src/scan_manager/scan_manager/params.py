@@ -273,7 +273,7 @@ HOME_PARAM_NAMES = (
     # 안전복귀도 /robot/status 의 최신성을 본다(끊긴 로봇으로는 복귀 모션 자체가 불가능하다).
     # /safety/status 는 보지 않는다: 감시자가 죽었다고 돌아오지 못하면 안 된다(CLAUDE.md 규칙 3).
     'robot_status_timeout_s',
-    # 계약 7.5(v0.1.16): 안전복귀는 HOME 전에 수직으로 올린다. 그 올림에 필요한 값들이다.
+    # 계약 7.5(v0.1.17): 안전복귀는 HOME 전에 수직으로 올린다. 그 올림에 필요한 값들이다.
     # search_origin_pose 는 넣지 않는다 — 올림은 지금 자세를 그대로 쓴다(그 값은 TBD 일 수 있다)
     'lift_height_m', 'move_speed_mps', 'pose_max_age_s')
 
