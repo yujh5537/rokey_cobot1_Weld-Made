@@ -32,6 +32,7 @@ import tempfile
 __all__ = [
     'CANDIDATE_DOMAIN_IDS',
     'DomainsExhausted',
+    'ForcedDomainRejected',
     'apply_isolated_ros_env',
     'domains_in_use',
     'isolated_ros_env',
@@ -51,6 +52,10 @@ _chosen_domain = None
 
 class DomainsExhausted(RuntimeError):
     """후보 번호가 모두 쓰이고 있다. 겹쳐 돌리는 것보다 멈추는 것이 낫다."""
+
+
+class ForcedDomainRejected(RuntimeError):
+    """손으로 고정한 번호를 쓸 수 없다. #126 4 항: 눈대중으로 고르면 안 된다."""
 
 
 def lock_dir() -> Path:
@@ -126,10 +131,26 @@ def pick_domain(candidates=CANDIDATE_DOMAIN_IDS) -> int:
         return _chosen_domain
     forced = os.environ.get('CONTACT_SCAN_TEST_DOMAIN_ID')
     if forced:
-        # 손으로 고정할 때를 위한 구멍. #126 주의: "안 쓰는 것 같은 번호"를 고르면 안 된다.
-        # 99 는 학민의 Virtual 확인용, 41 은 현지의 9/20 통합용이다.
-        _chosen_domain = int(forced)
-        return _chosen_domain
+        # 재현성을 위해 번호를 고정해야 할 때가 있다(T107 반복 측정). 다만 #126 4 항대로
+        # **눈대중으로 고르면 안 된다** — 41 은 현지의 9/20 통합용, 99 는 학민의 Virtual
+        # 확인용이고, 30 은 조 공용(실기)이다. 그래서 고정값도 후보 범위 · /proc · 락을
+        # 다 통과해야 쓴다. 통과 못 하면 조용히 다른 번호로 바꾸지 않고 멈춘다
+        domain = int(forced)
+        if domain not in candidates:
+            raise ForcedDomainRejected(
+                f'CONTACT_SCAN_TEST_DOMAIN_ID={domain} 은 후보 {list(candidates)} 밖이다. '
+                f'30 은 조 공용(실기 · 팀원의 Virtual), 41 은 9/20 통합용, 99 는 Virtual '
+                f'확인용이다(#126 4 항). 범위 안에서 고른다')
+        if domain in domains_in_use():
+            raise ForcedDomainRejected(
+                f'CONTACT_SCAN_TEST_DOMAIN_ID={domain} 은 살아 있는 프로세스가 쓰고 있다. '
+                f'그대로 쓰면 서로의 토픽이 섞인다(#126). 다른 번호를 고르거나 고정을 푼다')
+        if not _acquire(domain):
+            raise ForcedDomainRejected(
+                f'CONTACT_SCAN_TEST_DOMAIN_ID={domain} 은 다른 테스트 프로세스가 락을 '
+                f'들고 있다. 그 실행이 끝난 뒤 다시 돌린다. 락: {lock_dir()}')
+        _chosen_domain = domain
+        return domain
     in_use = domains_in_use()
     free = [d for d in candidates if d not in in_use]
     for domain in free:

@@ -81,11 +81,29 @@ def test_apply_sets_environment(monkeypatch):
     assert os.environ['ROS_AUTOMATIC_DISCOVERY_RANGE'] == 'LOCALHOST'
 
 
-def test_forced_domain_wins(monkeypatch):
-    """손으로 고정하는 구멍. #126 주의: 99 · 41 은 이미 쓰는 번호다."""
+def test_forced_domain_is_used_when_free(monkeypatch):
+    """재현성을 위해 번호를 고정할 수 있다. 비어 있으면 그 번호를 쓴다."""
+    monkeypatch.setenv('CONTACT_SCAN_TEST_DOMAIN_ID', '37')
+    monkeypatch.setattr(ct, 'domains_in_use', lambda *a, **k: set())
+    assert ct.pick_domain() == 37
+    assert (ct.lock_dir() / '37.lock').exists(), '고정값도 락을 잡아야 한다'
+
+
+@pytest.mark.parametrize('forced', [30, 41, 99, 0])
+def test_forced_domain_outside_candidates_is_rejected(monkeypatch, forced):
+    """#126 4 항: 30(조 공용 · 실기) · 41(9/20 통합) · 99(Virtual 확인)를 막는다."""
+    monkeypatch.setenv('CONTACT_SCAN_TEST_DOMAIN_ID', str(forced))
+    monkeypatch.setattr(ct, 'domains_in_use', lambda *a, **k: set())
+    with pytest.raises(ct.ForcedDomainRejected):
+        ct.pick_domain()
+
+
+def test_forced_domain_in_use_is_rejected(monkeypatch):
+    """고정값이라도 살아 있는 프로세스가 쓰고 있으면 쓰지 않는다. 조용히 바꾸지도 않는다."""
     monkeypatch.setenv('CONTACT_SCAN_TEST_DOMAIN_ID', '37')
     monkeypatch.setattr(ct, 'domains_in_use', lambda *a, **k: {37})
-    assert ct.pick_domain() == 37
+    with pytest.raises(ct.ForcedDomainRejected):
+        ct.pick_domain()
 
 
 def test_exhausted_raises_instead_of_sharing(monkeypatch):
