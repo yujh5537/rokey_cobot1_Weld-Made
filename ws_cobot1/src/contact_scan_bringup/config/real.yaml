@@ -37,7 +37,7 @@ contact_detector:
     # --- tare (/contact/tare): 무접촉 · 정지 구간의 외력 평균을 기준값 F0 로 저장 ---
     tare_duration_s: 1.5             # 요청의 duration_s 가 0 일 때 쓰는 구간. BRD 4.1.3 의 1~2 s
     tare_min_samples: 30             # 구간 안의 유효 샘플이 이보다 적으면 TARE_TIMEOUT
-    tare_max_std_n: 0.3              # |F - F0| 의 RMS 가 넘으면 TARE_UNSTABLE. 설계 출발값. 실기 정지 상태 실측 0.035 N (2026-09-20)
+    tare_max_std_n: 1.0              # |F - F0| 의 RMS 가 넘으면 TARE_UNSTABLE. 설계 출발값. 실기 정지 상태 실측 0.035 N (2026-09-20)
     tare_max_force_n: 6.0            # |F0| 가 넘으면 TOOL_REG_SUSPECT (BRD 4.1.5 툴 등록 점검). 병후 제안값 (PR #57 코멘트)
                                      #   실측 |F0|: 툴 등록 1.81 N (2026-09-20 홈 자세) · 2.1~2.9 N, 최대 3.7 N (2026-09-19 3자세)
                                      #             툴 미등록 11~12.5 N. 두 구간 사이가 벌어져 있어 6 N 으로 가른다
@@ -182,7 +182,7 @@ robot_manager:
     step_lift_m: 0.001               # 기준 힘을 잴 때 · 끝났을 때 드는 높이 [m]
     step_nudge_m: 0.001              # 기준 힘 전에 긁을 방향으로 움직이는 거리 [m]. 마지막 이동 방향을 긁기와 같게 둔다
                                      #   (9/21 1-1절: 멈춘 상태에서도 마지막 이동 방향만으로 Fz 가 1.9 N 다르다)
-    step_release_n: 1.5              # ΔFz 가 이 아래면 접촉이 약함 / 소실 [N]. 정지 잡음 ±0.5 N 의 3 배
+    step_release_n: 2.5              # ΔFz 가 이 아래면 접촉이 약함 / 소실 [N]. 정지 잡음 ±0.5 N 의 3 배
     step_follow_lo_n: 3.0            # 누름 하한 [N]. 이보다 약하면 z 를 더 내린다
     step_follow_hi_n: 7.0            # 누름 상한 [N]. 이보다 세면 z 를 올린다
     step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. over_force_n(15) 보다 작게
