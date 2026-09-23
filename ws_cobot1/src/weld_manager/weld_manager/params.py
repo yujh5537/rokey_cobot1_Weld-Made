@@ -85,6 +85,7 @@ class ParamSpec:
     check: Callable
     doc: str
     default: object = None   # required=False 인 이름표(프레임 이름)만 쓴다. 수치에는 두지 않는다
+    # required=False 이고 default 가 None 이면 "없으면 그 기능을 끈다"는 뜻이다(orientation_tolerance_deg)
 
 
 SPECS: Tuple[ParamSpec, ...] = (
@@ -114,6 +115,16 @@ SPECS: Tuple[ParamSpec, ...] = (
     ParamSpec('motion_timeout_s', DOUBLE, True, positive, '단위 goal 제한 시간 [s]'),
     ParamSpec('tool_check_max_force_n', DOUBLE, True, positive,
               '시작 때 무접촉 |F| 가 이보다 크면 툴 미등록으로 본다 [N] (TOOL_REG_SUSPECT 302)'),
+    # 노드가 기다리는 한도 (scan_manager 와 같은 이름 · 뜻. 계약 6절 표 추가를 병후에게 요청 중)
+    ParamSpec('server_wait_timeout_s', DOUBLE, True, positive,
+              'robot_manager 의 액션 서버 · goal 응답을 기다리는 한도 [s]'),
+    ParamSpec('stop_confirm_timeout_s', DOUBLE, True, positive,
+              '정지 요청 뒤 /robot/status 로 connected && !moving 을 확인하는 한도 [s]'),
+    ParamSpec('sample_timeout_s', DOUBLE, True, positive,
+              '시작 · 안전복귀 때 /robot/sample 이 이보다 오래됐으면 없는 것으로 본다 [s] (NO_SAMPLE 307)'),
+    # 선택: 도착 자세 대조 허용치. 없으면 대조하지 않는다(robot_manager 는 위치만 본다. 병후 확인 대기 Q9)
+    ParamSpec('orientation_tolerance_deg', DOUBLE, False, positive,
+              '도착한 자세와 목표 자세의 허용 차이 [deg]. 없으면 대조하지 않는다'),
     ParamSpec('state_publish_period_s', DOUBLE, True, positive, '/weld/state 주기 발행 간격 [s]'),
     ParamSpec('scan_state_timeout_s', DOUBLE, True, positive, '/scan/state 가 이보다 오래됐으면 시작 거절 [s]'),
     ParamSpec('result_dir', STRING, True, non_empty_text, 'result_store 경로. scan_manager 와 같은 값'),
@@ -148,6 +159,10 @@ class WeldParams:
     path_tolerance_m: float
     motion_timeout_s: float
     tool_check_max_force_n: float
+    server_wait_timeout_s: float
+    stop_confirm_timeout_s: float
+    sample_timeout_s: float
+    orientation_tolerance_deg: Optional[float]
     state_publish_period_s: float
     scan_state_timeout_s: float
     result_dir: str
@@ -160,6 +175,11 @@ class WeldParams:
 
     def tool_roll_rad(self, line_index: int) -> float:
         return math.radians(self.tool_roll_deg[line_index])
+
+    @property
+    def orientation_tolerance_rad(self) -> Optional[float]:
+        deg = self.orientation_tolerance_deg
+        return None if deg is None else math.radians(deg)
 
     @property
     def tool_profile(self) -> Tuple[Tuple[float, float], ...]:
@@ -221,6 +241,9 @@ def check(values: Mapping[str, object], override: Optional[Mapping[str, object]]
         if value is None:
             if spec.required:
                 missing.append(spec.name)
+                continue
+            if spec.default is None:
+                clean[spec.name] = None      # 선택 기능을 끈다
                 continue
             value = spec.default
         why = spec.check(value)
