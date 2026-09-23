@@ -37,17 +37,23 @@ R = [ x_tool | y_tool | d ]  → quaternion → (robot_manager 가) ZYZ deg
 - 윗면 변(L0~L3): n̂_out ⊥ ẑ 이므로 d 는 정확히 두 면 법선의 이등분 방향의 반대다.
 - 세로 모서리(L4~L7): 두 면 법선의 합은 수평이므로 "이등분 + 45° 기울임" = d 는 수평 대각선과 연직의 가운데.
 - θ = 0 이면 1차 스캔과 같은 수직 자세다(검산: 홈 quaternion 의 툴 z 축 = (0, 0, −1)).
-- 툴 축 둘레의 회전(x_tool 의 선택)은 손목(J6) 도달성에 영향을 준다. 실기에서 막히면 파라미터 `tool_roll_deg`(d 둘레 회전, 출발값 0)로 돌린다.
+- 툴 축 둘레의 회전(roll)은 손목(J6) 도달성과 세로선의 핑거 방향에 영향을 준다. **위빙 방향 w 는 roll 과 무관하게 `normalize(t̂ × d)` 로 정한다**(탐침은 축대칭). 툴 자세의 roll 은 **선별 파라미터 `tool_roll_deg[8]`**(d 둘레 회전, 출발값 전부 0)로 두어 M1 에서 막히는 선만 돌린다(현지 리뷰 6). 위 식의 x_tool 은 roll 0 의 기준 축이고, roll ≠ 0 이면 x_tool · y_tool 을 d 둘레로 그만큼 돌린 것이 툴 자세다. 참고: roll 0 에서는 윗면 루프의 ZYZ A 가 선마다 90° 씩 돈다(M1 표 90 → −180 → −90 → 0).
 - **2026-09-23 좌표로 계산한 대표 자세**(두산 posx, mm · ZYZ deg, 스탠드오프 3 mm 포함)는 `measurements-20260923.md` 표 M1 에 있다. 오늘 실기에서 도달성을 확인한다.
 
 ## 3. 스탠드오프 (D2)
 
-접촉하지 않는다. 힘 · 순응 제어를 켜지 않는다. 팁은 이음선에서 **툴 축 반대 방향(−d)으로 `standoff_m`** 만큼 물러난다(실제 토치의 stick-out 과 같은 그림).
+접촉하지 않는다. 힘 · 순응 제어를 켜지 않는다. **`standoff_m` 은 팁 구 표면과 이음선의 최단거리다**(D22, 현지 리뷰 1). 팁은 이음선에서 툴 축 반대 방향(−d)으로 물러나되, 물러나는 양 s′ 은 선의 방향에 따라 다르다.
 
 ```
-o = standoff_m · (−d)
-팁 위치 = 이음선 위의 점 + o
+r  = tip_radius_m                      # 팁 구 반지름 (스캔과 같은 값, 약 2 mm)
+k  = sqrt(1 − (d · t̂)²)                # 툴 축이 이음선과 이루는 각의 sin. 윗면선 1, 세로선 sin θ
+s′ = (standoff_m + r) / k − r          # 축 방향 물러남. 윗면선 = standoff_m, 세로선(45°) ≈ 5.07 mm
+o  = s′ · (−d)
+TCP 목표 = 이음선 위의 점 + o          # TCP 는 구 중심에서 d 방향으로 r 인 점(수직 자세의 최하단점)이라 위 식이 그대로 맞는다
 ```
+
+- 왜: 축 방향으로 3 mm 만 물러나면 세로선에서는 구 표면 ↔ 이음선이 (3 + 2)·sin45° − 2 ≈ **1.5 mm** 뿐이다(9/23 폭 오차 +1.5 mm 와 같은 크기. 접촉 판정이 없는 이동이라 과대 외력 전까지 막을 것이 없다).
+- 검산: 윗면선은 k = 1 이라 예전 정의와 같은 값(3 mm)이다.
 
 ## 4. 위빙 (D1)
 
@@ -65,7 +71,7 @@ weave_amplitude_m == 0 또는 weave_pitch_m == 0 → [S + o, E' + o] 두 점 (�
 ```
 
 - w 는 t̂ 와 d 에 모두 수직이라 "진행 방향과 수직으로, 두 면을 가로질러" 흔든다.
-- 출발값 진폭 2 mm · 반주기 4 mm → 80 mm 선에 경유점 21 개. 10 mm/s 면 선당 약 8 s, 8 선 약 65 s + 이동.
+- 출발값 진폭 2 mm · 반주기 4 mm → 80 mm 선에 경유점 21 개, 경로 길이는 직선의 약 1.38 배(110.8 mm). 10 mm/s 면 선당 약 11 s. 접근 · 후퇴 · goal 4 개를 더하면 **8 선 약 2.5 분, 경유점마다 멈추면 약 4 분**(현지 계산. 발표 시간표용. 스캔 약 7 분은 별도).
 - robot_manager 가 경유점을 `move_spline_task`(한 번 호출, 부드러움) 로 지나든 `move_line` 을 잇든(radius 로 blend) 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. 선택은 학민(D14 · D19). 오늘 실기 M4 에서 둘 중 되는 것을 본다.
 
 ## 5. 접근 · 후퇴 · 선 사이 이동
@@ -90,6 +96,10 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 - 마지막 선 뒤: 후퇴 → `OP_HOME`(마무리 복귀, DONE 에 포함).
 - 세로선의 P_ret 는 바닥 근처(받침대 + `bottom_margin_m` + approach 의 수직 성분)다. 거기서 z_safe 로 곧장 올라가는 경로는 모서리에서 대각선 바깥으로 `(standoff_m + approach_m)·sin θ` 떨어져 있다(3 + 30 mm, 45° 면 약 23 mm).
 - **작업영역 검사**(weld_manager): 모든 목표 z ≥ `support_z + bottom_margin_m` (작업대 좌표), x · y 는 부재에서 `workspace_margin_m` 안. 벗어나면 `PATH_REJECTED(604)` 로 시작을 거절한다. safety_monitor 는 작업영역을 보지 않는다(`OUT_OF_WORKSPACE` 미구현). robot_manager 는 Base z 하한(`path_min_z_m`) 하나를 수락 시점에 더 본다(두 겹, `weld-ros-interfaces.md` 5.2).
+- **툴 외형 검사**(weld_manager, D23, 현지 리뷰 2): 윗면선(L0~L3)은 툴의 모든 점이 이등분 축 뒤쪽이라 부재와 겹칠 수 없다(roll · 핑거 폭 무관). **세로선(L4~L7)은 부재가 팁 위로도 z_top 까지 있어** 탐침 몸통 · 홀더 · RG2 핑거가 옆면이나 작업대에 닿을 수 있다. 툴 외형을 파라미터 `tool_profile_m`(팁에서 축 방향 뒤로 u 인 자리의 부재 쪽 최대 반폭 R, `[[u, R], …]` 쌍 목록. 값은 M2 캘리퍼 실측, 이름은 현지가 P2 설계에서 확정)로 받아 세로선마다 검사한다:
+  - 옆면: 모든 (u, R) 에 대해 **R < (s′ + u) · tan θ**. tilt 0 이면 tan θ = 0 이라 세로선은 항상 실패한다 — **"tilt 0" 시험은 L0 에만 쓴다**.
+  - 작업대: 툴의 가장 낮은 점 **z_TCP + u · cos θ − R · sin θ ≥ support_z**(작업대 좌표) 를 세로선 아래 끝에서 검사한다.
+  - 어기면 `PATH_REJECTED(604)` 로 시작을 거절하고 detail 에 어느 선 · 어느 (u, R) 인지 적는다. 로봇을 움직이기 전의 계산만이다.
 
 ## 6. 파라미터 (weld_manager, `contact_scan_bringup/config/{sim,real}.yaml` 의 `weld_manager:` 절)
 
@@ -102,14 +112,17 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `weave_amplitude_m` | 0.002 | 위빙 진폭 | ○ |
 | `weave_pitch_m` | 0.004 | 위빙 반주기 | ○ |
 | `tilt_deg` | 45.0 | 기울임 | ○ |
-| `tool_roll_deg` | 0.0 | 툴 축 둘레 회전(도달성 조정) | |
+| `tool_roll_deg` | [0 × 8] | 선별 툴 축 둘레 회전(도달성 · 핑거 방향 조정, D24) | |
+| `tip_radius_m` | 0.002 | 팁 구 반지름. scan_manager 와 같은 값(스탠드오프 정의, 3절) | |
+| `tool_profile_m` | (M2 실측) | 툴 외형 `[[u, R], …]` (5절 외형 검사). 이름은 P2 에서 확정 | |
+| `weld_speed_min_mps` | 0.002 | 용접 · 접근 속도 하한. robot_manager 의 이동 판정(0.3 s · 0.2 mm ≈ 0.67 mm/s)보다 커야 한다(#152 거짓 도착) | |
 | `approach_m` | 0.030 | 접근 · 후퇴 거리 | |
 | `travel_clearance_m` | 0.050 | z_safe = z_top + 이 값 | |
 | `bottom_margin_m` | 0.005 | 세로선 끝 = support_z + 이 값 | |
 | `workspace_margin_m` | 0.100 | 부재 밖 허용 범위 (x · y) | |
 | `path_tolerance_m` | 0.003 | ExecutePath 마지막 점 도착 허용치 (D18 ±3 mm) | |
 | `motion_timeout_s` | 120.0 | 단위 goal 제한 | |
-| `result_dir` | data | scan_manager 와 같은 값이어야 한다 (result_store 를 읽는다) | |
+| `result_dir` | data | scan_manager 와 같은 값이어야 한다 (result_store 를 읽는다). 현지의 `result_dir` 절대경로 · sim/real 분리 PR 이 들어오면 그 값으로 바꾼다(`""` = 최신 성공 결과가 sim 결과를 고르지 않게) | |
 | `result_frame_id` · `motion_frame_id` | workpiece_fixture · base_link | 1차와 같다 | |
 | `state_publish_period_s` | 1.0 | /weld/state 주기 | |
 | `scan_state_timeout_s` | 5.0 | /scan/state 가 이보다 오래됐으면 시작 거절 | |

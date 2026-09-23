@@ -14,7 +14,7 @@
 
 | 항목 | 규칙 |
 |---|---|
-| 노드 | 자체 노드 5개: `scan_manager` · `robot_manager` · `contact_detector` · `safety_monitor` · `mqtt_bridge`. **네임스페이스 없음**(아래 이름은 절대 이름). 패키지는 노드별(`ws_cobot1/src/README.md`) |
+| 노드 | 자체 노드 5개: `scan_manager` · `robot_manager` · `contact_detector` · `safety_monitor` · `mqtt_bridge`. **네임스페이스 없음**(아래 이름은 절대 이름). 패키지는 노드별(`ws_cobot1/src/README.md`). **[v0.2.0] phase 2 예외: `weld_manager` 가 6번째 노드다**(`docs/phase2/weld-ros-interfaces.md`) |
 | 단위 | 길이 m · 각도 rad(자세는 quaternion) · 힘 N · 토크 N·m · 시간 s. 상세는 `units-frames.md` |
 | 시각 | `builtin_interfaces/Time`, 메인 PC ROS 시계. TCP와 힘은 **취득 시각을 각각 보존**하고 동시 취득으로 보지 않는다 |
 | 프레임 | 샘플 · 이벤트 · 모션 = Base(`base_link`, 가칭). `ScanResult` = 작업대 좌표(`workpiece_fixture`, 가칭). 변환은 scan_manager 한 곳(`units-frames.md`). 좌표를 쓰는 쪽은 `frame_id`를 확인한다 |

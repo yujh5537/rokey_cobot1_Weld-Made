@@ -18,7 +18,8 @@
 - 구독 필터 추가: mqtt_bridge = `cmd/weld/+`. FastAPI = `weld/#`.
 - `robot/sample.operation` 에 문자열 **`"WELD_PATH"`** 가 추가된다(`OP_WELD_PATH=5`). 웹은 이 값이고 `motion_id > 0` 인 샘플의 위치를 이어 비드 궤적으로 그린다.
 - `reason` 이름에 6xx 가 추가된다: `SCAN_ACTIVE` · `WELD_ACTIVE` · `NO_SCAN_RESULT` · `LINE_OUT_OF_RANGE` · `PATH_REJECTED`. (1차 이슈 #90: 표에 없는 코드를 조용히 버리지 않게 같이 손본다.)
-- 웹 → ROS 필수 필드는 1차 명령과 같다(`schema_version` · `request_id` · `timestamp_ms` · `payload`). `schema_version` 은 **"0.2"**. mqtt_bridge 는 "0.1" 도 받는다(스캔 명령은 그대로 "0.1").
+- 웹 → ROS 필수 필드는 1차 명령과 같다(`schema_version` · `request_id` · `timestamp_ms` · `payload`). **`schema_version` 은 토픽별이다**(원칙): 용접 토픽(`cmd/weld/*` · `weld/*`)은 "0.2", 스캔 토픽은 그대로 "0.1". mqtt_bridge 의 command_guard 는 토픽별 허용 버전으로 검사한다(의석). 3차가 붙어도 같은 방식이다.
+- **null 규칙(1차와 다른 점)**: `weld/state.line_index` 와 `weld/result.lines[].stop_pose` 는 `null` 단독이다(1차의 `null` + `*_valid` 쌍이 아니다). 그 밖의 숫자 필드는 1차 규칙 그대로.
 
 ## 2. JSON 예시
 

@@ -5,6 +5,7 @@
 
 ## 1. 원칙 (1차와 다른 점만)
 
+- **자체 노드는 6 개다**: 1차 5 개 + `weld_manager`. 1차 계약 1장의 "자체 노드 5개"와 `.claude/rules/ros2-nodes.md` 의 예외다(각각 한 줄로 표시).
 - phase 2 는 BRD · 1차 계약의 구속을 받지 않는다. 다만 다음은 유지한다(안전 · 품질): 실기 명령은 사람이(CLAUDE.md 규칙 1) · 미측정값 0 금지(규칙 4) · 수치는 파라미터(규칙 7) · **계약이 코드보다 우선**.
 - 힘 · 순응 제어를 **켜지 않는다**(D2). 그래서 규칙 2(try/finally 해제)는 용접 경로에 해당하지 않는다. robot_manager 의 `ExecutePath` 는 **자기 내부 플래그**(`/robot/status` 의 `compliance_active` · `force_ctrl_active` 를 만드는 그 값)가 켜져 있으면 goal 을 거절한다(`BUSY`). 이 검사는 켜는 경로가 없는데도 **남아 있으면 안 되는 상태를 잡는 안전망**이다(1차 SLIDE 의 해제 실패 뒤 등). 컨트롤러에 조회(`GetControlMode`)하지 않는다(#125 와 같은 이유로 1차와 같은 근거를 쓴다).
 - **스캔과 용접은 배타적이다**(D6). 3.3절.
@@ -20,6 +21,7 @@
 | `/scan/state` | `ScanState` | scan_manager | **weld_manager** (추가) | STATE | 스캔이 휴지인지 본다 |
 | `/robot/status` | `RobotStatus` | robot_manager | **weld_manager** (추가) | STATE | 정지 완료 확인 |
 | `/safety/status` | `SafetyStatus` | safety_monitor | **weld_manager** (추가) | STATE | 래치면 시작 거절 |
+| `/robot/sample` | `RobotSample` | robot_manager | **weld_manager** (추가) | SENSOR | 시작 시 현재 팁 위치(z_safe 위인지 · 첫 접근 1 의 출발점)와 툴 등록 확인(무접촉 \|F\| 가 크면 미등록, 9/23 비상정지 2 회 원인). 용접 중에는 쓰지 않는다 |
 
 `/robot/sample.operation` 은 `ExecutePath` 실행 중 `OP_WELD_PATH(5)` 다. `motion_id` 는 그 goal 의 값.
 
@@ -57,7 +59,7 @@ float64 tilt_deg              # 툴 축이 연직에서 바깥으로 기우는 �
 bool    tilt_set
 ```
 - `RunWeld.config_override` 로 받은 값은 그 작업에만 적용한다. 파라미터는 바꾸지 않는다(1차 SetConfig 전파는 쓰지 않는다).
-- 범위 밖(속도 ≤ 0 · > `path_max_speed_mps`, 진폭 < 0, tilt 0~80° 밖) 이면 `INVALID_VALUE(102)`.
+- 범위 밖(속도 < `weld_speed_min_mps` · > `path_max_speed_mps`, 진폭 < 0, tilt 0~80° 밖) 이면 `INVALID_VALUE(102)`.
 
 ### 3.2 WeldState.msg
 ```
@@ -172,8 +174,10 @@ WeldState state
 | `/robot/status` 없음 · `connected=false` | `ROBOT_DISCONNECTED(104)` |
 | `scan_id` 의 `result.json` 이 없다 · `success=false` · `box_valid=false` · `""` 인데 성공 결과가 하나도 없다 | `NO_SCAN_RESULT(602)` |
 | `start_line > 7` | `LINE_OUT_OF_RANGE(603)` |
-| `config_override` 범위 밖 | `INVALID_VALUE(102)` |
-| 생성한 경로가 작업영역 밖 | `PATH_REJECTED(604)` |
+| `config_override` 범위 밖 (속도 < `weld_speed_min_mps` 포함) | `INVALID_VALUE(102)` |
+| `/robot/sample` 이 없다 | `NO_SAMPLE(307)` |
+| 무접촉 \|F\| > `tool_check_max_force_n`(출발값 6.0, contact_detector 의 `tare_max_force_n` 과 같은 근거) | `TOOL_REG_SUSPECT(302)` |
+| 생성한 경로가 작업영역 밖, 또는 세로선 툴 외형 검사 실패(`weld-motion.md` 5절) | `PATH_REJECTED(604)` |
 
 - `scan_id == ""` 이면 **result_store 의 가장 최근(`scan_id` 사전순) `success=true` 결과**다. 진행 중 기록(progress.json)만 있는 작업은 후보가 아니다.
 - Result 의 `success` 는 마무리 홈 복귀까지 포함한다. `result.success` 는 용접선만 본다(1차 RunScan 과 같은 구분).
@@ -227,7 +231,8 @@ builtin_interfaces/Duration elapsed
 - ReasonCode 6xx: `SCAN_ACTIVE 600` · `WELD_ACTIVE 601` · `NO_SCAN_RESULT 602` · `LINE_OUT_OF_RANGE 603` · `PATH_REJECTED 604` (표는 1차 문서 6.1절).
 - robot_manager 파라미터(계약 이름): `path_max_points`(200) · `path_max_speed_mps`(0.100) · `path_min_z_m`(Base z 하한, 출발값 0.100) · `path_acc_ratio`(4.0, **단위 1/s**: 가속 [mm/s²] = 이 값 × 속도 [mm/s]. 1차 `dsr_client.move_line_request` 의 `acc = 4 × vel` 과 같은 규칙).
 - `weld_id`: `scan_id` 와 같은 형식 `YYYYMMDD-HHMMSS-xxxx`(벽시계). `motion_id`: weld 안에서 1부터 증가. `ExecuteMotion` 과 `ExecutePath` 가 같은 번호 공간을 쓴다.
-- 파라미터 이름(계약에 속함): `weld-motion.md` 6절의 표.
+- 파라미터 이름(계약에 속함): `weld-motion.md` 6절의 표. weld_manager 의 `tool_check_max_force_n`(6.0) · `weld_state_timeout_s`(scan_manager, 5.0) 포함.
+- **null 규칙(1차와 다른 점)**: `WeldState.line_index` 는 `LINE_NONE(255)` 이 "없음"이고 `*_valid` 짝이 없다. MQTT 에서는 `null` 단독이다. `WeldLine.stop_pose` 는 ROS 에서는 `stop_pose_valid` 짝이 있지만 MQTT 에서는 `null` 단독으로 싣는다(`weld-mqtt-schema.md`).
 
 ## 7. 동작 규칙
 
@@ -238,11 +243,12 @@ builtin_interfaces/Duration elapsed
 | scan_manager | `/weld/state.phase` 가 휴지(IDLE · DONE · ERROR · STOPPED)가 아니다 | START · RESUME → `WELD_ACTIVE(601)`. 안전복귀(`/scan/home`)는 막지 않는다 |
 | robot_manager | 다른 goal 실행 중 | 어느 서버든 `BUSY(100)` |
 
-`/weld/state` 가 한 번도 오지 않았으면(weld_manager 미기동) scan_manager 는 용접이 없다고 본다(1차 동작 유지).
+`/weld/state` 가 한 번도 오지 않았으면(weld_manager 미기동) scan_manager 는 용접이 없다고 본다(1차 동작 유지). **마지막 `/weld/state.stamp` 가 `weld_state_timeout_s`(출발값 5.0)보다 오래됐어도 용접이 없다고 본다** — TRANSIENT_LOCAL 이라 weld_manager 가 WELDING 중에 죽으면 마지막 값이 남아 스캔이 영영 601 로 막히기 때문이다(현지 리뷰 5. weld_manager 의 `scan_state_timeout_s` 와 대칭).
 
 ### 7.2 중지 · 안전복귀 (D7)
 - `/weld/stop` → STOPPING → `/robot/stop` → `/robot/status` 로 정지 확인 → STOPPED. 재시작은 없다. 중지 · 안전복귀 · 시작은 서로를 부르지 않는다(1차 규칙 3).
-- `/weld/home` 은 휴지 phase 에서만 받는다. `OP_MOVE_TO` 로 z_safe 까지 올린 뒤 `OP_HOME`. 현재 위치를 모르면(정지 좌표 없음) 올리지 않고 `OP_HOME` 만 보낸다 — 이때 기울인 자세에서 곧장 관절 이동이 나가므로 **관제자가 보고 누른다**.
+- **STOPPED 는 `/weld/stop` 을 경유한 정지뿐이다**(D25, 현지 리뷰 4). weld_manager 가 요청하지 않은 정지(웹의 스캔 중지 버튼이 부르는 `/robot/stop`, safety_monitor 의 정지)로 goal 이 `REASON_STOP_REQUESTED` · `REASON_CANCELED` 로 끝나면 **ERROR** 다(1차 scan_manager 와 같은 분류). 사유는 래치 중이면 `SafetyStatus.reason_code`, 아니면 `ROBOT_ERROR(204)` + detail.
+- `/weld/home` 은 휴지 phase 에서만 받는다. **정지 좌표를 알면 먼저 그 자세의 툴 축 뒤(−d)로 `approach_m` 물러난 뒤** `OP_MOVE_TO` 로 z_safe 까지 올리고 `OP_HOME`(현지 리뷰 3: 세로선 도중에 멈췄으면 팁이 모서리선에서 1.5~3 mm 떨어진 채 위 꼭짓점을 스치며 올라간다). 현재 위치를 모르면(정지 좌표 없음) 물러남 · 올림 없이 `OP_HOME` 만 보낸다 — 이때 기울인 자세에서 곧장 관절 이동이 나가므로 **관제자가 보고 누른다**.
 - safety_monitor 의 정지(OVER_FORCE · SAMPLE_STALE …)는 1차와 같이 goal Result 로 잡혀 ERROR 가 된다. 래치 해제는 `/safety/reset`.
 
 ### 7.3 용접 완료 순서

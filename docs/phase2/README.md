@@ -38,6 +38,12 @@
 | D19 | 위빙은 지그재그 경유점(`ExecutePath`). `move_periodic` 은 쓰지 않는다 |
 | D20 | mqtt_bridge `weld/*` 는 의석 |
 | D21 | 9/23 실기 측정: 정 학민 · 부 병후. 별도 PR |
+| D22 | `standoff_m` = 팁 구 표면 ↔ 이음선 최단거리(세로선은 축 방향 약 5.07 mm) |
+| D23 | 세로선 툴 외형 검사(`tool_profile_m`, M2 실측)로 겹치면 604 거절 |
+| D24 | `tool_roll_deg` 는 선별 8개 배열. 위빙 방향은 roll 과 무관 |
+| D25 | weld_manager 가 요청하지 않은 정지는 STOPPED 가 아니라 ERROR |
+| D26 | 이 최초 계약 PR(#184, 30 파일)은 규칙 5 의 예외. 이후 PR 은 15 파일 |
+| D27 | 9/29 단계: 윗면 4 선 = 반드시 성공, 세로선 · 위빙 = 조건부 |
 
 **계약 작성 중 드러난 것 → 2026-09-23 병후 결정**
 - **`move_periodic` 은 직선 이동과 겹쳐 실행되지 않는다**(dsr_msgs2 `MovePeriodic.srv` 는 제자리 주기 운동). 위빙은 **지그재그 경유점**으로 만들고 robot_manager 가 `ExecutePath` 로 지난다 — **채택(D19)**. 실행은 `move_spline_task` 또는 `move_line` 반복 중 실기에서 되는 것으로.
@@ -49,7 +55,8 @@
 2. 미측정 · 실패값 0 금지(규칙 4)
 3. 수치는 파라미터(규칙 7). 출발값은 `weld-motion.md` 6절
 4. 계약이 코드보다 우선. 타입 파일 · 문서 · CHANGELOG 를 한 PR 에서 같이 고친다(`test_contract_sync`)
-5. 브랜치 `p2-<주제>`, PR 본문에 `phase 2` 표시. 15 파일 초과 시 쪼갠다
+5. 브랜치 `p2-<주제>`, PR 본문에 `phase 2` 표시. 15 파일 초과 시 쪼갠다(최초 계약 PR #184 는 예외, D26)
+6. 자체 노드는 6 개(1차 5 + `weld_manager`). `.claude/rules/ros2-nodes.md` · 1차 계약 1장의 예외
 
 ## 담당 · 산출물
 
@@ -60,8 +67,13 @@
 | 의석 | 웹: 용접 화면 · 비드 궤적 · 명령 버튼, FastAPI `weld/#` **+ mqtt_bridge `weld/*` 중계** | `tasks/P3-web.md` · `tasks/P4-bridge.md` |
 | 병후 | 계약(이 디렉터리) · scan_manager 601 · 측정 보조 · 발표 | `tasks/P5-scan-guard.md` |
 
-## 통합 순서 (9/29)
+## 머지 순서 (연휴 중)
+0. **브리지 operation/reason 표 PR**(의석, 작은 PR): `ROBOT_OPERATION_NAMES[5]=WELD_PATH` · 표에 없는 코드는 `UNKNOWN_<n>` · 1차 `mqtt-schema.md` 1장에 그 규칙 한 줄. **P1 보다 먼저** — 없으면 P1 이 `operation=5` 를 싣는 순간 main 의 mqtt_bridge 가 `robot/sample` 을 통째로 버린다
+1. P1 robot_manager → P2 weld_manager(가짜 서버로 먼저 가능) → P4 브리지 · P3 웹(목업 발행기로 먼저 가능) → P5
+
+## 통합 순서 (9/29, D27)
 1. 실기 스캔 1회(큐브를 옮겼으면 필수) → `result.json`
 2. Virtual 로 용접 종단(웹 버튼 → mqtt → weld_manager → robot_manager 에뮬레이터) 통과 확인
-3. 실기: `tilt_deg=0 · weave 0 · 속도 낮게` 로 L0 한 선 → 45° 로 L0 → 8 선 전체 → 위빙 켬
-4. 시연 리허설
+3. 실기 **1단계(반드시 성공)**: 윗면 4 선. `tilt_deg=0 · weave 0 · 속도 낮게` 로 **L0 만** 한 선(tilt 0 은 세로선에 못 쓴다) → 45° 로 L0 → L0~L3
+4. 실기 **2단계(조건부)**: 세로선 L4~L7(M1 도달성 · M2 외형 검사 통과한 선만) → 위빙 켬
+5. 시연 리허설

@@ -4,7 +4,7 @@ paths:
 ---
 # ROS 2 노드 규칙
 
-- 자체 실행 노드는 5개뿐이다: scan_manager, robot_manager, contact_detector, safety_monitor, mqtt_bridge. geometry_estimator와 result_store는 scan_manager 안의 모듈이며 새 노드를 만들지 않는다.
+- 자체 실행 노드는 5개뿐이다: scan_manager, robot_manager, contact_detector, safety_monitor, mqtt_bridge. geometry_estimator와 result_store는 scan_manager 안의 모듈이며 새 노드를 만들지 않는다. **예외(phase 2, 2026-09-23~): `weld_manager` 가 6번째 노드다**(`docs/phase2/`). 그 밖의 새 노드는 여전히 만들지 않는다.
 - DSR_ROBOT2·dsr_msgs2·RG2 드라이버를 부르는 코드는 **robot_manager에만** 둔다. 다른 패키지는 `contact_scan_interfaces`의 타입만 쓴다.
 - `scan_manager/geometry_estimator/`는 rclpy를 import하지 않는 순수 Python으로 유지한다(ROS 없이 pytest 실행).
 - 장시간 모션은 비동기(amovel)로 실행하고 콜백을 막지 않는다. 모션 중에도 정지 요청과 샘플 수신이 처리되어야 한다(BRD 4.2.3). Action 취소 접수와 실제 정지 완료를 구분한다.
