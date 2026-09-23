@@ -3,15 +3,16 @@
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
 
-## v0.2.1 (2026-09-22, T41 · PR TBD)
+## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
 - 실측 종단에서 `/dsr01/joint_states` publisher가 2개임을 확인했다: `/dsr01/joint_state_broadcaster`는 M0609 J1~J6 6축, `/dsr01/joint_state_publisher`는 M0609 6축 + RG2 6축 합성 스냅샷
 - `robot/joints`는 정확히 M0609 6축인 스냅샷만 사용한다. 12축 합성 메시지가 M0609 웹 자세를 번갈아 덮지 않게 한다
 - 새 `robot/gripper_joints`는 합성 스냅샷에서 RG2 6축만 추려 QoS 0 · retain=false로 발행한다
 - 두 토픽 모두 표시 전용이다. 로봇/그리퍼 제어 입력으로 사용하지 않는다
+- 9/23 실기 통합값을 동결점에 반영: real `tare_max_std_n=1.0`(tare RMS 0.636~0.813 N에서 0.3 N이 두 번 TARE_UNSTABLE), `step_release_n=2.5`(1.5 N에서 F0 치우침으로 윗면 위 거짓 접촉 후 −y no_contact(204)). sim은 가상 외력이므로 기존 0.3 N을 유지한다
 - 웹 모델은 pinned M0609 URDF의 `link_6 -> tool0` 고정 RPY와 m0609_rg2_bringup의 `tool0 -> rg2_base_link` 장착 RPY를 반영한다
 
-## v0.2.0 (2026-09-22, T41 · PR TBD)
+## v0.1.19 (2026-09-23, T41 · #179)
 `mqtt-schema.md`에 웹 M0609 디지털 트윈 표시용 **`robot/joints`**를 추가했다. 영향: mqtt_bridge · FastAPI(`robot/#` 기존 구독으로 자동 전달) · frontend · mock_publisher.
 - ROS 원본은 Doosan `joint_state_broadcaster`의 `/dsr01/joint_states` (`sensor_msgs/JointState`). mqtt_bridge가 기본 20 Hz로 다운샘플해 QoS 0 · retain=false로 발행한다
 - payload는 `names[]`와 같은 인덱스의 `positions_rad[]`, `stamp_ms`, `published_at_ms`를 가진다. 자세 quaternion 규칙은 그대로이며 관절각만 rad 예외로 추가한다
@@ -37,7 +38,7 @@
 - 9/22 실기: 힘 제어 밀기는 방향별 실제 누름이 1.5~8.6 N(같은 6 N 설정), 방향 전환 뒤 떠서 모서리를 놓침(#155), 가짜 EDGE(#154), 옆 이동 명령 누락(#153), 가짜 도착(#152). 뿌리가 같다 — 움직이는 중에 힘을 읽고 누름을 힘 제어에 맡긴다
 - 9/17 `tactile_probe/edge_scan.py` 프로토타입(같은 M0609)은 위치 제어로 한 스텝 가고 멈춘 뒤 힘을 읽어 z 를 맞추며 긁어 원점 + 네 방향을 한 번에 끝냈다(`~/tactile_probe_logs/scan_20260917_171305.csv`). 이것을 robot_manager `slide_mode: step` 으로 옮겼다. `force` 는 기존 그대로
 - 스텝 모드의 EDGE 는 "힘 빠짐 → 더 내려가 보기 → 확정 → 가는 스텝 다듬기"가 동작과 한 몸이라 robot_manager 가 확정하고 `/contact/event` 로 낸다(`source robot_step`, `event_id ≥ 2³²`, `z_drop_valid` 항상 true). 짝 맞추기와 scan_manager 절차는 그대로
-- 소실 기준은 `step_follow_lo_n`(3 N)이다. `step_release_n`(1.5 N)은 처음 누를 때의 닿음 기준으로만 쓴다. 9/22 18:2x 실기: 모서리를 넘은 반지름 약 2 mm 팁이 모서리 각에 걸려 ΔFz 1~2 N 이 남는데, 기준 힘 F0 이 실행마다 ±0.6 N 흔들려 1.5 N 을 넘나들었다 → 넘으면 접촉 높이가 따라 내려가 모서리를 2.9 mm 타고 흘러내린 뒤 다듬기 실패. 다듬기는 윗면 위로 들고 마지막으로 3 N 이상 누른 자리보다 한 스텝 뒤에서 긁는 방향으로 들어와 F0 을 다시 재고 다시 누른다(18:40 네 방향 성공)
+- 소실 기준은 `step_follow_lo_n`(3 N)이다. `step_release_n`은 처음 누를 때의 닿음 기준으로만 쓴다. **v0.1.15 당시 출발값은 1.5 N**이었고, 9/23 실기 통합에서 F0 치우침으로 윗면보다 약 1.4 mm 위 거짓 접촉 후 −y `no_contact(204)`가 발생해 real 값을 **2.5 N**으로 조정했다(v0.1.20, #179). 9/22 18:2x 실기에서는 모서리를 넘은 반지름 약 2 mm 팁이 모서리 각에 걸려 ΔFz 1~2 N 이 남고, 기준 힘 F0 이 실행마다 ±0.6 N 흔들려 당시 1.5 N을 넘나들었다. 다듬기는 윗면 위로 들고 마지막으로 3 N 이상 누른 자리보다 한 스텝 뒤에서 긁는 방향으로 들어와 F0 을 다시 재고 다시 누른다(18:40 네 방향 성공)
 - 후속: 편향 보정의 속도 × 지연 항(스텝 모드는 0 이어야 한다, scan_manager), `edge_bias_offset_m` 을 스텝 모드 기준으로 다시 잰다(T30)
 
 ## v0.1.14 (2026-09-21, 새 탐침 TCP x · y, #137)
