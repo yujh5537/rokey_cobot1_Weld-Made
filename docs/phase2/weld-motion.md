@@ -89,7 +89,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 - 선 사이: 후퇴(i) → 접근 1(i+1). 두 점 모두 z_safe 위라 부재를 가로질러도 된다.
 - 마지막 선 뒤: 후퇴 → `OP_HOME`(마무리 복귀, DONE 에 포함).
 - 세로선의 P_ret 는 바닥 근처(받침대 + `bottom_margin_m` + approach 의 수직 성분)다. 거기서 z_safe 로 곧장 올라가는 경로는 모서리에서 대각선 바깥으로 `(standoff_m + approach_m)·sin θ` 떨어져 있다(3 + 30 mm, 45° 면 약 23 mm).
-- **작업영역 검사**(weld_manager): 모든 목표 z ≥ `support_z + bottom_margin_m` (작업대 좌표), x · y 는 부재에서 `workspace_margin_m` 안. 벗어나면 `PATH_REJECTED(604)` 로 시작을 거절한다. safety_monitor 는 작업영역을 보지 않는다(`OUT_OF_WORKSPACE` 미구현).
+- **작업영역 검사**(weld_manager): 모든 목표 z ≥ `support_z + bottom_margin_m` (작업대 좌표), x · y 는 부재에서 `workspace_margin_m` 안. 벗어나면 `PATH_REJECTED(604)` 로 시작을 거절한다. safety_monitor 는 작업영역을 보지 않는다(`OUT_OF_WORKSPACE` 미구현). robot_manager 는 Base z 하한(`path_min_z_m`) 하나를 수락 시점에 더 본다(두 겹, `weld-ros-interfaces.md` 5.2).
 
 ## 6. 파라미터 (weld_manager, `contact_scan_bringup/config/{sim,real}.yaml` 의 `weld_manager:` 절)
 
@@ -114,7 +114,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `state_publish_period_s` | 1.0 | /weld/state 주기 | |
 | `scan_state_timeout_s` | 5.0 | /scan/state 가 이보다 오래됐으면 시작 거절 | |
 
-robot_manager 쪽: `path_max_points`(출발값 200) · `path_max_speed_mps`(0.100, 넘으면 604) · `path_acc_ratio`(가속 = 속도 × 이 값, 출발값 4, 1차 `move_line_request` 와 같음).
+robot_manager 쪽: `path_max_points`(출발값 200) · `path_max_speed_mps`(0.100, 넘으면 604) · **`path_min_z_m`**(Base z 하한, 경유점 하나라도 아래면 604. 출발값 0.100 = 작업대 0.095 + 테이프 0.002 + 여유 0.003) · `path_acc_ratio`(4.0, 단위 1/s: 가속 [mm/s²] = 이 값 × 속도 [mm/s], 1차 `move_line_request` 의 `acc = 4 × vel` 과 같음).
 
 ## 7. 오늘 실기에서 정해야 하는 것
 

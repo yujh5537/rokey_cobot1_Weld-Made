@@ -7,12 +7,12 @@
 weld_manager 가 만든 경유점 목록(지그재그 위빙 포함)을 로봇이 차례로, 정해진 속도로 지나게 하는 액션 서버를 robot_manager 에 더한다. 접촉 판정도 힘 제어도 없는 "직선 이동 여러 개"다. 1차 `ExecuteMotion` 과 같은 자리를 써서 둘이 동시에 돌지 않게 한다.
 
 ## 오늘(9/23) 실기 측정 — 이 task 보다 먼저 (정 학민 · 부 병후, 별도 PR `p2-measure-0923`)
-`docs/phase2/measurements-20260923.md` **M1(16 자세 도달성, `docs/env/weld_pose_check.py`) · M2 · M4(spline vs line) · M6**. 결과는 그 PR 의 표에 채운다. M1 이 없으면 연휴 중 짠 경로가 9/29 에 관절 한계로 막힐 수 있다. 실기 명령은 사람이 한다.
+`docs/phase2/measurements-20260923.md` **M1(16 자세 도달성, `docs/env/weld_pose_check.py`) · M2 · M4(spline vs line) · M6**. 결과는 그 PR 의 표에 채운다. M1 이 없으면 연휴 중 짠 경로가 9/29 에 관절 한계로 막힐 수 있다. 실기 명령은 사람이 한다. **오늘 로봇 시간이 안 나면**: M1 은 Virtual(에뮬레이터, 관절 한계 · 특이점은 운동학이라 대부분 잡힌다)로 연휴 중 대신하고, 간섭은 M2 치수로 계산하며, 9/29 첫 30 분을 실기 M1 에 쓴다.
 
 ## 계약 (확정)
 - `docs/phase2/weld-ros-interfaces.md` 5.2 `ExecutePath.action`, 2.1(`RobotSample.operation = OP_WELD_PATH(5)`), 2.2(`/robot/stop` requester `'weld_manager'`).
 - goal 거절 · 종료 사유 · 도착 판정 규칙은 5.2 절의 글머리표 그대로.
-- 파라미터(robot_manager): `path_max_points`(200) · `path_max_speed_mps`(0.100) · `path_acc_ratio`(4.0). `real.yaml` · `sim.yaml` 에 주석과 함께.
+- 파라미터(robot_manager): `path_max_points`(200) · `path_max_speed_mps`(0.100) · **`path_min_z_m`**(Base z 하한, 출발값 real 0.100 / sim 은 sim 박스 밑면 0.400 + 여유) · `path_acc_ratio`(4.0, 1/s). `real.yaml` · `sim.yaml` 에 주석과 함께. 순응 · 힘 제어 검사는 내부 플래그(안전망).
 
 ## 초기 설계 (출발점, 바꿔도 됨)
 - `dsr_client.py`: `move_spline_task_request(posx_list, speed_mps)` 추가(`MoveSplineTask`: `pos` 는 `Float64MultiArray[]`, `pos_cnt`, `vel/acc [mm/s, deg/s]`, `ref=DR_BASE`, `mode=ABS`, `opt=CONST(1)` 검토, `sync_type=ASYNC`). M4 에서 spline 이 안 되면 `move_line_request` 를 radius 로 잇는다(`radius` 인자 추가).

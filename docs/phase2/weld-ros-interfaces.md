@@ -6,7 +6,7 @@
 ## 1. 원칙 (1차와 다른 점만)
 
 - phase 2 는 BRD · 1차 계약의 구속을 받지 않는다. 다만 다음은 유지한다(안전 · 품질): 실기 명령은 사람이(CLAUDE.md 규칙 1) · 미측정값 0 금지(규칙 4) · 수치는 파라미터(규칙 7) · **계약이 코드보다 우선**.
-- 힘 · 순응 제어를 **켜지 않는다**(D2). 그래서 규칙 2(try/finally 해제)는 용접 경로에 해당하지 않는다. robot_manager 의 `ExecutePath` 는 `compliance_active` · `force_ctrl_active` 가 켜져 있으면 goal 을 거절한다(`BUSY`).
+- 힘 · 순응 제어를 **켜지 않는다**(D2). 그래서 규칙 2(try/finally 해제)는 용접 경로에 해당하지 않는다. robot_manager 의 `ExecutePath` 는 **자기 내부 플래그**(`/robot/status` 의 `compliance_active` · `force_ctrl_active` 를 만드는 그 값)가 켜져 있으면 goal 을 거절한다(`BUSY`). 이 검사는 켜는 경로가 없는데도 **남아 있으면 안 되는 상태를 잡는 안전망**이다(1차 SLIDE 의 해제 실패 뒤 등). 컨트롤러에 조회(`GetControlMode`)하지 않는다(#125 와 같은 이유로 1차와 같은 근거를 쓴다).
 - **스캔과 용접은 배타적이다**(D6). 3.3절.
 
 ## 2. 연결 표 (추가분)
@@ -214,7 +214,8 @@ uint16 waypoint_index           # 향하고 있는 경유점
 builtin_interfaces/Duration elapsed
 ```
 - 동시에 1개만 수락한다. **`ExecuteMotion` 과 같은 자리**를 쓴다: 어느 한쪽이 실행 중이면 다른 쪽도 `BUSY`. `/robot/stop` 이 걸려 있으면 거절(1차 규칙과 같다).
-- 거절(`REASON_REJECTED` · `PATH_REJECTED(604)`): `waypoints` 가 비었다 · `path_max_points` 초과 · `speed ≤ 0` 또는 `> path_max_speed_mps` · `frame_id ≠ robot_manager.frame_id` · 순응 · 힘 제어가 켜져 있다.
+- 거절(`REASON_REJECTED` · `PATH_REJECTED(604)`): `waypoints` 가 비었다 · `path_max_points` 초과 · `speed ≤ 0` 또는 `> path_max_speed_mps` · `frame_id ≠ robot_manager.frame_id` · **경유점 하나라도 `z < path_min_z_m`**(Base, robot_manager 파라미터. 수락 시점에 전부 검사한다) · 순응 · 힘 제어가 켜져 있다(→ `BUSY`).
+- **작업영역은 두 겹이다.** weld_manager 가 먼저 작업대 좌표로 거른다(`weld-motion.md` 5절: z ≥ `support_z + bottom_margin_m`, x · y 는 부재 ± `workspace_margin_m`). robot_manager 는 Base 좌표의 **z 하한 하나**(`path_min_z_m`)만 본다 — 경유점이 잘못 와도 `path_max_speed_mps`(0.100, 밀기의 20 배)로 작업대에 박히지 않게 하는 마지막 울타리다(학민 리뷰). 출발값은 작업대 표면 `base_to_fixture.z`(0.095) + 테이프 2 mm + 여유 3 mm ≈ **0.100 m**. `real.yaml` 에서 좌표를 켤 때 같이 채운다.
 - 실행: 현재 위치에서 첫 점까지, 그리고 점 사이를 **직선**으로 `speed` 로 지난다. 구현(`move_spline_task` 한 번 / `move_line` 반복 + radius)은 robot_manager 담당의 선택이다. 어느 쪽이든 **점 사이에서 멈추지 않는 것**이 목표지만, 멈춰도 계약 위반은 아니다(D8 코너 정지 허용).
 - 종료: 마지막 점에서 정지 확인(1차 `arrival_grace_s` · `moving` 판정과 같다). 마지막 점과의 거리 > `path_tolerance_m` 이면 `REASON_ROBOT_ERROR` + `ROBOT_ERROR(204)`.
 - 접촉 이벤트로 멈추지 않는다. `TYPE_OVER_FORCE` 는 1차와 같이 항상 정지(`REASON_OVER_FORCE`).
@@ -224,6 +225,7 @@ builtin_interfaces/Duration elapsed
 ## 6. 공통 정의 (추가분)
 
 - ReasonCode 6xx: `SCAN_ACTIVE 600` · `WELD_ACTIVE 601` · `NO_SCAN_RESULT 602` · `LINE_OUT_OF_RANGE 603` · `PATH_REJECTED 604` (표는 1차 문서 6.1절).
+- robot_manager 파라미터(계약 이름): `path_max_points`(200) · `path_max_speed_mps`(0.100) · `path_min_z_m`(Base z 하한, 출발값 0.100) · `path_acc_ratio`(4.0, **단위 1/s**: 가속 [mm/s²] = 이 값 × 속도 [mm/s]. 1차 `dsr_client.move_line_request` 의 `acc = 4 × vel` 과 같은 규칙).
 - `weld_id`: `scan_id` 와 같은 형식 `YYYYMMDD-HHMMSS-xxxx`(벽시계). `motion_id`: weld 안에서 1부터 증가. `ExecuteMotion` 과 `ExecutePath` 가 같은 번호 공간을 쓴다.
 - 파라미터 이름(계약에 속함): `weld-motion.md` 6절의 표.
 
