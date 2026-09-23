@@ -107,6 +107,29 @@ def test_slow_descend_is_moving():
     assert is_moving(points, 0.0002) is True
 
 
+def test_one_mm_per_second_descend_is_moving():
+    """1 mm/s 하강도 이동으로 읽어야 한다 (9/23 실기 #152).
+
+    real.yaml 의 moving_window_s 0.3 · moving_eps_m 0.2 mm 에서 1 mm/s 는 창 하나에 0.3 mm 다.
+    실기 샘플 간격(약 20 ms)으로 창을 채워도 첫 점에서 0.2 mm 를 넘는 점이 있어야 한다.
+    넘지 못하면 "멈췄다 = 도착"이 되어 goal 이 끝나고, 로봇은 감시 없이 계속 내려간다.
+    2026-09-23 공중 10 mm 하강 3 회가 1.15 · 3.22 · 0.93 mm 만 가고 '도착'으로 끝났다.
+    """
+    points = window(*[(i * 0.02, (0.4, 0.0, 0.2 - 0.001 * i * 0.02)) for i in range(16)])
+    assert is_moving(points, 0.0002, window_s=0.3) is True
+
+
+def test_speed_below_eps_over_window_reads_as_still():
+    """이 파라미터 조합이 지켜 주는 최저 속도는 moving_eps_m / moving_window_s 다.
+
+    0.2 mm / 0.3 s = 약 0.67 mm/s. 그보다 느리면 창을 다 덮어도 변위가 eps 에 못 미쳐
+    움직이는 로봇이 "멈췄다"로 읽힌다. 하강 속도를 그 아래로 내리려면
+    moving_eps_m · moving_window_s 를 같이 본다 (real.yaml 주석).
+    """
+    points = window(*[(i * 0.02, (0.4, 0.0, 0.2 - 0.0005 * i * 0.02)) for i in range(16)])
+    assert is_moving(points, 0.0002, window_s=0.3) is False
+
+
 def test_trim_drops_old_points():
     points = window((0.0, (0, 0, 0)), (0.5, (0, 0, 0)), (0.9, (0, 0, 0)))
     trim(points, now_s=1.0, window_s=0.3)
