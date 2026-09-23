@@ -36,7 +36,7 @@
 ## v0.2.0 (2026-09-23, phase 2 용접 인터페이스, docs/phase2)
 **타입 추가**(`WeldConfig` · `WeldState` · `WeldLine` · `WeldResult` · `StopWeld` · `RunWeld` · `ExecutePath`)와 **기존 타입의 상수 추가**(`RobotSample` · `ExecuteMotion` 에 `OP_WELD_PATH=5`, ReasonCode 6xx 5 개). 기존 필드는 바꾸지 않았다. 전문과 동작 규칙은 `docs/phase2/weld-ros-interfaces.md`, MQTT 는 `docs/phase2/weld-mqtt-schema.md`, 모션 정의는 `docs/phase2/weld-motion.md`.
 - **왜**: 1차(스캔) 완료 뒤 2차 프로젝트 "스캔 결과로 용접 모션"을 같은 레포 · 같은 인터페이스 패키지에서 진행한다(병후, 2026-09-23). phase 2 는 기존 계약 · BRD 의 구속을 받지 않지만, 타입 동기화 검사(`test_contract_sync`)와 ReasonCode 번호 규칙(추가만, 변경 없음)은 그대로 쓴다
-- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름) · 새 노드 weld_manager · 웹
+- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름, 의석) · 새 노드 weld_manager · 웹
 - `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
 
 ## v0.1.15 (2026-09-22, SLIDE 스텝 모드)

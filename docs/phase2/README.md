@@ -9,8 +9,8 @@
 | `weld-motion.md` | 8 선 정의 · 툴 자세(45° 이등분) · 스탠드오프 · 위빙(지그재그 경유점) · 접근/후퇴 · 파라미터 표 |
 | `weld-ros-interfaces.md` | 토픽 · 서비스 · 액션, 타입 전문(`contact_scan_interfaces` 와 동기화 검사), 시작 거절 사유, 배타 규칙 |
 | `weld-mqtt-schema.md` | `cmd/weld/*` · `weld/*` 토픽과 JSON, 웹 표시 |
-| `measurements-20260923.md` | **오늘 실기로 재야 하는 것**(연휴 전 마지막 기회) |
-| `tasks/` | 담당별 지시서 P1~P4 |
+| `measurements-20260923.md` | **오늘 실기로 재야 하는 것**(연휴 전 마지막 기회). 별도 PR `p2-measure-0923` |
+| `tasks/` | 담당별 지시서 P1~P5 |
 | `fixtures/` | 실기 스캔 `result.json`(오늘 복사) — 연휴 중 오프라인 개발 입력 |
 
 ## 결정 (2026-09-23 병후)
@@ -35,11 +35,14 @@
 | D16 | weld_manager 상태기계는 scan_manager 패턴 참고, 복제 강제 없음 |
 | D17 | 인터페이스 목록 채택(`weld-ros-interfaces.md`) |
 | D18 | 허용오차 ±3 mm |
+| D19 | 위빙은 지그재그 경유점(`ExecutePath`). `move_periodic` 은 쓰지 않는다 |
+| D20 | mqtt_bridge `weld/*` 는 의석 |
+| D21 | 9/23 실기 측정: 정 학민 · 부 병후. 별도 PR |
 
-**계약 작성 중 드러난 것 (병후 확인 필요)**
-- **`move_periodic` 은 직선 이동과 겹쳐 실행되지 않는다**(dsr_msgs2 `MovePeriodic.srv` 는 제자리 주기 운동). 위빙은 **지그재그 경유점**으로 만들고 robot_manager 가 경유점을 지난다(`ExecutePath`). 실행은 `move_spline_task` 또는 `move_line` 반복 중 오늘 실기에서 되는 것으로.
-- mqtt_bridge 의 `weld/*` 추가 담당이 비어 있다. **제안: 병후**(계약 소유자, 연휴 중 문서 · 발표 외 여유). 의석이 맡아도 된다.
-- scan_manager 의 배타 거절(601) 한 줄은 병후(scan_manager 담당).
+**계약 작성 중 드러난 것 → 2026-09-23 병후 결정**
+- **`move_periodic` 은 직선 이동과 겹쳐 실행되지 않는다**(dsr_msgs2 `MovePeriodic.srv` 는 제자리 주기 운동). 위빙은 **지그재그 경유점**으로 만들고 robot_manager 가 `ExecutePath` 로 지난다 — **채택(D19)**. 실행은 `move_spline_task` 또는 `move_line` 반복 중 실기에서 되는 것으로.
+- mqtt_bridge 의 `weld/*` 중계는 **의석(D20)**. scan_manager 의 배타 거절(601)은 병후(P5).
+- 오늘 실기 측정은 **정 학민 · 부 병후(D21)**. 급하고 자세히 다뤄야 하므로 **별도 PR**(`p2-measure-0923`, `measurements-20260923.md` + `docs/env/weld_pose_check.py`)로 진행한다.
 
 ## 유지하는 규칙 (안전 · 품질)
 1. 실기 로봇 명령은 사람이 직접(CLAUDE.md 규칙 1). Claude 는 Virtual · sim 만
@@ -52,10 +55,10 @@
 
 | 담당 | 산출물 | 지시서 |
 |---|---|---|
-| 학민 | robot_manager: `/robot/execute_path` 서버, `OP_WELD_PATH` 발행, `requester='weld_manager'` 허용 + **오늘 실기 측정 M1 · M2 · M4** | `tasks/P1-robot-manager.md` |
-| 현지 | `weld_manager` 패키지(순수 경로 생성 모듈 + 상태기계 노드 + sim/Virtual 시험) | `tasks/P2-weld-manager.md` |
-| 의석 | 웹: 용접 화면 · 비드 궤적 · 명령 버튼, FastAPI `weld/#` | `tasks/P3-web.md` |
-| 병후 | 계약(이 디렉터리) · mqtt_bridge `weld/*`(제안) · scan_manager 601 · 발표 | `tasks/P4-bridge-and-scan-guard.md` |
+| 학민 | **오늘 실기 측정 M1 · M2 · M4 · M6**(정, 부 병후 · 별도 PR) → robot_manager: `/robot/execute_path` 서버, `OP_WELD_PATH` 발행, `requester='weld_manager'` 허용 | `tasks/P1-robot-manager.md` |
+| 현지 | `weld_manager` 패키지(순수 경로 생성 모듈 + 상태기계 노드 + sim/Virtual 시험) · M3 · M5 | `tasks/P2-weld-manager.md` |
+| 의석 | 웹: 용접 화면 · 비드 궤적 · 명령 버튼, FastAPI `weld/#` **+ mqtt_bridge `weld/*` 중계** | `tasks/P3-web.md` · `tasks/P4-bridge.md` |
+| 병후 | 계약(이 디렉터리) · scan_manager 601 · 측정 보조 · 발표 | `tasks/P5-scan-guard.md` |
 
 ## 통합 순서 (9/29)
 1. 실기 스캔 1회(큐브를 옮겼으면 필수) → `result.json`

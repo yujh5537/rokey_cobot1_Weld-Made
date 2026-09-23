@@ -66,7 +66,7 @@ weave_amplitude_m == 0 또는 weave_pitch_m == 0 → [S + o, E' + o] 두 점 (�
 
 - w 는 t̂ 와 d 에 모두 수직이라 "진행 방향과 수직으로, 두 면을 가로질러" 흔든다.
 - 출발값 진폭 2 mm · 반주기 4 mm → 80 mm 선에 경유점 21 개. 10 mm/s 면 선당 약 8 s, 8 선 약 65 s + 이동.
-- robot_manager 가 경유점을 `move_spline_task`(한 번 호출, 부드러움) 로 지나든 `move_line` 을 잇든(radius 로 blend) 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. 선택은 학민(D14). 오늘 실기 M4 에서 둘 중 되는 것을 본다.
+- robot_manager 가 경유점을 `move_spline_task`(한 번 호출, 부드러움) 로 지나든 `move_line` 을 잇든(radius 로 blend) 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. 선택은 학민(D14 · D19). 오늘 실기 M4 에서 둘 중 되는 것을 본다.
 
 ## 5. 접근 · 후퇴 · 선 사이 이동
 
@@ -118,4 +118,4 @@ robot_manager 쪽: `path_max_points`(출발값 200) · `path_max_speed_mps`(0.10
 
 ## 7. 오늘 실기에서 정해야 하는 것
 
-`measurements-20260923.md` M1~M6. 특히 M1(기울인 자세 도달성)과 M2(손가락 아래 탐침 노출 길이)가 없으면 연휴 중 코드가 9/29 에 안 맞을 수 있다.
+`measurements-20260923.md`(별도 PR `p2-measure-0923`, 정 학민 · 부 병후) M1~M6. 특히 M1(기울인 자세 도달성)과 M2(손가락 아래 탐침 노출 길이)가 없으면 연휴 중 코드가 9/29 에 안 맞을 수 있다.

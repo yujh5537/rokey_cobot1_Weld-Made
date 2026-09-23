@@ -6,8 +6,8 @@
 ## 이 task
 weld_manager 가 만든 경유점 목록(지그재그 위빙 포함)을 로봇이 차례로, 정해진 속도로 지나게 하는 액션 서버를 robot_manager 에 더한다. 접촉 판정도 힘 제어도 없는 "직선 이동 여러 개"다. 1차 `ExecuteMotion` 과 같은 자리를 써서 둘이 동시에 돌지 않게 한다.
 
-## 오늘(9/23) 실기 측정 — 이 task 보다 먼저
-`docs/phase2/measurements-20260923.md` **M1(16 자세 도달성) · M4(spline vs line) · M6**. 결과를 그 파일에 채우는 PR(`p2-measure-0923`). M1 이 없으면 연휴 중 짠 경로가 9/29 에 관절 한계로 막힐 수 있다.
+## 오늘(9/23) 실기 측정 — 이 task 보다 먼저 (정 학민 · 부 병후, 별도 PR `p2-measure-0923`)
+`docs/phase2/measurements-20260923.md` **M1(16 자세 도달성, `docs/env/weld_pose_check.py`) · M2 · M4(spline vs line) · M6**. 결과는 그 PR 의 표에 채운다. M1 이 없으면 연휴 중 짠 경로가 9/29 에 관절 한계로 막힐 수 있다. 실기 명령은 사람이 한다.
 
 ## 계약 (확정)
 - `docs/phase2/weld-ros-interfaces.md` 5.2 `ExecutePath.action`, 2.1(`RobotSample.operation = OP_WELD_PATH(5)`), 2.2(`/robot/stop` requester `'weld_manager'`).
