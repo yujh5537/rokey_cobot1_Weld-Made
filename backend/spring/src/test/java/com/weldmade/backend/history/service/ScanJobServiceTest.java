@@ -19,12 +19,9 @@ class ScanJobServiceTest {
 
     @Test
     void getScanHistoryDetailIncludesScanConfig() {
-        ScanJobRepository scanJobRepository =
-                mock(ScanJobRepository.class);
-        MeasurementRepository measurementRepository =
-                mock(MeasurementRepository.class);
-        ScanConfigRepository scanConfigRepository =
-                mock(ScanConfigRepository.class);
+        ScanJobRepository scanJobRepository = mock(ScanJobRepository.class);
+        MeasurementRepository measurementRepository = mock(MeasurementRepository.class);
+        ScanConfigRepository scanConfigRepository = mock(ScanConfigRepository.class);
 
         ScanJob scanJob = mock(ScanJob.class);
         Measurement measurement = mock(Measurement.class);
@@ -32,14 +29,9 @@ class ScanJobServiceTest {
 
         String scanId = "test-scan-001";
 
-        when(scanJobRepository.findById(scanId))
-                .thenReturn(Optional.of(scanJob));
-
-        when(measurementRepository.findById(scanId))
-                .thenReturn(Optional.of(measurement));
-
-        when(scanConfigRepository.findById(scanId))
-                .thenReturn(Optional.of(scanConfig));
+        when(scanJobRepository.findById(scanId)).thenReturn(Optional.of(scanJob));
+        when(measurementRepository.findById(scanId)).thenReturn(Optional.of(measurement));
+        when(scanConfigRepository.findById(scanId)).thenReturn(Optional.of(scanConfig));
 
         ScanJobService service = new ScanJobService(
                 scanJobRepository,
@@ -47,9 +39,7 @@ class ScanJobServiceTest {
                 scanConfigRepository
         );
 
-        ScanHistoryDetail detail =
-                service.getScanHistoryDetail(scanId)
-                        .orElseThrow();
+        ScanHistoryDetail detail = service.getScanHistoryDetail(scanId).orElseThrow();
 
         assertSame(scanJob, detail.getScanJob());
         assertSame(measurement, detail.getMeasurement());

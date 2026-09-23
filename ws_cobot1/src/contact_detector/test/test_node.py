@@ -25,6 +25,7 @@ PARAMS = {
     # #109 기능은 끈 채로 기존 노드 시험을 돈다(판정 로직은 test_split_baseline.py 가 본다)
     'descend_ref_window_s': 0.0, 'descend_ref_lag_s': 0.3, 'descend_ref_min_samples': 10, 'descend_hold_threshold_n': 6.0, 'descend_ref_settle_s': 5.5,
     'edge_arm_still_window_s': 0.0, 'edge_arm_still_m': 0.0001, 'edge_arm_travel_m': 0.0005,
+    'edge_force_drop_n': 0.0, 'edge_force_window_s': 0.5, 'edge_force_lag_s': 0.1, 'edge_force_settle_s': 1.5,
 }
 F0 = (0.6, 0.8, 1.5)          # 실기 무접촉 잔류 외력과 비슷한 크기
 

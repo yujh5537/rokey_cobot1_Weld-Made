@@ -1,6 +1,6 @@
 # ROS 인터페이스 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 최근 구간 평균(이동 기준), 밀기는 z 로 판정 켜기 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1·2차 회의) · v0.1.1(T09, QoS 정의 위치 확정 · 타입 변경 없음) · v0.1.4(2026-09-20, T15, PR #72 · #83: 6.3절 실측 발행 주기, 9장 `RobotStatus.moving`의 근거와 파라미터 변경 통지 · 타입 변경 없음) · v0.1.5(#69, 판정 샘플 = 첫 샘플 확정 · 타입 변경 없음) · v0.1.9(#51 · #54, 문서 보완 · 타입 변경 없음) · v0.1.10(2026-09-21, 6.3절 발행 주기가 부하에 따라 달라짐 · 두 번째 실측과 공백 꼬리 추가 · 타입 변경 없음). **v0.1.12**(2026-09-21, #109, 하강 기준과 밀기 기준 분리: 하강은 최근 구간 평균(이동 기준), 밀기는 z 로 판정 켜기 · 타입 변경 없음) · **v0.1.13**(2026-09-21, #128, 힘 꺾임 EDGE 추가(기본 꺼짐) · 타입 변경 없음) · **v0.1.15**(2026-09-22, SLIDE 스텝 모드: robot_manager가 EDGE를 확정해 `/contact/event`를 낸다 · 타입 변경 없음) · **v0.1.16**(2026-09-23, #130: real 의 `sample_stale_ms` 300 → 500 · 타입 변경 없음). 변경은 PR + `CHANGELOG.md`로만 한다.
 패키지: `contact_scan_interfaces` (ament_cmake, 소유 병후). 실제 `.msg`/`.srv`/`.action` 파일은 이 문서의 타입 전문을 그대로 옮긴 것이다(T09). 문서와 파일이 어긋나면 패키지의 `test/test_contract_sync.py`가 CI에서 실패한다.
 출처: 인터페이스 정의서 통합본 v1.1(팀 합의)을 채택하고, T01 2차 회의 결정을 덧붙였다. 정의서와 달라진 곳은 **[v0.1 변경]** 으로 표시했다.
 
@@ -31,7 +31,7 @@
 |---|---|---|---|---|---|
 | `/robot/sample` | `RobotSample` | robot_manager | contact_detector · safety_monitor · mqtt_bridge | SENSOR | TCP pose + 외력 + 실행 중 동작. 50 Hz 설계 목표. **scan_manager는 구독하지 않는다** |
 | `/robot/status` | `RobotStatus` | robot_manager | scan_manager · safety_monitor · mqtt_bridge | STATE | 연결 · 동작 · 오류 · 제어 상태. 정지 완료 확인의 근거. 변경 시 + 주기 |
-| `/contact/event` | `ContactEvent` | contact_detector | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE 판정. 판정 확정 즉시 1회 |
+| `/contact/event` | `ContactEvent` | contact_detector · **robot_manager**(스텝 모드 SLIDE 의 EDGE 만, 7.2절 · v0.1.15) | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE 판정. 판정 확정 즉시 1회 |
 | `/scan/state` | `ScanState` | scan_manager | contact_detector · safety_monitor · mqtt_bridge | STATE | 단계 · 방향 · 진행 n/4. 변경 시 + 주기 |
 | `/scan/result` | `ScanResult` | scan_manager | mqtt_bridge | STATE | 형상 결과. 작업 종료 시 1회(실패 · 중단 포함) |
 | `/scan/log` | `ScanLog` | scan_manager | mqtt_bridge | LOG | 시간순 로그 |
@@ -125,7 +125,7 @@ string scan_id              # /scan/state 에서 받은 현재 scan_id. 없으�
 uint32 motion_id            # 판정에 쓴 RobotSample.motion_id 를 그대로 복사
 uint64 sample_id            # 판정 샘플(= 조건이 처음 성립한 샘플)의 RobotSample.sample_id
 uint8 type
-string source               # 'robot_force' | 'sim'
+string source               # 'robot_force' | 'sim' | 'robot_step' (robot_manager 스텝 모드 SLIDE 의 EDGE, v0.1.15)
 string frame_id             # RobotSample 과 동일
 geometry_msgs/Pose pose     # 판정 샘플의 TCP pose (≠ 확정 샘플, ≠ 정지 완료 좌표)
 geometry_msgs/Wrench wrench # 판정 샘플의 외력
@@ -143,7 +143,7 @@ uint8 debounce_count        # 판정을 확정한 연속 횟수
   - **이동 기준이 없는 동안**(출발 뒤 `descend_ref_settle_s` · 구간 안 샘플이 `descend_ref_min_samples` 보다 적을 때) CONTACT 를 끄지 않고 `/contact/tare` 의 F₀(없으면 그 DESCEND 첫 샘플의 F)와 올린 임계 `descend_hold_threshold_n` 으로 판정한다. 끄면 그 사이에 닿았을 때 OVER_FORCE 까지 막을 것이 없다. 이렇게 확정한 CONTACT 는 더 눌린 좌표다(측정 품질 조건: 윗면이 출발점에서 하강 속도 × `descend_ref_settle_s` 보다 아래에 있어야 원래 임계로 잰다. 실기 5.5 s × 3 mm/s = 16.5 mm, 탐색 기준점 → 80 mm 큐브 윗면 107 mm)
   - **`descend_ref_settle_s` 는 `descend_ref_window_s` 이상이다.** 추정값은 출발 뒤 한 번 계단식으로 바뀌고(9/21 홈 출발 하강 22 회 모두 4.0~4.1 s, 1.4~2.6 N), 이동 기준은 계단이 구간을 다 지나갈 때까지 그 크기만큼 튄다. 3 N 으로 본 공중 최대 \|F − F₀\| 가 전부 이때(4.2~4.4 s, 최대 2.92 N) 나왔다. 계단 시각 + `descend_ref_window_s` + 여유로 둔다. 실기 5.5 s 로 재생하면 3 N 구간 공중 최대 2.04 N, 6 N 구간 최대 4.43 N
   - **한계**: 이동 기준은 느리게 오르는 접촉(부드러운 부재)을 흐름으로 흡수할 수 있다. 기준 큐브 · 탐침(43 N/mm)은 3 mm/s 에서 초당 약 130 N 이라 해당하지 않는다.
-  - **EDGE(밀기)**: 판정을 켜는 "누르고 있다" 확인을 F₀ 로 하지 않는다. **z 가 멈췄고(틈을 다 메움) x · y 가 움직이는 중**이면 켠다(`edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`). EDGE 판정 자체는 전과 같이 z 추세선이다. 다만 판정하려면 F₀ 가 있어야 한다(보고값 `force_delta_n` 을 위해).
+  - **EDGE(밀기)**: 판정을 켜는 "누르고 있다" 확인을 F₀ 로 하지 않는다. **z 가 멈췄고(틈을 다 메움) x · y 가 움직이는 중**이면 켠다(`edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`). EDGE 판정 자체는 z 추세선이다. **[v0.1.13]** `edge_force_drop_n > 0` 이면 **원시 Fz 가 최근 구간 중앙값보다 그만큼 넘게 떨어진 채 `debounce_n` 회**여도 EDGE 로 확정한다(#128, 기본 꺼짐). 둘 중 먼저 확정된 것을 낸다. 이때 `z_drop_m` 은 판정 첫 샘플의 추세선 대비 하강량(음수면 0)이고, 추세선이 없으면 `z_drop_valid = false` 다. 켜는 것은 팀 결정이다(BRD 4.1.2 는 외력 감소를 보조 신호로 둔다). 다만 판정하려면 F₀ 가 있어야 한다(보고값 `force_delta_n` 을 위해).
   - 밀기 등 DESCEND 가 아닐 때의 F₀(보고값 `force_delta_n` 용)는 마지막 CONTACT 때의 이동 기준과 `/contact/tare` 중 **나중 것**이다.
   - scan_manager 절차는 바뀌지 않는다. 준비 단계의 `/contact/tare`(정지)는 툴 등록 점검으로 그대로 부른다.
 - `/scan/state`는 `scan_id` 태깅에만 쓴다.
@@ -606,10 +606,17 @@ Service · Action은 기본값. 설계 목표(샘플 50 Hz · 표시 10 Hz · he
 있었다(현지). `stale_age_ms`(contact_detector) · `sample_stale_ms`(safety_monitor) · EDGE 판정 창(contact_detector)의
 근거를 평균 주기에 두면 이 공백에서 오판한다. 세 값은 **최대 공백**을 기준으로 잡는다.
 
-**맞바꿈이 있다.** 342 / 340 ms 는 지금의 `sample_stale_ms` 300 을 넘는다. 그 세션에 safety_monitor 가 떠 있었다면
+**맞바꿈이 있다.** 342 / 340 ms 는 **당시의** `sample_stale_ms` 300 을 넘는다(지금은 아래대로 real 이 500 이다). 그 세션에 safety_monitor 가 떠 있었다면
 모션도 없이 정지를 두 번 요청했을 값이다. 그렇다고 한계를 최대 공백 위로 올리면 **샘플이 실제로 끊겼을 때 알아채는
 시각이 그만큼 늦어진다.** `drop_limit_m` 2차 감시(7.2)가 샘플로 돌기 때문에 하강 제한 감시도 같이 늦어진다.
 그래서 **한계를 올리기 전에 공백의 원인을 없애는 쪽이 먼저다.**
+
+**그럼에도 real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다 [v0.1.16, 결정 3].** 위 원칙의 **예외**이며, 이유와 되돌릴 조건을 같이 남긴다.
+- 9/21~9/22 실기에서 정지 중 약 3 s 마다 **316~365 ms 공백**이 반복됐고, 그 때문에 **goal 의 약 40 %가 `SAMPLE_STALE` 로 정지**했다(#130). 접촉 위치에서 바로 안전복귀가 나간 것도 2회 있었다. 정지가 정상 동작을 막는 상태였다.
+- 기록된 공백 14개(316~365 ms 12개 · 464 ms · 687 ms) 중 300 에서는 14개 전부, **500 에서는 687 하나만** 걸린다(`safety_core` 재현).
+- **687 ms 공백이 실제로 있었으므로 500 도 완전하지 않다.** 700 으로 더 올리는 것은 **지금 하지 않는다** — 데이터가 더 쌓인 뒤 검토만 한다. 코드 기본값 · sim 값도 올리지 않는다.
+- 바뀌는 것은 "공백 뒤 정지를 요청하는 시점"이 0.2 s 늦어지는 것뿐이다(3 mm/s 면 0.6 mm, 5 mm/s 면 1 mm). 공백은 주로 정지 중이나 출발 직전에 난다.
+- **되돌릴 조건**: #130 의 근본 원인(약 3 s 주기 지연)이 해결되면 300 으로 되돌린다. sim 은 이미 500 이라 real 과 같아지고 역전되지 않는다.
 
 공백의 원인은 **미확인**이다. 후보는 셋이다: robot_manager 의 직렬 호출 큐(두산 서비스 한 건이 오래 걸리면 그 뒤
 조회가 전부 밀린다. 342 ms 는 `service_timeout_s` 0.5 s 보다 짧아 시간 초과가 아니라 한 건의 지연일 가능성이 크다),
@@ -649,6 +656,12 @@ SetConfig가 **이름으로** 전파하므로 아래 이름은 바꾸지 않는�
 | 하강 제한 `drop_limit_m` **[v0.1 변경]** | robot_manager가 SLIDE 안에서 즉시 정지 · 순응 해제. 기준은 2차와 같다: `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**. `REASON_ROBOT_ERROR` + `DROP_LIMIT(205)` | safety_monitor가 `operation`이 `OP_SLIDE`로 바뀐 **첫 샘플의 z**를 기준으로 하강량을 감시 → `/robot/stop` + 래치 |
 
 두 감시의 기준(값과 기준 z)이 다르면 1차보다 2차가 먼저 걸려 래치부터 걸린다. 그래서 값도 기준도 같게 둔다.
+
+**SLIDE 스텝 모드 [v0.1.15].** robot_manager 파라미터 `slide_mode`(계약 이름 아님)가 `step`이면 `OP_SLIDE`는 순응 · 힘 제어를 켜지 않고 **위치 제어로 한 스텝(`step_coarse_m`) 가고 멈춘 뒤** 외력을 여러 샘플 평균내 판단한다. 누르는 힘 ΔFz를 `[step_follow_lo_n, step_follow_hi_n]`으로 유지하도록 z를 `step_z_m`씩 조절하고, 힘이 빠지면 최근 접촉 높이보다 `step_drop_m` 아래까지 내려가 본 뒤에도 `step_follow_lo_n` 미만일 때만 접촉 소실로 본다(`step_release_n`은 처음 누를 때의 닿음 기준. 모서리를 넘은 팁이 모서리 각에 걸려 남기는 1~2 N이 이 값을 넘나들기 때문). 최근 접촉 높이는 `step_follow_lo_n` 이상으로 누른 자리만으로 정한다. 그 뒤 `step_fine_m` 스텝으로 다시 긁어 모서리를 다듬는다(9/17 tactile_probe 프로토타입).
+- **EDGE는 robot_manager가 확정한다.** `/contact/event`에 `TYPE_EDGE`를 낸다: `source = "robot_step"`, `event_id`는 contact_detector와 겹치지 않도록 2³² 이상, `pose.position` = (소실 지점 x · y, 최근 접촉 높이 z), `z_drop_m` = 소실을 확인하려고 더 내려간 깊이(항상 `z_drop_valid = true`), `force_delta_n` = 소실 판정 순간의 |ΔF|, `debounce_count = 1`. 짝 맞추기(`Result.event_id`, 5.4절)와 scan_manager 절차는 그대로다.
+- 스텝 모드 SLIDE 중 contact_detector의 EDGE는 robot_manager가 정지에 쓰지 않는다. `OVER_FORCE`(1차 · 2차)와 하강 제한(기준 = SLIDE 첫 샘플 z)은 그대로 산다. `step_press_max_m + step_drop_m < drop_limit_m`이어야 한다.
+- 시작 자리에서 스스로 `step_press_max_m`까지 내려가 누르므로, 7.3절의 방향 전환 뒤 `recontact_margin_m` 위에서 출발해도 닿는다. 멈춘 상태에서 판정하므로 편향 보정(BRD 4.2.4)의 속도 × 지연 항은 0이어야 한다 — scan_manager가 `slide_speed_mps`를 편향 보정에 그대로 넘기는 것은 후속 이슈다.
+- 한 방향에 약 50~70 s(0.5 mm마다 멈춤). `motion_timeout_s`를 그만큼 둔다. Virtual에서는 외력이 0 근처라 돌릴 수 없다(sim은 `force`).
 
 ### 7.3 방향 전환 절차 **[v0.1 변경]**
 한 방향의 밀기가 끝나면 scan_manager는 **`OP_MOVE_TO` goal을 연달아 보내** 다음 방향을 준비한다. 재하강(`OP_DESCEND`)은 하지 않는다.

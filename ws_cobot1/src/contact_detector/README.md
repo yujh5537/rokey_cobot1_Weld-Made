@@ -48,6 +48,11 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
   - 밀기 시작 z 대비 누적 하강량으로 재지 않는다. 모서리가 아닌데 z 가 내려가는 경우가 셋 있다: SLIDE 시작 때 틈(`recontact_margin_m`)을 메우는 하강(계약 7.3), 기울어진 윗면(0.87° 면 80 mm 에 1.2 mm), 탐침이 홀더 안으로 서서히 밀리는 것(PR #80). 앞의 것은 1 이, 뒤의 둘은 2 가 거른다
   - **가를 수 없는 것**: 탐침이 한 번에 툭 미끄러져 들어가면 모서리와 같은 모양이다(테스트에 한계로 고정해 두었다). 기구 쪽에서 막아야 한다
   - 추세선에는 최근 `debounce_n` 개 샘플을 넣지 않고 기다리게 한다(임계 직전의 내려앉는 샘플이 기준선을 끌어내리지 않게). 조건이 성립한 동안에는 기준선을 얼린다
+  - **추세선의 한계(#128)**: 모서리 뒤 z 가 **일정 속도로** 떨어지면 추세선이 그 기울기를 따라가 조건이 성립하지 않는다. 2026-09-21 실기 밀기 4회 모두 EDGE 가 안 나왔다(떨어지는 속도 0.2~0.35 mm/s, 한 번은 2 mm/s)
+  3. **힘 꺾임(`edge_force_drop_n > 0` 일 때, 기본 꺼짐)**: 1 로 판정을 켠 뒤, 원시 Fz 가 `[t − edge_force_window_s, t − edge_force_lag_s]` 구간의 중앙값보다 `edge_force_drop_n` 넘게 낮은 샘플이 연속 `debounce_n` 회 → 확정. F0 를 쓰지 않는다. SLIDE 시작 뒤 `edge_force_settle_s` 동안은 보지 않는다(눌린 채 시작하면 순응이 켜진 뒤 1 s 가까이 Fz 가 풀린다). 2 와 3 중 먼저 확정된 것을 내고, 로그에 `EDGE(z)` · `EDGE(force)` 로 남긴다
+     - 실기 밀기 4회 재생(1.0 N): 판정 x 464.43 · 464.53 · 464.59 · 466.70 (기대 모서리 463.56. 마지막은 9.8 N 으로 눌린 채 시작한 1회). 모서리 앞 잡음은 중앙값보다 최대 0.65 N 낮았다
+     - 힘 꺾임으로 확정하면 그 순간의 z 하강(`z_drop_m`)은 0~0.1 mm 로 작다. 음수는 0 으로 싣는다. 추세선이 없으면 `z_drop_valid = false`
+     - 공백(`stale_age_ms`)이 나면 기준 구간도 버린다. 꺾임이 공백 안에서 끝나면 힘으로는 놓친다
   - `z_drop_m` = 판정 샘플에서 추세선보다 내려간 양(편향 보정의 δ)
   - 누름 확인 직후 곧바로 모서리가 오면 늦게 잡히고 `z_drop_m` 이 작게 실린다. 밀기는 모서리에서 충분히 떨어져 시작한다
 - **OVER_FORCE**: 모든 동작에서 원시 `|F| > over_force_n` 이 연속 `over_force_debounce_n` 회. tare 와 무관. 구간마다 1 회
@@ -64,7 +69,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 ## 파라미터
 값은 `contact_scan_bringup/config/sim.yaml` · `real.yaml` 에만 둔다. 코드에 기본값이 없어서 값이 빠지면 노드가 기동하지 않는다.
 `source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
-`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_ref_settle_s` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
+`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_ref_settle_s` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109) · `edge_force_drop_n` · `edge_force_window_s` · `edge_force_lag_s` · `edge_force_settle_s`(#128)
 
 `source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
 

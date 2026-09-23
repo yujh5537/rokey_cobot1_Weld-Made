@@ -282,6 +282,10 @@ function App() {
   const [jointPositions, setJointPositions] = useState({})
   const [jointStatus, setJointStatus] = useState('수신 대기')
   const [robotModelStatus, setRobotModelStatus] = useState('LOADING')
+  // safety/status 수신 여부와 래치 상태.
+  // 상태를 아직 모를 때는 안전 해제 버튼을 막지 않는다.
+  const [safetyStatusSeen, setSafetyStatusSeen] = useState(false)
+  const [safetyLatched, setSafetyLatched] = useState(false)
 
   // 현재 로봇 TCP 팁 위치
   // robot/sample의 pose는 base_link 기준, 단위는 mm
@@ -465,6 +469,12 @@ function App() {
 
 
   async function handleSafetyReset() {
+    // 래치가 아님을 확인한 경우에만 요청을 막는다.
+    // 아직 safety/status를 못 받은 상태에서는 reset 요청을 허용한다.
+    if (safetyStatusSeen && !safetyLatched) {
+      return
+    }
+
     try {
       const response = await fetch(
         '/commands/safety/reset',
@@ -473,39 +483,21 @@ function App() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            payload: {},
-          }),
+          body: JSON.stringify({ payload: {} }),
         }
       )
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          `HTTP ${response.status}`
-        )
+        throw new Error(`HTTP ${response.status}`)
       }
 
-      console.log(
-        '[COMMAND]',
-        'safety/reset',
-        result
-      )
-
-      addLog(
-        `안전 해제 명령 전송: ${result.status}`
-      )
-
+      console.log('[COMMAND]', 'safety/reset', result)
+      addLog(`안전 해제 명령 전송: ${result.status}`)
     } catch (error) {
-      console.error(
-        '[COMMAND] safety/reset error:',
-        error
-      )
-
-      addLog(
-        '안전 해제 명령 전송 실패'
-      )
+      console.error('[COMMAND] safety/reset error:', error)
+      addLog('안전 해제 명령 전송 실패')
     }
   }
 
@@ -685,6 +677,12 @@ function App() {
               : `스캔 결과 실패: ${payload.reason ?? 'UNKNOWN'}`,
             payload.stamp_ms
           )
+        }
+
+        // safety/status
+        if (topic === 'safety/status') {
+          setSafetyStatusSeen(true)
+          setSafetyLatched(payload.latched === true)
         }
 
         // command/status
@@ -1743,7 +1741,17 @@ function App() {
           재시작
         </button>
 
-        <button onClick={handleSafetyReset}>
+        <button
+          onClick={handleSafetyReset}
+          disabled={safetyStatusSeen && !safetyLatched}
+          title={
+            !safetyStatusSeen
+              ? '안전 상태 미수신: 안전 해제 명령을 시도할 수 있습니다.'
+              : safetyLatched
+                ? '안전 래치를 해제합니다.'
+                : '안전 래치가 걸려 있지 않습니다.'
+          }
+        >
           안전 해제
         </button>
 
