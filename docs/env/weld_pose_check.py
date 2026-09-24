@@ -23,6 +23,8 @@ import sys
 import time
 
 PREFIX = '/dsr01/dsr_controller2/'
+ARRIVE_TOL_MM = 1.0   # 지령 ↔ 실측 posx 위치 차. 이보다 크면 도달 실패로 본다
+
 HEADER = ['time', 'line', 'where', 'x_mm', 'y_mm', 'z_mm', 'a_deg', 'b_deg', 'c_deg', 'reach',
           'posx_read', 'posj_read', 'clearance_mm', 'note']
 DEFAULT_CUBE = (378.48, 462.03, -198.75, -114.60, 178.003, 97.006)   # 9/22 스텝 모드 모서리 · 윗면 · 작업대+테이프 2 (units-frames v0.1.18)
@@ -36,6 +38,8 @@ def parse_args(argv):
     p.add_argument('--tilt', type=float, default=45.0, help='기울임 [deg]. 막히면 30 으로 낮춰 다시')
     p.add_argument('--bottom-margin', type=float, default=5.0, help='세로선 끝 = 지지면 + 이 값 [mm]')
     p.add_argument('--lift', type=float, default=30.0, help='자세 위로 띄우는 높이 [mm]')
+    p.add_argument('--safe-z', type=float, default=None,
+                   help='자세 사이를 옮길 높이 [mm, Base]. 기본 = 큐브 윗면 + --lift.\n                        세로선(L4~L7)은 목표 위 30 mm 가 큐브 옆구리라 이 높이 없이 옮기면 큐브를 통과한다')
     p.add_argument('--vel', type=float, default=20.0, help='movel 속도 [mm/s]. 실기는 10')
     p.add_argument('--only', default='', help='선 이름 목록 (예: L0,L4). 비면 전부')
     p.add_argument('--file', default='weld_pose_check.csv')
@@ -153,22 +157,62 @@ def run(args):
         w = csv.writer(fh)
         if new_file:
             w.writerow(HEADER)
+        safe_z = args.safe_z if args.safe_z is not None else args.cube[4] + args.lift
+        print(f'자세 사이 이동 높이(안전 높이) = {safe_z:.2f} mm  '
+              f'(큐브 윗면 {args.cube[4]:.2f} + {args.lift:.0f})')
+
+        def to_safe_z():
+            """현재 자세 그대로 수직으로 안전 높이까지 올린다. 이미 위면 아무것도 안 한다."""
+            p = read_posx()
+            if p is None:
+                return False
+            if p[2] >= safe_z - 0.5:
+                return True
+            return movel(p[:2] + [safe_z] + p[3:])
+
+        def arrived(target):
+            p = read_posx()
+            if p is None:
+                return False, float('inf')
+            g = max(abs(a - b) for a, b in zip(p[:3], target[:3]))
+            return g <= ARRIVE_TOL_MM, g
+
         for line, where, posx in weld_poses(args.cube, args.standoff, args.tilt, args.bottom_margin):
             if args.only and line not in args.only.split(','):
                 continue
             above = posx[:2] + [posx[2] + args.lift] + posx[3:]
-            print(f'\n[{line} {where}] 위 {args.lift:.0f} mm → {fmt(above)}')
+            over = posx[:2] + [max(safe_z, above[2])] + posx[3:]   # 목표 x·y 위 안전 높이
+            print(f'\n[{line} {where}] 안전 높이 {over[2]:.0f} → 위 {args.lift:.0f} mm → {fmt(above)}')
             ans = input('  Enter = 이동 / s = 건너뜀 / q = 종료: ').strip().lower()
             if ans == 'q':
                 break
             if ans == 's':
                 continue
-            ok_above = movel(above)
-            if not ok_above:
-                print('  위 자세 실패 (관절 한계 · 특이점?)')
-                w.writerow([time.strftime('%H:%M:%S'), line, where + '_above'] + posx + [0, '', '', '', 'above movel success=false'])
+            # ① 지금 자리에서 수직으로 안전 높이까지
+            if not to_safe_z():
+                print(f'  ❌ 안전 높이 {safe_z:.0f} mm 로 올리지 못했다 — 중단한다')
+                w.writerow([time.strftime('%H:%M:%S'), line, where + '_safez'] + posx + [0, '', '', '', f'안전 높이 {safe_z:.1f} 실패'])
                 fh.flush()
+                break
+            # ② 안전 높이에서 목표 x·y 로 수평 이동 + 회전
+            movel(over)
+            ok_over, gap_over = arrived(over)
+            if not ok_over:
+                print(f'  위 자세 실패 (관절 한계 · 특이점?) — 안전 높이에서 {gap_over:.2f} mm 차이')
+                w.writerow([time.strftime('%H:%M:%S'), line, where + '_above'] + posx + [0, '', '', '', f'안전 높이 접근 실패 {gap_over:.2f} mm'])
+                fh.flush()
+                to_safe_z()
                 continue
+            # ③ 안전 높이에서 목표 위 --lift 까지 수직 하강
+            if above[2] < over[2] - 0.5:
+                movel(above)
+                ok_ab, gap_ab = arrived(above)
+                if not ok_ab:
+                    print(f'  위 {args.lift:.0f} mm 자세 실패 — 지령과 {gap_ab:.2f} mm 차이')
+                    w.writerow([time.strftime('%H:%M:%S'), line, where + '_above'] + posx + [0, '', '', '', f'위 {args.lift:.0f} mm 실패 {gap_ab:.2f} mm'])
+                    fh.flush()
+                    to_safe_z()
+                    continue
             ans = input(f'  자세로 내려갈까요 → {fmt(posx)}  (Enter / s / q): ').strip().lower()
             if ans == 'q':
                 break
@@ -176,13 +220,24 @@ def run(args):
                 continue
             ok = movel(posx)
             px, pj = read_posx(), read_posj()
-            print(f'  reach={int(ok)}  posx={fmt(px) if px else "?"}  posj={fmt(pj) if pj else "?"}')
+            # 두산 move_line 의 success 는 "명령을 받았다"이지 "그 자세를 만들었다"가 아니다.
+            # 9/23 실기에서 L1 이 한 번도 안 움직였는데 success=true 가 왔다 → 도달은 posx 로 확인한다.
+            gap = (max(abs(a - b) for a, b in zip(px[:3], posx[:3]))
+                   if px else float('inf'))
+            hit = gap <= ARRIVE_TOL_MM      # 이름을 arrived 로 쓰면 위 도우미 함수를 덮어쓴다
+            reach = int(bool(ok) and hit)
+            why = '' if reach else (
+                'movel success=false' if not ok else
+                ('posx 조회 실패' if px is None else f'안 움직였다: 지령과 {gap:.2f} mm 차이'))
+            print(f'  reach={reach}  posx={fmt(px) if px else "?"}  posj={fmt(pj) if pj else "?"}'
+                  + (f'  ← {why}' if why else ''))
             clearance = input('  손가락 · 홀더 ↔ 큐브 · 작업대 최소 거리 [mm] (모르면 빈칸): ').strip()
             note = input('  메모: ').strip()
-            w.writerow([time.strftime('%H:%M:%S'), line, where] + posx + [int(ok), fmt(px) if px else '', fmt(pj) if pj else '', clearance, note])
+            w.writerow([time.strftime('%H:%M:%S'), line, where] + posx + [reach, fmt(px) if px else '', fmt(pj) if pj else '', clearance, (note + ' / ' + why).strip(' /') if why else note])
             fh.flush()
             input('  Enter = 위로 올림: ')
             movel(above)
+            to_safe_z()          # 다음 자세로 옆으로 가기 전에 큐브 위로 뺀다
     node.destroy_node()
     rclpy.shutdown()
     return 0
