@@ -196,7 +196,7 @@ uint8 line_index            # 관측용 (WeldState.line_index)
 geometry_msgs/Pose[] waypoints   # 차례로 지날 TCP pose. 마지막 점에서 정지한다. 첫 점까지도 직선으로 간다
 string frame_id             # waypoints 의 프레임
 float64 speed               # m/s (TCP 직선 속도)
-float64 path_tolerance_m    # 마지막 점 도착 허용치. 넘으면 ROBOT_ERROR
+float64 path_tolerance_m    # 경유점 도착 허용치 (line 은 중간 점마다 · 마지막 점). 넘으면 ROBOT_ERROR. <= 0 · NaN 은 PATH_REJECTED
 builtin_interfaces/Duration timeout
 ---
 uint8 REASON_TARGET_REACHED=0   # ExecuteMotion.REASON_* 와 같은 값
@@ -223,13 +223,14 @@ uint16 waypoint_index           # 향하고 있는 경유점
 builtin_interfaces/Duration elapsed
 ```
 - 동시에 1개만 수락한다. **`ExecuteMotion` 과 같은 자리**를 쓴다: 어느 한쪽이 실행 중이면 다른 쪽도 `BUSY`. `/robot/stop` 이 걸려 있으면 거절(1차 규칙과 같다).
-- 거절(`REASON_REJECTED` · `PATH_REJECTED(604)`): `waypoints` 가 비었다 · `path_max_points` 초과 · `speed ≤ 0` 또는 `> path_max_speed_mps` · `frame_id ≠ robot_manager.frame_id` · **경유점 하나라도 `z < path_min_z_m`**(Base, robot_manager 파라미터. 수락 시점에 전부 검사한다) · 순응 · 힘 제어가 켜져 있다(→ `BUSY`).
+- 거절(`REASON_REJECTED` · `PATH_REJECTED(604)`): `waypoints` 가 비었다 · `path_max_points` 초과 · `speed ≤ 0` 또는 `> path_max_speed_mps` · **`path_tolerance_m ≤ 0` 또는 NaN**(D32) · `frame_id ≠ robot_manager.frame_id` · **경유점 하나라도 `z < path_min_z_m`**(Base, robot_manager 파라미터. 수락 시점에 전부 검사한다) · 순응 · 힘 제어가 켜져 있다(→ `BUSY`).
 - **작업영역은 두 겹이다.** weld_manager 가 먼저 작업대 좌표로 거른다(`weld-motion.md` 5절: z ≥ `support_z + bottom_margin_m`, x · y 는 부재 ± `workspace_margin_m`). robot_manager 는 Base 좌표의 **z 하한 하나**(`path_min_z_m`)만 본다 — 경유점이 잘못 와도 `path_max_speed_mps`(0.100, 밀기의 20 배)로 작업대에 박히지 않게 하는 마지막 울타리다(학민 리뷰). 출발값은 작업대 표면 `base_to_fixture.z`(0.095) + 테이프 2 mm + 여유 3 mm ≈ **0.100 m**. `real.yaml` 에서 좌표를 켤 때 같이 채운다.
 - 실행: 현재 위치에서 첫 점까지, 그리고 점 사이를 **직선**으로 `speed` 로 지난다. 방식은 robot_manager 파라미터 **`path_mode`** 로 고른다(D31):
-  - **`line`(기본)**: 점마다 `move_line` ASYNC(amovel, 1차에서 실기 확인) + 도착 판정을 반복한다. **점마다 멈춘다**(D8 허용).
-  - **`spline`**: `move_spline_task` ASYNC(amovesx) 한 번. 점 사이에서 멈추지 않는다. 실기 미확인 — 호출 확인(#186 M4) 뒤에만 기본으로 올린다.
+  - **`line`(기본)**: 점마다 `move_line` ASYNC(amovel, 1차에서 실기 확인) + 도착 판정을 반복한다. **점마다 멈춘다**(D8 허용, Virtual 실측 점당 약 0.5 s → 경유점 100 개 선이면 약 +50 s, 계산값). **중간 점도 도착 판정에 `path_tolerance_m` 을 쓴다**: 멈춘 자리가 그 점에서 허용치 밖이면 `ROBOT_ERROR(204)` 로 끝낸다(D32).
+  - **`spline`**: `move_spline_task` ASYNC(amovesx) 한 번. 점 사이에서 멈추지 않는다. **Virtual 에서 응답 지연으로 사용 불가(현지 9/24, #191)**: 응답이 점당 약 30 ms 늦게 와서(21 점 0.5~0.67 s, 100 점 2.4~3.2 s) 그동안 두산 호출 줄이 막혀 `/robot/sample` 이 끊기고 SAMPLE_STALE 정지가 난다. 줄을 나누면 드라이버 동시 호출 문제. **쓰지 않는다** — 코드 · 파라미터는 남기되 기본은 line, 실기(#186 M4)도 line 만 확인한다.
   - "`move_line` 반복 + radius 블렌딩"은 **없다**: 드라이버가 ASYNC 에서는 radius 를 버리고(`dsr_controller2.cpp` 464행, 라이브러리 `amovel` 에 radius 인자 자체가 없다), SYNC 는 호출이 이동 내내 막혀 SAMPLE_STALE 정지가 난다(현지 소스 확인, 2026-09-24). 블렌딩이 필요하면 `move_blending`(amoveb, 최대 50 점)을 후보로 따로 확인한다.
-- 종료: 마지막 점에서 정지 확인(1차 `arrival_grace_s` · `moving` 판정과 같다). 마지막 점과의 거리 > `path_tolerance_m` 이면 `REASON_ROBOT_ERROR` + `ROBOT_ERROR(204)`.
+- 종료: 마지막 점에서 정지 확인(1차 `arrival_grace_s` · `moving` 판정과 같다). 마지막 점과의 거리 > `path_tolerance_m` 이면 `REASON_ROBOT_ERROR` + `ROBOT_ERROR(204)`(line 은 중간 점도 같다, D32).
+- **명령 실패 · 응답 시간 초과 뒤에도 세우고 확인한다**: 두산 `success` 는 실패여도 움직일 수 있고(#191 Virtual, spline 응답 3.2 s 지연 중 실행) 성공이어도 안 움직일 수 있다(#186 M1). 실패 경로는 `stop_robot` 으로 정지를 확인한 뒤 204 로 끝낸다. 1차 `ExecuteMotion` 의 같은 구멍은 #193.
 - 접촉 이벤트로 멈추지 않는다. `TYPE_OVER_FORCE` 는 1차와 같이 항상 정지(`REASON_OVER_FORCE`).
 - `RobotSample.operation = OP_WELD_PATH`, `motion_id = goal.motion_id` 를 실행 중 내내 발행한다(웹 비드 궤적의 근거).
 - Feedback 은 `/robot/sample` 주기와 같거나 느리게(10 Hz 이상 필요 없다).
@@ -263,6 +264,6 @@ builtin_interfaces/Duration elapsed
 마지막 선 후퇴 → `/weld/result` 발행 · 파일 저장 → HOMING(`OP_MOVE_TO` z_safe → `OP_HOME`) → DONE. 결과는 홈 복귀보다 먼저 나간다(1차 7.4 와 같다).
 
 ## 8. TBD
-- `ExecutePath` 의 `spline` 모드 실기 확인(#186 M4): 소스 확인은 됐고 **호출 확인이 남았다**. 확인 전까지 기본은 `line`.
+- ~~`ExecutePath` 의 `spline` 모드 실기 확인(#186 M4)~~ → 종결(9/24): Virtual 호출 확인에서 응답 지연으로 사용 불가, line 만 쓴다(D31). #186 M4 실기는 line(amovel 반복) 1 회만.
 - 기울인 자세의 손목 도달성(`tool_roll_deg` 필요 여부): 오늘 M1.
 - 웹 비드 궤적을 Base → 작업대로 옮길 때 `WeldResult.base_to_fixture` 를 쓸지, 프런트의 `VITE_BASE_TO_FIXTURE_MM` 을 그대로 쓸지: 의석.

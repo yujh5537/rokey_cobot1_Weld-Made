@@ -72,7 +72,7 @@ weave_amplitude_m == 0 또는 weave_pitch_m == 0 → [S + o, E' + o] 두 점 (�
 
 - w 는 t̂ 와 d 에 모두 수직이라 "진행 방향과 수직으로, 두 면을 가로질러" 흔든다.
 - 출발값 진폭 2 mm · 반주기 4 mm → 80 mm 선에 경유점 21 개(+ 후퇴점 1, 한도 100 안), 경로 길이는 직선의 약 1.38 배(110.8 mm). 10 mm/s 면 선당 약 11 s. 접근 · 후퇴 · goal 4 개를 더하면 **spline 8 선 약 2.5 분, line(점마다 정지) 약 4 분**(현지 계산. 발표 시간표용. 스캔 약 7 분은 별도).
-- robot_manager 가 경유점을 어떻게 지나는지는 `path_mode` 로 고른다(D31): **`line`(기본, 점마다 amovel + 도착 판정, 점마다 정지)** / **`spline`(`move_spline_task` 한 번, 실기 확인 뒤)**. 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. "`move_line` + radius 블렌딩"은 비동기에서 radius 가 버려져 없다(현지 소스 확인). 경유점은 한 선에 최대 100 개(spline 배열 한도).
+- robot_manager 가 경유점을 어떻게 지나는지는 `path_mode` 로 고른다(D31): **`line`(기본, 점마다 amovel + 도착 판정, 점마다 정지)** / ~~**`spline`(`move_spline_task` 한 번)**~~ — Virtual 에서 응답 지연으로 사용 불가(현지 9/24, `weld-ros-interfaces.md` 5.2 · D31). 계약은 같다: **경유점을 순서대로, `speed` 로, 마지막 점에서 정지**. "`move_line` + radius 블렌딩"은 비동기에서 radius 가 버려져 없다(현지 소스 확인). 경유점은 한 선에 최대 100 개(spline 배열 한도).
 
 ## 5. 접근 · 후퇴 · 선 사이 이동
 
@@ -92,7 +92,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | 후퇴 | `OP_MOVE_TO` → (P_ret(i).x, y, **z_safe**, q_i) | `travel_speed_mps` |
 
 - 첫 선 앞: 홈에서 접근 1 로 바로 간다(자세가 홈 → q_0 으로 보간된다. 이동 중 자세 변화는 z_safe 위에서만 일어난다). **시작 때 팁이 z_safe 아래면**(`/robot/sample` 로 확인. 앞 작업이 중간에 멈춘 자리 등) 거절하지 않고 **먼저 같은 x · y · 현재 자세로 z_safe 까지 수직 상승**(`OP_MOVE_TO`, `travel_speed_mps`)한 뒤 접근 1 로 간다(D30). 기울인 자세로 부재 옆에 서 있던 경우 상승 중 툴 뒤쪽이 부재를 스칠 수 있으므로, 관제자는 시작 전 화면의 팁 위치를 본다.
-- 선 사이: 후퇴(i) → 접근 1(i+1). 두 점 모두 z_safe 위라 부재를 가로질러도 된다.
+- 선 사이: 후퇴(i) → 접근 1(i+1). 두 점 모두 z_safe 위라 부재를 가로질러도 된다. **자세 변화(회전)를 포함해 선 사이의 모든 직선 이동은 z_safe 높이의 두 점 사이에서만 일어난다** — "목표 위 30 mm" 같은 중간 높이에서 다음 자세로 바로 직선 이동하지 않는다(9/23 M1 점검 스크립트가 세로 모서리 자세에서 그렇게 움직여 큐브 옆구리를 통과 · 충돌, 학민 #184 리뷰 ②. D30 의 "수직 상승" 은 시작 때만이고, 선 사이는 이 표의 후퇴 · 접근 1 이 덮는다).
 - 마지막 선 뒤: 후퇴 → `OP_HOME`(마무리 복귀, DONE 에 포함).
 - 세로선의 P_ret 는 바닥 근처(받침대 + `bottom_margin_m` + approach 의 수직 성분)다. 거기서 z_safe 로 곧장 올라가는 경로는 모서리에서 대각선 바깥으로 `(standoff_m + approach_m)·sin θ` 떨어져 있다(3 + 30 mm, 45° 면 약 23 mm).
 - **작업영역 검사**(weld_manager): 모든 목표 z ≥ `support_z + bottom_margin_m` (작업대 좌표), x · y 는 부재에서 `workspace_margin_m` 안. 벗어나면 `PATH_REJECTED(604)` 로 시작을 거절한다. safety_monitor 는 작업영역을 보지 않는다(`OUT_OF_WORKSPACE` 미구현). robot_manager 는 Base z 하한(`path_min_z_m`) 하나를 수락 시점에 더 본다(두 겹, `weld-ros-interfaces.md` 5.2).
@@ -120,7 +120,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `travel_clearance_m` | 0.050 | z_safe = z_top + 이 값 | |
 | `bottom_margin_m` | 0.005 | 세로선 끝 = support_z + 이 값 | |
 | `workspace_margin_m` | 0.100 | 부재 밖 허용 범위 (x · y) | |
-| `path_tolerance_m` | 0.003 | ExecutePath 마지막 점 도착 허용치 (D18 ±3 mm) | |
+| `path_tolerance_m` | 0.003 | ExecutePath 경유점 도착 허용치 — line 은 중간 점마다 · 마지막 점 (D18 ±3 mm, D32). ≤ 0 · NaN 은 robot_manager 가 604 로 거절 | |
 | `orientation_tolerance_deg` | 15.0 | 각 이동 뒤 `Result.pose` 자세와 목표 자세의 각 차이 허용치. 넘으면 `ROBOT_ERROR(204)` + detail. 0 = 끔. 여유 있게 크게 둔다(병후) | |
 | `server_wait_timeout_s` | 2.0 | 상대 서버(robot_manager)의 미기동 판단. scan_manager 와 같은 이름 · 뜻 | |
 | `stop_confirm_timeout_s` | 5.0 | 정지 완료(`connected && !moving`)를 기다리는 한도. scan_manager 와 같다 | |

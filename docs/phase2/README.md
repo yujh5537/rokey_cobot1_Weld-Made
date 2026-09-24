@@ -28,7 +28,7 @@
 | D9 | 웹: 8 선 · 현재 선 강조 · 완료 선 색 · 비드 궤적(robot/sample 누적) · 진행률. App.jsx 분리는 담당자 판단 |
 | D10 | 같은 레포, `weld_manager` 패키지 + `docs/phase2/`. 1차 규약에서 유연하게 |
 | D11 | 일정: 9/23 계획 + 필수 실기 측정 → 9/24~28 연휴(비대면, 로봇 없음) → 9/29 실기 적용 · 완성 |
-| D12 | 담당: 병후 계약 · 문서 · 발표 / 현지 weld_manager / 학민 robot_manager / 의석 웹 |
+| D12 | 담당: 병후 계약 · 문서 · 발표 / 현지 weld_manager **+ robot_manager `ExecutePath`(P1, 9/24 학민 → 현지. 리뷰 학민)** / 학민 1차 최적화 · 측정 · P1 리뷰 / 의석 웹 · 브리지 |
 | D13 | 계약을 먼저(오늘), 그 뒤 병렬 |
 | D14 | robot_manager 추가는 담당자 판단으로 단순화 가능(movel 등) |
 | D15 | safety_monitor 는 대체로 그대로 |
@@ -47,7 +47,8 @@
 | D28 | `RunWeld.end_line` 추가(기본 7, 생략 불가). 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` |
 | D29 | weld_manager 는 속도 상한을 검사하지 않는다. 상한은 robot_manager `path_max_speed_mps` → 604 |
 | D30 | 시작 때 팁이 z_safe 아래면 거절하지 않고 수직 상승 뒤 시작. 자세 허용치 `orientation_tolerance_deg` 는 여유 있게(15°) |
-| D31 | `ExecutePath` 는 `path_mode` line(기본, 점마다 정지) / spline. `move_line`+radius 블렌딩은 비동기에서 불가(드라이버 소스 확인). `path_max_points` 100. **소스 확인에 그치지 말고 호출 확인까지 한다** |
+| D31 | `ExecutePath` 는 `path_mode` line(기본, 점마다 정지) / spline. `move_line`+radius 블렌딩은 비동기에서 불가(드라이버 소스 확인). `path_max_points` 100. **소스 확인에 그치지 말고 호출 확인까지 한다** → 호출 확인 결과(현지 9/24 Virtual, #191): **spline 은 응답이 점당 약 30 ms 늦어 호출 줄이 막히고 샘플이 끊긴다(SAMPLE_STALE). 쓰지 않는다.** 코드 · 파라미터는 남기되 기본 · 실기 모두 line |
+| D32 | `path_tolerance_m` 은 마지막 점뿐 아니라 line 모드의 **중간 점 도착 판정에도** 쓴다(멈춘 자리가 그 점에서 허용치 밖이면 204). `≤ 0` · NaN 은 604 로 거절(현지 해석 9/24, 병후 채택 9/25) |
 
 **계약 작성 중 드러난 것 → 2026-09-23 병후 결정**
 - **`move_periodic` 은 직선 이동과 겹쳐 실행되지 않는다**(dsr_msgs2 `MovePeriodic.srv` 는 제자리 주기 운동). 위빙은 **지그재그 경유점**으로 만들고 robot_manager 가 `ExecutePath` 로 지난다 — **채택(D19)**. 실행은 `move_spline_task` 또는 `move_line` 반복 중 실기에서 되는 것으로.
@@ -66,8 +67,8 @@
 
 | 담당 | 산출물 | 지시서 |
 |---|---|---|
-| 학민 | **오늘 실기 측정 M1 · M2 · M4 · M6**(정, 부 병후 · 별도 PR) → robot_manager: `/robot/execute_path` 서버, `OP_WELD_PATH` 발행, `requester='weld_manager'` 허용 | `tasks/P1-robot-manager.md` |
-| 현지 | `weld_manager` 패키지(순수 경로 생성 모듈 + 상태기계 노드 + sim/Virtual 시험) · M3 · M5 | `tasks/P2-weld-manager.md` |
+| 학민 | **9/23 실기 측정 M1 · M2 · M4 · M6**(정, 부 병후 · 별도 PR #186) → 1차 개선(#167 · #123 · #125 · **#193** 정 학민 · 부 현지) · P1 리뷰 · 9/29 실기 30~35 분(M2 캘리퍼 · 세로선 bottom 계약 z 1 자세 · M4 실기 1 회 · 배치 사진) | (#186 · #193) |
+| 현지 | **P1**(9/24 학민 → 현지): robot_manager `/robot/execute_path` 서버, `OP_WELD_PATH` 발행, `requester='weld_manager'` 허용(PR #191) → `weld_manager` 패키지(순수 경로 생성 모듈 + 상태기계 노드 + sim/Virtual 시험) · M3 · M5 | `tasks/P1-robot-manager.md` · `tasks/P2-weld-manager.md` |
 | 의석 | 웹: 용접 화면 · 비드 궤적 · 명령 버튼, FastAPI `weld/#` **+ mqtt_bridge `weld/*` 중계** | `tasks/P3-web.md` · `tasks/P4-bridge.md` |
 | 병후 | 계약(이 디렉터리) · scan_manager 601 · 측정 보조 · 발표 | `tasks/P5-scan-guard.md` |
 
