@@ -89,7 +89,7 @@ class PathRunner:
         """한 번의 이동 명령을 보내고 멈출 때까지 본다. 도착이면 None, 끝내야 하면 결과."""
         node, motion = self.node, self.motion
         if not send():
-            return (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, f'{label}: 이동 명령 실패')
+            return self._send_failed(label)
         motion.sent_s = node.now_s()
         motion.moved = False
         motion.restarts = 0
@@ -149,9 +149,20 @@ class PathRunner:
         if not node.call_sync(node.srv_clients['move_stop'], dsr_client.move_stop_request(), 'move_stop'):
             return (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, f'{label}: 재출발 전 move_stop 응답 없음')
         if not send():
-            return (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, f'{label}: 재출발 이동 명령 실패')
+            return self._send_failed(f'{label} 재출발')
         motion.sent_s = node.now_s()
         return None
+
+    def _send_failed(self, label):
+        """이동 명령이 실패 · 응답 시간 초과였다. **컨트롤러는 받았을 수 있다** — 세우고 확인한 뒤 끝낸다.
+
+        2026-09-24 Virtual(P1-3): amovesx 100 점의 응답이 3.2 s 뒤에 왔다. CallQueue 는 0.5 s 에 포기해
+        "명령 실패"로 끝내고 goal 자리를 비웠는데, 컨트롤러는 spline 을 실행 중이었다(뒤이은 amovel 이
+        `state[TASK_MOTION] rejected` 알람으로 거절됨). 세우지 않으면 감시 없는 이동이 남는다.
+        """
+        stopped, why = self.node.stop_robot(f'{label} 명령 실패 뒤 정지 확인', self.motion)
+        return (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                f'{label}: 이동 명령 실패(응답 없음 또는 거절)' + ('' if stopped else f'. {why}'))
 
     def _check(self, elapsed):
         """취소 · 정지 요청 · 과대 외력 · 시간 초과 · 연결. 1차 watch 와 같은 순서와 약속."""

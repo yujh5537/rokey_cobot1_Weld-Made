@@ -15,6 +15,8 @@ BRD는 "매뉴얼 설명 / 소스 확인 / 실제 PC 호출 확인 / 실기 성�
 | get_current_posx | service `aux_control/get_current_posx` (ref=DR_BASE). 래퍼 있음 | 성공 | **성공** | 2026-09-19 / Real 2026-09-20~21 | `task_pos_info[0].data[:6]` = mm, deg. Real: 표시 좌표는 **등록된 TCP 로 계산**된다. 툴 · TCP 가 풀리면 플랜지 좌표가 나온다(realrobot-session_20260921.md 5-0 · 5-6) |
 | amovel | service `motion/move_line`, `sync_type=1`(ASYNC). 래퍼 `amovel()` 있음 | 성공 | **성공** | 2026-09-19 / Real 2026-09-21 | +z 20 mm, 20 mm/s 요청에 16~94 ms 만에 응답(이동 완료를 기다리지 않음). 0.4 s 뒤 z +5.3 mm로 이동 중 확인. Real: robot_manager `OP_DESCEND` · `OP_MOVE_TO`. `OP_MOVE_TO` 세 번 모두 목표와 0.1 mm 이내(realrobot-session_20260921.md 5-8) |
 | motion/move_stop (DR_QSTOP) | service `motion/move_stop`, `stop_mode=1`. **Python 래퍼 없음** | 성공 | **성공** | 2026-09-19 / Real 2026-09-21 | amovel 도중 호출 → z +5.5 mm(요청 20 mm)에서 멈춤, 0.5 s 사이 변화 0.0 mm. 응답 115~124 ms. **Real: ASYNC 모션이 도는 중에 불러도 드라이버가 멈추지 않았다** — 과대 외력 정지 0.5 s · 2.2 mm(5-0), `/robot/stop` 정지 8.84 mm(5-10). 병후 리뷰의 '모션 중 move_stop' 우려에 대한 실기 답이다 |
+| amovel 경유점 반복 (ExecutePath `path_mode: line`) | service `motion/move_line` ASYNC ABS 를 점마다, 멈춤 확인 뒤 다음 점(robot_manager `path_executor.py`) | **성공** | 미실시 | 2026-09-24 (현지 PC, Claude) | 공중 지그재그 21 점(간격 2 mm · 진폭 ±1.5 mm, 경로 74.6 mm, 10 mm/s): 18.1~18.2 s(순수 이동 7.5 s + 점마다 약 0.5 s 멈춤), **점 통과 오차 0.0 mm**, 최대 샘플 공백 69 ms, `RobotSample.operation = 5` 유지. 도중 `/robot/stop` → 0.13 s 에 멈춤, 요청 뒤 0.04 mm. 아래 "ExecutePath Virtual 확인" |
+| amovesx (`move_spline_task`) | service `motion/move_spline_task`, `sync_type=1`(ASYNC), ref=DR_BASE, ABS, `opt=1`(CONST). 래퍼 `amovesx()` 있음 | **호출 성공 · 응답 지연** | 미실시 (#186 M4) | 2026-09-24 (현지 PC, Claude) | ASYNC 인데 **응답이 점 수에 비례해 늦다**: 10 점 308 ms · 21 점 498~669 ms · 100 점 2.4~3.2 s. 받은 뒤에는 멈추지 않고 경유점을 지난다(21 점: 경로 이탈 최대 0.25 mm, 점 통과 0.10 mm, 9.6 s). **응답을 기다리는 동안 CallQueue 가 막혀 샘플이 그만큼 끊긴다**(21 점 800 ms · 100 점 2.5 s) → SAMPLE_STALE(sim 200 ms · real 100 ms) 에 걸린다. 아래 "ExecutePath Virtual 확인" |
 | task_compliance_ctrl / release_compliance_ctrl | service `force/task_compliance_ctrl`, `force/release_compliance_ctrl`. 래퍼 있음 | 호출 성공 | **호출 성공** | 2026-09-19 / Real 2026-09-21 | stx=[3000,3000,3000,200,200,200], ref=DR_BASE. Virtual에서 힘 제어가 정상 동작하지 않을 수 있음 [E10]. Real: robot_manager `OP_SLIDE` 두 번, 둘 다 `compliance_released true`. 순응 제어가 켜지자 0.4 s 안에 z 가 0.7 mm 올라오며 눌림이 풀렸다(realrobot-session_20260921.md 5-1). 성능(모서리 검출)은 T25 |
 | set_desired_force (DR_FC_MOD_REL) / release_force | service `force/set_desired_force`(`mod=1`), `force/release_force`. 래퍼 있음(기본 mod가 ABS라 REL을 명시해야 한다) | 호출 성공 | **호출 성공 · REL 의미 실측** | 2026-09-19 / Real 2026-09-21 | Virtual: 목표 힘 0 N, dir z. 1 s 동안 위치 변화 0.0 mm. 해제는 `finally`. **mod 의미는 헤더에서 확인**(`dsr_msgs2/srv/detail/set_desired_force__struct.h`): ABS(0)=절대값, REL(1)=**호출 시점 상태 기준 상대값**. **Real: 목표 3 N 이 SLIDE 시작 시점의 기준선에 더해진다고 로그가 찍는다** — 12:01 기준선 Fz 5.31 N → 실제 누름 약 8.3 N 으로 추정(realrobot-session_20260921.md 5-12, #91 · #105). 다만 10:36 에는 기준선 9.83 N 에서 시작했는데 순응 제어가 켜지며 눌림이 풀려 밀기 중 Fz 는 0.3~1.3 N 이었다(5-1). 조회값에 지령 힘이 섞이는 것으로 보여(추정) 실제 누름은 아직 확정하지 않는다. `DR_FC_MOD_ABS` 실기 동작은 **미확인**(보고서 6절) |
 | check_position_condition | service `force/check_position_condition`. 래퍼 있음 | **판정 불일치** | 미확인 (**설계에서 쓰지 않음**) | 2026-09-19 | 응답 `success`가 조건 판정 결과다(호출 실패와 구분 안 됨). 현재 z±5 mm 조건이 False. 비교값이 (x 0.634, y 0.161, z 179.89)로 고정되어 로봇을 움직여도 변하지 않았다. 아래 상세. z 급강하 판정은 contact_detector 가 `RobotSample.pose` 로 하므로(계약 2.1) 이 API 는 쓰지 않는다. Real 확인이 필요해지면 스크립트가 호출 직전 posx 6개를 같이 남긴다 |
@@ -70,6 +72,32 @@ BRD는 "매뉴얼 설명 / 소스 확인 / 실제 PC 호출 확인 / 실기 성�
   (`docs/contracts/ros-interfaces.md` 9장, v0.1.4 · #72): 최근 `moving_window_s`(0.3 s) 안의 위치 변화가 `moving_eps_m`(0.2 mm)를
   넘으면 이동 중. 샘플 공백으로 남은 점이 창의 절반도 못 덮으면 '모른다 = 이동 중'이다(#101).
 - 서비스 응답 자체는 정상이므로 **연결 확인(`connected`)** 용으로는 쓴다.
+
+## ExecutePath Virtual 확인 (2026-09-24, P1-3, 현지 PC · Claude 실행)
+`sodvir`(에뮬레이터 `dsr01_emulator`) + robot_manager 만, `ROS_DOMAIN_ID=34` · `ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, `contact_scan_bringup/config/sim.yaml`.
+홈(팁 424.96, −183.99, 540.60 mm)에서 +x 로 가는 공중 지그재그. 확인 수준은 **실제 PC 호출 확인(Virtual)** 이다. 실기 성능이 아니다.
+
+| 시험 | 결과 |
+|---|---|
+| line 21 점 | TARGET_REACHED · 21/21 · 18.2 s · 점 통과 0.0 mm · 샘플 `operation` 5, 끝나면 0 |
+| spline 10 점 | TARGET_REACHED · 5.1 s · 응답 308 ms · 샘플 공백 315 ms |
+| spline 21 점 | 한 번은 TARGET_REACHED(응답 498 ms, 9.6 s, 경로 이탈 0.25 mm), 두 번은 응답 669 ms 로 CallQueue 제한(`service_timeout_s` 0.5 s)을 넘어 **"명령 실패"** |
+| spline 100 점 | 응답 2.4~3.2 s → "명령 실패" |
+| line 도중 `/robot/stop`(3 s) | STOP_REQUESTED(200) · 3/21 · 0.13 s 에 멈춤 |
+| z 하한 아래 점 | REJECTED · PATH_REJECTED(604) · 움직이지 않음 |
+
+**발견 1 — 명령 실패 뒤 감시 없는 이동 (고침).** 첫 실행에서 spline 100 점이 0.5 s 에 "명령 실패"(204)로 끝나 goal 자리가 비었는데,
+컨트롤러는 3.2 s 뒤 요청을 받아 spline 을 실행 중이었다. 이어 보낸 amovel 이 알람 `1203 state[TASK_MOTION] rejected event[eMoveL]` 로
+거절된 것이 증거다. `path_executor` 가 명령 실패 · 시간 초과 뒤 `stop_robot` 으로 세우고 확인하게 고쳤고(P1-3 커밋),
+다시 돌려 실패 뒤 4 s 동안 이동 0.0 mm 를 확인했다. **1차 `ExecuteMotion`(`run_motion` 의 "이동 명령 실패")도 같은 경로가 있다** — amovel 응답은
+평소 4~94 ms 라 드물지만 실기에서 330~365 ms 지연이 있었다(#130).
+
+**발견 2 — spline 은 지금 구조로 쓸 수 없다.** 응답 지연이 점당 약 25~32 ms 이고 그동안 두산 호출 줄(CallQueue)이 막혀 샘플이 끊긴다.
+제한을 늘려도 safety_monitor 의 SAMPLE_STALE 에 걸린다. 두산 호출을 동시에 부르면 드라이버가 멈춘 이력(위 "동시 호출")이 있어 줄을 나눌 수도 없다.
+→ `path_mode: line` 을 유지한다. 실기 응답 시간은 미확인(#186 M4).
+
+**참고 — 원인 미확정 1.0 mm.** 발견 1 이 일어난 같은 에뮬레이터에서 그 뒤 line 경로와 MOVE_TO 가 모두 목표에서 y +1.0 mm 에 멈췄다
+(허용치 3 mm 안이라 "도착"). 에뮬레이터를 새로 띄우면 line → spline(실패 · 정지) → line 모두 0.0 mm 였다. 고친 뒤로는 재현되지 않았다.
 
 ## Real 확인 절차 (사람이 실행. 스크립트 실기 실행은 미실시)
 
