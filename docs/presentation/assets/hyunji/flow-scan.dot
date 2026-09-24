@@ -1,0 +1,83 @@
+// 동작 순서도 1 — 접촉 탐색 스캔 (scan_manager). 원본 텍스트. png 는 이 파일에서 만든다:
+//   dot -Tpng -Gdpi=150 flow-scan.dot -o flow-scan.png
+// 근거: ws_cobot1/src/scan_manager/README.md(시퀀스 · classify · 재시작), docs/contracts/ros-interfaces.md 5.4 · 7.1~7.4
+digraph scan {
+  graph [rankdir=TB, fontname="NanumGothic", fontsize=14, nodesep=0.45, ranksep=0.32, newrank=true, compound=true,
+         label="그림 1. 스캔 동작 순서 (scan_manager)   파랑 = 관제자 명령 · 노랑 = 판단 · 빨강 = 오류로 끝남(자동 복귀 없음)", labelloc=t];
+  node  [fontname="NanumGothic", fontsize=12, shape=box, style="rounded,filled", fillcolor="#FFFFFF", color="#444444"];
+  edge  [fontname="NanumGothic", fontsize=10, color="#444444"];
+
+  subgraph cluster_main {
+    label="본 흐름 (/scan/state.phase)"; style="rounded,dashed"; color="#999999"; fontsize=12;
+    start   [label="/scan/run (웹 START)", fillcolor="#D6E6FF"];
+    checks  [label="시작 조건\nBUSY 100 · 파라미터 102\n안전 래치 103 · 연결 104", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    prep    [label="PREPARING\nOP_MOVE_TO 기준점(search_origin_pose)\n정지 확인 → /contact/tare"];
+    top     [label="TOP_SEARCH\nOP_DESCEND"];
+    topq    [label="CONTACT 이벤트?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    slide   [label="EDGE_SEARCH  k / 4\nOP_SLIDE  (+x · −x · +y · −y)"];
+    edgeq   [label="EDGE 이벤트?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    more    [label="네 방향 끝?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    geom    [label="GEOMETRY\n윗면 1 점 + 모서리 4 점 → 편향 보정 → 직육면체\nresult.json 저장 → /scan/result"];
+    geomq   [label="형상 유효?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    homing  [label="HOMING (마무리)\nOP_MOVE_TO 들어 올림 → OP_HOME"];
+    done    [label="DONE", fillcolor="#D9F2D9"];
+  }
+  turn    [label="방향 전환 (2 번째 방향부터)\nOP_MOVE_TO ×3\nlift_height_m 올림 → 기준 원점 x · y\n→ 첫 접촉 z + recontact_margin_m"];
+  reject  [label="거절\nResult 에 사유 · 로봇 무이동", fillcolor="#EEEEEE"];
+
+  error   [label="ERROR\n원인 · 단계 · 위치를 기록\n모션을 더 보내지 않는다", fillcolor="#FFD6D6", color="#B00020", penwidth=1.5];
+  common  [label="모든 모션에 공통인 실패\n· 모션 전 안전 래치 → SafetyStatus.reason_code\n· 모션 중 safety_monitor 정지: OVER_FORCE 400 · SAMPLE_STALE 403\n· DROP_LIMIT 205 · 시간 초과 203 · 로봇 오류 204\n· tare 실패 303 / 305 / 306",
+           shape=note, style="filled", fillcolor="#FFF0F0", color="#B00020", fontsize=11];
+
+  subgraph cluster_ops {
+    label="관제자 명령 — 서로 부르지 않는다 (중지 ≠ 안전복귀 ≠ 재시작)"; style="rounded,dashed"; color="#3366CC"; fontsize=12;
+    stopcmd  [label="/scan/stop (웹 중지)\nPREPARING ~ HOMING · RESUMING 중", fillcolor="#D6E6FF"];
+    stopping [label="STOPPING\n/robot/stop + goal 취소\n요청 뒤 /robot/status 로\nconnected && !moving 확인"];
+    stopq    [label="정지 확인?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    stopped  [label="STOPPED\n중단 위치 기록 (progress.json)"];
+    resume   [label="/scan/resume (웹 재시작)", fillcolor="#D6E6FF"];
+    resuming [label="RESUMING\n중단 좌표에서 올림 → 정지 확인 → tare\n확정된 윗면 · 방향은 다시 재지 않는다"];
+    reset    [label="/safety/reset (래치 해제)", fillcolor="#D6E6FF"];
+    homecmd  [label="/scan/home (웹 안전복귀)\n휴지 phase(STOPPED · ERROR · DONE)에서만\n래치가 막지 않는다 → OP_HOME", fillcolor="#D6E6FF"];
+  }
+
+  // 본 흐름
+  start -> checks;
+  checks -> reject [label="하나라도"];
+  checks -> prep [label="통과"];
+  prep -> top -> topq;
+  topq -> slide [label="예: 윗면 1 점 기록\n첫 방향은 그 자리에서"];
+  slide -> edgeq;
+  edgeq -> more [label="예: 모서리 1 점 기록"];
+  more -> turn [label="아니오"];
+  turn -> slide;
+  more -> geom [label="예"];
+  geom -> geomq;
+  geomq -> homing [label="예"];
+  homing -> done;
+
+  // 실패 → ERROR
+  topq  -> error [label="아니오: NO_CONTACT 300", color="#B00020", fontcolor="#B00020", constraint=false];
+  edgeq -> error [label="아니오: NO_EDGE 301", color="#B00020", fontcolor="#B00020", constraint=false];
+  geomq -> error [label="아니오: INVALID_SHAPE 500\n· INSUFFICIENT_POINTS 501", color="#B00020", fontcolor="#B00020", constraint=false];
+  common -> error [color="#B00020", style=dashed];
+
+  // 관제자 명령
+  stopcmd -> stopping -> stopq;
+  stopq -> stopped [label="예"];
+  stopq -> error [label="아니오: ROBOT_STATUS_LOST 404", color="#B00020", fontcolor="#B00020", constraint=false];
+  stopped -> resume [style=dashed, label="관제자가 누르면"];
+  resume -> resuming;
+  resuming -> top   [label="윗면 미확정", style=dashed, color="#3366CC", fontcolor="#3366CC", constraint=false];
+  resuming -> turn  [label="남은 방향부터", style=dashed, color="#3366CC", fontcolor="#3366CC", constraint=false];
+  resuming -> geom  [label="네 방향 확정", style=dashed, color="#3366CC", fontcolor="#3366CC", constraint=false];
+  resuming -> reset [style=invis];
+  reset -> homecmd [label="래치면 먼저 해제", style=dashed];
+  error -> reset [style=dashed, arrowhead=none, color="#B00020", constraint=false];
+
+  { rank=same; start; stopcmd; }
+  { rank=same; turn; more; }
+  { rank=same; reject; prep; }
+  { rank=same; error; geom; }
+  { rank=same; common; homing; }
+}
