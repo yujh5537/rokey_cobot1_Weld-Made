@@ -941,9 +941,15 @@ def test_step_force_averages_only_samples_received_after_settling(ros, monkeypat
         node.motion = Motion(_slide_goal(), node.now_s())
         io = NodeStepIO(node, FakeGoalHandle(node.motion.goal), node.motion, 0.005, 60.0)
 
+        # 첫 샘플이 settle(10 ms) 뒤에 와야 하는 시험이다. 간격이 20 ms 면 여유가 10 ms 뿐이라 gen2 GC 한 번
+        # (이 PC 에서 최대 20 ms)이 끼면 첫 샘플을 settle 전으로 보고 평균이 한 칸 밀린다(P1-2b colcon 에서 재현).
+        # 간격을 50 ms 로 벌리고 GC 를 미리 돌린다. 검사하는 동작은 같다
+        import gc
+        gc.collect()
+
         def feed():
             for i in range(1, 6):
-                time.sleep(0.02)
+                time.sleep(0.05)
                 node.last_force_sample = (10 + i, (float(i), 0.0, 2.0 * i))
         threading.Thread(target=feed, daemon=True).start()
         fx, fy, fz = io.force()
