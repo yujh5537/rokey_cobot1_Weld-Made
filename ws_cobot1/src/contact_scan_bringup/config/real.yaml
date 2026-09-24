@@ -207,6 +207,17 @@ robot_manager:
     step_still_m: 0.00005            # 이 창 동안 위치 변화가 이 이하면 멈춤 [m]. posx 정지 잡음보다 커야 한다
     step_still_window_s: 0.15
     step_move_timeout_s: 2.0         # 한 스텝이 (거리/속도 + 이 값) 안에 멈추지 않으면 중단 [s]. 출발하지 않았으면 한 번 다시 보낸다(#153)
+    # --- ExecutePath (phase 2, docs/phase2/weld-ros-interfaces.md 5.2 · 6장, D31) ---------------------
+    # 없거나 못 쓰는 값이면 robot_manager 는 기동하고 ExecutePath 만 거절한다(코드에 기본값 없음)
+    path_mode: line                  # line = 점마다 amovel 뒤 멈춤 확인(1차에서 실기 확인된 API만). 점마다 선다(D8 허용).
+                                     #   spline = 첫 점까지 amovel 직선 뒤 나머지를 amovesx 한 번. 호출 확인(P1-3 Virtual ·
+                                     #   #186 M4) 전이라 기본으로 두지 않는다
+    path_max_points: 100             # 경유점 상한. spline 은 드라이버 고정 배열 100 을 넘을 수 없다(컨트롤러가 개수를 검사하지 않는다)
+    path_max_speed_mps: 0.100        # 경로 속도 상한 [m/s]. 계약 출발값. weld_manager 는 상한을 보지 않는다(D29)
+    path_min_z_m: 0.100              # Base z 하한 [m]. 경유점이 잘못 와도 작업대에 박히지 않게 하는 마지막 울타리.
+                                     #   계약 출발값 = 작업대 표면 base_to_fixture.z 0.095 + 테이프 0.002 + 여유 0.003.
+                                     #   weld_manager 의 세로선 끝은 지지면 + 5 mm. base_to_fixture 를 다시 재면 같이 고친다
+    path_acc_ratio: 4.0              # 가속 = 이 값 × 속도 [1/s]. 1차 move_line 의 4 배 규칙과 같다
 
 scan_manager:
   ros__parameters:
