@@ -437,6 +437,26 @@ def test_stopping_short_of_a_point_is_a_robot_error(ros, monkeypatch):
         node.destroy_node()
 
 
+@pytest.mark.parametrize('mode', ['line', 'spline'])
+def test_failed_command_is_followed_by_a_confirmed_stop(ros, monkeypatch, mode):
+    """명령이 실패 · 응답 시간 초과여도 컨트롤러는 받았을 수 있다. 세우고 확인한 뒤 204 로 끝낸다.
+
+    2026-09-24 Virtual: amovesx 100 점 응답이 3.2 s 뒤에 와서 0.5 s 에 "명령 실패"로 끝났는데 로봇은 spline 을 돌고 있었다.
+    """
+    node, arm = make_node(monkeypatch, extra=[Parameter('path_mode', Parameter.Type.STRING, mode)])
+    try:
+        failing = 'move_line' if mode == 'line' else 'move_spline_task'
+        real = arm.call_sync
+        monkeypatch.setattr(node, 'call_sync', lambda c, r, label: False if label == failing else real(c, r, label))
+        result, _ = run(node, path_goal(n=3))
+        assert (result.reason, result.reason_code) == (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR)
+        assert '이동 명령 실패' in result.detail
+        assert len(arm.stops) == 1 and '명령 실패 뒤 정지 확인' in arm.stops[0]
+        assert_cleaned(node)
+    finally:
+        node.destroy_node()
+
+
 def test_unknown_start_position_sends_nothing(ros, monkeypatch):
     node, arm = make_node(monkeypatch)
     try:
