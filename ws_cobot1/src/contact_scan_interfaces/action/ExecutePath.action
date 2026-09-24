@@ -5,7 +5,7 @@ uint8 line_index            # 관측용 (WeldState.line_index)
 geometry_msgs/Pose[] waypoints   # 차례로 지날 TCP pose. 마지막 점에서 정지한다. 첫 점까지도 직선으로 간다
 string frame_id             # waypoints 의 프레임
 float64 speed               # m/s (TCP 직선 속도)
-float64 path_tolerance_m    # 마지막 점 도착 허용치. 넘으면 ROBOT_ERROR
+float64 path_tolerance_m    # 경유점 도착 허용치 (line 은 중간 점마다 · 마지막 점). 넘으면 ROBOT_ERROR. <= 0 · NaN 은 PATH_REJECTED
 builtin_interfaces/Duration timeout
 ---
 uint8 REASON_TARGET_REACHED=0   # ExecuteMotion.REASON_* 와 같은 값
