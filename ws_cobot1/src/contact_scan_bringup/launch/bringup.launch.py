@@ -1,4 +1,4 @@
-"""자체 노드 5개를 입력원(source)에 맞는 파라미터 파일로 띄운다 (US-07).
+"""자체 노드 6개(1차 5개 + phase 2 weld_manager)를 입력원(source)에 맞는 파라미터 파일로 띄운다 (US-07).
 
   ros2 launch contact_scan_bringup bringup.launch.py source:=sim
   ros2 launch contact_scan_bringup bringup.launch.py source:=robot_force broker_host:=<웹 PC 주소>
@@ -22,13 +22,15 @@ CONFIG_BY_SOURCE = {
     'robot_force': 'real.yaml',
 }
 
-# 자체 실행 노드 5개. 패키지 이름 = 실행 파일 이름 = 노드 이름 (ws_cobot1/src/README.md 의 pkg create 명령 기준)
+# 자체 실행 노드. 패키지 이름 = 실행 파일 이름 = 노드 이름 (ws_cobot1/src/README.md 의 pkg create 명령 기준)
+# weld_manager 는 phase 2(docs/phase2/weld-ros-interfaces.md 1장 "자체 노드는 6 개"). 설치되지 않았으면 건너뛴다
 NODES = [
     'robot_manager',
     'contact_detector',
     'safety_monitor',
     'scan_manager',
     'mqtt_bridge',
+    'weld_manager',
 ]
 
 

@@ -315,6 +315,43 @@ scan_manager:
     robot_status_timeout_s: 2.0      # robot_manager.status_rate_hz(10 Hz = 0.1 s) 의 20 배.
                                      #   정지 중 300~360 ms 의 샘플 공백이 보고돼 있다(이슈 #130) — 그 5 배 이상으로 둔다
 
+# --- phase 2 용접 (docs/phase2/weld-motion.md 6절, D1~D31) ------------------------------------------
+# 값은 계약 6절의 **설계 출발값**이다. 실측이 아니다. 실기에서 조정한다
+weld_manager:
+  ros__parameters:
+    weld_speed_mps: 0.010            # 용접선 위 TCP 속도 [m/s]
+    travel_speed_mps: 0.050          # 선 사이(z_safe) 이동 속도 [m/s]
+    approach_speed_mps: 0.020        # 접근 2(접근점 → 첫 경유점) 속도 [m/s]
+    weld_speed_min_mps: 0.002        # 속도 하한 [m/s]. robot_manager 이동 판정(0.2 mm / 0.3 s ≈ 0.67 mm/s)보다 커야 한다(#152)
+    standoff_m: 0.003                # 팁 구 표면 ↔ 이음선 최단거리 [m] (D22)
+    tip_radius_m: 0.002              # 팁 구 반지름 [m]. scan_manager 의 tip_radius_m 과 같은 값 [v0.1.18 잠정, 캘리퍼 확정 전]
+    weave_amplitude_m: 0.002         # 위빙 진폭 [m]. 0 = 직선
+    weave_pitch_m: 0.004             # 위빙 반주기 [m]. 0 = 직선
+    tilt_deg: 45.0                   # 툴 축이 연직에서 바깥으로 기우는 각 [deg]. 세로선은 0 이면 거절(PathRejected)
+    tool_roll_deg: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # 선 L0~L7 별 툴 축 둘레 회전 [deg] (D24). M1 결과로 조정
+                                     #   ⚠️ sim(9/24 Virtual)에서는 모두 0 이면 L7 접근에서 J6 가 −360° 를 넘었다(선마다 툴이 같은 쪽으로 돌아
+                                     #   누적). sim 은 [0, 0, 180, 180, 0, 0, 180, 180] 으로 8 선을 완주했다(J6 −244.9 ~ +84.9°).
+                                     #   실기 홈(J6 −15.14)에서 같은 값이 맞는지 M1 에서 확인하고 여기에 넣는다. 확인 전에는 L7 까지 가지 않는다(end_line)
+    # tool_profile_u_m:               # 툴 외형 [m] (D23). **TBD — M2(#186 툴 치수) 미측정.** 0 이나 임의값을 넣지 않는다(규칙 4).
+    # tool_profile_r_m:               #   이 두 줄이 없으면 weld_manager 는 뜨지만 /weld/run 을 INVALID_VALUE(102)로 거절한다.
+                                     #   재면 같은 길이 두 배열로 채운다: u = 팁에서 축 방향 뒤 거리(오름차순), r = 그 구간 최대 반폭
+    approach_m: 0.030                # 접근 · 후퇴 거리 [m] (툴 축 뒤로)
+    travel_clearance_m: 0.050        # z_safe = 윗면 z + 이 값 [m] (작업대 좌표)
+    bottom_margin_m: 0.005           # 세로선 끝 = support_z + 이 값 [m]. robot_manager path_min_z_m 은 지지면 + 3 mm 라 이보다 낮다
+    workspace_margin_m: 0.100        # 부재 밖 허용 범위 x · y [m]
+    path_tolerance_m: 0.003          # ExecutePath 도착 허용치 [m] (D18 ±3 mm). robot_manager 는 line 의 중간 점에도 쓴다
+    orientation_tolerance_deg: 15.0  # 이동 뒤 자세 차이 허용 [deg]. 0 = 끔(병후 결정 Q9)
+    motion_timeout_s: 120.0          # 단위 goal 제한 [s]. line 방식은 점마다 약 0.5 s 멈춘다(Virtual 9/24) — 경유점 100 개면 약 60 s
+    tool_check_max_force_n: 6.0      # 시작 때 무접촉 |F| 가 이보다 크면 툴 미등록 의심(302). 9/23 미등록 치우침 약 12 N
+    server_wait_timeout_s: 2.0       # robot_manager 액션 서버 · goal 응답 대기 [s]. scan_manager 와 같은 뜻
+    stop_confirm_timeout_s: 5.0      # 정지 뒤 connected && !moving 확인 한도 [s]. scan_manager 와 같은 뜻
+    sample_timeout_s: 1.0            # 시작 · 안전복귀 때 /robot/sample 이 이보다 오래됐으면 없는 것(307)
+    state_publish_period_s: 1.0      # /weld/state 주기 [s]
+    scan_state_timeout_s: 5.0        # /scan/state 가 이보다 오래됐으면 시작 거절(600 계열 배타 판단 불가)
+    result_dir: ~/scan_results/real              # scan_manager 의 result_dir 과 **같은 값**이어야 한다(result_store 를 읽는다, #188)
+    result_frame_id: workpiece_fixture
+    motion_frame_id: base_link       # robot_manager 의 frame_id 와 같아야 한다(ExecutePath 는 다르면 604)
+
 mqtt_bridge:
   ros__parameters:
     broker_port: 1883
