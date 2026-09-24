@@ -1,0 +1,23 @@
+# 메인 PC (Ubuntu 24.04 · ROS 2 Jazzy) — ws_cobot1 와 docs/env 스크립트의 pip 의존성
+#
+# 여기에 없는 것:
+#   - ROS 2 패키지(rclpy · launch · *_msgs · ament_index_python …): apt 로 ROS 2 Jazzy 를 설치하면 들어온다.
+#     나머지 시스템 의존은 `rosdep install --from-paths ws_cobot1/src -y --ignore-src` 로 package.xml 에서 설치한다.
+#   - 두산 드라이버(dsr_msgs2 · DSR_ROBOT2)와 RG2 메시지(onrobot_rg_msgs): 레포 밖 ws_dsr 를 빌드해 `sod` 로 source 한다.
+#
+# 설치: ROS 와 같은 python3 로 `python3 -m pip install -r ws_cobot1/requirements.txt`
+# 확인한 버전: 2026-09-24 현지 PC(Python 3.12.3). 아래 하한은 이 PC 에서 시험이 통과한 값이다.
+
+# --- 현지: contact_detector · safety_monitor · contact_scan_bringup · scan_manager/geometry_estimator ·
+#           phase 2 robot_manager(ExecutePath) · weld_manager
+# 노드 코드는 표준 라이브러리 + ROS 만 쓴다. 아래는 시험(colcon test / pytest)과 설정 검사에 필요하다.
+pytest>=7.4          # 확인 7.4.4. apt 이름 python3-pytest (package.xml test_depend)
+PyYAML>=6.0          # contact_scan_bringup/test/test_config.py 가 sim.yaml · real.yaml 을 읽는다. 확인 6.0.1(apt) · 6.0.3
+
+# --- 의석: mqtt_bridge (담당 확인 요청)
+# package.xml exec_depend 는 apt 의 python3-paho-mqtt(Ubuntu 24.04 에서 1.6.1)다. mqtt_bridge.py 는
+# mqtt.Client(client_id=…, clean_session=True) 로 콜백 API 버전을 주지 않는 1.x 방식이라 2.x 에서는 기동하지 않는다.
+paho-mqtt>=1.6,<2.0
+
+# --- 학민: docs/env 스크립트(pivot_tcp.py · tcp_xy_from_180.py, runbook 의 TCP 등록 절차)
+numpy>=1.26          # 확인 1.26.4
