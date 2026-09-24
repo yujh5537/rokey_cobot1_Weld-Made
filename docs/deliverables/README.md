@@ -18,13 +18,13 @@
 | 산출물 | 담당 | 이미 있는 것 (origin/main) | 할 일 | 결과물 위치 |
 |---|---|---|---|---|
 | 시스템 아키텍처 | 병후 | `docs/architecture.md`, `docs/design/contact-scan-system-architecture-v1.6.drawio` | phase 2(weld_manager · ExecutePath · weld/*) 추가해 v1.7, png 내보내기 | `docs/deliverables/01-system-architecture.md` + png |
-| 네트워크 구성도 | 현지 + 의석 | 루트 README runbook(두 PC · 브로커 · 실기 192.168.1.100 · 포트), `docs/env/setup-record-20260916.md`, `docs/decisions/0002-web-stack-mqtt.md` | 새 그림 1 장: 웹 PC(Docker: mosquitto · FastAPI · PostgreSQL · React) ↔ 메인 PC(ROS 2 노드 6) ↔ 로봇 컨트롤러 · RG2. IP · 포트 · 프로토콜(MQTT · ROS DDS 도메인 30 · DRFL). 의석이 웹 PC 쪽, 현지가 메인 PC · 로봇 쪽 | `02-network.md` + drawio · png |
+| 네트워크 구성도 | 의석 초안 → 현지 | 루트 README runbook(두 PC · 브로커 · 실기 192.168.1.100 · 포트), `docker/docker-compose.yml`, `docs/env/setup-record-20260916.md`, `docs/decisions/0002-web-stack-mqtt.md` | 새 그림 1 장: 웹 PC(**Docker 4 서비스: mosquitto · postgres · FastAPI · Spring Boot 8080**, React/Vite 5173 은 Docker 밖 `npm run dev`) ↔ 메인 PC(ROS 2 노드 5 + weld_manager 는 "예정" 표시) ↔ 로봇 컨트롤러 · RG2. IP · 포트 · 프로토콜(MQTT 1883 · ROS DDS 도메인 30 · DRFL). 의석이 웹 PC 쪽 초안(9/25), 현지가 메인 PC · 로봇 쪽을 같은 파일에 덧붙임(9/26) | `02-network.md` + drawio · png |
 | 동작 순서도 | 현지 | `scan_manager/README.md` 시퀀스 표, `docs/design/contact-scan-node-diagram-v1.1.md` 시나리오, phase 2 `weld-motion.md` 5절 | 플로우차트 2 장: 스캔(PREPARING → TOP → EDGE ×4 → GEOMETRY → HOMING, 중지 · 안전복귀 · 재시작 분기) · 용접(접근 → 경로 → 후퇴 × 8 → 홈). 예외 분기(래치 · 미접촉 · 정지)를 같은 그림에 | `03-flowchart.md` + drawio · png |
 | 하드웨어 구성 | 학민 | `docs/contracts/units-frames.md`(TCP · 홈 · 작업대 원점 · 큐브 · 배치 원칙), `docs/env/tool-tcp-register.md`, 실기 사진 | 장비 목록 표(M0609 · RG2 · 인공눈물 탐침 · 홀더 · 작업대 · 81 mm 큐브 · 테이프 · 메인 PC · 웹 PC · 스위치) + 배치 사진(치수 표기) + TCP · 홈 · 좌표 기준 요약 | `04-hardware.md` + 사진 |
 | 인터페이스 정의서 | 병후 | `docs/contracts/ros-interfaces.md` · `mqtt-schema.md` · `docs/phase2/weld-*` | 요약본 1 편: 토픽 · 서비스 · 액션 표(이름 · 타입 · 발행/구독 · 뜻) + MQTT 표 + 대표 msg 3 개 전문. 원본은 링크 | `05-interfaces.md` |
 | ROS2 Node 구조도 | 병후 | `docs/design/contact-scan-node-diagram-v1.1.md/.drawio`(연결 40 선) | weld_manager · ExecutePath · /weld/* 추가해 v1.2, png | `06-node-graph.md` + drawio · png |
 | HMI 화면 구성 | 의석 | 프런트(React + Three.js 3D 관제), `docs/test-reports/t41-robot-visualization.md`, TR-05 보고 | 화면 캡처(스캔 · 용접)에 요소 번호 → 표시 정보 · 버튼 · 데이터 출처 표. 화면 흐름 1 장 | `07-hmi.md` + 캡처 |
-| 예외 · 오류 리스트와 처리 | 학민 | `ros-interfaces.md` 6.1 ReasonCode 표(1xx~6xx) · 7.1 세 정지 경로, `docs/test-reports/daily/20260923.md` §7 SAMPLE_STALE 대응표, safety 감사 보고 | 표 1 개: 상황 → 감지하는 노드 → 코드 → 로봇 동작 → 화면 표시 → 관제자 조치(재시작 · 안전복귀 · 래치 해제). 실기에서 실제로 겪은 것에 ✔ | `08-exceptions.md` |
+| 예외 · 오류 리스트와 처리 | 학민 | `ros-interfaces.md` 6.1 ReasonCode 표(1xx~5xx, 6xx 는 phase 2 `docs/phase2/weld-ros-interfaces.md`) · 7.1 세 정지 경로, `docs/test-reports/daily/20260923.md` §7 SAMPLE_STALE 대응표, safety 감사 보고 | 표 1 개: 상황 → 감지하는 노드 → 코드 → 로봇 동작 → 화면 표시 → 관제자 조치(재시작 · 안전복귀 · 래치 해제). 실기에서 실제로 겪은 것에 ✔ | `08-exceptions.md` |
 | 위험요소 · 안전대책 | 학민 | BRD 4.5 · 위험 목록, safety_monitor README, units-frames "탐침 상태 전제조건", 실기 세션 보고(46 N 밀림 · 툴 미등록 12 N · TCP 휘발) | 표: 위험 → 원인 → 대책(설계 · 절차 · 파라미터) → 검증(TR-07 · 실기 사례). 세션 시작 점검표 포함 | `09-safety.md` |
 | Business Requirements | 병후 | `docs/BRD.md` v3.2.0 | 그대로 등록 + phase 2 한 절 추가 여부 결정 | `docs/BRD.md` |
 
@@ -37,13 +37,13 @@
 | 제출물 | 담당(안) | 내용 · 근거 |
 |---|---|---|
 | 영상 (.mp4, 1 분 이내) | 의석 · 현지 | 소스는 **슬랙 채널의 9/23 촬영본**(각자 핸드폰 영상을 채널에 올린다). 편집: 웹 START → 스캔 → 3D 형상 → 완료(+ 중지 · 안전복귀 5 초), 9/29 용접 성사 시 8 선 장면 추가. 1080p · 60 초 이내 · 한국어 자막으로 단계 표시, 화면 캡처와 실기 영상을 나란히. 초안 9/28, 최종 9/29 저녁 |
-| 발표자료 (.pdf) | 병후 종합 | PPT 양식 5 장 목차(아래 4 절). 파트 슬라이드는 각자 |
-| 소스코드 (.zip) | 현지 | 요구는 "소스 폴더만"이다. `ws_cobot1/src` 를 기본으로 하고, 실행에 필요한 `backend` · `frontend` · `docker` 는 포함한다(Readme 실행 순서가 참조). `docs` · build · install · log · node_modules · data 는 제외. 풀어서 `colcon build` 가 되는지 확인 |
+| 발표자료 (.pdf) | 병후 종합 | PPT 양식 5 장 목차(아래 4 절). 파트 슬라이드는 각자. 용접 미성사 시 표지 · 그림 · 대응표까지 점검(outline 합치기 체크) |
+| 소스코드 (.zip) | 현지 | 요구는 "소스 폴더만"이다. `ws_cobot1/src` 를 기본으로 하고, 실행에 필요한 `backend` · `frontend` · `docker` · **`docs/env/*.py`**(runbook 이 부르는 툴 · TCP 등록 스크립트)는 포함한다. 그 밖의 `docs` · build · install · log · node_modules · data 는 제외. 풀어서 새 디렉터리에서 Readme 의 경로가 다 있는지와 `colcon build` 를 확인 |
 | Readme.md | 의석 (requirements.txt 는 현지 · 의석이 각자 패키지 몫) | 루트 README 보강: 시스템 설계 · 플로우차트 그림(02 · 03 · 06 재사용), OS · 버전(`docs/env/versions.md`), 장비 목록(04), `requirements.txt`(Python 의존성 정리 필요), 실행 순서(이미 있는 W0~W3 · M0~M4) |
 
 ## 4. PPT 목차
 
-확정본은 **`docs/presentation/outline-v1.md`**(2026-09-24). 양식 5 장 고정 · 15~20 분 · 28~32 장 · 파트별 배분 포함.
+확정본은 **`docs/presentation/outline-v1.md`**(2026-09-24). 양식 5 장 고정 · 18~20 분 기준 · 29~31 장 · 파트별 배분 포함.
 
 ## 5. 평가 항목 ↔ 우리 증거 (04-⑦ 장의 뼈대)
 
