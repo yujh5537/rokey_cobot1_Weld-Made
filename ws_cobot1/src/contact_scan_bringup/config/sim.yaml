@@ -46,6 +46,7 @@ contact_detector:
                                      #   TOOL_REG_SUSPECT 오탐이 나면 tare 가 실패해 스캔이 아예 시작되지 않는다
     # --- 하강 · 밀기 기준 분리 (#109). 값의 근거는 real.yaml ---
     descend_ref_window_s: 1.0        # sim 도 같은 경로를 탄다. sim 외력은 무접촉이면 0 이라 이동 기준도 0 근처다
+                                     #   느린 접촉 경계 약 4.6 N/s(real.yaml 주석, #139). sim 은 sim_stiffness_n_per_m × descend_speed_mps
     descend_ref_lag_s: 0.3
     descend_ref_min_samples: 10
     descend_ref_settle_s: 5.5
@@ -216,8 +217,11 @@ scan_manager:
                                      #   바꾸면 다시 계산한다(test_sim_source.py::test_full_scan_recovers_the_virtual_box 가 치수로 검증한다)
     edge_round_radius_m: 0.0         # 부재 모서리 둥글림 R. sim 박스는 예리하다. 0 이 정당한 값이다
     edge_bias_offset_m: 0.0          # 실측 나머지 편향. 스칼라 하나, 방향당 값, 진행 방향 + (geometry_estimator README, PR #75)
-    result_dir: data                 # result_store 경로. 상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이다
-                                     #   ws_cobot1 에서 launch 하면 ws_cobot1/data (gitignore)
+    result_dir: ~/scan_results/sim   # result_store 경로. **절대경로로 둔다**(#187): 상대 경로는 노드를 띄운 셸의
+                                     #   현재 디렉터리 기준이라 9/23 실기에서 ~/data 와 ws_cobot1/data 로 갈렸다.
+                                     #   sim 과 real 을 나눈다 — weld_tracer 가 '가장 최근 결과'를 고르므로
+                                     #   섞이면 실기 좌표를 sim 이 따라갈 수 있다(현지).
+                                     #   scan_manager 가 expanduser 하므로 ~ 를 쓸 수 있다. test_config 가 검사한다
     result_frame_id: workpiece_fixture    # ScanResult 의 프레임(가칭)
     motion_frame_id: base_link            # ExecuteMotion goal 의 프레임(가칭)
     direction_order: [POS_X, NEG_X, POS_Y, NEG_Y]   # 모서리 탐색 순서. 기동할 때만 읽는다

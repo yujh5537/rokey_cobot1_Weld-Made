@@ -157,3 +157,24 @@ def test_home_return_params_exist(file_name):
     for name in ('lift_height_m', 'move_speed_mps', 'pose_max_age_s', 'motion_timeout_s'):
         assert name in scan, f'{file_name}: scan_manager.{name} 이 없다'
         assert scan[name] > 0 and math.isfinite(scan[name]), f'{file_name}: {name} = {scan[name]}'
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_result_dir_is_absolute(file_name):
+    """result_dir 은 절대경로여야 한다 (#187).
+
+    상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이라, 같은 코드로도 launch 위치에 따라
+    기록이 다른 곳에 남는다. 9/23 실기에서 ~/data 와 ws_cobot1/data 로 갈렸다.
+    scan_manager 가 os.path.expanduser 를 하므로 ~ 로 시작해도 된다.
+    """
+    value = _params(file_name)['scan_manager']['result_dir']
+    assert value.startswith(('~', '/')), f'{file_name}: result_dir = {value!r} 이 상대 경로다'
+
+
+def test_sim_and_real_result_dirs_differ():
+    """sim 과 real 의 기록이 한 디렉터리에 섞이면 안 된다 (#187).
+
+    weld_tracer 가 '가장 최근 결과'를 고르므로, 섞이면 sim 박스 좌표를 실기가 따라갈 수 있다(현지).
+    """
+    dirs = {f: _params(f)['scan_manager']['result_dir'] for f in SOURCE_BY_FILE}
+    assert len(set(dirs.values())) == len(dirs), f'sim 과 real 의 result_dir 이 같다 {dirs}'

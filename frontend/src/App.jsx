@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { buildM0609Model, disposeObject3D } from './robotModel.js'
+import { parseRobotJoints } from './robotJoints.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -83,7 +86,6 @@ function formatNumber(value) {
 }
 
 const DISPLAY_SCALE = 0.01
-
 function toThreePosition(
   xMm,
   yMm,
@@ -125,6 +127,49 @@ function getBaseToFixtureMm() {
 }
 
 const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
+
+// 작업대는 실제 설비 배치용 시각 모델이다.
+// sim의 base_to_fixture.z=400 mm는 가상 박스 지지면이므로
+// 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
+const DEFAULT_TABLE_ORIGIN_MM = {
+  x: 420.255,
+  y: -156.675,
+  z: 95.006,
+}
+
+function getTableOriginMm() {
+  const raw =
+    import.meta.env
+      .VITE_TABLE_ORIGIN_MM ?? ''
+
+  if (!raw.trim()) {
+    return DEFAULT_TABLE_ORIGIN_MM
+  }
+
+  const values = raw
+    .split(',')
+    .map((value) =>
+      Number(value.trim())
+    )
+
+  if (
+    values.length !== 3 ||
+    values.some(
+      (value) =>
+        !Number.isFinite(value)
+    )
+  ) {
+    return DEFAULT_TABLE_ORIGIN_MM
+  }
+
+  return {
+    x: values[0],
+    y: values[1],
+    z: values[2],
+  }
+}
+
+const TABLE_ORIGIN_MM = getTableOriginMm()
 
 function formatScanLogMessage(payload) {
   const parts = []
@@ -190,6 +235,10 @@ function App() {
   // Three.js canvas
   const canvasRef = useRef(null)
 
+  // 실제 M0609 모델과 joint_1~joint_6 회전 Group.
+  const robotModelRef = useRef(null)
+  const robotJointRefs = useRef({})
+
   // Three.js에서 현재 TCP 팁 Mesh를 참조한다.
   const tipMeshRef = useRef(null)
 
@@ -198,6 +247,9 @@ function App() {
 
   // Three.js 접촉점들을 담는 Group
   const contactGroupRef = useRef(null)
+
+  // Three.js scan/result 직육면체를 담는 Group
+  const workpieceGroupRef = useRef(null)
 
   // Three.js 스캔 결과의 일반 모서리를 담는 Group
   const edgeGroupRef = useRef(null)
@@ -226,6 +278,10 @@ function App() {
   // FastAPI WebSocket 연결 상태
   const [wsConnected, setWsConnected] = useState(false)
 
+  // M0609 joint state. /dsr01/joint_states -> MQTT robot/joints.
+  const [jointPositions, setJointPositions] = useState({})
+  const [jointStatus, setJointStatus] = useState('수신 대기')
+  const [robotModelStatus, setRobotModelStatus] = useState('LOADING')
   // safety/status 수신 여부와 래치 상태.
   // 상태를 아직 모를 때는 안전 해제 버튼을 막지 않는다.
   const [safetyStatusSeen, setSafetyStatusSeen] = useState(false)
@@ -460,6 +516,7 @@ function App() {
       `${wsProtocol}://${window.location.host}/ws`
 
     const websocket = new WebSocket(wsUrl)
+    let jointTimeout
 
 
     // WebSocket 연결 성공
@@ -522,6 +579,22 @@ function App() {
           setScanId(nextScanId)
         }
 
+        // Apply only complete, finite J1~J6 snapshots, mapped by name.
+        if (topic === 'robot/joints') {
+          const nextPositions = parseRobotJoints(payload)
+          if (nextPositions) {
+            setJointPositions(nextPositions)
+            setJointStatus('실시간 수신 중')
+            window.clearTimeout(jointTimeout)
+            jointTimeout = window.setTimeout(() => {
+              setJointStatus('수신 지연 — 마지막 자세 표시')
+            }, 3000)
+          }
+        }
+
+        // RG2는 탐침 고정 파지용이므로 웹에서는 항상 닫힌 자세로 표시한다.
+        // robot/gripper_joints가 들어와도 시각 자세를 덮어쓰지 않는다.
+
         // robot/sample
         if (
           topic === 'robot/sample' &&
@@ -556,6 +629,9 @@ function App() {
           topic === 'contact/event' &&
           payload.pose
         ) {
+          // contact/event pose는 판정 순간의 탐침 TCP 좌표(base_link)다.
+          // scan/result도 이 접촉점들로 계산되므로 노란 접촉점은 이 원본 좌표를 쓴다.
+          // 이벤트 수신 시점의 현재 로봇 자세를 다시 읽으면 통신 지연만큼 어긋난다.
           const newContactPoint = {
             eventId: payload.event_id,
             frameId: payload.frame_id,
@@ -636,6 +712,8 @@ function App() {
       console.log('[WS] disconnected')
 
       setWsConnected(false)
+      window.clearTimeout(jointTimeout)
+      setJointStatus('연결 끊김 — 마지막 자세 표시')
       addLog('FastAPI WebSocket 연결 종료')
     }
 
@@ -651,6 +729,11 @@ function App() {
 
     // React 컴포넌트 종료 시 연결 정리
     return () => {
+      window.clearTimeout(jointTimeout)
+      websocket.onopen = null
+      websocket.onmessage = null
+      websocket.onclose = null
+      websocket.onerror = null
       websocket.close()
     }
   }, [])
@@ -661,6 +744,7 @@ function App() {
   // =========================
 
   useEffect(() => {
+    let disposed = false
     // 1. 3D 공간
     const scene = new THREE.Scene()
 
@@ -706,45 +790,351 @@ function App() {
 
 
     // 5. 작업대
-    const tableGeometry =
-      new THREE.BoxGeometry(
-        4,
-        0.2,
-        3
+    // 웹 3D 기준:
+    // - 작업대 상판 = workpiece_fixture Z = 0
+    // - 실제 바닥 = 작업대 상판보다 94 mm 아래
+    // - 화면 축척 = 100 mm -> Three.js 1 unit
+    const worktable = new THREE.Group()
+
+    const tableWidth = 4.0
+    const tableDepth = 3.0
+    const tableHeight = 94 * DISPLAY_SCALE
+    const topThickness = 0.12
+    const floorY = -tableHeight
+
+    // Three.js 장면은 base_link 기준으로 유지한다.
+    // 작업대 시각 모델은 실제 설비 위치를 사용한다.
+    // sim base_to_fixture는 가상 박스의 지지면이므로 작업대 위치와 분리한다.
+    const tableOriginThree =
+      toThreePosition(
+        TABLE_ORIGIN_MM.x,
+        TABLE_ORIGIN_MM.y,
+        TABLE_ORIGIN_MM.z
       )
 
-    const tableMaterial =
-      new THREE.MeshStandardMaterial()
-
-    const table = new THREE.Mesh(
-      tableGeometry,
-      tableMaterial
+    worktable.position.copy(
+      tableOriginThree
     )
 
-    table.position.y = -0.1
+    const topMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0x4f5963,
+        metalness: 0.55,
+        roughness: 0.38,
+      })
 
-    scene.add(table)
+    const frameMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0xaab2b9,
+        metalness: 0.7,
+        roughness: 0.32,
+      })
 
+    const footMaterial =
+      new THREE.MeshStandardMaterial({
+        color: 0x30363b,
+        metalness: 0.25,
+        roughness: 0.55,
+      })
 
-    // 6. 직육면체 부재
-    const workpieceGeometry =
-      new THREE.BoxGeometry(
-        2,
-        1,
-        1.2
+    // 상판 윗면을 정확히 Y=0에 둔다.
+    const tableTop =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          tableWidth,
+          topThickness,
+          tableDepth
+        ),
+        topMaterial
       )
 
-    const workpieceMaterial =
-      new THREE.MeshStandardMaterial()
+    tableTop.position.y =
+      -topThickness / 2
 
-    const workpiece = new THREE.Mesh(
-      workpieceGeometry,
-      workpieceMaterial
+    worktable.add(tableTop)
+
+    const tableTopEdges =
+      new THREE.LineSegments(
+        new THREE.EdgesGeometry(
+          tableTop.geometry
+        ),
+        new THREE.LineBasicMaterial({
+          color: 0xd9dde1,
+        })
+      )
+
+    tableTopEdges.position.copy(
+      tableTop.position
     )
 
-    workpiece.position.y = 0.5
+    worktable.add(tableTopEdges)
 
-    scene.add(workpiece)
+    // 상판 fixture hole은 시각화용이다.
+    const holeGeometry =
+      new THREE.CircleGeometry(
+        0.035,
+        16
+      )
+
+    const holeMaterial =
+      new THREE.MeshBasicMaterial({
+        color: 0x20262b,
+        side: THREE.DoubleSide,
+      })
+
+    for (
+      let x = -1.5;
+      x <= 1.5;
+      x += 0.5
+    ) {
+      for (
+        let z = -1.0;
+        z <= 1.0;
+        z += 0.5
+      ) {
+        const hole =
+          new THREE.Mesh(
+            holeGeometry,
+            holeMaterial
+          )
+
+        hole.rotation.x =
+          -Math.PI / 2
+
+        hole.position.set(
+          x,
+          0.002,
+          z
+        )
+
+        worktable.add(hole)
+      }
+    }
+
+    // 실제 높이 94 mm를 반영한 프레임/다리.
+    const legSize = 0.14
+
+    const legHeight =
+      tableHeight -
+      topThickness
+
+    const legCenterY =
+      -topThickness -
+      legHeight / 2
+
+    const legPositions = [
+      [-1.7, -1.2],
+      [1.7, -1.2],
+      [-1.7, 1.2],
+      [1.7, 1.2],
+    ]
+
+    legPositions.forEach(
+      ([x, z]) => {
+        const leg =
+          new THREE.Mesh(
+            new THREE.BoxGeometry(
+              legSize,
+              legHeight,
+              legSize
+            ),
+            frameMaterial
+          )
+
+        leg.position.set(
+          x,
+          legCenterY,
+          z
+        )
+
+        worktable.add(leg)
+
+        const foot =
+          new THREE.Mesh(
+            new THREE.CylinderGeometry(
+              0.12,
+              0.12,
+              0.05,
+              24
+            ),
+            footMaterial
+          )
+
+        foot.position.set(
+          x,
+          floorY + 0.025,
+          z
+        )
+
+        worktable.add(foot)
+      }
+    )
+
+    // 하부 프레임.
+    const railHeight = 0.12
+    const railY = floorY + 0.22
+
+    const frontRail =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          3.54,
+          railHeight,
+          0.12
+        ),
+        frameMaterial
+      )
+
+    frontRail.position.set(
+      0,
+      railY,
+      1.2
+    )
+
+    const backRail =
+      frontRail.clone()
+
+    backRail.position.z = -1.2
+
+    const leftRail =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          0.12,
+          railHeight,
+          2.54
+        ),
+        frameMaterial
+      )
+
+    leftRail.position.set(
+      -1.7,
+      railY,
+      0
+    )
+
+    const rightRail =
+      leftRail.clone()
+
+    rightRail.position.x = 1.7
+
+    worktable.add(
+      frontRail,
+      backRail,
+      leftRail,
+      rightRail
+    )
+
+    scene.add(worktable)
+
+    // 작업대 상판보다 실제 바닥이 94 mm 아래에 있다.
+    const floorGrid =
+      new THREE.GridHelper(
+        8,
+        16,
+        0x7f8a93,
+        0xc4c9ce
+      )
+
+    floorGrid.position.set(
+      tableOriginThree.x,
+      tableOriginThree.y + floorY,
+      tableOriginThree.z
+    )
+
+    floorGrid.material.transparent =
+      true
+
+    floorGrid.material.opacity =
+      0.32
+
+    scene.add(floorGrid)
+
+
+    // 5-1. 실제 M0609 + RG2 + 탐침 모델
+    // Doosan 공식 M0609 visual mesh와 RG2 공개 visual mesh를 사용한다.
+    const robotModel =
+      buildM0609Model()
+
+    robotModelRef.current =
+      robotModel.root
+
+    robotJointRefs.current =
+      robotModel.jointRefs
+
+    scene.add(
+      robotModel.root
+    )
+
+    robotModel.loadPromise
+      .then((results) => {
+        if (disposed) return
+        const rejected =
+          results.filter(
+            (result) =>
+              result.status === 'rejected'
+          )
+
+        setRobotModelStatus(
+          rejected.length === 0
+            ? 'READY'
+            : rejected.length === results.length
+              ? 'ERROR'
+              : 'PARTIAL'
+        )
+
+        rejected.forEach(
+          (result) =>
+            console.error(
+              '[3D] robot mesh load failed:',
+              result.reason
+            )
+        )
+      })
+
+    // M0609(base_link)와 실제 작업대가
+    // 한 화면에 들어오도록 두 원점의 중간을 바라본다.
+    const viewCenter =
+      tableOriginThree
+        .clone()
+        .multiplyScalar(0.5)
+
+    // Include the fully extended arm while waiting for the first joint snapshot.
+    viewCenter.y = Math.max(viewCenter.y, 4.5)
+    camera.position.set(
+      viewCenter.x + 10,
+      viewCenter.y + 8,
+      viewCenter.z + 12
+    )
+
+    camera.lookAt(viewCenter)
+
+    // 드래그 회전 / 휠 확대·축소 / 우클릭 이동.
+    const controls =
+      new OrbitControls(
+        camera,
+        renderer.domElement
+      )
+
+    controls.target.copy(
+      viewCenter
+    )
+
+    controls.enableDamping = true
+    controls.dampingFactor = 0.08
+    controls.enablePan = true
+    controls.minDistance = 1.5
+    controls.maxDistance = 35
+
+
+    // 6. scan/result 직육면체 부재
+    // 고정 BoxGeometry 목업은 제거한다.
+    // 최종 형상은 scan/result.vertices 8점으로 동적으로 생성한다.
+    const workpieceGroup =
+      new THREE.Group()
+
+    scene.add(workpieceGroup)
+
+    workpieceGroupRef.current =
+      workpieceGroup
 
 
     // 7. XYZ 좌표축
@@ -828,6 +1218,8 @@ function App() {
       animationFrameId =
         requestAnimationFrame(animate)
 
+      controls.update()
+
       renderer.render(
         scene,
         camera
@@ -841,15 +1233,50 @@ function App() {
     return () => {
       cancelAnimationFrame(animationFrameId)
 
+      controls.dispose()
+
+      disposed = true
+      robotModel.dispose()
+      disposeObject3D(scene)
+
+      robotModelRef.current = null
+      robotJointRefs.current = {}
+
       tipMeshRef.current = null
       trajectoryLineRef.current = null
       contactGroupRef.current = null
+      workpieceGroupRef.current = null
       pathCandidateGroupRef.current = null
       edgeGroupRef.current = null
 
       renderer.dispose()
     }
   }, [])
+
+  // =========================
+  // M0609 관절 실시간 갱신
+  // =========================
+
+  useEffect(() => {
+    Object.entries(
+      jointPositions
+    ).forEach(
+      ([name, positionRad]) => {
+        const joint =
+          robotJointRefs.current[name]
+
+        if (!joint) {
+          return
+        }
+
+        // M0609 URDF의 joint_1~joint_6 axis는 모두 local +Z.
+        joint.rotation.z =
+          positionRad
+      }
+    )
+  }, [jointPositions])
+
+
 
   // =========================
   // TCP 팁 3D 위치 갱신
@@ -943,6 +1370,7 @@ function App() {
           material
         )
 
+      // 판정 순간의 실제 탐침 TCP 좌표. scan/result를 만든 원본과 같은 좌표다.
       marker.position.copy(
         toThreePosition(
           point.x,
@@ -955,6 +1383,151 @@ function App() {
     })
 
   }, [contactPoints])
+
+  // =========================
+  // scan/result 직육면체 3D 갱신
+  // =========================
+
+  useEffect(() => {
+    if (!workpieceGroupRef.current) {
+      return
+    }
+
+    const group =
+      workpieceGroupRef.current
+
+    group.position.set(0, 0, 0)
+
+    // 이전 scan/result Mesh를 정리한다.
+    group.children.forEach((child) => {
+      child.geometry?.dispose()
+      child.material?.dispose()
+    })
+
+    group.clear()
+
+    if (!BASE_TO_FIXTURE_MM) {
+      return
+    }
+
+    // scan/result는 workpiece_fixture 기준이고 접촉점/궤적은 base_link 기준이다.
+    // ROS와 같은 base_to_fixture 평행이동을 그대로 적용해 한 좌표계에 겹친다.
+    group.position.copy(
+      toThreePosition(
+        BASE_TO_FIXTURE_MM.x,
+        BASE_TO_FIXTURE_MM.y,
+        BASE_TO_FIXTURE_MM.z
+      )
+    )
+
+    if (
+      scanResult?.success !== true ||
+      scanResult?.box_valid !== true ||
+      !Array.isArray(scanResult.vertices) ||
+      scanResult.vertices.length !== 8
+    ) {
+      return
+    }
+
+    const vertices =
+      scanResult.vertices.map((point) => {
+        const x = point?.x_mm
+        const y = point?.y_mm
+        const z = point?.z_mm
+
+        if (
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          !Number.isFinite(z)
+        ) {
+          return null
+        }
+
+        return toThreePosition(
+          x,
+          y,
+          z
+        )
+      })
+
+    if (
+      vertices.some(
+        (point) => point === null
+      )
+    ) {
+      return
+    }
+
+    // ScanResult.msg 꼭짓점 순서:
+    // 0~3 = 윗면, 4~7 = 아랫면.
+    // BoxGeometry를 새로 만드는 대신 실제 측정 꼭짓점으로
+    // 삼각형 면을 구성한다. 따라서 향후 회전된 꼭짓점이
+    // 들어와도 프론트 렌더러는 그대로 표현할 수 있다.
+    const triangleIndices = [
+      0, 1, 2,
+      0, 2, 3,
+
+      4, 6, 5,
+      4, 7, 6,
+
+      0, 4, 5,
+      0, 5, 1,
+
+      1, 5, 6,
+      1, 6, 2,
+
+      2, 6, 7,
+      2, 7, 3,
+
+      3, 7, 4,
+      3, 4, 0,
+    ]
+
+    const positions = []
+
+    triangleIndices.forEach((index) => {
+      const point = vertices[index]
+
+      positions.push(
+        point.x,
+        point.y,
+        point.z
+      )
+    })
+
+    const geometry =
+      new THREE.BufferGeometry()
+
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(
+        positions,
+        3
+      )
+    )
+
+    geometry.computeVertexNormals()
+
+    const material =
+      new THREE.MeshStandardMaterial({
+        color: 0xd9dde3,
+        metalness: 0.12,
+        roughness: 0.62,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+      })
+
+    const mesh =
+      new THREE.Mesh(
+        geometry,
+        material
+      )
+
+    group.add(mesh)
+
+  }, [scanResult])
+
 
   // =========================
   // 스캔 결과 일반 모서리 3D 갱신
@@ -1228,6 +1801,19 @@ function App() {
           Request ID: {lastRequestId ?? '-'}
         </p>
 
+        <p>
+          M0609 3D 모델: {robotModelStatus}
+        </p>
+
+        <p>
+          M0609 관절 수신:{' '}
+          {Object.keys(jointPositions).length} / 6 — {jointStatus}
+        </p>
+
+        <p>
+          RG2 자세: 실기 탐침 파지 고정 · 0.721396 rad · 탐침 돌출 13 mm
+        </p>
+
         {tipPose ? (
           <>
             <p>
@@ -1269,6 +1855,13 @@ function App() {
           <p>
             작업대 원점 미설정:
             VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.
+          </p>
+        )}
+
+        {scanResult?.success === true && (
+          <p>
+            3D 좌표: contact/event · robot/sample은 base_link,
+            scan/result는 base_to_fixture로 base_link에 정렬
           </p>
         )}
 
@@ -1450,6 +2043,12 @@ function App() {
 
         <h2>3D 화면</h2>
 
+        <p>좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
+        <p>RG2는 실기에서 읽은 탐침 파지 자세(±0.721396 rad)로 고정 표시하며, 그리퍼 끝에서 탐침 끝까지 13 mm로 렌더링합니다.</p>
+        {robotModelStatus === 'LOADING' && <p>로봇 모델을 불러오는 중입니다.</p>}
+        {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
+          <p role="alert">일부 로봇 모델을 불러오지 못했습니다. GitHub 모델 파일 접근을 확인한 뒤 새로고침하세요.</p>
+        )}
         <canvas ref={canvasRef} />
 
       </section>

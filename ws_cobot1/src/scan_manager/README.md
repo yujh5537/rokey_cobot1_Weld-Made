@@ -146,7 +146,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `detect_latency_s` | double | ● | ≥ 0 | 편향 보정 지연 t. 뜻은 이슈 #69의 결정에 달려 있다 |
 | `edge_round_radius_m` | double | ● | ≥ 0 | 부재 모서리 둥글림 R. 예리하면 0 |
 | `edge_bias_offset_m` | double | ● | 유한(음수 가능) | 실측 나머지 편향. 스칼라 하나, 방향당 값, 진행 방향 + |
-| `result_dir` | string | ● | 빈 문자열 아님 | result_store 경로. **상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준**이다(`ws_cobot1`에서 launch하면 `ws_cobot1/data`, gitignore). `~`를 쓸 수 있다 |
+| `result_dir` | string | ● | 빈 문자열 아님 | result_store 경로. **절대경로로 둔다**(#187). 상대 경로는 노드를 띄운 셸의 현재 디렉터리 기준이라 같은 코드로도 launch 위치에 따라 다른 곳에 남는다(9/23 실기에서 `~/data` 와 `ws_cobot1/data` 로 갈렸다). `~`를 쓸 수 있다(`expanduser`). bringup yaml 은 `~/scan_results/real` · `~/scan_results/sim` 으로 **입력원을 나눈다** — `weld_tracer` 가 '가장 최근 결과'를 고르므로 섞이면 sim 좌표를 실기가 따라갈 수 있다 |
 | `event_wait_timeout_s` | double | ● | > 0 | Result가 가리킨 `ContactEvent`를 기다리는 한도 |
 | `stop_confirm_timeout_s` | double | ● | > 0 | 정지 완료(`connected && !moving`)를 기다리는 한도. Result가 끝내 오지 않을 때의 대비(`motion_timeout_s` + 이 값)에도 쓴다 |
 | `server_wait_timeout_s` | double | ● | > 0 | 상대 서버의 미기동 판단 |
