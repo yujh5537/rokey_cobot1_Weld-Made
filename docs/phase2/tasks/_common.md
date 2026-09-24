@@ -1,7 +1,7 @@
 # 공통 작업 절차 (P1~P4 지시서에 포함되는 내용)
 
 ## 시작
-1. `git fetch --all --prune`, `origin/main` 에서 `p2-<주제>` 브랜치. 열린 PR · worktree 확인.
+1. `git fetch --all --prune`, `origin/main` 에서 `p2-<주제>` 브랜치. 열린 PR · worktree 확인. **계약 PR #184 가 아직 머지 전이면** `docs/phase2/` 와 `contact_scan_interfaces` 의 새 타입은 `origin/p2-contract` 에만 있다 — 그 브랜치에서 가지를 내거나 머지를 기다린다. PR #184 코멘트의 지시서 사본은 구버전이고 **브랜치 파일이 최신**이다.
 2. 읽을 것: `docs/phase2/README.md` → 자기 지시서 → `weld-motion.md` → `weld-ros-interfaces.md`(자기 절) → (웹) `weld-mqtt-schema.md`. 1차 문서는 지시서가 가리키는 절만.
 3. 출력 맨 위에 "이 task 가 무엇인지" 2~4 문장 소개글.
 

@@ -126,7 +126,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `stop_confirm_timeout_s` | 5.0 | 정지 완료(`connected && !moving`)를 기다리는 한도. scan_manager 와 같다 | |
 | `sample_timeout_s` | 1.0 | 시작 시 `/robot/sample` 을 기다리는 한도. 넘으면 `NO_SAMPLE(307)` | |
 | `motion_timeout_s` | 120.0 | 단위 goal 제한 | |
-| `result_dir` | data | scan_manager 와 같은 값이어야 한다 (result_store 를 읽는다). 현지의 `result_dir` 절대경로 · sim/real 분리 PR 이 들어오면 그 값으로 바꾼다(`""` = 최신 성공 결과가 sim 결과를 고르지 않게) | |
+| `result_dir` | `~/scan_results/<mode>` | scan_manager 와 **같은 값**이어야 한다(result_store 를 읽는다). PR #188(#187) 로 sim 은 `~/scan_results/sim`, real 은 `~/scan_results/real` 절대경로다(`sim.yaml` · `real.yaml` 의 scan_manager 절과 같게). `""` = 최신 성공 결과가 sim 결과를 고르지 않는 이유다 | |
 | `result_frame_id` · `motion_frame_id` | workpiece_fixture · base_link | 1차와 같다 | |
 | `state_publish_period_s` | 1.0 | /weld/state 주기 | |
 | `scan_state_timeout_s` | 5.0 | /scan/state 가 이보다 오래됐으면 시작 거절 | |

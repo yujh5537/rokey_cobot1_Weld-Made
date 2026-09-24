@@ -1,7 +1,7 @@
 # P2 weld_manager: 용접 순서 · 경로 생성 노드
 
 **세션 이름: P2 weld_manager 노드**
-담당: 현지 · 기한: 9/28 (sim + Virtual 통과) · 공통 절차: `_common.md`
+담당: 현지 · 권장 기한: 9/28 (sim + Virtual 통과) · 공통 절차: `_common.md`
 
 ## 이 task
 스캔 결과 파일에서 8 개 모서리를 읽어, 기울인 자세 · 스탠드오프 · 위빙 경유점을 만들고, robot_manager 에 접근 → 경로 → 후퇴 → 다음 선 순서로 명령을 보내며 상태를 `/weld/state` 로 알리는 새 패키지 `weld_manager` 를 만든다. scan_manager 의 "순수 계산은 rclpy 없이, 노드는 얇게" 구조를 참고한다(복제 강제 없음, D16).
@@ -39,7 +39,7 @@ weld_manager/
 ## 테스트 · 시뮬레이션
 - 순수 pytest(ROS 없이): `python3 -m pytest src/weld_manager/test -q`.
 - 노드 + 가짜 robot_manager: 8 선 완료 · 중지 · 시작 거절 9 종.
-- **Virtual 종단**(P1 이 머지된 뒤, 또는 P1 브랜치 위에서): `source:=sim` bringup + 에뮬레이터, fixtures 의 sim result.json 을 `data/` 에 두고 `ros2 action send_goal /weld/run`. `/weld/state` 가 IDLE→…→DONE, `/weld/result.success=true`. 도메인 31~39.
+- **Virtual 종단**(P1 이 머지된 뒤, 또는 P1 브랜치 위에서): `source:=sim` bringup + 에뮬레이터, fixtures 의 sim result.json 을 `~/scan_results/sim/<scan_id>/` 에 두고(PR #188 경로) `ros2 action send_goal /weld/run`. `/weld/state` 가 IDLE→…→DONE, `/weld/result.success=true`. 도메인 31~39.
 - P1 이 늦으면 가짜 `/robot/execute_path` 서버(fake_peers) 로 먼저 간다.
 
 ## 남기는 것

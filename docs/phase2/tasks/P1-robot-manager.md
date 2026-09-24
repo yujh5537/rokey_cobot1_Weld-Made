@@ -1,7 +1,7 @@
 # P1 robot_manager: 경유점 경로 실행 (`/robot/execute_path`)
 
 **세션 이름: P1 robot_manager 경로 실행**
-담당: 학민 · 기한: 9/28 (Virtual 통과), 9/29 실기 · 공통 절차: `_common.md`
+담당: 학민 · 권장 기한: 9/28 (Virtual 통과), 9/29 실기 · 공통 절차: `_common.md`
 
 ## 이 task
 weld_manager 가 만든 경유점 목록(지그재그 위빙 포함)을 로봇이 차례로, 정해진 속도로 지나게 하는 액션 서버를 robot_manager 에 더한다. 접촉 판정도 힘 제어도 없는 "직선 이동 여러 개"다. 1차 `ExecuteMotion` 과 같은 자리를 써서 둘이 동시에 돌지 않게 한다.
