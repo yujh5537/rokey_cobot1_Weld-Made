@@ -8,6 +8,10 @@
 
 규칙
 - 어떤 goal 이든 도착이 아니면 **그 자리에서 끝낸다**: 다음 goal 을 보내지 않고, 자동 복귀 · 재시도 없음(CLAUDE.md 규칙 3).
+  하나의 예외가 D33 이다: 한 선의 goal(접근 1 · 2 · 경로 · 후퇴)이 ROBOT_ERROR(204) 로 끝나면
+  (continue_on_line_failure=true) 그 선만 FAILED 로 적고, 팁이 z_safe 아래면 툴 축 뒤로 물러난 뒤 수직 상승해
+  다음 선으로 간다. 같은 선을 다시 시도하지는 않는다. 정지 · 취소 · 과대 외력 · 시간 초과 · 래치 · 복구 이동 실패는
+  그대로 ERROR 다. 끝까지 갔는데 FAILED 가 있으면 phase 는 DONE 이고 결과는 success=false(PARTIAL).
 - STOPPED 는 이 노드가 /weld/stop 으로 요청한 정지뿐이다. 요청하지 않은 정지는 ERROR 다(D25).
 - 모션 사이에 안전 래치가 걸리면 다음 goal 을 보내지 않는다. 안전복귀(run_home)는 래치 중에도 간다(1차와 같다).
 - 결과(/weld/result · 파일)는 마무리 홈 복귀보다 먼저 낸다(7.3절). 중지 · 실패도 한 번 낸다.
@@ -88,6 +92,7 @@ class Verdict:
     kind: VerdictKind
     reason_code: int = 0
     detail: str = ''
+    line_recoverable: bool = False   # D33: 이 실패는 "그 선만 FAILED 로 적고 다음 선으로" 갈 수 있는 종류다
 
 
 def orientation_error_rad(a: Quat, b: Quat) -> float:
@@ -97,8 +102,14 @@ def orientation_error_rad(a: Quat, b: Quat) -> float:
     return 2.0 * math.acos(min(1.0, dot / norm))
 
 
-def _failed(code, detail) -> Verdict:
-    return Verdict(VerdictKind.FAILED, int(code), detail)
+def _failed(code, detail, *, recoverable: bool = False) -> Verdict:
+    return Verdict(VerdictKind.FAILED, int(code), detail, recoverable)
+
+
+def _line_failure(code, detail) -> Verdict:
+    """robot_manager 가 goal 을 받아 끝냈고 사유가 ROBOT_ERROR(204) 인 실패만 D33 의 "계속" 대상이다.
+    도달 불가 · 출발 안 함 · 도착 · 자세 허용치 밖이 여기다. 604(PATH_REJECTED) 등 다른 코드는 그대로 ERROR."""
+    return _failed(code, detail, recoverable=int(code) == int(Reason.ROBOT_ERROR))
 
 
 def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bool,
@@ -141,17 +152,17 @@ def _classify_ended(request, result, orientation_tolerance_rad) -> Verdict:
                 return _failed(Reason.ROBOT_ERROR, f'{label}: 도착했지만 자세를 받지 못해 확인할 수 없다')
             error = orientation_error_rad(request.orientation, result.orientation)
             if error > orientation_tolerance_rad:
-                return _failed(Reason.ROBOT_ERROR,
-                               f'{label}: 도착했지만 자세가 목표와 {math.degrees(error):.2f}° 다르다 '
-                               f'(허용 {math.degrees(orientation_tolerance_rad):.2f}°)')
+                return _line_failure(Reason.ROBOT_ERROR,
+                                     f'{label}: 도착했지만 자세가 목표와 {math.degrees(error):.2f}° 다르다 '
+                                     f'(허용 {math.degrees(orientation_tolerance_rad):.2f}°)')
         return Verdict(VerdictKind.REACHED)
     if reason is MotionReason.TIMEOUT:
         return _failed(Reason.TIMEOUT, f'{label}: {result.detail}')
     if reason is MotionReason.OVER_FORCE:
         return _failed(Reason.OVER_FORCE, f'{label}: {result.detail}')
     if reason in (MotionReason.ROBOT_ERROR, MotionReason.REJECTED):
-        # PATH_REJECTED(604) 등 robot_manager 가 준 코드를 그대로 쓴다
-        return _failed(result.reason_code or Reason.ROBOT_ERROR, f'{label}: {result.detail}')
+        # PATH_REJECTED(604) 등 robot_manager 가 준 코드를 그대로 쓴다. 204 만 D33 의 "계속" 대상
+        return _line_failure(result.reason_code or Reason.ROBOT_ERROR, f'{label}: {result.detail}')
     name = getattr(reason, 'name', reason)
     return _failed(Reason.ROBOT_ERROR, f'{label}: {request.kind.name} 에 맞지 않는 종료 사유 {name}')
 
@@ -181,6 +192,10 @@ class Ports:
         """/robot/status 로 connected && !moving 을 확인한다. 제한 시간 안에 못 보면 False."""
         raise NotImplementedError
 
+    def current_pose(self) -> Optional[Pose]:
+        """지금 팁 자리(Base) — 최근 /robot/sample. 없거나 오래됐으면 None(모른다). D33 복구 이동의 출발점."""
+        raise NotImplementedError
+
     def now(self) -> Stamp:
         raise NotImplementedError
 
@@ -194,6 +209,7 @@ class Ports:
 
 class OutcomeKind(Enum):
     DONE = 'DONE'
+    PARTIAL = 'PARTIAL'               # 끝까지 갔고 홈에 돌아왔지만 FAILED 선이 있다(D33). phase 는 DONE, success=false
     STOPPED = 'STOPPED'
     FAILED = 'FAILED'
     HOMING_FAILED = 'HOMING_FAILED'   # 용접선은 다 끝났고 마무리 복귀만 실패. 결과는 유효하다(7.3절)
@@ -214,10 +230,11 @@ class _Stop(Exception):
 
 class _Fail(Exception):
 
-    def __init__(self, reason_code, detail):
+    def __init__(self, reason_code, detail, line_recoverable: bool = False):
         super().__init__(detail)
         self.reason_code = int(reason_code)
         self.detail = detail
+        self.line_recoverable = line_recoverable
 
 
 class _Runner:
@@ -262,7 +279,7 @@ class _Runner:
                 self._ports.log('info', verdict.detail, result.position)
             raise _Stop()
         if verdict.kind is VerdictKind.FAILED:
-            raise _Fail(verdict.reason_code, verdict.detail)
+            raise _Fail(verdict.reason_code, verdict.detail, verdict.line_recoverable)
         return result
 
     def _move_to(self, label, target, orientation, speed) -> MotionResult:
@@ -272,6 +289,20 @@ class _Runner:
 
     def _home(self) -> MotionResult:
         return self._execute(MotionRequest(MotionKind.HOME, 'home', timeout_s=self._params.motion_timeout_s))
+
+    def _back_off(self, pose: Pose, label: str) -> Vec3:
+        """툴 축 뒤(−d)로 approach_m 물러난다(7.2절 · D33). 물러난 점을 돌려준다."""
+        p = self._params
+        d = rotate(pose.orientation, (0.0, 0.0, 1.0))                  # 툴 z 축 = 플랜지 → 팁
+        back = tuple(c - p.approach_m * di for c, di in zip(pose.position, d))
+        self._move_to(label, back, pose.orientation, p.approach_speed_mps)
+        return back
+
+    def _lift(self, point: Vec3, orientation: Quat, z_safe: float, label: str) -> Vec3:
+        """같은 x · y · 같은 자세로 z_safe 까지 올린다. 이미 그 위면 내려가지 않는다(높이를 유지)."""
+        lift = (point[0], point[1], max(point[2], z_safe))
+        self._move_to(label, lift, orientation, self._params.travel_speed_mps)
+        return lift
 
 
 class WeldRunner(_Runner):
@@ -291,6 +322,7 @@ class WeldRunner(_Runner):
         self._current: Optional[int] = None    # 진행 중인 선. 끝났거나 선 밖이면 None
         self._homing = False
         self._published: Optional[WeldRecord] = None
+        self._safe_pose: Optional[Pose] = None   # z_safe 위의 가장 최근 자리(후퇴점 또는 복구 뒤). 마무리 올림의 목표
         chosen = range(plan.start_line, plan.end_line + 1)
         self._lines: List[LineRecord] = [
             LineRecord(i, plan.seams[i], LineStatus.NOT_ATTEMPTED if i in chosen else LineStatus.SKIPPED)
@@ -300,43 +332,94 @@ class WeldRunner(_Runner):
         p = self._params
         self._started_at = self._ports.now()
         try:
-            last = None
             for index in range(self._plan.start_line, self._plan.end_line + 1):
                 line = self._plan.lines[index]
-                last = line
                 # 알림이 받아들여진 뒤에 "진행 중"으로 표시한다. 그 사이에 중지가 접수되면 이 선은 시작하지 않은 것이다
                 self._notify(Signal.APPROACH, line=index)
                 self._current = index
                 self._lines[index] = replace(self._lines[index], started_at=self._ports.now())
                 if index == self._plan.start_line:
-                    self._lift_to_z_safe()
-                self._move_to(f'{line.name} 접근 1', line.approach1, line.orientation, p.travel_speed_mps)
-                self._move_to(f'{line.name} 접근 2', line.approach2, line.orientation, p.approach_speed_mps)
-                self._notify(Signal.WELD)
-                self._execute(MotionRequest(
-                    MotionKind.PATH, f'{line.name} 경로', speed=p.weld_speed_mps,
-                    orientation=line.orientation, waypoints=line.path, line_index=index,
-                    path_length_m=line.path_length_m, path_tolerance_m=p.path_tolerance_m,
-                    timeout_s=p.motion_timeout_s))
-                self._notify(Signal.RETREAT)
-                # 5절 표 · 6절(38b55e8): P_ret 까지는 경로(weld_speed), 그 뒤 z_safe 상승은 travel_speed
-                self._move_to(f'{line.name} 후퇴', line.retreat, line.orientation, p.travel_speed_mps)
+                    self._lift_to_z_safe()          # 선의 goal 이 아니다 — 실패하면 ERROR(D33 밖)
+                try:
+                    self._run_line(index, line)
+                except _Fail as failure:
+                    if not (p.continue_on_line_failure and failure.line_recoverable):
+                        raise
+                    self._fail_line_and_recover(line, failure)
+                    continue
                 self._lines[index] = replace(
                     self._lines[index], status=LineStatus.DONE, finished_at=self._ports.now())
                 self._current = None
+                self._safe_pose = Pose(tuple(line.retreat), tuple(line.orientation))
                 self._notify(Signal.LINE_DONE)
-            self._publish(success=True, reason_code=0, detail='')
+            failed = [i for i in range(self._plan.start_line, self._plan.end_line + 1)
+                      if self._lines[i].status is LineStatus.FAILED]
+            if failed:
+                # D33: 작업은 끝까지 갔다. 결과는 success=false, 코드는 첫 FAILED 선의 것, detail 에 실패 선 목록
+                code, detail = self._lines[failed[0]].reason_code, ','.join(f'L{i}' for i in failed) + ' FAILED'
+            else:
+                code, detail = 0, ''
+            self._publish(success=not failed, reason_code=code, detail=detail)
             self._homing = True
             self._notify(Signal.HOMING)
-            # 7.3절: HOMING = OP_MOVE_TO z_safe → OP_HOME. 마지막 후퇴가 이미 z_safe 라 거의 제자리 이동이다
-            self._move_to('마무리 올림', last.retreat, last.orientation, p.travel_speed_mps)
+            # 7.3절: HOMING = OP_MOVE_TO z_safe → OP_HOME. 마지막 후퇴(또는 복구 뒤 자리)가 이미 z_safe 라 거의 제자리 이동이다.
+            # 마지막 선이 도달 불가로 실패했으면 그 선의 후퇴점도 못 가므로, 실제로 서 있는 z_safe 자리를 쓴다
+            safe = self._safe_pose
+            self._move_to('마무리 올림', safe.position, safe.orientation, p.travel_speed_mps)
             self._home()
             self._notify(Signal.HOMING_DONE)
-            return RunOutcome(OutcomeKind.DONE, 0, '', self._published, self.last_motion_id)
+            kind = OutcomeKind.PARTIAL if failed else OutcomeKind.DONE
+            return RunOutcome(kind, code, detail, self._published, self.last_motion_id)
         except _Stop:
             return self._finish_stop()
         except _Fail as failure:
             return self._finish_fail(failure)
+
+    def _run_line(self, index: int, line) -> None:
+        """한 선의 goal 4 개(5절 표): 접근 1 → 접근 2 → 경로 → 후퇴."""
+        p = self._params
+        self._move_to(f'{line.name} 접근 1', line.approach1, line.orientation, p.travel_speed_mps)
+        self._move_to(f'{line.name} 접근 2', line.approach2, line.orientation, p.approach_speed_mps)
+        self._notify(Signal.WELD)
+        self._execute(MotionRequest(
+            MotionKind.PATH, f'{line.name} 경로', speed=p.weld_speed_mps,
+            orientation=line.orientation, waypoints=line.path, line_index=index,
+            path_length_m=line.path_length_m, path_tolerance_m=p.path_tolerance_m,
+            timeout_s=p.motion_timeout_s))
+        self._notify(Signal.RETREAT)
+        # 5절 표 · 6절(38b55e8): P_ret 까지는 경로(weld_speed), 그 뒤 z_safe 상승은 travel_speed
+        self._move_to(f'{line.name} 후퇴', line.retreat, line.orientation, p.travel_speed_mps)
+
+    def _fail_line_and_recover(self, line, failure: _Fail) -> None:
+        """D33: 그 선을 FAILED 로 적고, 팁을 z_safe 로 올려 다음 선의 접근 1 을 보낼 수 있게 한다(weld-motion.md 5절).
+
+        - 팁 자리는 /robot/sample(ports.current_pose)로 본다. 모르면 복구를 시도하지 않고 ERROR.
+        - z_safe 위(도달 불가라 출발조차 안 한 경우 — 앞 선의 후퇴점에 서 있다)면 이동 없이 다음 선.
+        - z_safe 아래면 7.2 안전복귀와 같은 순서: 툴 축 뒤(−d)로 approach_m 물러남 → 같은 x · y 로 z_safe 까지 수직 상승.
+        - 복구 이동 자체가 실패(어떤 사유든)하면 ERROR. 같은 선을 다시 시도하지 않는다.
+        """
+        p = self._params
+        self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+        self._ports.log('warn', f'{line.name} 실패 → FAILED 로 기록하고 다음 선으로 계속한다(D33): {failure.detail}',
+                        None if self.last_pose is None else self.last_pose.position)
+        self._notify(Signal.LINE_FAILED)
+        pose = self._ports.current_pose()
+        if pose is None:
+            raise _Fail(failure.reason_code,
+                        f'{line.name} 실패 뒤 복구 불가: 팁 위치(/robot/sample)를 모른다. 원인: {failure.detail}')
+        z_safe = self._plan.z_safe_base
+        if pose.position[2] >= z_safe - p.path_tolerance_m:
+            self._ports.log('info', f'{line.name}: 팁이 z_safe 위라 복구 이동 없이 다음 선으로 간다', pose.position)
+            self._safe_pose = pose
+            return
+        self._ports.log('warn', f'{line.name}: 팁 z {pose.position[2] * 1000:.1f} mm 가 z_safe '
+                                f'{z_safe * 1000:.1f} mm 아래다. 툴 축 뒤로 물러난 뒤 올린다', pose.position)
+        try:
+            back = self._back_off(pose, f'{line.name} 복구 물러남')
+            lift = self._lift(back, pose.orientation, z_safe, f'{line.name} 복구 올림')
+        except _Fail as recovery:
+            raise _Fail(recovery.reason_code, f'{line.name} 복구 이동 실패: {recovery.detail}')
+        self._safe_pose = Pose(tuple(lift), tuple(pose.orientation))
 
     def _lift_to_z_safe(self) -> None:
         """D30: 시작 때 팁이 z_safe 아래면 같은 x · y · 현재 자세로 z_safe 까지 수직 상승한다(거절하지 않는다).
@@ -425,15 +508,11 @@ class HomeRunner(_Runner):
             if self._pose is None:
                 self._ports.log('warn', '안전복귀: 현재 자리를 몰라 물러남 · 올림 없이 OP_HOME 만 보낸다')
             else:
-                q = self._pose.orientation
-                d = rotate(q, (0.0, 0.0, 1.0))                  # 툴 z 축 = 플랜지 → 팁
-                back = tuple(c - p.approach_m * di for c, di in zip(self._pose.position, d))
-                self._move_to('안전복귀 물러남', back, q, p.approach_speed_mps)
+                back = self._back_off(self._pose, '안전복귀 물러남')
                 if self._z_safe is None:
                     self._ports.log('warn', '안전복귀: z_safe 를 몰라 물러난 뒤 바로 OP_HOME 을 보낸다')
                 else:
-                    lift = (back[0], back[1], max(back[2], self._z_safe))
-                    self._move_to('안전복귀 올림', lift, q, p.travel_speed_mps)
+                    self._lift(back, self._pose.orientation, self._z_safe, '안전복귀 올림')
             self._home()
             self._notify(Signal.HOMING_DONE)
             return RunOutcome(OutcomeKind.DONE, 0, '', None, self.last_motion_id)

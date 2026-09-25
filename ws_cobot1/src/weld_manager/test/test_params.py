@@ -61,6 +61,7 @@ def test_missing_values_are_listed_not_filled(param_values):
     ('tool_profile_u_m', []), ('tool_profile_u_m', [0.0, 0.012, 0.003]),
     ('tool_profile_u_m', [0.0, 0.003, 0.003]), ('tool_profile_u_m', [-0.001, 0.003, 0.012]),
     ('tool_profile_r_m', [0.002, 0.0, 0.015]), ('tool_check_max_force_n', 0.0),
+    ('continue_on_line_failure', 1), ('continue_on_line_failure', 'true'),    # D33: bool 만
 ])
 def test_out_of_range(param_values, name, value):
     param_values[name] = value
@@ -72,6 +73,7 @@ def test_out_of_range(param_values, name, value):
 @pytest.mark.parametrize('name, value', [
     ('weave_amplitude_m', 0.0), ('weave_pitch_m', 0.0), ('tilt_deg', 0.0), ('tilt_deg', 80.0),
     ('tool_roll_deg', [-30.0, 0, 0, 0, 0, 0, 0, 60.0]), ('bottom_margin_m', 0.0),
+    ('continue_on_line_failure', False),
 ])
 def test_zero_and_bounds_are_values(param_values, name, value):
     param_values[name] = value

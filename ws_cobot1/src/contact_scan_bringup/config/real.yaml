@@ -339,7 +339,9 @@ weld_manager:
     travel_clearance_m: 0.050        # z_safe = 윗면 z + 이 값 [m] (작업대 좌표)
     bottom_margin_m: 0.005           # 세로선 끝 = support_z + 이 값 [m]. robot_manager path_min_z_m 은 지지면 + 3 mm 라 이보다 낮다
     workspace_margin_m: 0.100        # 부재 밖 허용 범위 x · y [m]
-    path_tolerance_m: 0.003          # ExecutePath 도착 허용치 [m] (D18 ±3 mm). robot_manager 는 line 의 중간 점에도 쓴다
+    path_tolerance_m: 0.003          # ExecutePath 경유점 도착 허용치 [m] (D18 ±3 mm, D32: line 은 중간 점마다 · 마지막 점)
+    continue_on_line_failure: true   # 한 선의 goal 이 ROBOT_ERROR(204) 로 끝나면 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로(D33).
+                                     #   근거: 9/23 M1(#186) 에서 L1 · L5 가 45° 자세로 도달 불가 → 9/29 기대는 6 선. false 면 첫 실패에서 ERROR
     orientation_tolerance_deg: 15.0  # 이동 뒤 자세 차이 허용 [deg]. 0 = 끔(병후 결정 Q9)
     motion_timeout_s: 120.0          # 단위 goal 제한 [s]. line 방식은 점마다 약 0.5 s 멈춘다(Virtual 9/24) — 경유점 100 개면 약 60 s
     tool_check_max_force_n: 6.0      # 시작 때 무접촉 |F| 가 이보다 크면 툴 미등록 의심(302). 9/23 미등록 치우침 약 12 N

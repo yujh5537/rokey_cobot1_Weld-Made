@@ -12,6 +12,8 @@ scan_manager 노드의 방식을 따랐다(코드는 가져오지 않았다):
 - goal 을 보내기 직전의 중지 확인과 보내기는 작업 락 안에서 한다. 그 뒤에 온 중지는 goal 취소로 받는다.
 - 정지 완료는 요청 뒤에 찍힌 /robot/status 의 connected && !moving 으로만 본다.
 - 실행 중에는 파라미터 변경을 거절한다(시연 중 값 변경 금지).
+- 한 선의 ROBOT_ERROR(204) 실패는 그 선만 FAILED 로 적고 다음 선으로 간다(D33, continue_on_line_failure).
+  끝까지 갔는데 FAILED 가 있으면 phase 는 DONE 이고 RunWeld Result.success=false(마무리 홈 복귀는 한다).
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -87,6 +89,7 @@ _PARAM_TYPE = {
     weld_params.DOUBLE: Parameter.Type.DOUBLE,
     weld_params.DOUBLE_ARRAY: Parameter.Type.DOUBLE_ARRAY,
     weld_params.STRING: Parameter.Type.STRING,
+    weld_params.BOOL: Parameter.Type.BOOL,
 }
 
 
@@ -440,6 +443,7 @@ class WeldManager(Node):
             result.success = True
             goal_handle.succeed()
             return result
+        # PARTIAL(D33: FAILED 선이 있지만 끝까지 갔다)도 success=false 다. 사유는 첫 FAILED 선의 코드 + 실패 선 목록
         result.success = False
         result.reason_code = int(outcome.reason_code) if outcome else int(Reason.CANCELED)
         result.detail = outcome.detail if outcome else 'weld_manager 종료'
@@ -686,6 +690,17 @@ class _NodePorts(Ports):
 
     def wait_still(self):
         return self._node.wait_still(self._p.stop_confirm_timeout_s)
+
+    def current_pose(self):
+        sample, why = self._node._fresh_sample(self._p.sample_timeout_s)
+        if sample is None:
+            self._node.log('warn', Reason.NO_SAMPLE, f'팁 위치를 모른다: {why}')
+            return None
+        if sample.frame_id != self._p.motion_frame_id:
+            self._node.log('warn', Reason.NO_SAMPLE,
+                           f'/robot/sample 의 frame_id {sample.frame_id!r} 가 {self._p.motion_frame_id!r} 가 아니다')
+            return None
+        return Pose(conversions.position_of(sample.pose), conversions.orientation_of(sample.pose))
 
     def now(self):
         return self._node._now_stamp()

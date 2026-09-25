@@ -100,6 +100,9 @@ class FakePeers(Node):
 
     def _finish(self, handle, result_type, reason, code, position, orientation, detail=''):
         self.position, self.orientation = position, orientation
+        # Result 보다 먼저 멈춘 자리의 샘플을 낸다. 실기에서는 정지 확인(arrival_grace_s) 동안 샘플이 계속 오므로
+        # weld_manager 가 Result 뒤에 읽는 /robot/sample 은 멈춘 자리다. 주기 발행(50 ms)만 믿으면 앞 goal 의 자리가 남는다
+        self._publish()
         result = result_type.Result(reason=reason, reason_code=code, detail=detail, frame_id='base_link',
                                     pose=_pose(position, orientation), pose_stamp=self._now())
         if reason == R.REASON_TARGET_REACHED:

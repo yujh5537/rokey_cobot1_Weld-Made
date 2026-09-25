@@ -150,8 +150,35 @@ def test_stop_during_safety_home(sm):
     assert sm.phase is P.STOPPED
 
 
-@pytest.mark.parametrize('signal', [Signal.WELD, Signal.RETREAT, Signal.LINE_DONE, Signal.HOMING,
-                                    Signal.HOMING_DONE, Signal.STOP_CONFIRMED])
+@pytest.mark.parametrize('phase_signals', [
+    [Signal.APPROACH],                                # 접근 중
+    [Signal.APPROACH, Signal.WELD],                   # 경로 중
+    [Signal.APPROACH, Signal.WELD, Signal.RETREAT],   # 후퇴 중
+])
+def test_line_failed_goes_to_retreat_and_next_line_continues(sm, phase_signals):
+    # D33: 어느 단계에서 실패했든 LINE_FAILED → RETREAT(복구 이동) → 다음 선 APPROACH. lines_done 은 그대로
+    started(sm)
+    one_line(sm, 0)
+    for signal in phase_signals:
+        sm.notify(signal, line=1) if signal is Signal.APPROACH else sm.notify(signal)
+    state = sm.notify(Signal.LINE_FAILED)
+    assert state.phase is P.RETREAT and state.line_index == 1 and state.lines_done == 1
+    assert state.line_progress == 0.0
+    state = sm.notify(Signal.APPROACH, line=2)
+    assert state.phase is P.APPROACH and state.line_index == 2
+    sm.notify(Signal.WELD); sm.notify(Signal.RETREAT); sm.notify(Signal.LINE_DONE)
+    sm.notify(Signal.HOMING); sm.notify(Signal.HOMING_DONE)
+    assert sm.phase is P.DONE and sm.snapshot().lines_done == 2
+
+
+def test_line_failed_needs_an_active_line(sm):
+    started(sm)
+    with pytest.raises(InvalidTransition):
+        sm.notify(Signal.LINE_FAILED)                 # PREPARING 에는 실패할 선이 없다
+
+
+@pytest.mark.parametrize('signal', [Signal.WELD, Signal.RETREAT, Signal.LINE_DONE, Signal.LINE_FAILED,
+                                    Signal.HOMING, Signal.HOMING_DONE, Signal.STOP_CONFIRMED])
 def test_out_of_order_signals_raise(sm, signal):
     started(sm)
     with pytest.raises(InvalidTransition):

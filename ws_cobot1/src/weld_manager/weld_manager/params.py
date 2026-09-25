@@ -6,6 +6,7 @@
 - "없음"은 None 이다. 0 은 값이다(weave_amplitude_m · weave_pitch_m 0 = 직선, tool_roll_deg 0 = 돌리지 않음).
 - RunWeld.config_override(WeldConfig 의 *_set=true 항목)는 그 작업에만 덮어쓴다. 파라미터는 바꾸지 않는다(3.1절).
 - 속도는 하한(weld_speed_min_mps)만 본다. 상한은 robot_manager 의 path_max_speed_mps 가 거른다(D29).
+- 참 · 거짓 값(continue_on_line_failure, D33)은 bool 만 받는다. 0 · 1 · "true" 로 대신하지 않는다.
 - 노드는 SPECS 를 돌며 파라미터를 선언하고, 읽은 값을 dict 로 모아 check() 에 넘긴다.
 """
 
@@ -18,6 +19,7 @@ from .contract_enums import LINE_COUNT
 DOUBLE = 'double'
 DOUBLE_ARRAY = 'double_array'
 STRING = 'string'
+BOOL = 'bool'
 
 # WeldConfig 의 항목 (weld-ros-interfaces.md 3.1절). 필드 이름 = 파라미터 이름
 CONFIG_NAMES = (
@@ -52,6 +54,10 @@ def tilt(value) -> Optional[str]:
 
 def non_empty_text(value) -> Optional[str]:
     return None if isinstance(value, str) and value else '빈 문자열이 아니어야 한다'
+
+
+def boolean(value) -> Optional[str]:
+    return None if isinstance(value, bool) else 'true 또는 false 여야 한다'
 
 
 def _array(element_check: Callable, size: Optional[int] = None, what='') -> Callable:
@@ -110,7 +116,12 @@ SPECS: Tuple[ParamSpec, ...] = (
     ParamSpec('travel_clearance_m', DOUBLE, True, positive, 'z_safe = z_top + 이 값 [m] (작업대 좌표)'),
     ParamSpec('bottom_margin_m', DOUBLE, True, non_negative, '세로선 끝 = support_z + 이 값 [m]'),
     ParamSpec('workspace_margin_m', DOUBLE, True, non_negative, '부재 밖 허용 범위 x · y [m]'),
-    ParamSpec('path_tolerance_m', DOUBLE, True, positive, 'ExecutePath 마지막 점 도착 허용치 [m]'),
+    ParamSpec('path_tolerance_m', DOUBLE, True, positive,
+              'ExecutePath 경유점 도착 허용치 [m] — line 은 중간 점마다 · 마지막 점 (D18 · D32). '
+              '≤ 0 · NaN 은 robot_manager 가 604 로 거절하므로 여기서 양수만 받는다'),
+    ParamSpec('continue_on_line_failure', BOOL, True, boolean,
+              '한 선의 goal 이 ROBOT_ERROR(204) 로 끝나면 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(D33). '
+              'false 면 첫 실패에서 ERROR'),
     ParamSpec('motion_timeout_s', DOUBLE, True, positive, '단위 goal 제한 시간 [s]'),
     ParamSpec('tool_check_max_force_n', DOUBLE, True, positive,
               '시작 때 무접촉 |F| 가 이보다 크면 툴 미등록으로 본다 [N] (TOOL_REG_SUSPECT 302)'),
@@ -156,6 +167,7 @@ class WeldParams:
     bottom_margin_m: float
     workspace_margin_m: float
     path_tolerance_m: float
+    continue_on_line_failure: bool       # D33
     motion_timeout_s: float
     tool_check_max_force_n: float
     server_wait_timeout_s: float
@@ -250,6 +262,8 @@ def check(values: Mapping[str, object], override: Optional[Mapping[str, object]]
             clean[spec.name] = float(value)
         elif spec.kind == DOUBLE_ARRAY:
             clean[spec.name] = tuple(float(v) for v in value)
+        elif spec.kind == BOOL:
+            clean[spec.name] = bool(value)
         else:
             clean[spec.name] = value
 

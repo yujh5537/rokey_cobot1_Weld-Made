@@ -58,6 +58,7 @@ class FakePorts(Ports):
         self.script = script or {}
         self.calls, self.saved, self.logs, self.events = [], [], [], []
         self.stop, self.latch, self.still = False, 0, True
+        self.sample = None        # current_pose() 가 돌려줄 "지금 팁 자리"(/robot/sample 대역). None = 모른다
         self.after = {}           # {n: (ports) → None} n번째 goal 이 Result 를 돌려주기 직전에 할 일(= 모션 도중)
         self.on_notify = {}       # {(Signal, k): (ports) → None} 그 신호의 k 번째 알림이 받아들여진 직후 할 일(= goal 사이)
         self._notified = {}
@@ -98,6 +99,9 @@ class FakePorts(Ports):
 
     def wait_still(self):
         return self.still
+
+    def current_pose(self):
+        return self.sample
 
     def now(self):
         self._clock += 1
@@ -312,12 +316,12 @@ def test_stop_during_final_homing_publishes_once(scan):
     (MotionResult(reason=MR.OVER_FORCE, reason_code=400, detail='31 N'), 0, 400),
     (MotionResult(reason=MR.TIMEOUT, reason_code=203), 0, 203),
     (MotionResult(reason=MR.REJECTED, reason_code=604, detail='z < path_min_z_m'), 0, 604),
-    (MotionResult(reason=MR.ROBOT_ERROR, reason_code=204), 0, 204),
-    (MotionResult(accepted=False), 0, 204),
+    (MotionResult(accepted=False), 0, 204),                                  # ROS 거절: 로봇이 받지 않았다
     (MotionResult(available=False), 0, 104),
     (MotionResult(reason=MR.CONTACT), 0, 204),                               # 맞지 않는 종료 사유
 ])
 def test_failures_end_in_error_without_more_motion(scan, result, latch, code):
+    # D33 의 "계속" 은 robot_manager 가 받아 끝낸 ROBOT_ERROR(204) 뿐이다. 그 밖은 continue_on_line_failure 와 무관하게 ERROR
     def action(ports, request):
         ports.latch = latch
         return result
@@ -347,16 +351,179 @@ def test_latch_between_goals_blocks_next_goal(scan):
 
 def test_orientation_mismatch_is_caught_when_tolerance_given(scan):
     wrong = {3: lambda ports, request: reached(request, orientation=(0.0, 1.0, 0.0, 0.0))}
-    outcome, ports, _ = run(scan, wrong, tolerance=math.radians(1.0))
+    outcome, ports, _ = run(scan, wrong, tolerance=math.radians(1.0), continue_on_line_failure=False)
     assert outcome.kind is OutcomeKind.FAILED and '자세' in outcome.detail
     outcome, _, _ = run(scan, wrong, tolerance=None)          # 허용치가 없으면 보지 않는다
     assert outcome.kind is OutcomeKind.DONE
+    # D33: 자세 허용치 밖도 204 라 그 선만 FAILED 로 적고 계속한다(팁 자리는 z_safe 위라 복구 이동 없음)
+    def wrong_and_high(ports, request):
+        ports.sample = Pose((0.44, -0.20, 0.60), (0.0, 1.0, 0.0, 0.0))
+        return reached(request, orientation=(0.0, 1.0, 0.0, 0.0))
+    outcome, _, _ = run(scan, {3: wrong_and_high}, tolerance=math.radians(1.0))
+    assert outcome.kind is OutcomeKind.PARTIAL and '자세' in outcome.record.lines[0].detail
 
 
 def test_final_homing_failure_keeps_result(scan):
     outcome, ports, _ = run(scan, {34: MotionResult(reason=MR.TIMEOUT, reason_code=203)})
     assert outcome.kind is OutcomeKind.HOMING_FAILED and ports.sm.phase is P.ERROR
     assert len(ports.saved) == 1 and ports.saved[0].success   # 용접 결과는 유효하다(7.3절)
+
+
+# ---- 선 실패 뒤 계속 (D33) ----
+
+ERR_204 = MotionResult(reason=MR.ROBOT_ERROR, reason_code=204, detail='출발하지 않았다')
+
+
+def at_z_safe(plan):
+    """앞 선의 후퇴점처럼 z_safe 위에 서 있는 팁 자리."""
+    return Pose((0.44, -0.20, plan.z_safe_base), Q_TILT)
+
+
+def test_unreachable_line_is_failed_and_the_rest_continue(scan):
+    # L1 접근 1(goal 5)이 204 → L1 만 FAILED, 팁은 L0 후퇴점(z_safe)이라 복구 이동 없이 L2 접근 1
+    def action(ports, request):
+        ports.sample = at_z_safe(plan)
+        return ERR_204
+    p = params()
+    plan = plan_weld(scan, 0, 7, p)
+    outcome, ports, _ = run(scan, {5: action})
+    assert outcome.kind is OutcomeKind.PARTIAL and ports.sm.phase is P.DONE
+    labels = [r.label for _, r in ports.calls]
+    assert labels[4:6] == ['L1 접근 1', 'L2 접근 1']                  # 재시도 · 복구 이동 없음
+    assert len(ports.calls) == 4 + 1 + 4 * 6 + 2 and labels[-2:] == ['마무리 올림', 'home']
+    record = outcome.record
+    D, F = LineStatus.DONE, LineStatus.FAILED
+    assert statuses(record) == [D, F, D, D, D, D, D, D]
+    assert not record.success and record.reason_code == 204 and record.detail == 'L1 FAILED'
+    assert record.lines[1].reason_code == 204 and '출발하지 않았다' in record.lines[1].detail
+    assert outcome.reason_code == 204 and outcome.detail == 'L1 FAILED'
+    assert ports.sm.snapshot().lines_done == 7
+    assert len(ports.saved) == 1 and ('save', False) in ports.events
+    assert ports.events.index(('notify', Signal.HOMING)) > ports.events.index(('save', False))
+    assert any('D33' in message for _, message in ports.logs)
+
+
+def test_failure_below_z_safe_backs_off_then_lifts_before_next_line(scan):
+    # L1 경로(goal 7) 도중 204, 팁은 부재 옆 낮은 자리 → 툴 축 뒤로 approach_m 물러남(approach_speed) → z_safe 로 올림(travel_speed)
+    def action(ports, request):
+        ports.sample = LOW
+        return ERR_204
+    p = params()
+    outcome, ports, plan = run(scan, {7: action})
+    assert outcome.kind is OutcomeKind.PARTIAL
+    labels = [r.label for _, r in ports.calls]
+    assert labels[6:10] == ['L1 경로', 'L1 복구 물러남', 'L1 복구 올림', 'L2 접근 1']
+    back, lift = ports.calls[7][1], ports.calls[8][1]
+    d = rotate(LOW.orientation, (0.0, 0.0, 1.0))
+    expected_back = tuple(c - p.approach_m * di for c, di in zip(LOW.position, d))
+    assert all(math.isclose(a, e) for a, e in zip(back.target, expected_back))
+    assert back.orientation == LOW.orientation and back.speed == p.approach_speed_mps
+    assert lift.target[:2] == expected_back[:2] and math.isclose(lift.target[2], plan.z_safe_base)
+    assert lift.orientation == LOW.orientation and lift.speed == p.travel_speed_mps
+    assert statuses(outcome.record)[1] is LineStatus.FAILED and outcome.record.lines[1].stop_pose is None
+    assert ports.sm.snapshot().phase is P.DONE
+
+
+def test_two_failed_lines_are_listed(scan):
+    def action(ports, request):
+        ports.sample = at_z_safe(plan)
+        return ERR_204
+    p = params()
+    plan = plan_weld(scan, 0, 7, p)
+    # L1 접근 1 = goal 5. L1 이 한 goal 로 끝나므로 L5 접근 1 = 5 + 4·3 + 1 = 18
+    outcome, ports, _ = run(scan, {5: action, 18: action})
+    assert outcome.kind is OutcomeKind.PARTIAL and outcome.detail == 'L1,L5 FAILED'
+    F = LineStatus.FAILED
+    assert [i for i, st in enumerate(statuses(outcome.record)) if st is F] == [1, 5]
+    assert ports.sm.snapshot().lines_done == 6
+
+
+def test_unknown_tip_position_after_failure_is_error(scan):
+    # 팁 위치를 모르면(sample 없음) 복구를 시도하지 않고 ERROR. 더 움직이지 않는다
+    outcome, ports, _ = run(scan, {5: ERR_204})
+    assert outcome.kind is OutcomeKind.FAILED and ports.sm.phase is P.ERROR
+    assert outcome.reason_code == 204 and '팁 위치' in outcome.detail and len(ports.calls) == 5
+    assert statuses(outcome.record)[:3] == [LineStatus.DONE, LineStatus.FAILED, LineStatus.NOT_ATTEMPTED]
+
+
+def test_recovery_motion_failure_is_error(scan):
+    def action(ports, request):
+        ports.sample = LOW
+        return ERR_204
+    outcome, ports, _ = run(scan, {7: action, 8: ERR_204})           # 8 = L1 복구 물러남
+    assert outcome.kind is OutcomeKind.FAILED and ports.sm.phase is P.ERROR
+    assert '복구 이동 실패' in outcome.detail and len(ports.calls) == 8
+    assert statuses(outcome.record)[1] is LineStatus.FAILED
+
+
+def test_stop_during_recovery_is_stopped(scan):
+    def action(ports, request):
+        ports.sample = LOW
+        return ERR_204
+    outcome, ports, _ = run(scan, {7: action, **stop_during(8)})
+    assert outcome.kind is OutcomeKind.STOPPED and ports.sm.phase is P.STOPPED
+    assert len(ports.calls) == 8
+    D, F, N = LineStatus.DONE, LineStatus.FAILED, LineStatus.NOT_ATTEMPTED
+    assert statuses(outcome.record) == [D, F, N, N, N, N, N, N]
+
+
+def test_latch_during_recovery_is_error(scan):
+    def action(ports, request):
+        ports.sample = LOW
+        ports.latch = 403
+        return ERR_204
+    outcome, ports, _ = run(scan, {7: action})
+    assert outcome.kind is OutcomeKind.FAILED and outcome.reason_code == 403 and len(ports.calls) == 7
+
+
+def test_continue_can_be_turned_off(scan):
+    def action(ports, request):
+        ports.sample = at_z_safe(plan)
+        return ERR_204
+    plan = plan_weld(scan, 0, 7, params())
+    outcome, ports, _ = run(scan, {5: action}, continue_on_line_failure=False)
+    assert outcome.kind is OutcomeKind.FAILED and ports.sm.phase is P.ERROR and len(ports.calls) == 5
+
+
+@pytest.mark.parametrize('result', [
+    MotionResult(reason=MR.REJECTED, reason_code=604, detail='z < path_min_z_m'),
+    MotionResult(reason=MR.STOP_REQUESTED, reason_code=200),
+    MotionResult(reason=MR.OVER_FORCE, reason_code=400),
+    MotionResult(reason=MR.TIMEOUT, reason_code=203),
+])
+def test_only_204_continues(scan, result):
+    def action(ports, request):
+        ports.sample = at_z_safe(plan)
+        return result
+    plan = plan_weld(scan, 0, 7, params())
+    outcome, ports, _ = run(scan, {5: action})
+    assert outcome.kind is OutcomeKind.FAILED and len(ports.calls) == 5
+
+
+def test_last_line_failure_homes_from_where_it_stands(scan):
+    # 마지막 선(L7) 접근 1 이 도달 불가 → 마무리 올림은 L7 후퇴점이 아니라 지금 서 있는 z_safe 자리
+    standing = Pose((0.40, -0.10, 0.60), (0.0, 1.0, 0.0, 0.0))
+    def action(ports, request):
+        ports.sample = standing
+        return ERR_204
+    outcome, ports, plan = run(scan, {29: action})                   # 4·7 + 1 = L7 접근 1
+    assert outcome.kind is OutcomeKind.PARTIAL and outcome.detail == 'L7 FAILED'
+    final = ports.calls[-2][1]
+    assert final.label == '마무리 올림' and final.target == standing.position
+    assert final.orientation == standing.orientation
+
+
+def test_failed_line_keeps_stop_pose_from_result(scan):
+    # 204 Result 에 좌표가 있으면 그 선의 stop_pose 로 남긴다(작업대 좌표)
+    def action(ports, request):
+        ports.sample = at_z_safe(plan)
+        return MotionResult(reason=MR.ROBOT_ERROR, reason_code=204, position=(0.43, -0.2, 0.44),
+                            orientation=Q_TILT)
+    plan = plan_weld(scan, 0, 7, params())
+    outcome, _, _ = run(scan, {5: action})
+    b = plan.base_to_fixture
+    pose = outcome.record.lines[1].stop_pose
+    assert all(math.isclose(a, e - o) for a, e, o in zip(pose.position, (0.43, -0.2, 0.44), b))
 
 
 # ---- classify 단독 ----

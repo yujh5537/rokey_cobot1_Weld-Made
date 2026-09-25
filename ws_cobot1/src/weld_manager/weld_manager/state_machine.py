@@ -2,6 +2,7 @@
 
     IDLE → PREPARING → (APPROACH → WELDING → RETREAT) × 선 → HOMING → DONE
     실패 → ERROR,  STOP → STOPPING → STOPPED,  안전복귀(HOME) → HOMING → 출발했던 휴지 phase
+    한 선의 ROBOT_ERROR(204) 실패(D33) → LINE_FAILED → RETREAT(복구 이동) → 다음 선 APPROACH. lines_done 은 늘지 않는다
 
 입력은 두 종류다(scan_manager 의 상태 기계와 같은 구분).
 - Command: 관제자 명령. 허용되지 않으면 예외 없이 Outcome(accepted=False, reason) 을 돌려준다.
@@ -35,6 +36,7 @@ class Signal(Enum):
     WELD = 'WELD'                      # 그 선의 ExecutePath 시작
     RETREAT = 'RETREAT'                # 그 선의 후퇴 시작
     LINE_DONE = 'LINE_DONE'            # 그 선을 끝까지 지났다 (lines_done + 1)
+    LINE_FAILED = 'LINE_FAILED'        # 그 선이 204 로 실패했고 복구 이동으로 넘어간다 (D33). phase 는 RETREAT
     HOMING = 'HOMING'                  # 마무리 홈 복귀 시작 (마지막 선 뒤)
     HOMING_DONE = 'HOMING_DONE'        # 홈 복귀 끝 (마무리 → DONE, 안전복귀 → 출발한 휴지 phase)
     STOP_CONFIRMED = 'STOP_CONFIRMED'  # /robot/status 로 connected && !moving 확인
@@ -51,6 +53,8 @@ SIGNAL_TRANSITIONS = {
     Signal.WELD: {WeldPhase.APPROACH: WeldPhase.WELDING},
     Signal.RETREAT: {WeldPhase.WELDING: WeldPhase.RETREAT},
     Signal.LINE_DONE: {WeldPhase.RETREAT: WeldPhase.RETREAT},
+    Signal.LINE_FAILED: {WeldPhase.APPROACH: WeldPhase.RETREAT, WeldPhase.WELDING: WeldPhase.RETREAT,
+                         WeldPhase.RETREAT: WeldPhase.RETREAT},
     Signal.HOMING: {WeldPhase.RETREAT: WeldPhase.HOMING},
     Signal.HOMING_DONE: {WeldPhase.HOMING: WeldPhase.DONE},
     Signal.STOP_CONFIRMED: {WeldPhase.STOPPING: WeldPhase.STOPPED},

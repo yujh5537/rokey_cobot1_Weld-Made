@@ -90,7 +90,7 @@ WELD_PARAMS = [
     'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
     'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'approach_m',
     'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
-    'orientation_tolerance_deg', 'motion_timeout_s', 'tool_check_max_force_n', 'server_wait_timeout_s',
+    'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'tool_check_max_force_n', 'server_wait_timeout_s',
     'stop_confirm_timeout_s', 'sample_timeout_s', 'state_publish_period_s', 'scan_state_timeout_s',
     'result_dir', 'result_frame_id', 'motion_frame_id',
 ]
@@ -103,6 +103,12 @@ def test_weld_manager_has_contract_params(file_name):
     weld = _params(file_name)['weld_manager']
     missing = [name for name in WELD_PARAMS if name not in weld]
     assert not missing, f'{file_name}: weld_manager 에 {missing} 가 없다'
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_continue_on_line_failure_is_a_bool(file_name):
+    """D33 스위치는 bool 만 받는다(weld_manager 는 1 · 'true' 를 거절한다)."""
+    assert isinstance(_params(file_name)['weld_manager']['continue_on_line_failure'], bool)
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)

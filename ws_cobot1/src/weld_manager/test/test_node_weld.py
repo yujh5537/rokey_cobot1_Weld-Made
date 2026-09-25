@@ -275,6 +275,42 @@ def test_over_force_is_error(make):
     assert result.result.lines[0].status == WeldLine.STATUS_FAILED
 
 
+# ---- 선 실패 뒤 계속 (D33) ----
+
+def test_unreachable_line_is_failed_and_the_rest_continue(make):
+    # L1 접근 1(goal 5)이 204 → L1 FAILED. 가짜의 자리는 L0 후퇴점(z_safe)이라 복구 이동 없이 L2 로. 끝까지 가고 홈
+    h = make(script={5: (R.REASON_ROBOT_ERROR, 204)})
+    result = h.run()
+    assert not result.success and result.reason_code == 204 and result.detail == 'L1 FAILED'
+    statuses = [line.status for line in result.result.lines]
+    assert statuses == [WeldLine.STATUS_DONE, WeldLine.STATUS_FAILED] + [WeldLine.STATUS_DONE] * 6
+    assert result.result.lines[1].reason_code == 204 and not result.result.success
+    kinds = h.fake.kinds()
+    assert kinds[:5] == ['MOVE_TO', 'MOVE_TO', 'PATH', 'MOVE_TO', 'MOVE_TO'] and len(kinds) == 4 + 1 + 24 + 2
+    assert kinds[-2:] == ['MOVE_TO', 'HOME'] and h.phase().name == 'DONE'
+    assert wait_for(lambda: h.results and not h.results[-1].success and h.results[-1].detail == 'L1 FAILED')
+
+
+def test_failure_below_z_safe_recovers_by_backing_off_and_lifting(make):
+    # L1 경로(goal 7)가 204 → 가짜의 자리는 접근점(z_safe 아래) → 물러남 · 올림 두 MOVE_TO 뒤 L2 접근 1
+    h = make(script={7: (R.REASON_ROBOT_ERROR, 204)})
+    result = h.run()
+    assert not result.success and result.detail == 'L1 FAILED'
+    kinds = h.fake.kinds()
+    assert kinds[4:10] == ['MOVE_TO', 'MOVE_TO', 'PATH', 'MOVE_TO', 'MOVE_TO', 'MOVE_TO']
+    assert len(kinds) == 4 + 3 + 2 + 24 + 2
+    lift = h.fake.goals[8][1]
+    assert abs(lift.target.position.z - 0.48986501464843746) < 1e-9      # z_safe (sim 픽스처)
+    assert h.phase().name == 'DONE'
+
+
+def test_continue_off_stops_at_first_failure(make):
+    h = make(script={5: (R.REASON_ROBOT_ERROR, 204)}, params={'continue_on_line_failure': False})
+    result = h.run()
+    assert not result.success and result.reason_code == 204
+    assert h.phase().name == 'ERROR' and len(h.fake.goals) == 5
+
+
 def test_path_server_missing(make):
     h = make(with_path_server=False, params={'server_wait_timeout_s': 0.5})
     result = h.run()

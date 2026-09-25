@@ -29,7 +29,7 @@ PARAM_VALUES = dict(
     approach_m=0.030, travel_clearance_m=0.050, bottom_margin_m=0.005, workspace_margin_m=0.100,
     path_tolerance_m=0.003, motion_timeout_s=120.0, tool_check_max_force_n=6.0,
     server_wait_timeout_s=2.0, stop_confirm_timeout_s=3.0, sample_timeout_s=1.0,
-    orientation_tolerance_deg=15.0,
+    orientation_tolerance_deg=15.0, continue_on_line_failure=True,
     state_publish_period_s=1.0, scan_state_timeout_s=5.0, result_dir='data',
 )
 
