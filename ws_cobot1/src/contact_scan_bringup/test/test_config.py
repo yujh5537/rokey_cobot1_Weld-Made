@@ -83,3 +83,65 @@ def test_sim_and_real_result_dirs_differ():
     """
     dirs = {f: _params(f)['scan_manager']['result_dir'] for f in SOURCE_BY_FILE}
     assert len(set(dirs.values())) == len(dirs), f'sim 과 real 의 result_dir 이 같다 {dirs}'
+
+
+# phase 2 weld_manager 절 (docs/phase2/weld-motion.md 6절). 이름은 계약에 속한다
+WELD_PARAMS = [
+    'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
+    'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'approach_m',
+    'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
+    'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'tool_check_max_force_n', 'server_wait_timeout_s',
+    'stop_confirm_timeout_s', 'sample_timeout_s', 'state_publish_period_s', 'scan_state_timeout_s',
+    'result_dir', 'result_frame_id', 'motion_frame_id',
+]
+# M2(#186 툴 치수)를 재기 전이라 real.yaml 에는 두지 않는다(미측정값을 채우지 않는다, 규칙 4)
+TOOL_PROFILE = ['tool_profile_u_m', 'tool_profile_r_m']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_manager_has_contract_params(file_name):
+    weld = _params(file_name)['weld_manager']
+    missing = [name for name in WELD_PARAMS if name not in weld]
+    assert not missing, f'{file_name}: weld_manager 에 {missing} 가 없다'
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_continue_on_line_failure_is_a_bool(file_name):
+    """D33 스위치는 bool 만 받는다(weld_manager 는 1 · 'true' 를 거절한다)."""
+    assert isinstance(_params(file_name)['weld_manager']['continue_on_line_failure'], bool)
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_tool_profile_is_both_or_neither(file_name):
+    """외형 두 배열은 같이 있거나 같이 없다. 있으면 길이가 같고 u 는 오름차순이다."""
+    weld = _params(file_name)['weld_manager']
+    present = [name for name in TOOL_PROFILE if name in weld]
+    assert len(present) in (0, 2), f'{file_name}: {present} 만 있다'
+    if present:
+        u, r = weld['tool_profile_u_m'], weld['tool_profile_r_m']
+        assert len(u) == len(r) and u == sorted(set(u)) and all(v > 0 for v in r)
+
+
+@pytest.mark.parametrize('file_name, node, name', [
+    (f, 'scan_manager', 'result_dir') for f in SOURCE_BY_FILE] + [
+    (f, 'scan_manager', 'tip_radius_m') for f in SOURCE_BY_FILE])
+def test_weld_manager_shares_values_with_scan_manager(file_name, node, name):
+    """result_dir 이 다르면 weld_manager 가 스캔 결과를 못 찾고, tip_radius_m 이 다르면 스탠드오프 정의가 어긋난다(계약 6절)."""
+    params = _params(file_name)
+    assert params['weld_manager'][name] == params[node][name]
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_frame_matches_robot_manager(file_name):
+    """ExecutePath 는 frame_id 가 robot_manager.frame_id 와 다르면 604 로 거절한다."""
+    params = _params(file_name)
+    assert params['weld_manager']['motion_frame_id'] == params['robot_manager']['frame_id']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_speeds_fit_robot_limits(file_name):
+    """용접 속도는 robot_manager 상한 이하, 하한은 이동 판정 최저 속도(eps / 창)보다 커야 한다(#152)."""
+    params = _params(file_name)
+    weld, robot = params['weld_manager'], params['robot_manager']
+    assert weld['weld_speed_mps'] <= robot['path_max_speed_mps']
+    assert weld['weld_speed_min_mps'] > robot['moving_eps_m'] / robot['moving_window_s']
