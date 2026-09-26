@@ -8,10 +8,12 @@
 
 규칙
 - 어떤 goal 이든 도착이 아니면 **그 자리에서 끝낸다**: 다음 goal 을 보내지 않고, 자동 복귀 · 재시도 없음(CLAUDE.md 규칙 3).
-  하나의 예외가 D33 이다: 한 선의 goal(접근 1 · 2 · 경로 · 후퇴)이 ROBOT_ERROR(204) 로 끝나면
-  (continue_on_line_failure=true) 그 선만 FAILED 로 적고, 팁이 z_safe 아래면 툴 축 뒤로 물러난 뒤 수직 상승해
-  다음 선으로 간다. 같은 선을 다시 시도하지는 않는다. 정지 · 취소 · 과대 외력 · 시간 초과 · 래치 · 복구 이동 실패는
-  그대로 ERROR 다. 끝까지 갔는데 FAILED 가 있으면 phase 는 DONE 이고 결과는 success=false(PARTIAL).
+  하나의 예외가 D33 이다(9/26 좁힘, #198): 한 선의 goal(접근 1 · 2 · 경로 · 후퇴)이 ROBOT_ERROR(204) 로 끝났고
+  **그때 팁이 z_safe 위**(도달 불가 · 출발 안 함 — 앞 선의 후퇴점에 그대로)면 (continue_on_line_failure=true) 그 선만
+  FAILED 로 적고 이동 없이 다음 선으로 간다. **z_safe 아래**의 204(원인 모름 · 접촉 가능성)는 툴 축 뒤로 물러난 뒤
+  수직 상승하는 복구 이동만 하고 ERROR 로 끝낸다. 같은 선을 다시 시도하지는 않는다. 정지 · 취소 · 과대 외력 ·
+  시간 초과 · 래치 · 복구 이동 실패는 그대로 ERROR 다. 끝까지 갔는데 FAILED 가 있으면 phase 는 DONE 이고 결과는
+  success=false(PARTIAL). "z_safe 위" 의 여유는 path_tolerance_m(robot_manager 도착 허용치와 같은 값)이다.
 - STOPPED 는 이 노드가 /weld/stop 으로 요청한 정지뿐이다. 요청하지 않은 정지는 ERROR 다(D25).
 - 모션 사이에 안전 래치가 걸리면 다음 goal 을 보내지 않는다. 안전복귀(run_home)는 래치 중에도 간다(1차와 같다).
 - 결과(/weld/result · 파일)는 마무리 홈 복귀보다 먼저 낸다(7.3절). 중지 · 실패도 한 번 낸다.
@@ -391,16 +393,18 @@ class WeldRunner(_Runner):
         self._move_to(f'{line.name} 후퇴', line.retreat, line.orientation, p.travel_speed_mps)
 
     def _fail_line_and_recover(self, line, failure: _Fail) -> None:
-        """D33: 그 선을 FAILED 로 적고, 팁을 z_safe 로 올려 다음 선의 접근 1 을 보낼 수 있게 한다(weld-motion.md 5절).
+        """D33(9/26 좁힘): 그 선을 FAILED 로 적고, 팁 위치에 따라 다음 선으로 가거나 복구 뒤 ERROR 로 끝낸다(weld-motion.md 5절).
 
         - 팁 자리는 /robot/sample(ports.current_pose)로 본다. 모르면 복구를 시도하지 않고 ERROR.
         - z_safe 위(도달 불가라 출발조차 안 한 경우 — 앞 선의 후퇴점에 서 있다)면 이동 없이 다음 선.
-        - z_safe 아래면 7.2 안전복귀와 같은 순서: 툴 축 뒤(−d)로 approach_m 물러남 → 같은 x · y 로 z_safe 까지 수직 상승.
+          "위" 의 여유는 path_tolerance_m — 후퇴점 도착도 그 허용치로 판정되므로 샘플이 z_safe 를 조금 밑돌 수 있다.
+        - z_safe 아래(원인 모름 · 접촉 가능성)면 7.2 안전복귀와 같은 순서로 복구만 한다: 툴 축 뒤(−d)로 approach_m
+          물러남 → 같은 x · y 로 z_safe 까지 수직 상승 → 그리고 ERROR. 뒤 선은 NOT_ATTEMPTED.
         - 복구 이동 자체가 실패(어떤 사유든)하면 ERROR. 같은 선을 다시 시도하지 않는다.
         """
         p = self._params
         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
-        self._ports.log('warn', f'{line.name} 실패 → FAILED 로 기록하고 다음 선으로 계속한다(D33): {failure.detail}',
+        self._ports.log('warn', f'{line.name} 실패 → FAILED 로 기록한다(D33). 팁 위치를 본다: {failure.detail}',
                         None if self.last_pose is None else self.last_pose.position)
         self._notify(Signal.LINE_FAILED)
         pose = self._ports.current_pose()
@@ -409,36 +413,39 @@ class WeldRunner(_Runner):
                         f'{line.name} 실패 뒤 복구 불가: 팁 위치(/robot/sample)를 모른다. 원인: {failure.detail}')
         z_safe = self._plan.z_safe_base
         if pose.position[2] >= z_safe - p.path_tolerance_m:
-            self._ports.log('info', f'{line.name}: 팁이 z_safe 위라 복구 이동 없이 다음 선으로 간다', pose.position)
+            self._ports.log('info', f'{line.name}: 팁이 z_safe 위라 이동 없이 다음 선으로 계속한다', pose.position)
             self._safe_pose = pose
             return
         self._ports.log('warn', f'{line.name}: 팁 z {pose.position[2] * 1000:.1f} mm 가 z_safe '
-                                f'{z_safe * 1000:.1f} mm 아래다. 툴 축 뒤로 물러난 뒤 올린다', pose.position)
+                                f'{z_safe * 1000:.1f} mm 아래다. 툴 축 뒤로 물러난 뒤 올리고 ERROR 로 끝낸다', pose.position)
         try:
             back = self._back_off(pose, f'{line.name} 복구 물러남')
-            lift = self._lift(back, pose.orientation, z_safe, f'{line.name} 복구 올림')
+            self._lift(back, pose.orientation, z_safe, f'{line.name} 복구 올림')
         except _Fail as recovery:
             raise _Fail(recovery.reason_code, f'{line.name} 복구 이동 실패: {recovery.detail}')
-        self._safe_pose = Pose(tuple(lift), tuple(pose.orientation))
+        raise _Fail(failure.reason_code,
+                    f'{line.name}: z_safe 아래에서 난 204 — 복구 이동 뒤 ERROR(D33 9/26). 원인: {failure.detail}')
 
     def _lift_to_z_safe(self) -> None:
-        """D30: 시작 때 팁이 z_safe 아래면 같은 x · y · 현재 자세로 z_safe 까지 수직 상승한다(거절하지 않는다).
+        """D30(9/26 갱신): 시작 때 팁이 z_safe 아래면 툴 축 뒤(−d)로 approach_m 물러난 뒤 같은 x · y · 현재 자세로
+        z_safe 까지 수직 상승한다(거절하지 않는다). D33 복구 · 7.2 안전복귀와 같은 순서다.
 
         첫 접근 1 은 지금 자리에서 z_safe 위의 점으로 곧장 가는 직선이라, 부재 높이 아래에서 출발하면 그 직선이
         부재를 가로지를 수 있다. 자세를 바꾸지 않으므로 순수한 이동이다(제자리 회전의 거짓 도착이 없다).
         올릴 거리가 path_tolerance_m 이내면 보내지 않는다 — 거의 제자리인 목표는 robot_manager 가 유예 뒤에야 끝낸다.
-        기울인 자세로 부재 옆에 서 있었다면 상승 중 툴 뒤쪽이 부재를 스칠 수 있다. 막지 않는다(관제자 확인, 5절).
+        기울인 자세로 부재 옆에 서 있었다면 먼저 물러나므로 상승 중 툴 뒤쪽이 부재를 스치지 않는다(관제자는 그래도 본다).
         """
         pose = self._start_pose
         if pose is None:
             return
         z_safe = self._plan.z_safe_base
-        x, y, z = pose.position
+        z = pose.position[2]
         if z >= z_safe - self._params.path_tolerance_m:
             return
         self._ports.log('warn', f'시작 자리 z {z * 1000:.1f} mm 가 z_safe {z_safe * 1000:.1f} mm 아래다. '
-                                '같은 x · y 로 먼저 올린다(D30)', pose.position)
-        self._move_to('시작 상승', (x, y, z_safe), pose.orientation, self._params.travel_speed_mps)
+                                '툴 축 뒤로 물러난 뒤 같은 x · y 로 올린다(D30)', pose.position)
+        back = self._back_off(pose, '시작 물러남')
+        self._lift(back, pose.orientation, z_safe, '시작 상승')
 
     # ---- 마무리 ----
 
