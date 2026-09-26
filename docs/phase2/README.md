@@ -50,6 +50,7 @@
 | D31 | `ExecutePath` 는 `path_mode` line(기본, 점마다 정지) / spline. `move_line`+radius 블렌딩은 비동기에서 불가(드라이버 소스 확인). `path_max_points` 100. **소스 확인에 그치지 말고 호출 확인까지 한다** → 호출 확인 결과(현지 9/24 Virtual, #191): **spline 은 응답이 점당 약 30 ms 늦어 호출 줄이 막히고 샘플이 끊긴다(SAMPLE_STALE). 쓰지 않는다.** 코드 · 파라미터는 남기되 기본 · 실기 모두 line |
 | D33 | **한 선이 실패하면 그 선만 FAILED 로 기록하고 다음 선으로 계속한다**(병후 9/25, 학민 #184 리뷰 ①). 계속하는 실패 = 그 선의 goal(접근 1 · 2 · ExecutePath · 후퇴)이 `ROBOT_ERROR(204)` 로 끝났고 **그때 팁이 z_safe 위에 있는 경우**(도달 불가 · 출발 안 함 — 이전 후퇴점에 그대로 서 있다. 판정 `z ≥ z_safe − path_tolerance_m`, 9/26). **z_safe 아래에서 난 204(원인 모름 · 접촉 가능성)는 복구 이동 뒤 ERROR** 로 끝낸다(9/26 좁힘, 현지 #184 리뷰). 정지 · 취소 · 과대 외력 · 시간 초과 · 래치는 그대로 ERROR · STOPPED. 파라미터 `continue_on_line_failure`(true). 타입 변경 없음(`WeldLine.STATUS_FAILED` · `WeldResult.success=false`) |
 | D34 | **접근 · 후퇴점 도달성(학민 9/26)**: M1 은 목표 위 수직 자세만 확인했고, phase 2 접근 · 후퇴점(툴 축 뒤 30 mm + z_safe)은 플랜지가 더 멀리 나가 L0 후퇴점 733 · L6 접근 1 729 mm 가 M1 의 도달 712 · 실패 738 사이 빈 구간이다(학민 계산, 레포 미기록). **9/29 실기 맨 앞에 두 자세(L0 후퇴점 · L6 접근 1, movel · 접촉 없음, 약 2 분)를 확인**하고, 실패하면 윗면선 오프셋을 수직 위로 바꾼다 — 파라미터 `top_line_offset_dir`(`tool` 기본 / `vertical`, weld-motion 6절)로 현지가 미리 준비, 9/29 는 yaml 전환만 |
+| D35 | `ExecutePath` 수락 시점에 **출발점(현재 위치) z 도 `path_min_z_m` 과 비교**해 아래면 604 (학민 #191 리뷰 🟡, 병후 9/27). D30 의 z_safe 상승은 weld_manager 절차이고, robot_manager 의 울타리는 출발점까지 포함해야 "마지막 울타리" 다 |
 | D32 | `path_tolerance_m` 은 마지막 점뿐 아니라 line 모드의 **중간 점 도착 판정에도** 쓴다(멈춘 자리가 그 점에서 허용치 밖이면 204). `≤ 0` · NaN 은 604 로 거절(현지 해석 9/24, 병후 채택 9/25) |
 
 **계약 작성 중 드러난 것 → 2026-09-23 병후 결정**

@@ -18,6 +18,7 @@
 - 2026-09-26(병후 결정, 현지 #184 리뷰): **D33 좁힘** — 다음 선으로 계속하는 것은 z_safe 위에서 난 204(도달 불가 · 출발 안 함)뿐. z_safe 아래의 204 는 복구 이동(−d 물러남 → z_safe) 뒤 ERROR. **D30 갱신** — 시작 때 z_safe 아래면 −d 물러남 → 상승(복구 · 7.2 안전복귀와 같은 순서). 타입 변경 없음
 - 2026-09-26(#198, 문서만): 1차 `ros-interfaces.md` 5.1 · 5.3 에 `WELD_ACTIVE(601)` 와 검사 순서(BUSY → 601 → 래치 → 로봇) · phase 2 7.1 에 같은 순서 한 줄(600 과 대칭) · `weld-motion.md` 6절에 scan_manager 파라미터 `weld_state_timeout_s`(5.0) 줄. 새 버전 번호 없음
 - 2026-09-26 밤(#198): D33 "z_safe 위" 판정 = `z ≥ z_safe − path_tolerance_m`(학민 ③ · 현지 제안 1, 코드와 일치) · 3.2 복구 이동 중 stop → STOPPED · **D34** 접근 · 후퇴점 도달성 — 9/29 2 자세 선확인, 윗면선 오프셋 방향 파라미터 `top_line_offset_dir`(`tool`/`vertical`) 추가(weld_manager, 타입 변경 없음)
+- 2026-09-27(D35, 문서만): `ExecutePath` 거절 사유에 **출발점 z < `path_min_z_m`** 추가(수락 시점, 604). 학민 #191 리뷰 🟡. robot_manager 코드는 #191 에서 반영(현지). 타입 변경 없음
 
 ## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
