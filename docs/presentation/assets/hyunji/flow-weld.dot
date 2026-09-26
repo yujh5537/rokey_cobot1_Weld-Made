@@ -1,0 +1,71 @@
+// 동작 순서도 2 — 모서리 용접 시연 모션 (phase 2, weld_manager + robot_manager ExecutePath). 원본 텍스트:
+//   dot -Tpng -Gdpi=150 flow-weld.dot -o flow-weld.png
+// 근거: docs/phase2/weld-motion.md 5절 · weld-ros-interfaces.md 5.1 · 5.2 · 7.2 (PR #184), weld_manager(p2-weld-manager),
+//       robot_manager ExecutePath(PR #191). 2026-09-24 Virtual 에서 8 선 완주(242 s) — 실기 미실시
+digraph weld {
+  graph [rankdir=TB, fontname="NanumGothic", fontsize=14, nodesep=0.45, ranksep=0.32, newrank=true,
+         label="그림 2. 용접 시연 동작 순서 (phase 2: weld_manager → robot_manager)   파랑 = 관제자 명령 · 노랑 = 판단 · 빨강 = 오류로 끝남(자동 복귀 없음)", labelloc=t];
+  node  [fontname="NanumGothic", fontsize=12, shape=box, style="rounded,filled", fillcolor="#FFFFFF", color="#444444"];
+  edge  [fontname="NanumGothic", fontsize=10, color="#444444"];
+
+  subgraph cluster_main {
+    label="본 흐름 (/weld/state.phase)"; style="rounded,dashed"; color="#999999"; fontsize=12;
+    start   [label="/weld/run (웹 용접 시작)\nscan_id(\"\" = 최신 성공 결과) · start_line · end_line", fillcolor="#D6E6FF"];
+    checks  [label="시작 조건 (5.1 순서)\nBUSY 100 · 파라미터 102 · 요청 101 · 스캔 중 600\n래치 103 · 연결 104 · 스캔 결과 없음 602 · 선 범위 603\n샘플 없음 307 · 툴 미등록 의심 302 · 경로 거절 604", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    prep    [label="PREPARING\nresult.json 읽기 → 선별 경로 생성\n이등분 45° 자세 · 스탠드오프 · 위빙 · 작업영역 · 툴 외형 검사"];
+    liftq   [label="팁이 z_safe 아래?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    lift    [label="같은 x · y · 자세로 z_safe 까지 수직 상승 (D30)"];
+    app1    [label="APPROACH (선 i)\n접근 1: OP_MOVE_TO (P_app.x, y, z_safe, q_i)  travel_speed_mps\n접근 2: OP_MOVE_TO P_app  approach_speed_mps"];
+    weld    [label="WELDING\nExecutePath [p_0 … p_N, P_ret]  weld_speed_mps\nrobot_manager: 점마다 amovel → 정지 · 도착 확인 (path_mode line)"];
+    ret     [label="RETREAT\nOP_MOVE_TO (P_ret.x, y, z_safe, q_i)  → 선 i DONE"];
+    moreq   [label="i < end_line?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    result  [label="/weld/result 발행 (8 선 상태 · 이음선 · 정지 위치)\nresult_dir/<scan_id>/weld/<weld_id>.json"];
+    homing  [label="HOMING (마무리)\nOP_HOME"];
+    done    [label="DONE", fillcolor="#D9F2D9"];
+  }
+  reject  [label="거절\nResult 에 사유 · 로봇 무이동", fillcolor="#EEEEEE"];
+  robot   [label="robot_manager 가 한 번 더 막는다 (ExecutePath)\n· 경유점 z < path_min_z_m · 속도 > path_max_speed_mps\n  · 점 수 > path_max_points → 604 (움직이지 않음)\n· 멈췄는데 점에서 path_tolerance_m 밖 → 204\n· 명령 실패 · 응답 지연 → 먼저 세우고 확인 뒤 204",
+           shape=note, style="filled", fillcolor="#F4F4F4", color="#666666", fontsize=11];
+
+  error   [label="ERROR\n그 선 FAILED(reason_code · 정지 위치)\n남은 선 NOT_ATTEMPTED · 모션을 더 보내지 않는다", fillcolor="#FFD6D6", color="#B00020", penwidth=1.5];
+  common  [label="모든 모션에 공통인 실패\n· 각 모션 뒤 자세가 목표와 orientation_tolerance_deg 넘게 다름 → 204\n· 요청하지 않은 정지(safety_monitor · 스캔 중지 버튼) → 래치 사유 또는 204 (D25)\n· OVER_FORCE 400 · SAMPLE_STALE 403 · 시간 초과 203 · 관절 한계 등 로봇 오류 204",
+           shape=note, style="filled", fillcolor="#FFF0F0", color="#B00020", fontsize=11];
+
+  subgraph cluster_ops {
+    label="관제자 명령 — 서로 부르지 않는다 · 용접은 재시작이 없다"; style="rounded,dashed"; color="#3366CC"; fontsize=12;
+    stopcmd  [label="/weld/stop (웹 용접 중지)\n진행 중 phase 에서만 · 휴지 중이면 /robot/stop 을 부르지 않는다", fillcolor="#D6E6FF"];
+    stopping [label="STOPPING\n/robot/stop (requester weld_manager)\n요청 뒤 /robot/status 로 connected && !moving 확인"];
+    stopq    [label="정지 확인?", shape=diamond, style="filled", fillcolor="#FFF5CC"];
+    stopped  [label="STOPPED\n그 선 STOPPED + 정지 위치"];
+    homecmd  [label="/weld/home (웹 안전복귀) — 휴지 phase 에서만\n정지 위치를 알면: 툴 축 뒤(−d)로 approach_m 물러남\n→ z_safe 까지 올림 → OP_HOME\n모르면 OP_HOME 만 (관제자가 보고 누른다)", fillcolor="#D6E6FF"];
+  }
+
+  start -> checks;
+  checks -> reject [label="하나라도"];
+  checks -> prep [label="통과"];
+  prep -> liftq;
+  liftq -> lift [label="예"];
+  liftq -> app1 [label="아니오"];
+  lift -> app1;
+  app1 -> weld -> ret -> moreq;
+  moreq -> app1 [label="예: i + 1\n(z_safe 위에서 자세 변경)"];
+  moreq -> result [label="아니오"];
+  result -> homing -> done;
+
+  weld -> robot [style=dotted, arrowhead=none, constraint=false];
+  app1 -> error [label="실패", color="#B00020", fontcolor="#B00020", constraint=false];
+  weld -> error [label="실패", color="#B00020", fontcolor="#B00020", constraint=false];
+  ret  -> error [label="실패", color="#B00020", fontcolor="#B00020", constraint=false];
+  common -> error [color="#B00020", style=dashed];
+
+  stopcmd -> stopping -> stopq;
+  stopq -> stopped [label="예"];
+  stopq -> error [label="아니오: ROBOT_STATUS_LOST 404", color="#B00020", fontcolor="#B00020", constraint=false];
+  stopped -> homecmd [style=dashed, label="관제자가 누르면"];
+  error -> homecmd [style=dashed, color="#B00020", constraint=false, label="래치면 /safety/reset 먼저"];
+
+  { rank=same; start; stopcmd; }
+  { rank=same; reject; prep; }
+  { rank=same; weld; robot; }
+  { rank=same; error; ret; }
+}

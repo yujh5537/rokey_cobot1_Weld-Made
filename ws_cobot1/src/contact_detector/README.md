@@ -1,15 +1,30 @@
 # contact_detector
 
-접촉(CONTACT) · 접촉 소실(EDGE) · 과대 외력(OVER_FORCE) 판정. 소유: 현지 (T07, T16). 계약: `docs/contracts/ros-interfaces.md` 3.3 · 4.2.
+접촉(CONTACT) · 접촉 소실(EDGE) · 과대 외력(OVER_FORCE) 판정 노드. 담당: 현지 (T07, T16). 계약: [`ros-interfaces.md`](../../../docs/contracts/ros-interfaces.md) 3.1 · 3.3 · 4.2 · 6.3 · 7.2.
+로봇을 움직이지 않는다. 판정만 해서 `/contact/event` 로 알리고, 정지는 robot_manager 가 한다(계약 7.1 경로 ②).
 
-| 파일 | 역할 |
-|---|---|
-| `contact_detector/detector_core.py` | 판정 로직. **rclpy 를 import 하지 않는다.** tare(기준값 F0), 임계 · 디바운스, 과대 외력 |
-| `contact_detector/sim_source.py` | sim 입력원. 가상 직육면체와 TCP 위치로 외력 · z 를 만든다. **rclpy 를 import 하지 않는다** |
-| `contact_detector/offline.py` | 기록한 CSV 를 같은 판정 로직에 통과시키는 분석기 (`analyze_samples`). 실측 주기, 무접촉 잡음, 임계 × 디바운스 비교표 |
-| `contact_detector/contact_detector.py` | 노드. `/robot/sample`(SENSOR) 구독 → 판정 → `/contact/event`(EVENT) 발행, `/contact/tare` 서비스, `/scan/state` 로 `scan_id` 태깅. 로봇을 움직이지 않는다 |
+| 파일 | 역할 | rclpy |
+|---|---|---|
+| `contact_detector/detector_core.py` | 판정 로직: tare(기준값 F0), 하강 이동 기준, 임계 · 디바운스, EDGE(z 추세선 · 힘 꺾임), 과대 외력 | 안 씀 |
+| `contact_detector/sim_source.py` | sim 입력원. 가상 직육면체와 TCP 위치로 외력 · z 를 만든다 | 안 씀 |
+| `contact_detector/offline.py` | 기록 CSV 를 같은 판정 로직에 통과시키는 분석기 `analyze_samples`(실측 주기 · 무접촉 잡음 · 임계 × 디바운스 비교표) | 안 씀 |
+| `contact_detector/contact_detector.py` | 노드. 구독 → 판정 → 발행, `/contact/tare` 서비스, 파라미터 콜백(SetConfig P02) | 씀 |
 
-외력 감소(보조 신호)는 쓰지 않는다(이슈 #16 코멘트에 근거).
+| 방향 | 이름 | 타입 · QoS | 계약 |
+|---|---|---|---|
+| 구독 | `/robot/sample` | `RobotSample` · SENSOR | 3.1 (판정 모드는 샘플의 `operation`) |
+| 구독 | `/scan/state` | `ScanState` · STATE | 3.4 (`scan_id` 태깅에만 쓴다) |
+| 발행 | `/contact/event` | `ContactEvent` · EVENT | 3.3 |
+| 서비스 | `/contact/tare` | `TareForce` | 4.2 |
+| 파라미터 | `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` | SetConfig 전파 P02 | 2.4 · 6.4 |
+
+외력 감소(보조 신호)는 기본으로 쓰지 않는다(이슈 #16 코멘트). 켜는 스위치는 `edge_force_drop_n`(#128, 기본 0 = 끔).
+
+## 실기 구성에서 맡는 것 (2026-09-23 기준)
+- **CONTACT(하강)**: 이 노드가 확정한다. 실기 · sim 모두
+- **EDGE(밀기)**: 실기 `real.yaml` 은 robot_manager `slide_mode: step` 이다. 이때 EDGE 는 **robot_manager 가 멈춰서 힘을 읽고 확정**해 `/contact/event`(`source = "robot_step"`)로 내고, 이 노드의 EDGE 는 정지에 쓰이지 않는다(계약 v0.1.15 · 7.2). 이 노드의 EDGE 판정은 `slide_mode: force` 와 sim 에서 쓰인다
+- **OVER_FORCE**: 모든 동작에서 이 노드가 1차로 판정하고 robot_manager 가 대조 없이 즉시 정지한다. 2차는 safety_monitor 다(계약 7.2)
+- 실기 외력 값은 샘플 주기(약 43 Hz)와 달리 **약 94 ms(10 Hz)마다만 바뀐다**(9/20 `idle_30s.csv` · `descend_01.csv` 분석, 두산 `OnMonitoringDataCB` 100 ms 캐시). `debounce_n: 3` 은 사실상 힘 측정 1 회이고, 판정이 최대 약 120 ms 늦어질 수 있다(3 mm/s 면 0.3 mm. 계산값). robot_manager 50 Hz 경로에서 같은지는 **미확인**
 
 ## sim 입력원 (`source: sim`)
 Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(BRD 위험 2, `api-check-log.md`), 실제 샘플만으로는
@@ -61,17 +76,38 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
   - `detect_stamp` 는 연속 N 번째(확정) 샘플의 시각이다. `detect_stamp − force_stamp` 가 디바운스 지연이다
   - `force_delta_n` 은 확정 샘플의 값이다(검출 하중. BRD 9장 "접촉으로 확정된 순간의 외력")
   - 확정 샘플의 좌표를 쓰면 디바운스 동안 더 움직인 만큼 측정값이 밀린다(50 Hz · 5 mm/s · N=3 이면 0.2 mm)
-  - **계약 3.3 의 "판정 샘플" 정의가 확정될 때까지 초안이다**
+  - 이 정의는 계약 v0.1.5(#69)에서 확정됐다
 - `motion_id` 가 0(없음)으로 오는 동안에는 외력이 임계 아래로 내려오면 다시 판정한다. 0 이 아닌 `motion_id` 에서는 외력이 출렁여도 1 회만 낸다
 - 무효 샘플(`valid=false`)은 세지도 않고 연속 구간을 끊지도 않는다
 - tare: 기준값 F0 = 성분별 평균. 불안정 판정은 `|F − F0|` 의 RMS 로 한다. 외력 크기의 표준편차(`std_norm_n`)는 방향만 바뀌는 흔들림을 놓치므로 보고용으로만 쓴다
 
 ## 파라미터
-값은 `contact_scan_bringup/config/sim.yaml` · `real.yaml` 에만 둔다. 코드에 기본값이 없어서 값이 빠지면 노드가 기동하지 않는다.
-`source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
-`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_ref_settle_s` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109) · `edge_force_drop_n` · `edge_force_window_s` · `edge_force_lag_s` · `edge_force_settle_s`(#128)
+값은 [`contact_scan_bringup/config/sim.yaml`](../contact_scan_bringup/config/sim.yaml) · [`real.yaml`](../contact_scan_bringup/config/real.yaml) 의 `contact_detector:` 절에만 둔다. **코드에 기본값이 없다** — 값이 빠지면 노드가 기동하지 않는다.
+계약 이름 넷(★)은 SetConfig 가 실행 중에 바꾼다. 범위를 벗어나면 거절하고, 기준값 F0 는 유지된다.
+"성격"은 1차 관례대로 가른다: **출발값** = 설계에서 정한 값(실측 아님) · **실측 조정** = 실기 기록을 근거로 바꾼 값 · **재생 확인** = 실기 기록을 판정기에 다시 넣어 고른 값.
 
-`source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
+| 이름 | sim | real | 성격 | 근거 · 실측 |
+|---|---|---|---|---|
+| `source` | `sim` | `robot_force` | — | BRD 4.1.6 |
+| ★ `contact_threshold_n` | 3.0 N | 3.0 N | 출발값(3~5 N 하한) | 무접촉 외력 크기 표준편차 최대 0.50 N(9/19, PR #57). **실측 검출 하중(2026-09-23 학민 실기, 하강 2 mm/s · 큐브 윗면 1 점 반복): 임계 3.0 → 평균 4.49 N · 10 회 중 2 회 5 N 초과, 임계 2.0 → 평균 2.76 N · 0/7 초과**(TR-01_20260923, PR #181 머지 전) |
+| ★ `edge_drop_m` | 0.5 mm | 0.5 mm | 출발값 | BRD 1.4 예시 값. 실기는 스텝 모드라 이 노드의 EDGE 를 쓰지 않는다(위) |
+| ★ `debounce_n` | 3 | 3 | 출발값 | 실기에서는 힘 측정 약 1 회에 해당(위 94 ms) |
+| ★ `over_force_n` | 30 N | 30 N | 출발값 · 팀 결정 유지 | BRD 4.5. safety_monitor 와 같은 값(`test_config.py` 가 검사) |
+| `over_force_debounce_n` | 1 | 1 | 출발값(안전 쪽) | 한 샘플로 즉시 |
+| `edge_arm_force_n` | 1.5 N | 1.5 N | 출발값 | 실기 무접촉 30 s `|F − F0|` 최대 0.447 N(9/20 `idle_30s.csv`). `edge_arm_still_window_s > 0` 이면 쓰지 않는다 |
+| `edge_trend_window_s` · `edge_trend_min_samples` | 0.5 s · 10 | 0.5 s · 10 | 출발값 | 42.7 Hz 에서 0.5 s 약 21 개 |
+| `stale_age_ms` | 200 | 100 | 출발값 | real: 기록기 단독 간격 최대 29 ms(9/20). sim: Virtual 간격 최대 97.7 ms(계약 6.3)의 2 배. 2026-09-23 학민 실기 공백 141~160 ms 관측(TR-01_20260923) |
+| `tare_duration_s` · `tare_min_samples` | 1.5 s · 30 | 1.5 s · 30 | 출발값 | BRD 4.1.3 |
+| `tare_max_std_n` | 0.3 N | **1.0 N** | **실측 조정**(real) | 2026-09-23 실기 통합(기준점 tare) RMS 0.636~0.813 N 에서 0.3 N 이 두 번 `TARE_UNSTABLE` → 1.0(PR #179, 계약 v0.1.20) |
+| `tare_max_force_n` | 6.0 N | 6.0 N | 출발값 | 툴 등록 `|F0|` 1.81~3.7 N, 미등록 11~12.5 N(9/19~20) 사이 |
+| `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` | 1.0 s · 0.3 s · 10 | 같음 | **재생 확인** | 2026-09-21 학민 실기 하강 23 회를 판정기에 재생: 한 번 잡은 F0 는 공중 거짓 CONTACT 1~2 회, 이동 기준 0 회(PR #127, 계약 v0.1.12) |
+| `descend_ref_settle_s` · `descend_hold_threshold_n` | 5.5 s · 6.0 N | 같음 | **재생 확인** | 2026-09-21 학민 실기 홈 출발 하강 22 회의 계단식 치우침 4.0~4.1 s(bag 재생). 5.5 s 재생 시 3 N 구간 공중 최대 2.04 N, 6 N 구간 4.43 N(PR #127). **9/23 실기에서 6 N 구간이 뚫림 → #182** |
+| `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m` | 0.2 s · 0.1 mm · 0.5 mm | 같음 | 출발값 | #109 |
+| `edge_force_drop_n` | 0(끔) | 0(끔) | 출발값 | 켤 때 1.0 N: 2026-09-21 학민 실기 밀기 4 회 재생 464.43 · 464.53 · 464.59 · 466.70(기대 463.56)(PR #132, 계약 v0.1.13) |
+| `edge_force_window_s` · `edge_force_lag_s` · `edge_force_settle_s` | 0.5 · 0.1 · 1.5 s | 같음 | 출발값 | PR #132 |
+| `sim_box_frame_id` · `sim_box_origin_m` · `sim_box_size_m` | `base_link` · (0.425, −0.184, 0.400) m · 0.10 × 0.06 × 0.04 m | — | 가상값 | 홈 근처(관절 0 은 특이점, 9/21 확인) |
+| `sim_stiffness_n_per_m` · `sim_fall_speed_mps` · `sim_slide_press_n` | 20000 N/m · 0.05 m/s · 3.0 N | — | 가상값 | 3 N 에서 침투 0.15 mm |
+| `sim_tip_radius_m` | 0.225 mm | — | 가상값 | scan_manager sim `tip_radius_m` 과 같아야 한다(치수 복원 조건). 실기 탐침은 약 2 mm(계약 v0.1.18) |
 
 ## 샘플 최신성 · 경고
 - `now − max(pose_stamp, force_stamp) > stale_age_ms` 인 샘플은 버린다(계약 3.1). 샘플 간격이 `stale_age_ms` 를 넘으면 경고한다(판정은 바꾸지 않는다). 샘플이 비는 동안에는 접촉도 하강도 볼 수 없다
@@ -86,12 +122,20 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 `NO_SAMPLE`(샘플 없음) · `TARE_TIMEOUT`(`tare_min_samples` 미달) · `TARE_UNSTABLE`(`|F − F0|` RMS > `tare_max_std_n`) · `TOOL_REG_SUSPECT`(`|F0|` > `tare_max_force_n`, BRD 4.1.5) · `BUSY`(진행 중).
 응답의 `offset.torque` 는 쓰지 않으므로 NaN 이다. 서비스는 구간이 끝날 때까지 코루틴으로 기다리며 그동안 샘플 콜백은 계속 돈다
 
-## 실행
+## 실행 · 테스트
+2026-09-24 에 이 PC(Ubuntu 24.04 · Jazzy)에서 실제로 돌려 통과한 명령만 적는다. 실기 명령은 사람이 친다(CLAUDE.md 규칙 1).
 ```bash
-cd ~/ws_cobot_pjt/ws_cobot1 && source install/setup.bash
+# 단위 · 판정 · 분석기 · sim 입력원 시험 — ROS 를 source 하지 않아도 돈다
+cd ~/ws_cobot_pjt/ws_cobot1
+python3 -m pytest src/contact_detector/test -q
+# 노드 시험까지 (빌드 · source 뒤. 도메인은 contact_scan_testing 이 31~39 에서 고른다)
+sod && colcon build --packages-up-to contact_detector && source install/setup.bash   # sod 먼저(bringup README)
+colcon test --packages-select contact_detector && colcon test-result --verbose
+# sim 종단 (Virtual 없이 노드만) — bringup README 참고
 ros2 launch contact_scan_bringup bringup.launch.py source:=sim
-python3 -m pytest src/contact_detector/test -q          # ROS 를 source 하지 않아도 판정 · 분석기 테스트는 돈다
 ```
+- 실기 전용(마지막 확인 2026-09-23, #179 실기 종단): `ros2 launch contact_scan_bringup bringup.launch.py source:=robot_force broker_host:=<웹 PC>`
+- `ros2 topic echo /robot/sample` 은 `--qos-reliability best_effort` 가 필요하다
 
 ## 오프라인 분석 (T08 · T24)
 ```bash
@@ -103,3 +147,12 @@ CSV 머리줄: `t_pose_s,t_force_s,x_mm,y_mm,z_mm,fx_n,fy_n,fz_n,valid`
 - 조회에 실패한 줄은 0 으로 채우지 말고 `valid=0` 으로 남긴다
 - 파일 앞 `--tare-seconds` 동안은 무접촉 · 정지 상태여야 한다
 - 무접촉 기록을 넣으면 "CONTACT 확정 수" 열이 그 임계 · 디바운스 조합의 거짓 접촉 횟수다
+
+## 알려진 문제 (2026-09-24 열린 이슈)
+| 이슈 | 내용 |
+|---|---|
+| #182 | 하강 settle 5.5 s 구간의 6 N 둔한 판정이 공중 치우침에 뚫린다 — 9/23 실기 거짓 접촉 3/10 |
+| #154 | 힘 꺾임 EDGE: 옆 이동이 늦게 출발하면 출발 흔들림이 가짜 EDGE 가 된다(기본 꺼짐이라 실기 영향 없음) |
+| #130 | `/robot/sample` 약 3 s 주기 공백 — 이 노드는 공백 동안 판정하지 못한다(간격 경고) |
+| #16 · #24 | T16 · TR-01 상위 이슈. TR-01 은 PR #181(9/23 실측)로 완결 예정 |
+| — | 검출 하중 KPI(개별 회차 5 N 이하)는 임계 3.0 에서 2/10 불합격, 2.0 에서 합격(TR-01_20260923). 임계를 바꿀지는 팀 결정 전 |
