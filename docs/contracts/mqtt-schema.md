@@ -302,10 +302,29 @@ RG2 값도 원본 `JointState.position`의 rad다. `robot/gripper_joints`는 표
   "force_ctrl_active": true,
   "motion_id": 7,
   "operation": "SLIDE",
+  "slide_mode": "force",
+  "slide_force_setpoint_n": 3.0,
+  "slide_force_baseline_n": 5.3,
+  "slide_force_estimate_n": 8.3,
+  "step_press_lo_n": null,
+  "step_press_hi_n": null,
   "detail": "",
   "published_at_ms": 1789720001003
 }
 ```
+**SLIDE 누름 목표 6개 [ROS 계약 v0.1.21, 3.2절].** 서로 다른 세 값을 한 자리에 섞지 않는다.
+
+| 필드 | 뜻 | 화면에 쓸 때 |
+|---|---|---|
+| `slide_mode` | `"force"`(순응 · 힘 제어, REL) / `"step"`(위치 제어 스텝) / `""`(모름) | 지금 어느 방식인지 먼저 보여 준다 |
+| `slide_force_setpoint_n` | **설정한 증분 힘**(`DR_FC_MOD_REL`) | "설정" 이라고 쓴다. 실제 누름이 아니다 |
+| `slide_force_baseline_n` | 이번 SLIDE 를 **시작한 시점의 기준 Fz** | "시작 기준" |
+| `slide_force_estimate_n` | 위 둘의 합 = **추정 최종 누름** | **"추정"이라고 반드시 표시한다.** 실측으로 쓰면 안 된다 |
+| `step_press_lo_n` · `step_press_hi_n` | `step` 모드의 **목표 누름 ΔFz 띠** | `step` 모드에서 이 띠를 보여 준다 |
+
+- **`step` 모드에서는 힘 세 값이 `null` 이다.** 스텝 모드는 REL 힘 제어를 켜지 않으므로 그 값들은 제어 목표가 아니다. `null` 을 0 으로 그리지 않는다(2장의 무효 값 규칙).
+- 반대로 `force` 모드에서는 `step_press_*` 가 `null` 이다.
+- 모르는 값(SLIDE 중이 아님 · 기준 Fz 미수신)도 `null` 이다.
 
 #### scan/state
 ```json

@@ -21,8 +21,12 @@ from safety_monitor.safety_core import (
 MM = 1e-3
 # 테스트용 값이다. 실기 · sim 의 값은 contact_scan_bringup/config/*.yaml 에 있다
 # startup_grace_s=0.0: 기동 유예 없음(유예는 전용 테스트에서 본다)
+# drop_limit_margin_m=5 mm: 1차 5 mm · 2차 10 mm (계약 7.2, real.yaml · sim.yaml 과 같은 값)
 LIMITS = SafetyLimits(over_force_n=30.0, drop_limit_m=5 * MM, sample_stale_ms=200,
-                      robot_status_timeout_ms=500, confirm_n=1, startup_grace_s=0.0)
+                      robot_status_timeout_ms=500, confirm_n=1, startup_grace_s=0.0,
+                      drop_limit_margin_m=5 * MM)
+FIRST_STAGE_M = LIMITS.drop_limit_m                     # robot_manager 의 1차 제한
+SECOND_STAGE_M = LIMITS.effective_drop_limit_m          # safety_monitor 의 2차 제한
 Z0 = 0.080
 
 
@@ -62,11 +66,13 @@ def test_over_force_in_every_operation_without_tare():
 
 
 def test_confirm_n_requires_consecutive_samples():
-    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
+    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0,
+                        drop_limit_margin_m=5 * MM))
     assert w.on_sample(sample(fz=-40.0)) == [] and w.on_sample(sample(fz=-40.0)) == []
     assert [c.code for c in w.on_sample(sample(fz=-40.0))] == [OVER_FORCE]
     # 한 샘플만 튀면 확정되지 않는다
-    w2 = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
+    w2 = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0,
+                        drop_limit_margin_m=5 * MM))
     for fz in (-40.0, -40.0, -10.0, -40.0, -40.0):
         assert w2.on_sample(sample(fz=fz)) == []
 
@@ -80,10 +86,64 @@ def test_invalid_sample_is_not_judged():
 def test_drop_limit_measured_from_first_slide_sample():
     w = watch()
     w.on_sample(sample(z=Z0, operation=OP_SLIDE))                       # 기준 z
-    assert w.on_sample(sample(z=Z0 - 4.9 * MM, operation=OP_SLIDE)) == []
-    found = w.on_sample(sample(z=Z0 - 5.1 * MM, operation=OP_SLIDE))
+    assert w.on_sample(sample(z=Z0 - 9.9 * MM, operation=OP_SLIDE)) == []
+    found = w.on_sample(sample(z=Z0 - 10.1 * MM, operation=OP_SLIDE))
     assert [c.code for c in found] == [DROP_LIMIT]
-    assert '5.1 mm > 5.0 mm' in found[0].detail and 'SLIDE 첫 샘플' in found[0].detail
+    assert '10.1 mm > 10.0 mm' in found[0].detail and 'SLIDE 첫 샘플' in found[0].detail
+
+
+def test_second_stage_does_not_latch_between_the_two_limits():
+    """1차(5 mm)와 2차(10 mm) 사이는 2차가 걸지 않는다 (계약 7.2, 결정 2).
+
+    이 구간은 robot_manager 가 SLIDE 를 실패로 끝내는 구간이다. 여기서 2차가 같이 걸면
+    1차가 정상 동작했는데도 래치가 남아 다음 작업 시작이 막힌다(#53).
+    """
+    w = watch()
+    w.on_sample(sample(z=Z0, operation=OP_SLIDE))
+    for drop_mm in (5.0, 5.1, 6.0, 7.0, 8.0, 9.0, 9.9, 10.0):
+        assert w.on_sample(sample(z=Z0 - drop_mm * MM, operation=OP_SLIDE)) == [], drop_mm
+        assert DROP_LIMIT not in w.active, drop_mm
+
+
+def test_second_stage_catches_what_the_first_stage_did_not():
+    """1차가 막지 못하고 10 mm 를 넘으면 2차가 잡는다."""
+    w = watch()
+    w.on_sample(sample(z=Z0, operation=OP_SLIDE))
+    found = w.on_sample(sample(z=Z0 - 10.01 * MM, operation=OP_SLIDE))
+    assert [c.code for c in found] == [DROP_LIMIT]
+
+
+@pytest.mark.parametrize('drop_m, tripped', [
+    (FIRST_STAGE_M, False),            # 정확히 1차 한계: 1차도 2차도 걸지 않는다
+    (SECOND_STAGE_M, False),           # 정확히 2차 한계: 걸지 않는다 (경계는 초과다)
+    (SECOND_STAGE_M + 1e-6, True),     # 한 눈금만 넘으면 걸린다
+])
+def test_drop_limit_boundary_is_exceeded_not_reached(drop_m, tripped):
+    w = watch()
+    w.on_sample(sample(z=Z0, operation=OP_SLIDE))
+    found = w.on_sample(sample(z=Z0 - drop_m, operation=OP_SLIDE))
+    assert bool(found) is tripped
+
+
+def test_margin_survives_setconfig_overwriting_drop_limit():
+    """SetConfig(P03)가 두 노드의 drop_limit_m 을 같은 값으로 덮어도 여유는 남는다.
+
+    drop_limit_margin_m 은 계약 이름이 아니고 ScanConfig 에도 없어 전파 대상이 아니다.
+    """
+    w = watch()
+    w.on_sample(sample(z=Z0, operation=OP_SLIDE))
+    # scan_manager 가 두 노드에 drop_limit_m = 3 mm 를 보냈다고 하자
+    w.set_limits(SafetyLimits(30.0, 3 * MM, 200, 500, 1, 0.0, drop_limit_margin_m=5 * MM))
+    assert w.limits.effective_drop_limit_m == pytest.approx(8 * MM)
+    assert w.on_sample(sample(z=Z0 - 7.9 * MM, operation=OP_SLIDE)) == []
+    assert [c.code for c in w.on_sample(sample(z=Z0 - 8.1 * MM, operation=OP_SLIDE))] == [DROP_LIMIT]
+
+
+def test_margin_must_be_positive():
+    """0 을 허용하면 '여유를 뒀다'고 적힌 설정이 조용히 1차와 같아진다."""
+    for bad in (0.0, -1 * MM):
+        with pytest.raises(ValueError, match='drop_limit_margin_m'):
+            SafetyLimits(30.0, 5 * MM, 200, 500, 1, 0.0, drop_limit_margin_m=bad)
 
 
 def test_drop_limit_is_not_watched_outside_slide():
@@ -99,8 +159,8 @@ def test_reference_z_resets_between_slides():
     w.on_sample(sample(z=Z0 - 4.0 * MM, operation=OP_SLIDE))
     w.on_sample(sample(z=Z0 - 4.0 * MM, operation=1))                   # 방향 전환(OP_MOVE_TO)
     w.on_sample(sample(z=Z0 - 4.0 * MM, operation=OP_SLIDE))            # 새 기준 z
-    assert w.on_sample(sample(z=Z0 - 8.0 * MM, operation=OP_SLIDE)) == []
-    assert [c.code for c in w.on_sample(sample(z=Z0 - 9.2 * MM, operation=OP_SLIDE))] == [DROP_LIMIT]
+    assert w.on_sample(sample(z=Z0 - 13.0 * MM, operation=OP_SLIDE)) == []   # 새 기준에서 9 mm
+    assert [c.code for c in w.on_sample(sample(z=Z0 - 14.2 * MM, operation=OP_SLIDE))] == [DROP_LIMIT]
 
 
 def test_rising_z_is_not_a_drop():
@@ -112,14 +172,16 @@ def test_rising_z_is_not_a_drop():
 def test_both_conditions_in_one_sample():
     w = watch()
     w.on_sample(sample(z=Z0))
-    found = w.on_sample(sample(fz=-40.0, z=Z0 - 6 * MM))
+    found = w.on_sample(sample(fz=-40.0, z=Z0 - 11 * MM))
     assert [c.code for c in found] == [OVER_FORCE, DROP_LIMIT]
 
 
 def test_limits_reject_bad_values():
-    for args in ((0.0, 5 * MM, 200, 500, 1, 0.0), (30.0, 0.0, 200, 500, 1, 0.0),
-                 (30.0, 5 * MM, 0, 500, 1, 0.0), (30.0, 5 * MM, 200, 0, 1, 0.0),
-                 (30.0, 5 * MM, 200, 500, 0, 0.0), (30.0, 5 * MM, 200, 500, 1, -1.0)):
+    M = 4 * MM
+    for args in ((0.0, 5 * MM, 200, 500, 1, 0.0, M), (30.0, 0.0, 200, 500, 1, 0.0, M),
+                 (30.0, 5 * MM, 0, 500, 1, 0.0, M), (30.0, 5 * MM, 200, 0, 1, 0.0, M),
+                 (30.0, 5 * MM, 200, 500, 0, 0.0, M), (30.0, 5 * MM, 200, 500, 1, -1.0, M),
+                 (30.0, 5 * MM, 200, 500, 1, 0.0, 0.0)):
         with pytest.raises(ValueError):
             SafetyLimits(*args)
 
@@ -127,8 +189,9 @@ def test_limits_reject_bad_values():
 def test_set_limits_keeps_reference_z():
     w = watch()
     w.on_sample(sample(z=Z0, operation=OP_SLIDE))
-    w.set_limits(SafetyLimits(30.0, 3 * MM, 200, 500, 1, 0.0))               # SetConfig 로 더 엄하게
-    assert [c.code for c in w.on_sample(sample(z=Z0 - 3.5 * MM, operation=OP_SLIDE))] == [DROP_LIMIT]
+    w.set_limits(SafetyLimits(30.0, 3 * MM, 200, 500, 1, 0.0, 4 * MM))       # SetConfig 로 더 엄하게
+    # 2차의 실제 한계는 3 + 4 = 7 mm 다 (여유는 전파 대상이 아니라 그대로 남는다)
+    assert [c.code for c in w.on_sample(sample(z=Z0 - 7.5 * MM, operation=OP_SLIDE))] == [DROP_LIMIT]
 
 
 # ---------------------------------------------------------------- 최신성
@@ -149,9 +212,53 @@ def test_sample_and_status_timeouts():
     assert w.active == {}
 
 
+# real.yaml 의 값 (계약 v0.1.16 결정 3, #130). 여기서 고정해 두면 yaml 을 되돌릴 때 시험이 알려 준다
+REAL_SAMPLE_STALE_MS = 500
+
+
+def real_freshness_watch():
+    return watch(SafetyLimits(30.0, 5 * MM, REAL_SAMPLE_STALE_MS, 500, 1, 0.0,
+                              drop_limit_margin_m=5 * MM))
+
+
+@pytest.mark.parametrize('gap_ms, stale', [
+    (499, False),
+    (500, False),      # 경계는 **초과**다. 정확히 한계면 걸리지 않는다
+    (501, True),
+])
+def test_sample_stale_boundary_at_500ms(gap_ms, stale):
+    w = real_freshness_watch()
+    found = w.check_freshness(10.0, 10.0 - gap_ms / 1000, 10.0, uptime_s=99.0)
+    assert bool(found) is stale
+    assert (SAMPLE_STALE in w.active) is stale
+
+
+def test_recorded_gaps_at_500ms():
+    """#130 에 기록된 공백 14개 중 500 ms 에서 걸리는 것은 687 하나뿐이다.
+
+    300 ms 에서는 14개 전부 걸렸고, 그 때문에 goal 의 약 40 %가 SAMPLE_STALE 로 멈췄다.
+    687 이 남는다는 사실이 "500 도 완전하지 않다"는 근거다 — 그래도 700 으로 올리지는 않는다.
+    """
+    gaps_ms = [316, 338, 344, 347, 347, 349, 352, 353, 357, 358, 360, 365, 464, 687]
+    caught = []
+    for gap in gaps_ms:
+        w = real_freshness_watch()
+        if w.check_freshness(10.0, 10.0 - gap / 1000, 10.0, uptime_s=99.0):
+            caught.append(gap)
+    assert caught == [687]
+    # 옛 값 300 에서는 전부 걸렸다
+    old_caught = []
+    for gap in gaps_ms:
+        w = watch(SafetyLimits(30.0, 5 * MM, 300, 500, 1, 0.0, drop_limit_margin_m=5 * MM))
+        if w.check_freshness(10.0, 10.0 - gap / 1000, 10.0, uptime_s=99.0):
+            old_caught.append(gap)
+    assert old_caught == gaps_ms
+
+
 def test_startup_grace_skips_freshness_watch():
     """기동 직후에는 노드들이 순차로 준비되어 샘플 주기가 불안정하다. 그 공백으로 래치를 걸지 않는다."""
-    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, 1, startup_grace_s=3.0))
+    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, 1, startup_grace_s=3.0,
+                           drop_limit_margin_m=5 * MM))
     assert w.check_freshness(10.0, last_sample_s=9.0, last_status_s=9.0, uptime_s=1.0) == []
     assert w.active == {}
     # 유예가 지나면 감시한다
@@ -161,7 +268,8 @@ def test_startup_grace_skips_freshness_watch():
 
 def test_startup_grace_does_not_delay_force_or_drop():
     """과대 외력 · 하강 제한은 기동과 무관한 실제 위험이라 유예하지 않는다."""
-    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, 1, startup_grace_s=3.0))
+    w = watch(SafetyLimits(30.0, 5 * MM, 200, 500, 1, startup_grace_s=3.0,
+                           drop_limit_margin_m=5 * MM))
     assert [c.code for c in w.on_sample(sample(fz=-40.0))] == [OVER_FORCE]
 
 
@@ -289,26 +397,32 @@ def test_over_force_always_stops_even_when_not_moving():
 
 # ---------------------------------------------------------------- 이슈 #53
 
-def test_issue_53_second_watch_fires_on_the_same_sample_as_the_first():
-    """계약 7.2 대로 값과 기준 z 를 1차와 같게 두면, DROP_LIMIT 마다 2차 래치도 같이 걸린다.
+def test_issue_53_first_stage_window_is_free_of_the_second_latch():
+    """#53 결정(계약 7.2, v0.1.21): 2차는 여유만큼 뒤에 있어 1차의 동작 구간을 덮지 않는다.
 
-    confirm_n 으로 2차를 늦출 수 있다(값과 기준 z 는 그대로다). 이슈 #53 의 판단 자료다.
+    옛 규칙("값도 기준도 같게")에서는 DROP_LIMIT 마다 2차 래치가 같이 걸려, 1차가 정상 동작해
+    SLIDE 를 끝냈을 뿐인데 래치가 남아 다음 작업 시작이 막혔다. 여유가 그 구간을 비운다.
     """
-    same = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=1, startup_grace_s=0.0))
-    same.on_sample(sample(z=Z0))
-    assert [c.code for c in same.on_sample(sample(z=Z0 - 5.1 * MM))] == [DROP_LIMIT]
+    w = watch()
+    w.on_sample(sample(z=Z0))
+    # 1차가 멈추는 구간(5 mm 초과 ~ 10 mm). 2차는 조용하다
+    assert w.on_sample(sample(z=Z0 - 5.1 * MM)) == []
+    assert w.on_sample(sample(z=Z0 - 9.9 * MM)) == []
+    assert w.active == {}
+    # 1차가 제때 멈춰 하강이 멎으면 2차는 끝까지 걸리지 않는다
+    assert w.on_sample(sample(z=Z0 - 9.9 * MM)) == []
+    assert w.active == {}
 
-    delayed = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
-    delayed.on_sample(sample(z=Z0))
-    assert delayed.on_sample(sample(z=Z0 - 5.1 * MM)) == []             # 1차가 정지시킬 틈이 생긴다
-    assert delayed.on_sample(sample(z=Z0 - 5.2 * MM)) == []
-    assert [c.code for c in delayed.on_sample(sample(z=Z0 - 5.3 * MM))] == [DROP_LIMIT]
-    # 1차가 제때 멈춰 하강이 멎으면 2차는 걸리지 않는다
-    stopped = watch(SafetyLimits(30.0, 5 * MM, 200, 500, confirm_n=3, startup_grace_s=0.0))
-    stopped.on_sample(sample(z=Z0))
-    assert stopped.on_sample(sample(z=Z0 - 5.1 * MM)) == []
-    assert stopped.on_sample(sample(z=Z0 - 4.0 * MM)) == []
-    assert stopped.active == {}
+
+def test_issue_53_second_stage_still_latches_when_the_first_fails():
+    """여유를 둔다고 2차가 사라지는 것은 아니다. 1차가 막지 못하면 여전히 정지 + 래치다."""
+    state = SafetyState(LIMITS, StopTracker(0.6, 2.0))
+    state.moving = True
+    state.watch.on_sample(sample(z=Z0))
+    found = state.watch.on_sample(sample(z=Z0 - 10.5 * MM))
+    assert [c.code for c in found] == [DROP_LIMIT]
+    state.note(found[0])
+    assert state.latched and state.level() is Level.STOP
 
 
 def test_module_does_not_import_rclpy():

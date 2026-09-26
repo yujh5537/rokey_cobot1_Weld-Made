@@ -658,6 +658,13 @@ class MqttBridge(Node):
             "compliance_active": msg.compliance_active,
             "force_ctrl_active": msg.force_ctrl_active,
             "motion_id": msg.motion_id, "operation": msg.operation, "detail": msg.detail,
+            # SLIDE 누름 목표 (계약 3.2, v0.1.21). 셋은 서로 다른 값이라 합치지 않는다
+            "slide_mode": msg.slide_mode,
+            "slide_force_setpoint_n": msg.slide_force_setpoint_n,
+            "slide_force_baseline_n": msg.slide_force_baseline_n,
+            "slide_force_estimate_n": msg.slide_force_estimate_n,
+            "step_press_lo_n": msg.step_press_lo_n,
+            "step_press_hi_n": msg.step_press_hi_n,
         }
         self._publish("robot/status", encode_robot_status(data, now_ms()), 1, True)
 

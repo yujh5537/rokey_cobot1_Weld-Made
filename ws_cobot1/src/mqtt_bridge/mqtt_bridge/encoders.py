@@ -24,8 +24,11 @@ REASON_NAMES = {
     306: "TARE_TIMEOUT", 307: "NO_SAMPLE",
     400: "OVER_FORCE", 401: "OVER_SPEED", 402: "OUT_OF_WORKSPACE",
     403: "SAMPLE_STALE", 404: "ROBOT_STATUS_LOST", 405: "HB_EXPIRED",
-    406: "CONDITION_ACTIVE",
+    406: "CONDITION_ACTIVE", 407: "STOP_UNCONFIRMED",
     500: "INVALID_SHAPE", 501: "INSUFFICIENT_POINTS",
+    # 6xx 용접 (phase 2, 계약 v0.2.0 #184). 이름만 — WELD_PATH 동작 이름 · UNKNOWN_<n> 규칙은 의석의 브리지 표 PR
+    600: "SCAN_ACTIVE", 601: "WELD_ACTIVE", 602: "NO_SCAN_RESULT",
+    603: "LINE_OUT_OF_RANGE", 604: "PATH_REJECTED",
 }
 SCAN_PHASE_NAMES = {
     0: "IDLE", 1: "PREPARING", 2: "TOP_SEARCH", 3: "EDGE_SEARCH",
@@ -133,6 +136,15 @@ def encode_robot_status(status, published_at_ms):
         "force_ctrl_active": status["force_ctrl_active"],
         "motion_id": status["motion_id"],
         "operation": encode_robot_operation(status["operation"]),
+        # SLIDE 누름 목표 (계약 3.2, v0.1.21). 모르는 값은 NaN → null 이다. 0 으로 채우지 않는다.
+        # slide_force_estimate_n 은 **추정**이다(기준 + 설정). 실측 누름이 아니다 —
+        # 웹은 이 값을 "실측"이라고 표시하면 안 된다
+        "slide_mode": status["slide_mode"],
+        "slide_force_setpoint_n": non_finite_to_none(status["slide_force_setpoint_n"]),
+        "slide_force_baseline_n": non_finite_to_none(status["slide_force_baseline_n"]),
+        "slide_force_estimate_n": non_finite_to_none(status["slide_force_estimate_n"]),
+        "step_press_lo_n": non_finite_to_none(status["step_press_lo_n"]),
+        "step_press_hi_n": non_finite_to_none(status["step_press_hi_n"]),
         "detail": status["detail"],
         "published_at_ms": published_at_ms,
     }

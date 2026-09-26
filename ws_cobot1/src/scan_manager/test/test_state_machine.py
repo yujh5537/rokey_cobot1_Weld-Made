@@ -13,6 +13,8 @@ from scan_manager.state_machine import InvalidTransition
 from scan_manager.state_machine import REST_PHASES
 from scan_manager.state_machine import ScanStateMachine
 from scan_manager.state_machine import Signal
+from scan_manager.state_machine import failure_is_resumable
+from scan_manager.state_machine import RESUMABLE_FAILURE_CODES
 from scan_manager.state_machine import SIGNAL_TRANSITIONS
 
 # phase 별로 그 phase 에 도달하는 방법
@@ -116,6 +118,93 @@ def test_failure_goes_to_error_and_never_homes(phase):
     assert sm.phase is Phase.ERROR
 
 
+# ---- ERROR 재시작 허용 목록 (계약 5.3 · 9장, v0.1.21 결정 1) ----
+
+# 목록 밖의 사유. 물리적 위험 · 알 수 없는 오류 · 아직 목록에 없는 것
+NOT_RESUMABLE_CODES = (
+    Reason.OVER_FORCE, Reason.DROP_LIMIT, Reason.ROBOT_ERROR, Reason.OUT_OF_WORKSPACE,
+    Reason.NO_CONTACT, Reason.NO_EDGE, Reason.TIMEOUT, Reason.INVALID_SHAPE,
+    Reason.TARE_FAILED, Reason.HB_EXPIRED,
+)
+
+
+def test_allowlist_is_exactly_the_three_decided_codes():
+    """허용 목록에 사유를 더하는 것은 팀 결정이다. 코드만 늘어나면 이 시험이 막는다."""
+    assert RESUMABLE_FAILURE_CODES == {
+        int(Reason.SAMPLE_STALE), int(Reason.ROBOT_STATUS_LOST), int(Reason.STOP_UNCONFIRMED)}
+
+
+def test_unknown_codes_are_not_resumable_by_default():
+    """목록에 없는 새 사유는 저절로 허용되지 않는다(allowlist 이지 denylist 가 아니다)."""
+    from scan_manager.state_machine import Failure
+    assert not failure_is_resumable(None)
+    assert not failure_is_resumable(Failure(999, 'brand new code', Phase.EDGE_SEARCH))
+
+
+@pytest.mark.parametrize('code', sorted(RESUMABLE_FAILURE_CODES))
+def test_allowed_failure_keeps_the_resume_point_and_accepts_resume(code):
+    sm = at(Phase.EDGE_SEARCH)
+    progress = sm.snapshot().progress
+    sm.notify(Signal.FAILED, reason_code=code, detail='공백')
+    assert sm.phase is Phase.ERROR
+    # 자동 재개는 없다. 사람이 RESUME 을 보낸 뒤에야 움직인다
+    outcome = sm.request(Command.RESUME, conditions=READY)
+    assert outcome.accepted and outcome.state.phase is Phase.RESUMING
+    state = sm.notify(Signal.RESUME_READY)
+    assert state.phase is Phase.EDGE_SEARCH and state.progress == progress
+
+
+@pytest.mark.parametrize('code', NOT_RESUMABLE_CODES)
+def test_forbidden_failure_clears_the_resume_point_and_refuses_resume(code):
+    sm = at(Phase.EDGE_SEARCH)
+    sm.notify(Signal.FAILED, reason_code=code, detail='x')
+    outcome = sm.request(Command.RESUME, conditions=READY)
+    assert not outcome.accepted and outcome.reason is Reason.NOT_SUPPORTED
+    assert str(int(code)) in outcome.detail and 'START' in outcome.detail
+    assert sm.phase is Phase.ERROR
+    # 새 START 는 받는다 (안전 점검 뒤 사람이 다시 시작한다)
+    assert sm.request(Command.START, conditions=READY, scan_id='20260922-090000-0002').accepted
+
+
+def test_allowed_failure_outside_a_resumable_phase_has_no_resume_point():
+    """마무리 HOMING 중의 실패는 측정이 끝난 뒤다. 사유가 허용 목록이어도 재개 대상이 아니다."""
+    sm = at(Phase.HOMING)
+    sm.notify(Signal.FAILED, reason_code=Reason.SAMPLE_STALE)
+    outcome = sm.request(Command.RESUME, conditions=READY)
+    assert not outcome.accepted and outcome.reason is Reason.NO_RESUMABLE_SCAN
+
+
+def test_resume_from_error_still_passes_the_usual_gates():
+    """허용 목록이 래치 · 상태 최신성 관문을 우회하지 않는다 (계약 5.3)."""
+    from scan_manager.state_machine import Conditions
+    sm = at(Phase.EDGE_SEARCH)
+    sm.notify(Signal.FAILED, reason_code=Reason.SAMPLE_STALE)
+    latched = Conditions(**{**READY.__dict__, 'safety_latched': True})
+    assert sm.request(Command.RESUME, conditions=latched).reason is Reason.SAFETY_LATCHED
+    disconnected = Conditions(**{**READY.__dict__, 'robot_connected': False})
+    assert sm.request(Command.RESUME, conditions=disconnected).reason is Reason.ROBOT_DISCONNECTED
+    assert sm.request(Command.RESUME).reason is Reason.SAFETY_LATCHED   # 조건 미수신
+    assert sm.phase is Phase.ERROR                                      # 거절은 상태를 바꾸지 않는다
+
+
+def test_home_return_after_an_allowed_failure_blocks_resume():
+    """안전복귀를 하면 로봇이 실패 지점에 없다. 재접근 절차는 여전히 TBD 다 (계약 5.3)."""
+    sm = at(Phase.EDGE_SEARCH)
+    sm.notify(Signal.FAILED, reason_code=Reason.SAMPLE_STALE)
+    assert sm.request(Command.HOME, conditions=READY).accepted
+    sm.notify(Signal.HOMING_DONE)
+    assert sm.phase is Phase.ERROR                                      # 출발했던 휴지 phase 로
+    outcome = sm.request(Command.RESUME, conditions=READY)
+    assert not outcome.accepted and outcome.reason is Reason.NOT_SUPPORTED
+
+
+def test_start_clears_the_failure_and_the_resume_point():
+    sm = at(Phase.EDGE_SEARCH)
+    sm.notify(Signal.FAILED, reason_code=Reason.SAMPLE_STALE)
+    assert sm.request(Command.START, conditions=READY, scan_id='20260922-090000-0003').accepted
+    assert sm.failure is None
+
+
 def test_geometry_failure_keeps_scan_id_and_progress():
     sm = at(Phase.GEOMETRY)
     state = sm.notify(Signal.FAILED, reason_code=Reason.INVALID_SHAPE)
@@ -162,6 +251,12 @@ def test_command_follows_table(phase, command):
     new_id = '20260918-220000-0002' if command is Command.START else ''
     outcome = sm.request(command, conditions=READY, scan_id=new_id)
     targets = COMMAND_TRANSITIONS[command].get(phase)
+    # ERROR 에서의 RESUME 은 표를 지나도 실패 사유로 한 번 더 걸린다(계약 9장 허용 목록).
+    # REACH 가 만드는 ERROR 는 TARE_FAILED(303) 이라 목록 밖이다 — 거절이 맞다.
+    if command is Command.RESUME and phase is Phase.ERROR:
+        assert not outcome.accepted and outcome.reason is Reason.NOT_SUPPORTED
+        assert sm.snapshot() == before
+        return
     if targets is None:
         assert not outcome.accepted
         assert outcome.reason is not Reason.OK

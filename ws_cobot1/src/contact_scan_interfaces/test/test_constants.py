@@ -40,6 +40,7 @@ REASON_CODES_V0_1 = {
     'ROBOT_STATUS_LOST': 404,
     'HB_EXPIRED': 405,
     'CONDITION_ACTIVE': 406,
+    'STOP_UNCONFIRMED': 407,   # v0.1.21 추가 (계약 9장의 재시작 허용 목록)
     'INVALID_SHAPE': 500,
     'INSUFFICIENT_POINTS': 501,
     # 6xx 용접 (phase 2, v0.2.0)
@@ -58,9 +59,9 @@ def constants_of(cls, prefix=''):
     return {n: getattr(cls, n) for n in names if n.startswith(prefix)}
 
 
-def test_reason_code_has_38_constants_with_frozen_values():
+def test_reason_code_has_39_constants_with_frozen_values():
     actual = constants_of(ReasonCode)
-    assert len(REASON_CODES_V0_1) == 38
+    assert len(REASON_CODES_V0_1) == 39
     assert actual == REASON_CODES_V0_1
 
 

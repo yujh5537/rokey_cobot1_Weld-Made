@@ -26,6 +26,7 @@ from .result_store import Stamp
 from .result_store.records import CONFIG_FIELDS
 from .sequence import ResumePlan
 from .state_machine import Failure
+from .state_machine import failure_is_resumable
 from .state_machine import RESUMABLE_PHASES
 
 
@@ -60,6 +61,9 @@ class Resumption:
     stop_pose: Optional[PoseRecord]              # 중단 좌표의 원본. 모션 없이 다시 중지되면 그대로 이어 적는다
     started_at: Stamp
     last_motion_id: int
+    # ERROR 로 끝난 작업을 잇는가(계약 9장 허용 목록). 접수 사실을 남기는 곳이 다르다:
+    # 중지는 record_resume(마지막 중지에 시각), 실패는 record_failure_resume(실패 기록에 시각)
+    from_failure: bool = False
 
 
 def latest_record(store):
@@ -98,6 +102,29 @@ def resume_point_consumed(record) -> bool:
     return False
 
 
+def failure_resume_refusal(record) -> str:
+    """ERROR 로 끝난 기록을 이을 수 없는 이유. 이을 수 있으면 "".
+
+    허용 목록(계약 9장, state_machine.RESUMABLE_FAILURE_CODES)을 통과한 뒤에도 기록이 갖춰져야 한다.
+    - 실패한 단계가 재개할 수 있는 단계여야 한다(마무리 HOMING 중의 실패는 측정이 끝난 뒤다)
+    - 그 실패에서 이미 재시작했으면 다시 하지 않는다
+    - 안전복귀를 한 번이라도 접수했으면 로봇이 실패 지점에 없다. 재접근 절차는 TBD(계약 5.3)
+    """
+    failure = record.failure
+    if failure is None:
+        return f'{record.scan_id}: 오류로 끝났는데 사유 기록이 없다'
+    if not failure_is_resumable(failure):
+        return (f'{record.scan_id}: 오류 사유 {failure.reason_code} 는 재시작 허용 목록에 없다. '
+                '안전 점검 뒤 새 START 로 시작한다')
+    if failure.phase not in RESUMABLE_PHASES:
+        return f'{record.scan_id}: {failure.phase.name} 에서 난 실패는 재개할 단계가 아니다'
+    if failure.resumed_at is not None:
+        return f'{record.scan_id}: 그 실패에서 시작한 재시작이 이미 있다'
+    if record.home_return.requested:
+        return f'{record.scan_id}: 안전복귀 뒤의 재접근 절차는 TBD'
+    return ''
+
+
 def restoration_from(record) -> Tuple[Optional[Restoration], str]:
     """가장 최근 작업의 기록 → (되돌릴 값, 되돌리지 않는 이유).
 
@@ -111,17 +138,24 @@ def restoration_from(record) -> Tuple[Optional[Restoration], str]:
             '작업 도중에 프로세스가 끝났다. 로봇이 어디서 멈췄는지 모른다')
         return None, f'가장 최근 작업 {record.scan_id} 의 기록이 phase={phase.name} 이다({why})'
 
-    # 상태 기계의 규칙 그대로: FAILED · 마무리 HOMING 중의 중지 · RESUME_READY 는 재개 지점을 지운다
+    # 상태 기계의 규칙 그대로: 마무리 HOMING 중의 중지 · RESUME_READY 는 재개 지점을 지운다
     point = record.resume_point
     resumable = (
         phase is Phase.STOPPED and record.failure is None and point is not None
         and not point.during_final_homing and point.phase in RESUMABLE_PHASES
         and not resume_point_consumed(record))
     failure = record.failure
+    resume_phase = point.phase if resumable else None
+    moved_since_stop = record.home_return_since_resume_point
+    if phase is Phase.ERROR and not failure_resume_refusal(record):
+        # 허용 목록의 사유로 ERROR 가 된 작업이다. 재개 지점은 실패가 난 단계다(계약 9장, v0.1.21).
+        # 중지 기록이 아니라 실패 기록에서 만든다 — FAILED 는 Interruption 을 남기지 않는다.
+        resume_phase = failure.phase
+        moved_since_stop = False       # 위 판정이 안전복귀를 이미 걸러 냈다
     return Restoration(
         scan_id=record.scan_id, phase=phase, progress=record.state.progress,
-        resume_phase=point.phase if resumable else None,
-        moved_since_stop=record.home_return_since_resume_point,
+        resume_phase=resume_phase,
+        moved_since_stop=moved_since_stop,
         failure=None if failure is None else Failure(
             failure.reason_code, failure.detail, failure.phase),
         last_motion_id=record.last_motion_id), ''
@@ -142,20 +176,32 @@ def plan_resume(record, *, result_file_exists: bool, direction_order) -> Union[R
       (상태 기계가 progress 로 방향을 되찾는다).
     """
     scan_id = record.scan_id
-    if record.state.phase is not Phase.STOPPED:
-        return _refuse(f'{scan_id} 의 기록이 STOPPED 가 아니다(phase={record.state.phase.name})')
-    last, point = record.last_interruption, record.resume_point
-    if last is None or last.resumed_at is not None or point is None:
-        return _refuse(f'{scan_id}: 재시작하지 않은 중지 기록이 없다')
-    if resume_point_consumed(record):
-        return _refuse(f'{scan_id}: 그 중지에서 시작한 재시작이 이미 측정 단계로 돌아갔다')
-    # 아래 셋은 상태 기계가 먼저 거른다. 기록이 메모리와 어긋난 경우의 대비다
-    if record.failure is not None:
-        return _refuse(f'{scan_id}: 오류로 끝난 작업의 재시작 절차는 TBD', Reason.NOT_SUPPORTED)
-    if record.home_return_since_resume_point:
-        return _refuse(f'{scan_id}: 홈 안전복귀 뒤의 재접근 절차는 TBD', Reason.NOT_SUPPORTED)
-    if point.during_final_homing:
-        return _refuse(f'{scan_id}: 마무리 복귀 중에 중지된 작업이다. 측정은 끝났다(7.4절)')
+    phase = record.state.phase
+    from_failure = phase is Phase.ERROR
+    if phase not in (Phase.STOPPED, Phase.ERROR):
+        return _refuse(f'{scan_id} 의 기록이 STOPPED · ERROR 가 아니다(phase={phase.name})')
+    if from_failure:
+        # ERROR 로 끝난 작업(계약 9장 허용 목록, v0.1.21). 재개 지점 · 중단 좌표를 중지 기록이
+        # 아니라 실패 기록에서 만든다 — FAILED 는 Interruption 을 남기지 않는다
+        why = failure_resume_refusal(record)
+        if why:
+            return _refuse(why, Reason.NOT_SUPPORTED)
+        resume_phase, stop_pose = record.failure.phase, record.failure.pose
+    else:
+        last, point = record.last_interruption, record.resume_point
+        if last is None or last.resumed_at is not None or point is None:
+            return _refuse(f'{scan_id}: 재시작하지 않은 중지 기록이 없다')
+        if resume_point_consumed(record):
+            return _refuse(f'{scan_id}: 그 중지에서 시작한 재시작이 이미 측정 단계로 돌아갔다')
+        # 아래 셋은 상태 기계가 먼저 거른다. 기록이 메모리와 어긋난 경우의 대비다
+        if record.failure is not None:
+            return _refuse(
+                f'{scan_id}: 오류로 끝난 기록이 STOPPED 로 남아 있다', Reason.NOT_SUPPORTED)
+        if record.home_return_since_resume_point:
+            return _refuse(f'{scan_id}: 홈 안전복귀 뒤의 재접근 절차는 TBD', Reason.NOT_SUPPORTED)
+        if point.during_final_homing:
+            return _refuse(f'{scan_id}: 마무리 복귀 중에 중지된 작업이다. 측정은 끝났다(7.4절)')
+        resume_phase, stop_pose = point.phase, last.pose
 
     order = tuple(record.direction_order)
     if order != tuple(Direction(d) for d in direction_order):
@@ -178,8 +224,8 @@ def plan_resume(record, *, result_file_exists: bool, direction_order) -> Union[R
     poses = [record.edges[d].detection.pose for d in confirmed]
     if record.top.valid:
         poses.append(record.top.detection.pose)
-    if last.pose is not None:
-        poses.append(last.pose)
+    if stop_pose is not None:
+        poses.append(stop_pose)
     for pose in poses:
         if pose.frame_id != params.motion_frame_id:
             return _refuse(
@@ -196,12 +242,13 @@ def plan_resume(record, *, result_file_exists: bool, direction_order) -> Union[R
             tuple(detection.pose.position_m), detection.z_drop_m, params.slide_speed_mps)
     try:
         plan = ResumePlan(
-            phase=point.phase, progress=record.state.progress, confirmed=confirmed,
+            phase=resume_phase, progress=record.state.progress, confirmed=confirmed,
             first_contact_z=None if top is None else top.position_m[2],
-            position=None if last.pose is None else tuple(last.pose.position_m),
+            position=None if stop_pose is None else tuple(stop_pose.position_m),
             result_saved=record.result_saved or result_file_exists)
     except ValueError as error:
         return _refuse(f'{scan_id}: {error}')
     return Resumption(
-        plan=plan, params=params, config=config, top=top, edges=edges, stop_pose=last.pose,
-        started_at=record.started_at, last_motion_id=record.last_motion_id)
+        plan=plan, params=params, config=config, top=top, edges=edges, stop_pose=stop_pose,
+        started_at=record.started_at, last_motion_id=record.last_motion_id,
+        from_failure=from_failure)
