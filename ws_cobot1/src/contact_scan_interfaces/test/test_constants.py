@@ -43,6 +43,12 @@ REASON_CODES_V0_1 = {
     'STOP_UNCONFIRMED': 407,   # v0.1.21 추가 (계약 9장의 재시작 허용 목록)
     'INVALID_SHAPE': 500,
     'INSUFFICIENT_POINTS': 501,
+    # 6xx 용접 (phase 2, v0.2.0)
+    'SCAN_ACTIVE': 600,
+    'WELD_ACTIVE': 601,
+    'NO_SCAN_RESULT': 602,
+    'LINE_OUT_OF_RANGE': 603,
+    'PATH_REJECTED': 604,
 }
 
 
@@ -53,9 +59,9 @@ def constants_of(cls, prefix=''):
     return {n: getattr(cls, n) for n in names if n.startswith(prefix)}
 
 
-def test_reason_code_has_34_constants_with_frozen_values():
+def test_reason_code_has_39_constants_with_frozen_values():
     actual = constants_of(ReasonCode)
-    assert len(REASON_CODES_V0_1) == 34
+    assert len(REASON_CODES_V0_1) == 39
     assert actual == REASON_CODES_V0_1
 
 
@@ -65,7 +71,8 @@ def test_reason_code_values_are_unique():
 
 
 def test_op_constants_match_between_sample_and_execute_motion():
-    expected = {'OP_NONE': 0, 'OP_MOVE_TO': 1, 'OP_DESCEND': 2, 'OP_SLIDE': 3, 'OP_HOME': 4}
+    expected = {'OP_NONE': 0, 'OP_MOVE_TO': 1, 'OP_DESCEND': 2, 'OP_SLIDE': 3, 'OP_HOME': 4,
+                'OP_WELD_PATH': 5}   # 5 는 phase 2 (v0.2.0). ExecuteMotion goal 에는 쓰지 않는다
     assert constants_of(RobotSample, 'OP_') == expected
     assert constants_of(ExecuteMotion.Goal, 'OP_') == expected
 

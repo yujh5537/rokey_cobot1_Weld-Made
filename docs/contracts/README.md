@@ -9,6 +9,8 @@
 | `units-frames.md` | 단위, 좌표계, TCP, 홈, 작업대 원점, z=0 | 학민 |
 | `CHANGELOG.md` | 계약 변경 이력 | 바꾼 사람 |
 
+> **phase 2(용접, 2026-09-23~)** 의 계약은 `docs/phase2/` 에 있다(`weld-ros-interfaces.md` · `weld-mqtt-schema.md` · `weld-motion.md`). 1차 위에 더하는 방식이며 타입 파일은 같은 `contact_scan_interfaces` 에 둔다(CHANGELOG v0.2.0).
+
 ## T01 동결 회의(9/18) 결과 — v0.1
 정의서 통합본 v1.1(팀 합의)을 계약 v0.1로 채택하고, 1차(병후·의석) · 2차(전원) 회의 결정을 덧붙였다. 정의서와 달라진 곳은 `CHANGELOG.md`에 있다.
 
