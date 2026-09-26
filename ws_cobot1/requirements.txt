@@ -3,7 +3,8 @@
 # 여기에 없는 것:
 #   - ROS 2 패키지(rclpy · launch · *_msgs · ament_index_python …): apt 로 ROS 2 Jazzy 를 설치하면 들어온다.
 #     나머지 시스템 의존은 `rosdep install --from-paths ws_cobot1/src -y --ignore-src` 로 package.xml 에서 설치한다.
-#   - 두산 드라이버(dsr_msgs2 · DSR_ROBOT2)와 RG2 메시지(onrobot_rg_msgs): 레포 밖 ws_dsr 를 빌드해 `sod` 로 source 한다.
+#   - 두산 드라이버(dsr_msgs2 · DSR_ROBOT2)와 RG2 메시지(onrobot_rg_msgs, docs/env/check_api_calls.py 가 쓴다):
+#     레포 밖 ws_dsr 를 빌드해 `sod` 로 source 한다.
 #
 # 설치: ROS 와 같은 python3 로 `python3 -m pip install -r ws_cobot1/requirements.txt`
 # 확인한 버전: 2026-09-24 현지 PC(Python 3.12.3). 아래 하한은 이 PC 에서 시험이 통과한 값이다.
@@ -19,5 +20,7 @@ PyYAML>=6.0          # contact_scan_bringup/test/test_config.py 가 sim.yaml · 
 # mqtt.Client(client_id=…, clean_session=True) 로 콜백 API 버전을 주지 않는 1.x 방식이라 2.x 에서는 기동하지 않는다.
 paho-mqtt>=1.6,<2.0
 
-# --- 학민: docs/env 스크립트(pivot_tcp.py · tcp_xy_from_180.py, runbook 의 TCP 등록 절차)
-numpy>=1.26          # 확인 1.26.4
+# --- 학민: docs/env 스크립트(pivot_tcp.py · tcp_xy_from_180.py, runbook 의 TCP 등록 절차). 확인 학민 2026-09-24(#190):
+#     docs/env/*.py 여섯 개 중 제3자 의존은 numpy 뿐. tcp_xy_from_180.py 는 pivot_tcp.py 를 형제 모듈로 import 하므로
+#     두 파일을 같은 디렉터리(docs/env/)에 두고 거기서 실행한다(루트 README 실행 순서에도 한 줄, 의석).
+numpy>=1.26          # 확인 1.26.4(현지 · 학민 PC)

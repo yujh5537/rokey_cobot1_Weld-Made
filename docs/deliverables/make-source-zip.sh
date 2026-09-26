@@ -12,6 +12,8 @@
 # - zip 안의 최상위 폴더는 ASCII(weld-made/)다. **경로에 한글이 있으면 contact_scan_interfaces 빌드가 실패한다**
 #   (rosidl_generate_interfaces 의 CMake list 오류, 2026-09-24 확인). 파일 이름만 제출 양식(한글)을 따른다.
 #   받는 쪽 안내: 한글이 없는 경로에서 `unzip <파일>.zip` → weld-made/ws_cobot1 에서 colcon build
+# - docs/env/tcp_xy_from_180.py 는 pivot_tcp.py 를 형제 모듈로 import 한다(학민 #190). zip 안에서도 둘이 docs/env/ 에
+#   같이 들어가며, 실행은 그 디렉터리에서 한다(README 실행 순서에 한 줄).
 # - 만든 뒤 임시 디렉터리에 풀어 제외 목록 검사와 파일 수를 출력한다. colcon build 확인은 --build 를 세 번째 인자로 준다
 #   (ws_dsr 를 먼저 source 해야 한다: `sod`).
 set -euo pipefail

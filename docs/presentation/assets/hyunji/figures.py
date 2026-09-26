@@ -4,7 +4,7 @@
 
 출처
 - 검출 하중: docs/test-reports/TR-01_20260923.md(PR #181) 2 절 — 2026-09-23 학민 실기, 하강 2 mm/s, 큐브 윗면 1 점
-- 탐색 시간: docs/phase1/detection-safety-geometry.md 4 장 — scan 20260923-183211-3702, #180
+- 탐색 시간: #180 학민 코멘트(2026-09-23, 성공 회차 scan 20260923-183211-3702) 구간 실측 · 절감 추정(계산값 · 미실시)
 - 기동 래치: PR #99 본문 — 2026-09-21 아침 Virtual + sim 재현
 """
 import pathlib
@@ -17,6 +17,7 @@ from matplotlib import font_manager  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 BLUE, RED, GRAY, ORANGE = '#3378C8', '#C0392B', '#7F7F7F', '#E08E0B'
+DARK_TXT = '#262626'
 for f in font_manager.findSystemFonts():
     if 'NanumGothic.ttf' in f:
         font_manager.fontManager.addfont(f)
@@ -53,22 +54,32 @@ def detect_load():
 
 
 def scan_time():
-    parts = [('스텝 긁기 (모서리 4 방향)', 331, BLUE), ('재접근 내림', 100, '#8FB3E0'), ('나머지 (계산값)', 7, GRAY)]
-    fig, ax = plt.subplots(figsize=(12, 2.6))
-    left = 0
-    for name, sec, color in parts:
-        ax.barh(0, sec, left=left, color=color, height=0.5)
-        if sec > 40:
-            ax.text(left + sec / 2, 0, f'{name}\n{sec} s', ha='center', va='center', color='white', fontsize=12)
-        left += sec
-    ax.text(left + 4, 0, '← 나머지 7 s', va='center', fontsize=11, color=GRAY)
+    """위: 실측 438 s(#180 학민 정정, 구간 합 441.7 s — 구간 경계 반올림). 아래: 개선안 적용 시 계산값(미실시).
+    재접근 2 단(45 mm 빠름 + 5 mm 저속): 방향당 25 → 4 s, 3 회라 −60 s(#180 본문의 −84 는 4 회 기준).
+    거친 스텝 0.5 → 1.0 mm: 84 → 42 스텝, 약 −150 s(분해능은 다듬기 0.1 mm 가 정하므로 정확도 영향 없음)."""
+    light = '#8FB3E0'
+    measured = [('기준점 · tare\n· 첫 하강', 18.7, GRAY), ('스텝 긁기 4 방향', 331.1, BLUE),
+                ('재접근 내림 3 회', 75.9, light), ('올림 ·\n수평', 16.0, GRAY)]
+    improved = [('', 18.7, GRAY), ('스텝 긁기 (거친 스텝 1.0 mm)', 331.1 - 150.0, BLUE),
+                ('재접근 2 단', 75.9 - 60.0, light), ('', 16.0, GRAY)]
+    fig, ax = plt.subplots(figsize=(12, 3.2))
+    for y, parts, label in ((1, measured, '실측 438 s'), (0, improved, '개선안 약 230 s\n(계산값 · 미실시)')):
+        left = 0
+        for name, sec, color in parts:
+            ax.barh(y, sec, left=left, color=color, height=0.55)
+            if name and sec > 30:
+                ax.text(left + sec / 2, y, f'{name}\n{sec:.0f} s', ha='center', va='center', color='white', fontsize=11)
+            left += sec
+        ax.text(left + 5, y, label, va='center', fontsize=12, color=DARK_TXT)
+    ax.text(18.7 / 2, 1.42, '기준점 · tare · 첫 하강 19 s', ha='left', fontsize=9.5, color=GRAY)
+    ax.text(441.7 - 8, 0.62, '올림 · 수평 16 s', ha='right', fontsize=9.5, color=GRAY)
     ax.axvline(120, color=RED, ls='--', lw=2)
-    ax.text(124, -0.36, 'KPI 120 s', color=RED, fontsize=12, va='center')
+    ax.text(124, 1.48, 'KPI 120 s (연속 밀기 전제)', color=RED, fontsize=12, va='center')
     ax.set_xlim(0, 500)
-    ax.set_ylim(-0.45, 0.35)
+    ax.set_ylim(-0.5, 1.6)
     ax.set_yticks([])
     ax.set_xlabel('시작 버튼 → 형상 생성 종료 [s]')
-    ax.set_title('전체 탐색 시간 438 s — 2026-09-23 실기 통합 스캔 20260923-183211-3702 (스텝 모드)', fontsize=13)
+    ax.set_title('전체 탐색 시간 — 2026-09-23 실기 통합 스캔 20260923-183211-3702 (스텝 모드) vs 개선안', fontsize=13)
     ax.spines[['top', 'right', 'left']].set_visible(False)
     fig.tight_layout()
     fig.savefig(HERE / 'kpi-scan-time.png', dpi=160)
