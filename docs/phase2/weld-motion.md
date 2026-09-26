@@ -77,8 +77,8 @@ weave_amplitude_m == 0 또는 weave_pitch_m == 0 → [S + o, E' + o] 두 점 (�
 ## 5. 접근 · 후퇴 · 선 사이 이동
 
 ```
-P_app(i) = p_0(i) + approach_m · (−d_i)        # 첫 경유점에서 툴 축 뒤로 물러난 점
-P_ret(i) = p_N(i) + approach_m · (−d_i)
+P_app(i) = p_0(i) + approach_m · o_i            # 첫 경유점에서 물러난 점. o_i = −d_i (툴 축 뒤, 기본) 또는 +ẑ (수직 위, D34)
+P_ret(i) = p_N(i) + approach_m · o_i
 z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 이동 높이
 ```
 
@@ -94,7 +94,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 - 첫 선 앞: 홈에서 접근 1 로 바로 간다(자세가 홈 → q_0 으로 보간된다. 이동 중 자세 변화는 z_safe 위에서만 일어난다). **시작 때 팁이 z_safe 아래면**(`/robot/sample` 로 확인. 앞 작업이 중간에 멈춘 자리 등) 거절하지 않고 **먼저 툴 축 뒤(−d)로 `approach_m` 물러난 뒤(`approach_speed_mps`), 같은 x · y · 현재 자세로 z_safe 까지 수직 상승**(`OP_MOVE_TO`, `travel_speed_mps`)한 뒤 접근 1 로 간다(D30, 9/26 갱신: 아래 D33 복구 · 7.2 안전복귀와 같은 순서). 기울인 자세로 부재 옆에 서 있던 상황이 같기 때문이다. 관제자는 시작 전 화면의 팁 위치를 본다.
 - 선 사이: 후퇴(i) → 접근 1(i+1). 두 점 모두 z_safe 위라 부재를 가로질러도 된다. **자세 변화(회전)를 포함해 선 사이의 모든 직선 이동은 z_safe 높이의 두 점 사이에서만 일어난다** — "목표 위 30 mm" 같은 중간 높이에서 다음 자세로 바로 직선 이동하지 않는다(9/23 M1 점검 스크립트가 세로 모서리 자세에서 그렇게 움직여 큐브 옆구리를 통과 · 충돌, 학민 #184 리뷰 ②. D30 의 "수직 상승" 은 시작 때만이고, 선 사이는 이 표의 후퇴 · 접근 1 이 덮는다).
 - 마지막 선 뒤: 후퇴 → `OP_HOME`(마무리 복귀, DONE 에 포함).
-- **선 실패 뒤 복구(D33)**: 그 선의 goal 이 `ROBOT_ERROR(204)` 로 끝나면 `/robot/sample` 로 팁 위치를 본다. **z_safe 위**(도달 불가라 출발조차 안 한 경우 — 이전 선의 후퇴점에 서 있다)면 그 선을 FAILED 로 기록하고 바로 다음 선의 접근 1(`continue_on_line_failure`). **z_safe 아래**(부재 옆에서 원인 모를 정지 — 접촉일 수 있다)면 7.2 안전복귀와 같은 순서로 복구만 한다 — 툴 축 뒤(−d)로 `approach_m` 물러난 뒤(`approach_speed_mps`) 같은 x · y 로 z_safe 까지 수직 상승(`OP_MOVE_TO`, `travel_speed_mps`) — 그리고 **ERROR 로 끝낸다**(9/26 좁힘: 이유를 모르는 204 에 다음 선으로 가지 않는다. 뒤 선은 NOT_ATTEMPTED). 팁 위치를 모르면(sample 없음) 복구를 시도하지 않고 ERROR. 복구 이동 자체가 204 면 ERROR.
+- **선 실패 뒤 복구(D33)**: 그 선의 goal 이 `ROBOT_ERROR(204)` 로 끝나면 `/robot/sample` 로 팁 위치를 본다. **z_safe 위**(도달 불가라 출발조차 안 한 경우 — 이전 선의 후퇴점에 서 있다)면 그 선을 FAILED 로 기록하고 — 판정은 **`z ≥ z_safe − path_tolerance_m`** 이다(후퇴점 도착이 `path_tolerance_m` 으로 판정되므로 샘플 z 가 z_safe 를 그만큼 밑돌 수 있다. 별도 상수 없이 D18 ±3 mm 하나로 모은다. D30 의 "이미 z_safe 위" 판정도 같은 식. 학민 · 현지 9/26) — 바로 다음 선의 접근 1(`continue_on_line_failure`). **z_safe 아래**(부재 옆에서 원인 모를 정지 — 접촉일 수 있다)면 7.2 안전복귀와 같은 순서로 복구만 한다 — 툴 축 뒤(−d)로 `approach_m` 물러난 뒤(`approach_speed_mps`) 같은 x · y 로 z_safe 까지 수직 상승(`OP_MOVE_TO`, `travel_speed_mps`) — 그리고 **ERROR 로 끝낸다**(9/26 좁힘: 이유를 모르는 204 에 다음 선으로 가지 않는다. 뒤 선은 NOT_ATTEMPTED). 팁 위치를 모르면(sample 없음) 복구를 시도하지 않고 ERROR. 복구 이동 자체가 204 면 ERROR.
 - 세로선의 P_ret 는 바닥 근처(받침대 + `bottom_margin_m` + approach 의 수직 성분)다. 거기서 z_safe 로 곧장 올라가는 경로는 모서리에서 대각선 바깥으로 `(standoff_m + approach_m)·sin θ` 떨어져 있다(3 + 30 mm, 45° 면 약 23 mm).
 - **작업영역 검사**(weld_manager): 모든 목표 z ≥ `support_z + bottom_margin_m` (작업대 좌표), x · y 는 부재에서 `workspace_margin_m` 안. 벗어나면 `PATH_REJECTED(604)` 로 시작을 거절한다. safety_monitor 는 작업영역을 보지 않는다(`OUT_OF_WORKSPACE` 미구현). robot_manager 는 Base z 하한(`path_min_z_m`) 하나를 수락 시점에 더 본다(두 겹, `weld-ros-interfaces.md` 5.2).
 - **툴 외형 검사**(weld_manager, D23, 현지 리뷰 2): 윗면선(L0~L3)은 툴의 모든 점이 이등분 축 뒤쪽이라 부재와 겹칠 수 없다(roll · 핑거 폭 무관). **세로선(L4~L7)은 부재가 팁 위로도 z_top 까지 있어** 탐침 몸통 · 홀더 · RG2 핑거가 옆면이나 작업대에 닿을 수 있다. 툴 외형을 파라미터 **`tool_profile_u_m` · `tool_profile_r_m`**(같은 길이의 두 배열. u = 팁에서 축 방향 뒤 거리, R = 그 자리에서 축에서 가장 멀리 뻗은 반폭. ROS 2 파라미터는 중첩 배열이 안 돼 두 배열로 둔다. 값은 M2 캘리퍼 실측, 현지 확정)로 받아 세로선마다 검사한다:
@@ -118,6 +118,7 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `tool_profile_u_m` · `tool_profile_r_m` | (M2 실측) | 툴 외형: 팁 뒤 거리 u 와 그 자리의 최대 반폭 R, 같은 길이 두 배열 (5절 외형 검사) | |
 | `weld_speed_min_mps` | 0.002 | 용접 · 접근 속도 하한. robot_manager 의 이동 판정(0.3 s · 0.2 mm ≈ 0.67 mm/s)보다 커야 한다(#152 거짓 도착) | |
 | `approach_m` | 0.030 | 접근 · 후퇴 거리 | |
+| `top_line_offset_dir` | `tool` | 윗면선(L0~L3)의 접근 · 후퇴 오프셋 방향(D34). `tool` = 툴 축 뒤(−d), `vertical` = 수직 위(+ẑ). 세로선(L4~L7)은 항상 `tool`. 9/29 첫 2 자세 시험(L0 후퇴점 · L6 접근 1, movel)이 실패하면 `vertical` 로 바꾼다 — M1 이 실제로 도달한 자세(목표 위 수직, 플랜지 712 mm)가 그것이다(학민 9/26) | 코드 변경 없이 yaml 로 전환 |
 | `travel_clearance_m` | 0.050 | z_safe = z_top + 이 값 | |
 | `bottom_margin_m` | 0.005 | 세로선 끝 = support_z + 이 값 | |
 | `workspace_margin_m` | 0.100 | 부재 밖 허용 범위 (x · y) | |
