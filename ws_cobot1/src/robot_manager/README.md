@@ -8,6 +8,7 @@
 | T15 | `/robot/sample` · `/robot/status` 발행 |
 | T13 (이 PR) | `/robot/execute_motion` Action (DESCEND · SLIDE · MOVE_TO · HOME) |
 | T14 | `/robot/stop`(move_stop 서비스 서버), 예외 주입 테스트 |
+| phase 2 P1 (현지) | `/robot/execute_path` Action — 용접 경유점 경로 (line · spline). 아래 "ExecutePath" |
 
 ## 구조
 | 파일 | 하는 일 | ROS · 두산 의존 |
@@ -17,6 +18,8 @@
 | `motion_state.py` | 위치 변화로 이동 여부 판정 | 없음 |
 | `call_queue.py` | 두산 호출을 한 줄로 줄 세우기 | 없음 |
 | `dsr_client.py` | `dsr_controller2` 서비스 클라이언트 | `dsr_msgs2` |
+| `paths.py` | ExecutePath 검사(604 사유) · 경로 길이 · 진행 · posx 목록 | 없음 |
+| `path_executor.py` | ExecutePath 실행(line · spline) 과 감시 | rclpy 타입, `dsr_msgs2` |
 | `robot_manager.py` | 노드. 조회 → 발행 | rclpy, `dsr_msgs2` |
 
 `dsr_msgs2`는 `ws_dsr`에만 있고 CI에는 없다. 그래서 `package.xml`에 의존으로 넣지 않고 노드에서만
@@ -67,6 +70,42 @@ ros2 topic echo /robot/sample contact_scan_interfaces/msg/RobotSample --qos-reli
   (실패 경로는 계약에서 TBD다. 성공한 것으로 적지 않는다).
 - `OP_HOME` 의 목적지는 관절각(`home_joint_deg`)이다. 계약 5.4 는 `home_pose` 라고 적었지만, T03 이 홈을
   관절각으로 확정했고 `OP_HOME` 은 movej 로 간다(`units-frames.md`). 계약 이름이 아닌 파라미터라 바꿔도 된다.
+
+## ExecutePath (phase 2 P1)
+계약 `docs/phase2/weld-ros-interfaces.md` 5.2 · 6장, 결정 D31. weld_manager 가 보낸 경유점(위빙 지그재그 포함)을 차례로 지난다.
+접촉 판정 · 힘 제어는 없다. 실행 중 `/robot/sample.operation = OP_WELD_PATH(5)`, `motion_id = goal.motion_id`.
+
+| `path_mode` | 어떻게 | 확인 수준 |
+|---|---|---|
+| `line` (기본) | 점마다 `move_line` ABS ASYNC(amovel) → 멈춤 · 도착 확인 → 다음 점. **점마다 선다**(D8 허용) | amovel 은 1차에서 실기 확인. 경로로는 Virtual 확인(2026-09-24): 21 점 18.2 s, 점 통과 0.0 mm, 점마다 약 0.5 s 멈춤 |
+| `spline` | 첫 점까지 amovel 직선(계약 "첫 점까지도 직선") → 나머지를 `move_spline_task` ASYNC(amovesx, opt=CONST) 한 번 | **Virtual 호출 확인(2026-09-24): 쓰지 않는다.** ASYNC 인데 응답이 점당 약 25~32 ms 늦고(21 점 0.5~0.67 s, 100 점 2.4~3.2 s) 그동안 샘플이 끊겨 SAMPLE_STALE 에 걸린다(`docs/env/api-check-log.md`) |
+
+- **goal 자리를 ExecuteMotion 과 같이 쓴다.** 어느 한쪽이 실행 중이면 다른 쪽도 BUSY 로 거절. 미연결 · 처리 안 된 정지 요청 ·
+  순응 · 힘 제어가 켜진 상태(안전망) · `path_*` 파라미터가 없거나 못 쓰는 값도 거절(`GoalResponse.REJECT`)
+- **경로 자체의 문제는 수락한 뒤** 움직이지 않고 `REASON_REJECTED` + `PATH_REJECTED(604)` 로 끝낸다(ROS 2 거절에는 사유를 실을 수 없다):
+  빈 목록 · `path_max_points` 초과 · 속도 ≤ 0 또는 `> path_max_speed_mps` · 프레임이 `frame_id` 가 아님 · 값이 숫자가 아님 ·
+  `path_tolerance_m ≤ 0` · **경유점 하나라도 `z < path_min_z_m`**(수락 시점에 전부 본다)
+- **이동 명령이 실패하거나 응답이 늦으면 세우고 확인한 뒤** 204 로 끝낸다. 컨트롤러는 늦게 받아 움직이고 있을 수 있다(Virtual 에서 spline 100 점이 "실패" 뒤 실행된 것을 확인)
+- 구간마다 1차 `watch` 와 같은 규칙으로 본다: 위치로 확인된 이동(`moved_min_m`)만 "움직였다", 명령 뒤 `arrival_grace_s` 안에
+  출발하지 않으면 `move_stop` 뒤 다시 보낸다(`move_restart_max`, #153), **멈췄는데 목표에서 `path_tolerance_m` 밖이면 `ROBOT_ERROR(204)`**
+  (중간 점도 같은 허용치). 취소 · `/robot/stop` · 과대 외력 · 시간 초과는 `stop_robot` 으로 멈춤까지 확인한다
+- 접촉 이벤트(CONTACT · EDGE)로는 멈추지 않는다. `on_event` 가 `goal.operation` 을 읽으므로 goal 자리에는
+  `operation = OP_WELD_PATH` 를 가진 어댑터(`PathGoal`)를 넣는다(기존 `on_event` 무수정)
+- Result `waypoints_done` 은 line 이면 센 값, spline 이면 위치로 추정한 값(계약 허용). `distance_travelled` 는 출발점부터 경로를 따라 잰 거리
+- **드라이버 주의**(소스 확인 2026-09-24, `dsr_controller2.cpp` 458~583행): ASYNC `move_line` 은 `radius` 를 버린다(블렌딩 없음).
+  `move_spline_task` 는 요청을 검사하지 않는다 — 100 점 고정 배열, `pos.at(i)` 를 `pos_cnt` 번, 점마다 `data[0..5]`.
+  `dsr_client.move_spline_request` 가 세 가지를 모두 막는다
+
+| 파라미터 (계약 이름, 기본값 없음) | sim / real | 설명 |
+|---|---|---|
+| `path_mode` | `line` / `line` | `line` \| `spline` |
+| `path_max_points` | 100 / 100 | spline 이면 100 을 넘을 수 없다(드라이버 배열) |
+| `path_max_speed_mps` | 0.100 / 0.100 | 경로 속도 상한 [m/s] |
+| `path_min_z_m` | 0.403 / 0.100 | Base z 하한 [m]. sim 박스 밑면 + 3 mm / 작업대 표면 0.095 + 테이프 2 mm + 여유 3 mm(계약 출발값) |
+| `path_acc_ratio` | 4.0 / 4.0 | 가속 = 이 값 × 속도 [1/s] |
+
+시험: `test_paths.py`(순수) · `test_dsr_path_requests.py`(요청 메시지) · `test_node_path.py`(가짜 팔로 노드 전체: 거절 · 604 · line 완주 ·
+operation 5 · 정지 · 과대 외력 · 접촉 이벤트 무시 · 취소 · 시간 초과 · 재출발 · 도중 정지 · spline).
 
 ## 파라미터
 | 이름 | 기본값 | 설명 |

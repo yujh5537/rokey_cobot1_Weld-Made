@@ -153,6 +153,16 @@ robot_manager:
                                      #   힘 제어를 켤 때 z 0.3~0.5 mm 움직임을 출발로 보지 않는다(9/22 실기 1083)
     slide_mode: force                # sim 은 힘 제어 밀기를 유지한다. Virtual 의 외력은 0 근처라 스텝 모드(멈춰서 힘 읽기)를
                                      #   돌릴 수 없다. 스텝 모드는 순수 모듈 시험(test_step_slide.py)과 실기로 검증한다 (real.yaml)
+    # --- ExecutePath (phase 2, docs/phase2/weld-ros-interfaces.md 5.2 · 6장, D31) ---------------------
+    # 없거나 못 쓰는 값이면 robot_manager 는 기동하고 ExecutePath 만 거절한다(코드에 기본값 없음)
+    path_mode: line                  # line = 점마다 amovel 뒤 멈춤 확인(1차에서 실기 확인된 API만). 점마다 선다(D8 허용).
+                                     #   spline = 첫 점까지 amovel 직선 뒤 나머지를 amovesx 한 번. 쓰지 않는다: Virtual(9/24)에서
+                                     #   amovesx 응답이 점당 약 30 ms 늦어(21 점 0.5~0.67 s) 그동안 샘플이 끊긴다 → SAMPLE_STALE
+    path_max_points: 100             # 경유점 상한. spline 은 드라이버 고정 배열 100 을 넘을 수 없다(컨트롤러가 개수를 검사하지 않는다)
+    path_max_speed_mps: 0.100        # 경로 속도 상한 [m/s]. 계약 출발값. weld_manager 는 상한을 보지 않는다(D29)
+    path_min_z_m: 0.403              # Base z 하한 [m]. 경유점이 잘못 와도 작업대에 박히지 않게 하는 마지막 울타리.
+                                     #   sim 박스 밑면(지지면) z 0.400 + 여유 3 mm. weld_manager 의 세로선 끝은 지지면 + 5 mm
+    path_acc_ratio: 4.0              # 가속 = 이 값 × 속도 [1/s]. 1차 move_line 의 4 배 규칙과 같다
 
 scan_manager:
   ros__parameters:
