@@ -199,15 +199,22 @@ def test_middle_range_skips_both_sides(scan):
 LOW = Pose((0.46, -0.21, 0.43), Q_TILT)      # 부재 옆 낮은 자리, 기울인 자세 (sim 픽스처 z_safe ≈ 0.4899)
 
 
-def test_start_below_z_safe_lifts_straight_up_first(scan):
+def test_start_below_z_safe_backs_off_then_lifts_first(scan):
+    # D30(9/26): 툴 축 뒤(−d)로 approach_m 물러남(approach_speed) → 같은 x · y 로 z_safe 수직 상승(travel_speed) → 접근 1
     outcome, ports, plan = run(scan, start_pose=LOW)
-    assert outcome.kind is OutcomeKind.DONE and len(ports.calls) == 35
-    lift = ports.calls[0][1]
-    assert lift.label == '시작 상승' and lift.kind is MotionKind.MOVE_TO
-    assert lift.target[:2] == LOW.position[:2] and math.isclose(lift.target[2], plan.z_safe_base)
+    assert outcome.kind is OutcomeKind.DONE and len(ports.calls) == 36
+    p = params()
+    back, lift = ports.calls[0][1], ports.calls[1][1]
+    d = rotate(LOW.orientation, (0.0, 0.0, 1.0))
+    expected_back = tuple(c - p.approach_m * di for c, di in zip(LOW.position, d))
+    assert back.label == '시작 물러남' and back.kind is MotionKind.MOVE_TO
+    assert all(math.isclose(a, e) for a, e in zip(back.target, expected_back))
+    assert back.orientation == LOW.orientation and back.speed == p.approach_speed_mps
+    assert lift.label == '시작 상승'
+    assert lift.target[:2] == expected_back[:2] and math.isclose(lift.target[2], plan.z_safe_base)
     assert lift.orientation == LOW.orientation            # 자세를 바꾸지 않는다(순수 이동)
-    assert lift.speed == params().travel_speed_mps
-    assert ports.calls[1][1].label == 'L0 접근 1'
+    assert lift.speed == p.travel_speed_mps
+    assert ports.calls[2][1].label == 'L0 접근 1'
     assert any('D30' in message for _, message in ports.logs)
 
 
@@ -238,7 +245,7 @@ def test_start_lift_stopped(scan):
 def test_lift_only_before_the_first_line(scan):
     outcome, ports, _ = run(scan, start=2, end=3, start_pose=LOW)
     labels = [r.label for _, r in ports.calls]
-    assert labels.count('시작 상승') == 1 and labels[1] == 'L2 접근 1'
+    assert labels.count('시작 물러남') == 1 and labels.count('시작 상승') == 1 and labels[2] == 'L2 접근 1'
 
 
 # ---- 중지 (/weld/stop) ----
@@ -403,16 +410,20 @@ def test_unreachable_line_is_failed_and_the_rest_continue(scan):
     assert any('D33' in message for _, message in ports.logs)
 
 
-def test_failure_below_z_safe_backs_off_then_lifts_before_next_line(scan):
-    # L1 경로(goal 7) 도중 204, 팁은 부재 옆 낮은 자리 → 툴 축 뒤로 approach_m 물러남(approach_speed) → z_safe 로 올림(travel_speed)
+def test_failure_below_z_safe_backs_off_lifts_then_error(scan):
+    # D33(9/26 좁힘): L1 경로(goal 7) 도중 204, 팁은 부재 옆 낮은 자리(원인 모름) → 툴 축 뒤로 approach_m 물러남(approach_speed)
+    # → z_safe 로 올림(travel_speed) → 다음 선으로 가지 않고 ERROR. L1 은 FAILED, L2~ 는 NOT_ATTEMPTED
     def action(ports, request):
         ports.sample = LOW
         return ERR_204
     p = params()
     outcome, ports, plan = run(scan, {7: action})
-    assert outcome.kind is OutcomeKind.PARTIAL
+    assert outcome.kind is OutcomeKind.FAILED and ports.sm.phase is P.ERROR
+    assert outcome.reason_code == 204 and 'z_safe 아래' in outcome.detail
     labels = [r.label for _, r in ports.calls]
-    assert labels[6:10] == ['L1 경로', 'L1 복구 물러남', 'L1 복구 올림', 'L2 접근 1']
+    assert labels[6:] == ['L1 경로', 'L1 복구 물러남', 'L1 복구 올림'] and len(ports.calls) == 9
+    D, F, N = LineStatus.DONE, LineStatus.FAILED, LineStatus.NOT_ATTEMPTED
+    assert statuses(outcome.record) == [D, F, N, N, N, N, N, N] and not outcome.record.success
     back, lift = ports.calls[7][1], ports.calls[8][1]
     d = rotate(LOW.orientation, (0.0, 0.0, 1.0))
     expected_back = tuple(c - p.approach_m * di for c, di in zip(LOW.position, d))
@@ -420,8 +431,8 @@ def test_failure_below_z_safe_backs_off_then_lifts_before_next_line(scan):
     assert back.orientation == LOW.orientation and back.speed == p.approach_speed_mps
     assert lift.target[:2] == expected_back[:2] and math.isclose(lift.target[2], plan.z_safe_base)
     assert lift.orientation == LOW.orientation and lift.speed == p.travel_speed_mps
-    assert statuses(outcome.record)[1] is LineStatus.FAILED and outcome.record.lines[1].stop_pose is None
-    assert ports.sm.snapshot().phase is P.DONE
+    assert outcome.record.lines[1].stop_pose is None       # 204 Result 에 좌표가 없었다 — 지어내지 않는다
+    assert ports.sm.failure.reason_code == 204
 
 
 def test_two_failed_lines_are_listed(scan):
