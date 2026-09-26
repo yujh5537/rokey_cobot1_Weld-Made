@@ -220,8 +220,11 @@ def test_start_below_z_safe_lifts_first(make):
     time.sleep(0.2)
     result = h.run(start=0, end=0)
     assert result.success, result.detail
-    lift = h.fake.goals[0][1]
-    assert h.fake.kinds()[:2] == ['MOVE_TO', 'MOVE_TO'] and len(h.fake.goals) == 1 + 4 + 2
+    # D30(9/26): 물러남(툴 축 뒤 30 mm. 가짜 자세 (0,1,0,0) 은 툴 z 가 −Base z 라 위로 30 mm) → 같은 x · y 로 z_safe → 접근 1
+    back, lift = h.fake.goals[0][1], h.fake.goals[1][1]
+    assert h.fake.kinds()[:3] == ['MOVE_TO'] * 3 and len(h.fake.goals) == 2 + 4 + 2
+    b = back.target.position
+    assert (round(b.x, 6), round(b.y, 6), round(b.z, 6)) == (0.46, -0.21, 0.46)
     p = lift.target.position
     assert (round(p.x, 6), round(p.y, 6)) == (0.46, -0.21) and abs(p.z - 0.48986501464843746) < 1e-9
     q = lift.target.orientation
@@ -291,17 +294,18 @@ def test_unreachable_line_is_failed_and_the_rest_continue(make):
     assert wait_for(lambda: h.results and not h.results[-1].success and h.results[-1].detail == 'L1 FAILED')
 
 
-def test_failure_below_z_safe_recovers_by_backing_off_and_lifting(make):
-    # L1 경로(goal 7)가 204 → 가짜의 자리는 접근점(z_safe 아래) → 물러남 · 올림 두 MOVE_TO 뒤 L2 접근 1
+def test_failure_below_z_safe_recovers_then_errors(make):
+    # D33(9/26 좁힘): L1 경로(goal 7)가 204 → 가짜의 자리는 접근점(z_safe 아래) → 물러남 · 올림 두 MOVE_TO 뒤 ERROR
     h = make(script={7: (R.REASON_ROBOT_ERROR, 204)})
     result = h.run()
-    assert not result.success and result.detail == 'L1 FAILED'
+    assert not result.success and result.reason_code == 204 and 'z_safe 아래' in result.detail
     kinds = h.fake.kinds()
-    assert kinds[4:10] == ['MOVE_TO', 'MOVE_TO', 'PATH', 'MOVE_TO', 'MOVE_TO', 'MOVE_TO']
-    assert len(kinds) == 4 + 3 + 2 + 24 + 2
+    assert kinds == ['MOVE_TO', 'MOVE_TO', 'PATH', 'MOVE_TO', 'MOVE_TO', 'MOVE_TO', 'PATH', 'MOVE_TO', 'MOVE_TO']
     lift = h.fake.goals[8][1]
     assert abs(lift.target.position.z - 0.48986501464843746) < 1e-9      # z_safe (sim 픽스처)
-    assert h.phase().name == 'DONE'
+    statuses = [line.status for line in result.result.lines]
+    assert statuses[:3] == [WeldLine.STATUS_DONE, WeldLine.STATUS_FAILED, WeldLine.STATUS_NOT_ATTEMPTED]
+    assert h.phase().name == 'ERROR'
 
 
 def test_continue_off_stops_at_first_failure(make):
