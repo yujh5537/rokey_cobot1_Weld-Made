@@ -447,7 +447,7 @@ ScanResult result           # /scan/result 와 같은 내용. result.success 는
 ---
 ScanState state
 ```
-- 진행 중이면 goal 거절 `BUSY`, 래치 중이면 `SAFETY_LATCHED`, 미연결이면 `ROBOT_DISCONNECTED`.
+- 진행 중이면 goal 거절 `BUSY`, **용접 중이면 `WELD_ACTIVE(601)` [v0.2.0, phase 2 7.1]**, 래치 중이면 `SAFETY_LATCHED`, 미연결이면 `ROBOT_DISCONNECTED`. 검사 순서도 이 순서다(BUSY → 601 → 래치 → 로봇, 9/26 결정. `/weld/state` 를 한 번도 못 받았거나 `weld_state_timeout_s` 보다 오래됐으면 용접이 없다고 본다).
 
 ### 5.2 ReturnHome.action
 ```
@@ -480,7 +480,7 @@ ScanResult result
 ScanState state
 ```
 - 기존 측정값을 유지하고 중단 방향부터 잇는다. `scan_id`를 유지한다(새 작업 아님).
-- 거절: `NO_RESUMABLE_SCAN` · `SAFETY_LATCHED` · `BUSY` · `ROBOT_DISCONNECTED` · `NOT_SUPPORTED`.
+- 거절: `NO_RESUMABLE_SCAN` · `SAFETY_LATCHED` · `BUSY` · `ROBOT_DISCONNECTED` · `NOT_SUPPORTED` · **`WELD_ACTIVE(601)` [v0.2.0]**(START 와 같은 자리: BUSY 다음, 래치 앞. phase 2 7.1).
 - **홈 안전복귀를 거친 뒤의 재접근 절차는 TBD**(BRD 6장). 확정 전까지 그 경우는 `NOT_SUPPORTED`로 거절한다. v0.1의 재시작은 "중지한 위치에서 재개"만 지원한다.
 - **`ERROR`로 끝난 작업의 재시작 [v0.1.21, 9장]**: 실패 사유가 허용 목록(`SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)`)에 있을 때만 받는다. 그 밖의 사유(`OVER_FORCE` · `DROP_LIMIT` · 알 수 없는 오류 · 목록에 없는 새 사유)는 `NOT_SUPPORTED`로 거절하고, 안전 점검 뒤 **새 START** 만 가능하다. 사람이 먼저 `/safety/reset`을 해야 하며(자동 재개 없음), 래치 · 상태 최신성 관문은 그대로 본다.
 
