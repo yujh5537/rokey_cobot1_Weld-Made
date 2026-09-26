@@ -85,7 +85,7 @@ uint8 lines_done            # 완료한 용접선 수
 float32 line_progress       # 진행 중인 선 안의 진행률 0.0~1.0 (WELDING 에서만 유효, 그 밖은 0)
 uint32 motion_id            # 진행 중 ExecuteMotion · ExecutePath goal. 없으면 0
 ```
-- 전이: IDLE → PREPARING → (APPROACH → WELDING → RETREAT) × 선 → HOMING → DONE. **한 선의 `ROBOT_ERROR(204)` 실패 → 그 선 FAILED 기록 → 복구 이동(RETREAT, `weld-motion.md` 5절) → 다음 선 APPROACH(D33).** 그 밖의 실패(정지 · 취소 · 과대 외력 · 시간 초과 · 래치 · 복구 이동 실패) → ERROR. STOP → STOPPING → STOPPED. 안전복귀 → HOMING → (원래 휴지 phase 로) 1차와 같다.
+- 전이: IDLE → PREPARING → (APPROACH → WELDING → RETREAT) × 선 → HOMING → DONE. **z_safe 위에서 난 한 선의 `ROBOT_ERROR(204)` → 그 선 FAILED 기록 → 다음 선 APPROACH(D33). z_safe 아래에서 난 204 → 복구 이동(RETREAT, `weld-motion.md` 5절) → ERROR.** 그 밖의 실패(정지 · 취소 · 과대 외력 · 시간 초과 · 래치 · 복구 이동 실패) → ERROR. STOP → STOPPING → STOPPED. 안전복귀 → HOMING → (원래 휴지 phase 로) 1차와 같다.
 - `line_progress` = 진행 거리 / 선 길이. `ExecutePath.Feedback.distance_travelled` 로 계산한다.
 - **재시작은 없다**(D7). STOPPED · ERROR 뒤에는 `start_line` 을 지정한 새 START 로 이어 간다.
 
@@ -178,14 +178,14 @@ WeldState state
 | `start_line > 7` · `end_line > 7` · `end_line < start_line` | `LINE_OUT_OF_RANGE(603)` |
 | `config_override` 범위 밖 (속도 < `weld_speed_min_mps` 포함) | `INVALID_VALUE(102)` |
 | `/robot/sample` 이 `sample_timeout_s` 안에 없다 | `NO_SAMPLE(307)` |
-| (거절 아님) 팁이 z_safe 아래 | 먼저 같은 x · y 로 z_safe 까지 수직 상승 뒤 시작(D30, `weld-motion.md` 5절) |
+| (거절 아님) 팁이 z_safe 아래 | 먼저 툴 축 뒤(−d)로 `approach_m` 물러난 뒤 같은 x · y 로 z_safe 까지 수직 상승, 그 다음 시작(D30 9/26 갱신, `weld-motion.md` 5절) |
 | 무접촉 \|F\| > `tool_check_max_force_n`(출발값 6.0, contact_detector 의 `tare_max_force_n` 과 같은 근거) | `TOOL_REG_SUSPECT(302)` |
 | 생성한 경로가 작업영역 밖, 또는 세로선 툴 외형 검사(`tool_profile_u_m` · `tool_profile_r_m`, `weld-motion.md` 5절) 실패 | `PATH_REJECTED(604)` |
 
 - `end_line` 은 **생략할 수 없다**(uint8 의 0 은 "L0 까지"다). mqtt_bridge 가 payload 에 없으면 7 을 넣는다. `start_line..end_line` 밖의 선은 `SKIPPED`. "tilt 0 으로 L0 만"은 `start_line=0 · end_line=0`.
 - `scan_id == ""` 이면 **result_store 의 가장 최근(`scan_id` 사전순) `success=true` 결과**다. 진행 중 기록(progress.json)만 있는 작업은 후보가 아니다.
 - `WeldResult.success` 는 `start_line..end_line` 의 선이 전부 DONE 일 때다.
-- **선 실패 뒤 계속(D33, `continue_on_line_failure` 출발값 true)**: 한 선의 goal(접근 1 · 2 · `ExecutePath` · 후퇴)이 `ROBOT_ERROR(204)` 로 끝나면 그 선을 `STATUS_FAILED`(`reason_code` 204 · detail · `stop_pose`)로 기록하고, `weld-motion.md` 5절의 복구 이동으로 z_safe 에 올라간 뒤 **다음 선의 접근 1 로 계속**한다. 복구 이동까지 실패하면 ERROR. 204 가 아닌 종료(`REASON_STOP_REQUESTED` · `CANCELED` · `OVER_FORCE` · `TIMEOUT` · 래치)는 7.2 대로 ERROR · STOPPED 이고 그 뒤 선은 `NOT_ATTEMPTED`. 끝까지 간 뒤 FAILED 가 하나라도 있으면 phase 는 **DONE**(작업은 끝까지 갔다), `WeldResult.success=false` · `reason_code` = 첫 FAILED 선의 코드 · detail 에 실패 선 목록(예 `L1,L5 FAILED`). RunWeld `Result.success` 도 false(마무리 홈 복귀는 그대로 한다). 파라미터가 false 면 첫 실패에서 ERROR(1차와 같다). 근거: 9/23 M1 에서 L1 · L5 가 도달 불가(#186, D27).
+- **선 실패 뒤 계속(D33, `continue_on_line_failure` 출발값 true)**: 한 선의 goal(접근 1 · 2 · `ExecutePath` · 후퇴)이 `ROBOT_ERROR(204)` 로 끝났고 **그때 팁이 z_safe 위**(`/robot/sample`)면 — 도달 불가 · 출발 안 함이라 이전 후퇴점에 그대로 서 있는 경우 — 그 선을 `STATUS_FAILED`(`reason_code` 204 · detail · `stop_pose`)로 기록하고 이동 없이 **다음 선의 접근 1 로 계속**한다. **팁이 z_safe 아래**면(원인 모름 · 접촉 가능성) `weld-motion.md` 5절의 복구 이동(−d 물러남 → z_safe)만 하고 **ERROR** 로 끝낸다(9/26 좁힘, 현지 #184 리뷰). 복구 이동까지 실패해도 ERROR. 204 가 아닌 종료(`REASON_STOP_REQUESTED` · `CANCELED` · `OVER_FORCE` · `TIMEOUT` · 래치)는 7.2 대로 ERROR · STOPPED 이고 그 뒤 선은 `NOT_ATTEMPTED`. 끝까지 간 뒤 FAILED 가 하나라도 있으면 phase 는 **DONE**(작업은 끝까지 갔다), `WeldResult.success=false` · `reason_code` = 첫 FAILED 선의 코드 · detail 에 실패 선 목록(예 `L1,L5 FAILED`). RunWeld `Result.success` 도 false(마무리 홈 복귀는 그대로 한다). 파라미터가 false 면 첫 실패에서 ERROR(1차와 같다). 근거: 9/23 M1 에서 L1 · L5 가 도달 불가(#186, D27).
 - Result 의 `success` 는 마무리 홈 복귀까지 포함한다. `result.success` 는 용접선만 본다(1차 RunScan 과 같은 구분).
 
 ### 5.2 ExecutePath.action

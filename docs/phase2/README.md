@@ -46,9 +46,9 @@
 | D27 | 9/29 단계: 윗면 4 선 = 반드시 성공, 세로선 · 위빙 = 조건부 → **M1(9/23, #186): L1 · L5 는 45° 자세로 도달 불가**(플랜지 한계 689~761 mm, 기울기 · 롤 · 재배치로 해결 안 됨). 9/29 기대는 윗면 3 선(L0 · L2 · L3) + 세로 3 선(L4 · L6 · L7), L1 · L5 는 FAILED 로 기록(D33) |
 | D28 | `RunWeld.end_line` 추가(기본 7, 생략 불가). 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` |
 | D29 | weld_manager 는 속도 상한을 검사하지 않는다. 상한은 robot_manager `path_max_speed_mps` → 604 |
-| D30 | 시작 때 팁이 z_safe 아래면 거절하지 않고 수직 상승 뒤 시작. 자세 허용치 `orientation_tolerance_deg` 는 여유 있게(15°) |
+| D30 | 시작 때 팁이 z_safe 아래면 거절하지 않고 **툴 축 뒤(−d)로 `approach_m` 물러난 뒤 z_safe 까지 수직 상승** 뒤 시작(9/26 갱신: D33 복구 · 7.2 안전복귀와 같은 순서. 현지 #184 리뷰). 자세 허용치 `orientation_tolerance_deg` 는 여유 있게(15°) |
 | D31 | `ExecutePath` 는 `path_mode` line(기본, 점마다 정지) / spline. `move_line`+radius 블렌딩은 비동기에서 불가(드라이버 소스 확인). `path_max_points` 100. **소스 확인에 그치지 말고 호출 확인까지 한다** → 호출 확인 결과(현지 9/24 Virtual, #191): **spline 은 응답이 점당 약 30 ms 늦어 호출 줄이 막히고 샘플이 끊긴다(SAMPLE_STALE). 쓰지 않는다.** 코드 · 파라미터는 남기되 기본 · 실기 모두 line |
-| D33 | **한 선이 실패하면 그 선만 FAILED 로 기록하고 다음 선으로 계속한다**(병후 9/25, 학민 #184 리뷰 ①). 계속하는 실패 = 그 선의 goal(접근 1 · 2 · ExecutePath · 후퇴)이 `ROBOT_ERROR(204)` 로 끝난 경우(도달 불가 · 출발 안 함 · 도착 · 자세 허용치 밖). 정지 · 취소 · 과대 외력 · 시간 초과 · 래치는 그대로 ERROR · STOPPED. 파라미터 `continue_on_line_failure`(true). 타입 변경 없음(`WeldLine.STATUS_FAILED` · `WeldResult.success=false`) |
+| D33 | **한 선이 실패하면 그 선만 FAILED 로 기록하고 다음 선으로 계속한다**(병후 9/25, 학민 #184 리뷰 ①). 계속하는 실패 = 그 선의 goal(접근 1 · 2 · ExecutePath · 후퇴)이 `ROBOT_ERROR(204)` 로 끝났고 **그때 팁이 z_safe 위에 있는 경우**(도달 불가 · 출발 안 함 — 이전 후퇴점에 그대로 서 있다). **z_safe 아래에서 난 204(원인 모름 · 접촉 가능성)는 복구 이동 뒤 ERROR** 로 끝낸다(9/26 좁힘, 현지 #184 리뷰). 정지 · 취소 · 과대 외력 · 시간 초과 · 래치는 그대로 ERROR · STOPPED. 파라미터 `continue_on_line_failure`(true). 타입 변경 없음(`WeldLine.STATUS_FAILED` · `WeldResult.success=false`) |
 | D32 | `path_tolerance_m` 은 마지막 점뿐 아니라 line 모드의 **중간 점 도착 판정에도** 쓴다(멈춘 자리가 그 점에서 허용치 밖이면 204). `≤ 0` · NaN 은 604 로 거절(현지 해석 9/24, 병후 채택 9/25) |
 
 **계약 작성 중 드러난 것 → 2026-09-23 병후 결정**

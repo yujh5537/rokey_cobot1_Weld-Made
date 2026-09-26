@@ -3,6 +3,20 @@
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
 
+> phase 2(용접) 계약은 **v0.2.x** 로 번호를 매기고 1차 v0.1.x 와 병행한다. 최신이 위.
+
+## v0.2.0 (2026-09-23, phase 2 용접 인터페이스, docs/phase2)
+**타입 추가**(`WeldConfig` · `WeldState` · `WeldLine` · `WeldResult` · `StopWeld` · `RunWeld` · `ExecutePath`)와 **기존 타입의 상수 추가**(`RobotSample` · `ExecuteMotion` 에 `OP_WELD_PATH=5`, ReasonCode 6xx 5 개). 기존 필드는 바꾸지 않았다. 전문과 동작 규칙은 `docs/phase2/weld-ros-interfaces.md`, MQTT 는 `docs/phase2/weld-mqtt-schema.md`, 모션 정의는 `docs/phase2/weld-motion.md`.
+- **왜**: 1차(스캔) 완료 뒤 2차 프로젝트 "스캔 결과로 용접 모션"을 같은 레포 · 같은 인터페이스 패키지에서 진행한다(병후, 2026-09-23). phase 2 는 기존 계약 · BRD 의 구속을 받지 않지만, 타입 동기화 검사(`test_contract_sync`)와 ReasonCode 번호 규칙(추가만, 변경 없음)은 그대로 쓴다
+- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름, 의석) · 새 노드 weld_manager · 웹
+- `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
+- 리뷰 반영(2026-09-23 저녁): 학민 — robot_manager `path_min_z_m` · 순응 검사 근거 · `path_acc_ratio` 단위. 의석 — 토픽별 `schema_version` · null 단독 규칙 · 브리지 표 PR 을 P1 앞에. 현지 — 스탠드오프 정의(구 표면 ↔ 이음선) · 세로선 툴 외형 검사 · 미요청 정지 = ERROR · 오래된 `/weld/state` 무시 · roll 선별 배열 · `/robot/sample` 구독 · 속도 하한. 자체 노드 6 개(1장 · `.claude/rules/ros2-nodes.md` 예외)
+- 현지 2차(2026-09-23 밤): `RunWeld.end_line` · `WeldResult.end_line` 추가("L0 만" 시험을 계약상 가능하게) · 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` · weld_manager 는 속도 상한을 검사하지 않는다(D29, 3.1)
+- 현지 3차(2026-09-24): 후퇴점은 ExecutePath 안(weld_speed) · 대기 한도 3 개 · `orientation_tolerance_deg` · z_safe 아래면 수직 상승(D30) · 휴지 중 `/weld/stop` 은 `/robot/stop` 을 부르지 않음 · `ExecuteMotion.scan_id` 자리에 `weld_id`
+- 현지 4차(2026-09-24, 드라이버 소스 확인): `ExecutePath` 실행 방식을 `path_mode` line(기본) / spline 으로, `move_line`+radius 는 ASYNC 에서 radius 가 버려져 제외 · `path_max_points` 200 → 100(`MAX_SPLINE_POINT`, 컨트롤러가 `pos_cnt` 를 검사하지 않음). 호출 확인은 #186 M4(D31)
+- 2026-09-25(병후 결정): **D12 갱신** — P1 robot_manager `ExecutePath` 구현은 현지(PR #191), 리뷰 학민. **D32** — `path_tolerance_m` 은 line 모드의 중간 점 도착 판정에도 쓰고 `≤ 0` · NaN 은 604(현지 해석 채택). **D31 결과** — spline 은 Virtual 응답 지연으로 사용 불가(현지 9/24), line 만. 5.2 에 명령 실패 뒤 정지 확인 규칙(#191 · #193). `weld-motion.md` 5절에 선 사이 이동은 z_safe 두 점 사이에서만(학민 M1 충돌 사례). **D33** — 한 선의 204 실패는 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(`continue_on_line_failure`, 5.1 · 3.2 · weld-motion 5 · 6절. M1: L1 · L5 도달 불가 → D27 기대는 6 선). 타입 변경 없음(`ExecutePath.action` 주석만)
+- 2026-09-26(병후 결정, 현지 #184 리뷰): **D33 좁힘** — 다음 선으로 계속하는 것은 z_safe 위에서 난 204(도달 불가 · 출발 안 함)뿐. z_safe 아래의 204 는 복구 이동(−d 물러남 → z_safe) 뒤 ERROR. **D30 갱신** — 시작 때 z_safe 아래면 −d 물러남 → 상승(복구 · 7.2 안전복귀와 같은 순서). 타입 변경 없음
+
 ## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
 - 실측 종단에서 `/dsr01/joint_states` publisher가 2개임을 확인했다: `/dsr01/joint_state_broadcaster`는 M0609 J1~J6 6축, `/dsr01/joint_state_publisher`는 M0609 6축 + RG2 6축 합성 스냅샷
@@ -32,17 +46,6 @@
 
 ## v0.1.16 (2026-09-23, #130 최신성 한계)
 **타입 변경 없음.** real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다(6.3절). 6.3 의 "한계를 올리기 전에 원인을 없앤다"는 원칙의 **예외**이며, 이유 · 남는 위험(687 ms 공백) · 되돌릴 조건을 6.3 과 real.yaml 주석에 같이 남겼다. 코드 기본값과 sim 값은 바꾸지 않았다(sim 은 이미 500). 영향: safety_monitor(실기 값만).
-
-## v0.2.0 (2026-09-23, phase 2 용접 인터페이스, docs/phase2)
-**타입 추가**(`WeldConfig` · `WeldState` · `WeldLine` · `WeldResult` · `StopWeld` · `RunWeld` · `ExecutePath`)와 **기존 타입의 상수 추가**(`RobotSample` · `ExecuteMotion` 에 `OP_WELD_PATH=5`, ReasonCode 6xx 5 개). 기존 필드는 바꾸지 않았다. 전문과 동작 규칙은 `docs/phase2/weld-ros-interfaces.md`, MQTT 는 `docs/phase2/weld-mqtt-schema.md`, 모션 정의는 `docs/phase2/weld-motion.md`.
-- **왜**: 1차(스캔) 완료 뒤 2차 프로젝트 "스캔 결과로 용접 모션"을 같은 레포 · 같은 인터페이스 패키지에서 진행한다(병후, 2026-09-23). phase 2 는 기존 계약 · BRD 의 구속을 받지 않지만, 타입 동기화 검사(`test_contract_sync`)와 ReasonCode 번호 규칙(추가만, 변경 없음)은 그대로 쓴다
-- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름, 의석) · 새 노드 weld_manager · 웹
-- `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
-- 리뷰 반영(2026-09-23 저녁): 학민 — robot_manager `path_min_z_m` · 순응 검사 근거 · `path_acc_ratio` 단위. 의석 — 토픽별 `schema_version` · null 단독 규칙 · 브리지 표 PR 을 P1 앞에. 현지 — 스탠드오프 정의(구 표면 ↔ 이음선) · 세로선 툴 외형 검사 · 미요청 정지 = ERROR · 오래된 `/weld/state` 무시 · roll 선별 배열 · `/robot/sample` 구독 · 속도 하한. 자체 노드 6 개(1장 · `.claude/rules/ros2-nodes.md` 예외)
-- 현지 2차(2026-09-23 밤): `RunWeld.end_line` · `WeldResult.end_line` 추가("L0 만" 시험을 계약상 가능하게) · 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` · weld_manager 는 속도 상한을 검사하지 않는다(D29, 3.1)
-- 현지 3차(2026-09-24): 후퇴점은 ExecutePath 안(weld_speed) · 대기 한도 3 개 · `orientation_tolerance_deg` · z_safe 아래면 수직 상승(D30) · 휴지 중 `/weld/stop` 은 `/robot/stop` 을 부르지 않음 · `ExecuteMotion.scan_id` 자리에 `weld_id`
-- 현지 4차(2026-09-24, 드라이버 소스 확인): `ExecutePath` 실행 방식을 `path_mode` line(기본) / spline 으로, `move_line`+radius 는 ASYNC 에서 radius 가 버려져 제외 · `path_max_points` 200 → 100(`MAX_SPLINE_POINT`, 컨트롤러가 `pos_cnt` 를 검사하지 않음). 호출 확인은 #186 M4(D31)
-- 2026-09-25(병후 결정): **D12 갱신** — P1 robot_manager `ExecutePath` 구현은 현지(PR #191), 리뷰 학민. **D32** — `path_tolerance_m` 은 line 모드의 중간 점 도착 판정에도 쓰고 `≤ 0` · NaN 은 604(현지 해석 채택). **D31 결과** — spline 은 Virtual 응답 지연으로 사용 불가(현지 9/24), line 만. 5.2 에 명령 실패 뒤 정지 확인 규칙(#191 · #193). `weld-motion.md` 5절에 선 사이 이동은 z_safe 두 점 사이에서만(학민 M1 충돌 사례). **D33** — 한 선의 204 실패는 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(`continue_on_line_failure`, 5.1 · 3.2 · weld-motion 5 · 6절. M1: L1 · L5 도달 불가 → D27 기대는 6 선). 타입 변경 없음(`ExecutePath.action` 주석만)
 
 ## v0.1.15 (2026-09-22, SLIDE 스텝 모드)
 타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가). `ContactEvent.msg` · 2.1 메시지 정의의 `source` 주석에 `robot_step` 을 더했다(주석만, 타입 · 빌드 영향 없음).
