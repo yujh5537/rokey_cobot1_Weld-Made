@@ -33,7 +33,9 @@ D33 코드(선 실패 뒤 계속)를 넣고 `run()` 을 `_run_line` 로 나눈 �
 | 소요 | 15:43:03 → 15:46:48, **225 s**(실패 선에 쓴 시간 약 1 s + 마무리) |
 | 그 밖 | SAMPLE_STALE · OVER_FORCE · 래치 0. 두 번째 작업의 motion_id 는 1 부터(작업마다 새로) |
 
-계약 5.1 · 3.2 · `weld-motion.md` 5절(D33)과 같다. "z_safe 아래에서의 물러남 · 올림" 경로는 Virtual 로 만들 방법이 없어(접근 2 · 경로 도중 204 를 일으킬 수단이 없다) 가짜 robot_manager 노드 시험(`test_failure_below_z_safe_recovers_by_backing_off_and_lifting`)과 순수 시험으로만 확인했다.
+계약 5.1 · 3.2 · `weld-motion.md` 5절(D33)과 같다. "z_safe 아래에서의 물러남 · 올림" 경로는 Virtual 로 만들 방법이 없어(접근 2 · 경로 도중 204 를 일으킬 수단이 없다) 가짜 robot_manager 노드 시험과 순수 시험으로만 확인했다.
+
+> 9/26 갱신(#198, D33 좁힘): z_safe 아래의 204 는 복구 이동 뒤 **ERROR** 로 끝나게 바뀌었다(`test_failure_below_z_safe_recovers_then_errors`). 위 2절의 "z_safe 위 → 이동 없이 계속" 은 그대로다. Virtual 재실행은 하지 않았다(바뀐 경로는 Virtual 로 만들 수 없는 쪽).
 
 정리: `docker rm -f dsr01_emulator`, 노드 종료. `tool_roll_deg` 는 노드 메모리에서만 바꿨다(yaml 은 그대로).
 
