@@ -39,7 +39,7 @@ class EdgeObservation:
     """한 방향의 EDGE 판정 좌표."""
 
     coordinate_m: Optional[float]         # 판정 샘플의 TCP 좌표 중 진행 축의 값 (±X 는 x, ±Y 는 y)
-    z_drop_m: Optional[float]             # ContactEvent.z_drop_m. 판정 시점의 실제 하강량 δ
+    z_drop_m: Optional[float]             # ContactEvent.z_drop_m. 판정 시점의 실제 하강량 δ. 모르면 None(d = 0 으로 보정)
     slide_speed_mps: Optional[float]      # 그 밀기의 속도
 
 
