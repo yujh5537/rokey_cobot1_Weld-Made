@@ -16,6 +16,7 @@
 - 현지 4차(2026-09-24, 드라이버 소스 확인): `ExecutePath` 실행 방식을 `path_mode` line(기본) / spline 으로, `move_line`+radius 는 ASYNC 에서 radius 가 버려져 제외 · `path_max_points` 200 → 100(`MAX_SPLINE_POINT`, 컨트롤러가 `pos_cnt` 를 검사하지 않음). 호출 확인은 #186 M4(D31)
 - 2026-09-25(병후 결정): **D12 갱신** — P1 robot_manager `ExecutePath` 구현은 현지(PR #191), 리뷰 학민. **D32** — `path_tolerance_m` 은 line 모드의 중간 점 도착 판정에도 쓰고 `≤ 0` · NaN 은 604(현지 해석 채택). **D31 결과** — spline 은 Virtual 응답 지연으로 사용 불가(현지 9/24), line 만. 5.2 에 명령 실패 뒤 정지 확인 규칙(#191 · #193). `weld-motion.md` 5절에 선 사이 이동은 z_safe 두 점 사이에서만(학민 M1 충돌 사례). **D33** — 한 선의 204 실패는 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(`continue_on_line_failure`, 5.1 · 3.2 · weld-motion 5 · 6절. M1: L1 · L5 도달 불가 → D27 기대는 6 선). 타입 변경 없음(`ExecutePath.action` 주석만)
 - 2026-09-26(병후 결정, 현지 #184 리뷰): **D33 좁힘** — 다음 선으로 계속하는 것은 z_safe 위에서 난 204(도달 불가 · 출발 안 함)뿐. z_safe 아래의 204 는 복구 이동(−d 물러남 → z_safe) 뒤 ERROR. **D30 갱신** — 시작 때 z_safe 아래면 −d 물러남 → 상승(복구 · 7.2 안전복귀와 같은 순서). 타입 변경 없음
+- 2026-09-26(#198, 문서만): 1차 `ros-interfaces.md` 5.1 · 5.3 에 `WELD_ACTIVE(601)` 와 검사 순서(BUSY → 601 → 래치 → 로봇) · phase 2 7.1 에 같은 순서 한 줄(600 과 대칭) · `weld-motion.md` 6절에 scan_manager 파라미터 `weld_state_timeout_s`(5.0) 줄. 새 버전 번호 없음
 
 ## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.

@@ -253,6 +253,8 @@ builtin_interfaces/Duration elapsed
 | scan_manager | `/weld/state.phase` 가 휴지(IDLE · DONE · ERROR · STOPPED)가 아니다 | START · RESUME → `WELD_ACTIVE(601)`. 안전복귀(`/scan/home`)는 막지 않는다 |
 | robot_manager | 다른 goal 실행 중 | 어느 서버든 `BUSY(100)` |
 
+**검사 순서(9/26 결정)**: scan_manager 는 601 을 **BUSY 다음, 래치 · 로봇 연결 검사 앞**에서 본다 — weld_manager 의 600 이 5.1 표에서 BUSY · INVALID_REQUEST 다음, 래치 앞에 있는 것과 대칭이다. 래치와 용접이 동시면 601 이 먼저 나온다. 1차 `ros-interfaces.md` 5.1 · 5.3 에 같은 줄이 있다.
+
 `/weld/state` 가 한 번도 오지 않았으면(weld_manager 미기동) scan_manager 는 용접이 없다고 본다(1차 동작 유지). **마지막 `/weld/state.stamp` 가 `weld_state_timeout_s`(출발값 5.0)보다 오래됐어도 용접이 없다고 본다** — TRANSIENT_LOCAL 이라 weld_manager 가 WELDING 중에 죽으면 마지막 값이 남아 스캔이 영영 601 로 막히기 때문이다(현지 리뷰 5. weld_manager 의 `scan_state_timeout_s` 와 대칭).
 
 ### 7.2 중지 · 안전복귀 (D7)

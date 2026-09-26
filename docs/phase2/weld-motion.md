@@ -133,6 +133,8 @@ z_safe   = z_top + travel_clearance_m           # 작업대 좌표. 선 사이 �
 | `state_publish_period_s` | 1.0 | /weld/state 주기 | |
 | `scan_state_timeout_s` | 5.0 | /scan/state 가 이보다 오래됐으면 시작 거절 | |
 
+scan_manager 쪽: **`weld_state_timeout_s`**(출발값 **5.0** s = weld_manager `state_publish_period_s` 1.0 의 5 배. `/weld/state` 의 마지막 stamp 가 이보다 오래되면 용접이 없다고 보고 START · RESUME 을 막지 않는다. `weld-ros-interfaces.md` 7.1. `contact_scan_bringup/config/*.yaml` 의 `scan_manager:` 절 — weld_manager 절이 아니다).
+
 robot_manager 쪽: `path_mode`(`line` | `spline`, 기본 `line`) · `path_max_points`(출발값 **100**, spline 배열 한도) · `path_max_speed_mps`(0.100, 넘으면 604) · **`path_min_z_m`**(Base z 하한, 경유점 하나라도 아래면 604. 출발값 0.100 = 작업대 0.095 + 테이프 0.002 + 여유 0.003) · `path_acc_ratio`(4.0, 단위 1/s: 가속 [mm/s²] = 이 값 × 속도 [mm/s], 1차 `move_line_request` 의 `acc = 4 × vel` 과 같음).
 
 ## 7. 오늘 실기에서 정해야 하는 것
