@@ -10,7 +10,10 @@ import re
 import pytest
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
-CONTRACT = Path(__file__).resolve().parents[4] / 'docs' / 'contracts' / 'ros-interfaces.md'
+DOCS = Path(__file__).resolve().parents[4] / 'docs'
+CONTRACT = DOCS / 'contracts' / 'ros-interfaces.md'
+# phase 2(용접) 타입 전문. 같은 장 번호 규칙(3 msg · 4 srv · 5 action)으로 쓴다. ReasonCode 표는 ros-interfaces.md 6.1 에만 둔다.
+CONTRACTS = (CONTRACT, DOCS / 'phase2' / 'weld-ros-interfaces.md')
 TYPE_CHAPTERS = (3, 4, 5)       # msg · srv · action
 REASON_CODE_SECTION = '### 6.1'
 FILE_NAME = re.compile(r'(\w+)\.(msg|srv|action)')
@@ -26,17 +29,27 @@ def normalize(lines):
     return out
 
 
-def contract_lines():
+def contract_lines(path=CONTRACT):
     # 문서를 못 찾으면 skip 하지 않고 실패시킨다. 조용히 꺼지는 검사는 검사가 아니다.
-    assert CONTRACT.is_file(), f'계약 문서를 찾지 못했다: {CONTRACT}'
-    return CONTRACT.read_text(encoding='utf-8').splitlines()
+    assert path.is_file(), f'계약 문서를 찾지 못했다: {path}'
+    return path.read_text(encoding='utf-8').splitlines()
 
 
 def contract_types():
-    """{'msg/RobotSample.msg': [정의 줄, ...]} — 계약 3~5장의 코드 블록."""
+    """{'msg/RobotSample.msg': [정의 줄, ...]} — 계약 문서들의 3~5장 코드 블록을 합친 것."""
+    types = {}
+    for path in CONTRACTS:
+        for name, block in _types_in(path).items():
+            assert name not in types, f'{name} 이 두 문서에 다 있다: {path}'
+            types[name] = block
+    return types
+
+
+def _types_in(path):
+    """한 문서의 3~5장 코드 블록."""
     types = {}
     chapter, heading, block = 0, '', None
-    for line in contract_lines():
+    for line in contract_lines(path):
         if block is None:
             chapter_match = re.match(r'## (\d+)\.', line)
             if chapter_match:

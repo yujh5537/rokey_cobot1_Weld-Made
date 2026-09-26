@@ -44,6 +44,7 @@ class Operation(IntEnum):
     DESCEND = 2
     SLIDE = 3
     HOME = 4
+    WELD_PATH = 5     # phase 2 (v0.2.0). ExecutePath 실행 중 표시용. scan_manager 는 goal 에 쓰지 않는다
 
 
 class MotionReason(IntEnum):
@@ -102,3 +103,9 @@ class Reason(IntEnum):
     # 5xx 형상
     INVALID_SHAPE = 500
     INSUFFICIENT_POINTS = 501
+    # 6xx 용접 (phase 2, v0.2.0)
+    SCAN_ACTIVE = 600
+    WELD_ACTIVE = 601
+    NO_SCAN_RESULT = 602
+    LINE_OUT_OF_RANGE = 603
+    PATH_REJECTED = 604
