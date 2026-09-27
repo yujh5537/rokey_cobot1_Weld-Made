@@ -85,7 +85,7 @@ def architecture(phase2):
     # ── 브라우저 · 웹 PC ──────────────────────────────────────────────
     cluster(ax, 0.15, 5.35, 4.05, 6.65, '브라우저 (관제자)', '#6B7280', '#F4F4F4')
     box(ax, 0.35, 5.45, 3.85, 6.35, 'React + Three.js 관제 화면',
-        ['Vite 5173 · Docker 밖 (npm run dev)', '3D 형상 · 접촉점 · 로그 · 버튼 6'])
+        ['Vite 5173 · Docker 밖 (npm run dev)', '3D 형상 · 접촉점 · 로그 · 버튼 5'])
     cluster(ax, 0.15, 0.3, 4.05, 4.95, '웹 PC — docker compose 4 서비스', '#A05195', '#FAEFF7')
     box(ax, 0.35, 3.7, 3.85, 4.55, 'FastAPI :8000', ['REST /commands/* · WS /ws · DB 쓰기'])
     box(ax, 1.45, 2.45, 3.85, 3.25, 'Mosquitto :1883', ['MQTT 브로커 · 중계만'])
@@ -115,7 +115,7 @@ def architecture(phase2):
         size=8.8, title_size=11)
     box(ax, 6.9, 3.88, 7.98, 4.8, 'geometry_', ['estimator', '5 점 → 형상'], lw=1, size=8.4, title_size=9.2)
     box(ax, 8.12, 3.88, 9.2, 4.8, 'result_store', ['progress.json', 'result.json'], lw=1, size=8.4, title_size=9.2)
-    box(ax, 7.1, 2.3, 9.2, 3.3, 'safety_monitor', ['과대 외력 · 하강 제한 2차', '샘플 최신성 · heartbeat', '→ 정지 요청 · 래치'],
+    box(ax, 7.1, 2.3, 9.2, 3.3, 'safety_monitor', ['과대 외력 · 하강 제한 2차', '샘플 최신성', '→ 정지 요청 · 래치'],
         size=8.6, title_size=11)
     box(ax, 11.15, 5.0, 13.25, 6.05, 'contact_detector', ['CONTACT · EDGE ·', 'OVER_FORCE 판정 · tare'],
         size=8.8, title_size=11)
@@ -154,7 +154,7 @@ def architecture(phase2):
     arrow(ax, (8.15, 3.3), (8.15, 3.75), None)
     ax.text(8.22, 3.52, '/safety/status', ha='left', **lab)
     arrow(ax, (5.95, 2.75), (7.1, 2.75), None)
-    ax.text(6.0, 3.12, '/web/heartbeat\n/safety/reset (S)', ha='left', fontsize=7.8, color='#374151', va='center',
+    ax.text(6.0, 3.12, '/safety/reset (S)\n(heartbeat 감시 미구현)', ha='left', fontsize=7.8, color='#374151', va='center',
             linespacing=1.2)
     # 표시 데이터 → mqtt_bridge
     poly(ax, [(11.3, 2.55), (11.3, 2.1), (5.95, 2.1)], color='#6B7280', lw=1.1)

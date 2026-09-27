@@ -14,15 +14,17 @@
 | `/robot/sample` | RobotSample | robot_manager | contact_detector · safety_monitor · mqtt_bridge · [P2] weld_manager | SENSOR | TCP pose + 외력 + 실행 중 동작(`motion_id` · `operation`). scan_manager 는 구독하지 않는다 |
 | `/robot/status` | RobotStatus | robot_manager | scan_manager · safety_monitor · mqtt_bridge · [P2] weld_manager | STATE | 연결 · 동작 · 오류 · 제어 상태. 정지 완료 확인의 근거 |
 | `/contact/event` | ContactEvent | contact_detector · robot_manager(스텝 모드 EDGE) | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE. 판정 확정 즉시 1 회 |
-| `/scan/state` | ScanState | scan_manager | contact_detector · safety_monitor · mqtt_bridge · [P2] weld_manager | STATE | 단계 · 방향 · 진행 n/4 |
+| `/scan/state` | ScanState | scan_manager | contact_detector · safety_monitor* · mqtt_bridge · [P2] weld_manager | STATE | 단계 · 방향 · 진행 n/4 |
 | `/scan/result` | ScanResult | scan_manager | mqtt_bridge | STATE | 형상 결과. 작업 종료 시 1 회(실패 · 중단 포함) |
 | `/scan/log` | ScanLog | scan_manager | mqtt_bridge | LOG | 시간순 로그 |
 | `/safety/status` | SafetyStatus | safety_monitor | scan_manager · mqtt_bridge · [P2] weld_manager | STATE | 안전 상태 · 래치 |
-| `/web/heartbeat` | WebHeartbeat | mqtt_bridge | safety_monitor | HEARTBEAT | MQTT `hb/web` 을 실제로 받았을 때만 전달 |
+| `/web/heartbeat` | WebHeartbeat | mqtt_bridge | safety_monitor* | HEARTBEAT | MQTT `hb/web` 을 실제로 받았을 때만 전달 |
 | `/dsr01/joint_states` | sensor_msgs/JointState | 두산 드라이버 | mqtt_bridge | SENSOR | **표시 전용** 관절값. 제어 입력으로 쓰지 않는다 |
 | [P2] `/weld/state` | WeldState | weld_manager | scan_manager · mqtt_bridge | STATE | 단계 · 선 번호 · 진행 |
 | [P2] `/weld/result` | WeldResult | weld_manager | mqtt_bridge | STATE | 용접 결과(8 선 계획 · 상태) |
 | [P2] `/weld/log` | ScanLog | weld_manager | mqtt_bridge | LOG | 시간순 로그(`scan_id` 자리에 `weld_id`) |
+
+\* 계약에는 있지만 2026-09-27 main 의 safety_monitor 는 이 두 토픽을 구독하지 않는다(웹 heartbeat 감시 · `HB_EXPIRED` 405 미구현, `integration-audit_20260921.md` T33). mqtt_bridge 는 `/web/heartbeat` 를 발행한다.
 
 QoS 프로파일(`contact_scan_qos` 모듈, 발행 · 구독 양쪽이 같은 정의를 import): SENSOR = BEST_EFFORT · VOLATILE · KEEP_LAST 5 / STATE = RELIABLE · TRANSIENT_LOCAL · KEEP_LAST 1 / EVENT = RELIABLE · VOLATILE · KEEP_LAST 50 / LOG = RELIABLE · VOLATILE · KEEP_LAST 100 / HEARTBEAT = BEST_EFFORT · VOLATILE · KEEP_LAST 1.
 
@@ -74,7 +76,7 @@ QoS 프로파일(`contact_scan_qos` 모듈, 발행 · 구독 양쪽이 같은 �
 | 1xx | 요청 거절 | 100 `BUSY` · 103 `SAFETY_LATCHED` · 104 `ROBOT_DISCONNECTED` · 105 `NO_RESUMABLE_SCAN` · 108 `PARAM_SET_FAILED` |
 | 2xx | 동작 종료 | 200 `STOP_REQUESTED` · 202 `MAX_DISTANCE` · 203 `TIMEOUT` · 204 `ROBOT_ERROR` · 205 `DROP_LIMIT` |
 | 3xx | 접촉 · 툴 | 300 `NO_CONTACT` · 301 `NO_EDGE` · 302 `TOOL_REG_SUSPECT` · 303~307 tare · 샘플 |
-| 4xx | 안전 | 400 `OVER_FORCE` · 403 `SAMPLE_STALE` · 404 `ROBOT_STATUS_LOST` · 405 `HB_EXPIRED` · 406 `CONDITION_ACTIVE` |
+| 4xx | 안전 | 400 `OVER_FORCE` · 403 `SAMPLE_STALE` · 404 `ROBOT_STATUS_LOST` · 405 `HB_EXPIRED`(감시 미구현) · 406 `CONDITION_ACTIVE` |
 | 5xx | 형상 | 500 `INVALID_SHAPE` · 501 `INSUFFICIENT_POINTS` |
 | [P2] 6xx | 용접 | 600 `SCAN_ACTIVE` · 601 `WELD_ACTIVE` · 602 `NO_SCAN_RESULT` · 603 `LINE_OUT_OF_RANGE` · 604 `PATH_REJECTED` |
 

@@ -5,7 +5,7 @@
 // 선 라벨의 [L..] [P..] [X..] [C..] [W..] 는 06-node-graph.md 연결 표의 번호다. 같은 두 노드 사이의 같은 방향 선은 한 화살표에 모았다.
 digraph nodes {
   graph [rankdir=TB, fontname="Noto Sans CJK KR", fontsize=22, nodesep=0.55, ranksep=0.75, newrank=true, compound=true, pad=0.3, splines=true,
-         label="ROS2 노드 구조도 v1.2 — 자체 노드 5\n선 = 이름 · 종류(T Topic / S Service / A Action) · 타입   ·   굵은 테두리 = 자체 노드   ·   회색 점선 = 외부(제공)   ·   주황 = phase 2   ·   점선 = 검토안(MVP 밖)", labelloc=t];
+         label="ROS2 노드 구조도 v1.2 — 자체 노드 5\n선 = 이름 · 종류(T Topic / S Service / A Action) · 타입   ·   굵은 테두리 = 자체 노드   ·   회색 점선 = 외부(제공) 또는 계약 · 미구현   ·   주황 = phase 2   ·   점선 = 검토안(MVP 밖)", labelloc=t];
   node  [fontname="Noto Sans CJK KR", fontsize=15, shape=box, style="rounded,filled", fillcolor="#D3DCF5", color="#22357F", penwidth=2.4];
   edge  [fontname="Noto Sans CJK KR", fontsize=11, color="#444444", arrowsize=0.8];
 
@@ -49,7 +49,8 @@ digraph nodes {
   // ── scan_manager → 다른 노드 ──
   sm -> rm  [label="[L11] /robot/execute_motion · A · ExecuteMotion\n[L22] /robot/stop · S · StopRobot\n[P01] /robot_manager/set_parameters · S", penwidth=1.6];
   sm -> cd  [label="[L09] /scan/state · T · ScanState\n[L12] /contact/tare · S · TareForce\n[P02] /contact_detector/set_parameters · S"];
-  sm -> saf [label="[L10] /scan/state · T · ScanState\n[P03] /safety_monitor/set_parameters · S"];
+  sm -> saf [label="[P03] /safety_monitor/set_parameters · S"];
+  sm -> saf [label="[L10] /scan/state · T\n(계약 · 9/27 main 미구현)", style=dashed, color="#999999", fontcolor="#777777"];
   sm -> store [label="기록 (파일)", style=dotted, arrowhead=none];
 
   // ── robot_manager → ──
@@ -67,7 +68,8 @@ digraph nodes {
   saf -> rm     [label="[L23] /robot/stop · S · StopRobot\n웹 경유 없음", color="#B00020", fontcolor="#B00020", penwidth=2];
   saf -> sm     [label="[L24] /safety/status · T · SafetyStatus"];
   saf -> bridge [label="[L25] /safety/status · T"];
-  bridge -> saf [label="[L26] /web/heartbeat · T · WebHeartbeat\n[L27] /safety/reset · S · ResetSafety"];
+  bridge -> saf [label="[L27] /safety/reset · S · ResetSafety"];
+  bridge -> saf [label="[L26] /web/heartbeat · T · WebHeartbeat\n(발행만 · 감시는 9/27 main 미구현)", style=dashed, color="#999999", fontcolor="#777777"];
 
   // ── 드라이버 · 컨트롤러 ──
   rm -> dsr     [label="[X04] dsr_msgs2 서비스\n[X05] 상태 · TCP/힘 응답", dir=both, color="#8A96A3"];

@@ -1,4 +1,4 @@
-근거: `docs/BRD.md`(v3.2.0, 1차 — 수정하지 않음) · `docs/phase2/README.md`(결정 D1~D35) · `docs/phase2/weld-motion.md` · `docs/phase2/weld-ros-interfaces.md` · `docs/phase2/weld-mqtt-schema.md`(계약 v0.2.0, PR #184 · #198) · 9/23 실측 `docs/phase2/measurements-20260923.md`(PR #186, 머지 전) · Virtual 기록 `docs/test-reports/p2-weld-virtual_20260925.md`(PR #197, 머지 전)
+근거: `docs/BRD.md`(v3.2.0, 1차 — 수정하지 않음) · `docs/phase2/README.md`(결정 D1~D34 · D35 는 PR #199 머지 전) · `docs/phase2/weld-motion.md` · `docs/phase2/weld-ros-interfaces.md` · `docs/phase2/weld-mqtt-schema.md`(계약 v0.2.0, PR #184 · #198) · 9/23 실측 `docs/phase2/measurements-20260923.md`(PR #186, 머지 전) · Virtual 기록 `docs/test-reports/p2-weld-virtual_20260925.md`(PR #197, 머지 전)
 
 **비즈니스 요구사항 정의서 (BRD) — phase 2: 스캔 결과 기반 용접 모션**
 
@@ -13,7 +13,7 @@
 | **핵심 메시지** 1차는 "만져서 형상을 안다"까지였다 → phase 2 는 그 결과만으로 "용접 자세로 모서리를 따라간다"까지 간다 → 좌표를 한 점도 교시하지 않은 채로. |
 | --- |
 
-※ D1~D35 는 `docs/phase2/README.md` 의 결정 번호다. 수치는 **계약의 설계 출발값**(파라미터) · **실측**(날짜 · 출처) · **계산값**을 구분해 적는다.
+※ D1~D34 는 `docs/phase2/README.md` 의 결정 번호다(D35 는 PR #199 로 더해지는 중, 머지 전). 수치는 **계약의 설계 출발값**(파라미터) · **실측**(날짜 · 출처) · **계산값**을 구분해 적는다.
 
 # 1. 비즈니스 목표
 
@@ -140,4 +140,4 @@
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
-| 0.1 | 2026-09-27 | 최초 작성(병후). 1차 BRD v3.2.0 은 고치지 않고 phase 2 만 별도 문서로(병후 결정 9/27). 내용은 `docs/phase2/` 계약 v0.2.0 과 결정 D1~D35 를 요구사항 형식으로 옮긴 것이다 |
+| 0.1 | 2026-09-27 | 최초 작성(병후). 1차 BRD v3.2.0 은 고치지 않고 phase 2 만 별도 문서로(병후 결정 9/27). 내용은 `docs/phase2/` 계약 v0.2.0 과 결정 D1~D34(+ D35, PR #199 머지 전)를 요구사항 형식으로 옮긴 것이다 |

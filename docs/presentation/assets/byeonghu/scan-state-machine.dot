@@ -31,6 +31,7 @@ digraph sm {
   STOPPED -> RESUMING [label="RESUME", color="#3378C8", fontcolor="#3378C8", penwidth=1.6];
   RESUMING -> ESRCH [label="중단됐던 단계로\n(확정값은 다시 안 잰다)", color="#3378C8", fontcolor="#3378C8", style=dashed];
   TOP -> ERROR [label="FAILED", color="#C0392B", fontcolor="#C0392B"];
+  STOPPING -> ERROR [label="정지 확인 실패(404)", color="#C0392B", fontcolor="#C0392B", style=dashed];
   ESRCH -> ERROR [label="FAILED (어느 동작 중이든)", color="#C0392B", fontcolor="#C0392B"];
 
   HOMEBOX [shape=note, fillcolor="#FFFFFF", color="#888888", fontsize=9.5, label="안전복귀 (HOME)\n휴지 상태(IDLE · DONE · ERROR · STOPPED)에서만\n→ HOMING → 출발했던 상태로\n\n세 명령은 서로 부르지 않는다:\nSTOP ↛ HOME · RESUME,  FAILED ↛ HOME"];

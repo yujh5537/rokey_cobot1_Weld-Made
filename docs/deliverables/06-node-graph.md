@@ -10,6 +10,7 @@
 - phase 2(주황 점선)를 뺀 판: [`06-node-graph-no-phase2.png`](06-node-graph-no-phase2.png).
 - 자체 노드 6 개: 1차 5 개 + `weld_manager`(phase 2, **구현 PR 진행 중** — #191 · #195~#197, 2026-09-27 머지 전). 네임스페이스 없음, 실행 파일명 = 노드명, 노드별 패키지(`ws_cobot1/src/`).
 - 메시지 필드 · QoS 는 계약 문서에 있다. 요약은 [05 인터페이스 정의서](05-interfaces.md).
+- 이 그림은 **계약**의 연결이다. 2026-09-27 main 의 코드와 대조해 다른 곳은 L10 · L26 두 선(safety_monitor 가 구독하지 않음)뿐이고, 회색 점선으로 표시했다. 나머지 노드의 발행 · 구독은 계약과 같다.
 
 ## 1. 노드
 
@@ -18,7 +19,7 @@
 | `scan_manager` | scan_manager | `/scan/state` · `/scan/result` · `/scan/log` | `/robot/status` · `/contact/event` · `/safety/status` · (P2) `/weld/state` | A `/scan/run` · `/scan/home` · `/scan/resume`, S `/scan/stop` · `/scan/set_config` | A `/robot/execute_motion`, S `/robot/stop` · `/contact/tare` · `*/set_parameters` |
 | `robot_manager` | robot_manager | `/robot/sample` · `/robot/status` · `/contact/event`(스텝 EDGE) | `/contact/event` | A `/robot/execute_motion` · (P2) `/robot/execute_path`, S `/robot/stop` | 두산 `dsr_msgs2` · RG2 |
 | `contact_detector` | contact_detector | `/contact/event` | `/robot/sample` · `/scan/state` | S `/contact/tare` | — |
-| `safety_monitor` | safety_monitor | `/safety/status` | `/robot/sample` · `/robot/status` · `/scan/state` · `/web/heartbeat` | S `/safety/reset` | S `/robot/stop` |
+| `safety_monitor` | safety_monitor | `/safety/status` | `/robot/sample` · `/robot/status` (계약의 `/scan/state` · `/web/heartbeat` 는 9/27 main 미구현 — 아래 L10 · L26) | S `/safety/reset` | S `/robot/stop` |
 | `mqtt_bridge` | mqtt_bridge | `/web/heartbeat` | `/robot/sample` · `/robot/status` · `/contact/event` · `/scan/*` · `/safety/status` · `/dsr01/joint_states` · (P2) `/weld/*` | — | A `/scan/run` · `/scan/home` · `/scan/resume`, S `/scan/stop` · `/scan/set_config` · `/safety/reset` · (P2) A `/weld/run` · `/weld/home` · S `/weld/stop` |
 | `weld_manager` **[P2]** | weld_manager | `/weld/state` · `/weld/result` · `/weld/log` | `/scan/state` · `/robot/status` · `/safety/status` · `/robot/sample` | A `/weld/run` · `/weld/home`, S `/weld/stop` | A `/robot/execute_path` · `/robot/execute_motion`, S `/robot/stop` |
 
@@ -36,7 +37,7 @@
 | L07 | `/scan/result` | T | ScanResult | scan_manager | mqtt_bridge | 형상 결과(작업 종료 시 1 회, 무효값 NaN + `*_valid`) |
 | L08 | `/scan/log` | T | ScanLog | scan_manager | mqtt_bridge | 시간순 로그 |
 | L09 | `/scan/state` | T | ScanState | scan_manager | contact_detector | `scan_id` 태깅 |
-| L10 | `/scan/state` | T | ScanState | scan_manager | safety_monitor | 단계별 감시 |
+| L10 | `/scan/state` | T | ScanState | scan_manager | safety_monitor | 단계별 감시. **계약에만 있고 9/27 main 의 safety_monitor 는 구독하지 않는다**(그림에서 회색 점선) |
 | L11 | `/robot/execute_motion` | A | ExecuteMotion | scan_manager | robot_manager | 단위 모션(MOVE_TO · DESCEND · SLIDE · HOME). Result = 정지 pose + 사유 |
 | L12 | `/contact/tare` | S | TareForce | scan_manager | contact_detector | 외력 기준값 F₀ |
 | L13 | `/robot/sample` | T | RobotSample | robot_manager | contact_detector | TCP · 힘 + `motion_id` · `operation` |
@@ -52,7 +53,7 @@
 | L23 | `/robot/stop` | S | StopRobot | safety_monitor | robot_manager | 안전 이상 정지(정지 경로 ③), 웹 경유 없음 |
 | L24 | `/safety/status` | T | SafetyStatus | safety_monitor | scan_manager | 래치면 시작 · 재시작 거절 |
 | L25 | `/safety/status` | T | SafetyStatus | safety_monitor | mqtt_bridge | 표시 |
-| L26 | `/web/heartbeat` | T | WebHeartbeat | mqtt_bridge | safety_monitor | MQTT `hb/web` 을 실제로 받았을 때만 |
+| L26 | `/web/heartbeat` | T | WebHeartbeat | mqtt_bridge | safety_monitor | MQTT `hb/web` 을 실제로 받았을 때만. **mqtt_bridge 는 발행하지만 safety_monitor 의 감시(`HB_EXPIRED` 405)는 9/27 main 미구현**(그림에서 회색 점선, `integration-audit_20260921.md` T33) |
 | L27 | `/safety/reset` | S | ResetSafety | mqtt_bridge | safety_monitor | 래치 해제(조건 해소 때만) |
 | L28 | `/contact/event` | T | ContactEvent | robot_manager | scan_manager | **v1.2 추가.** 스텝 모드 SLIDE 의 EDGE(계약 v0.1.15) |
 | L29 | `/contact/event` | T | ContactEvent | robot_manager | mqtt_bridge | **v1.2 추가.** 같은 이벤트의 표시 |
@@ -114,6 +115,7 @@
 | 2 | P04: `/dsr01/joint_states` 를 mqtt_bridge 가 표시 전용으로 중계 | 계약 v0.1.19 · v0.1.20, PR #179 |
 | 3 | W01~W17: phase 2 weld_manager · ExecutePath · 배타 규칙 · MQTT `weld/*` | 계약 v0.2.0, PR #184 · #198 |
 | 4 | 표기: 선마다 **타입**을 적었다(v1.1 은 이름 · 뜻만). 같은 두 노드 사이의 같은 방향 선은 그림에서 한 화살표에 모았다 | 강사 요구 "주고받는 데이터 형식 · 이름 · 연결 관계" |
-| 5 | 형식: drawio 대신 Graphviz(`06-node-graph.dot`). phase 2 줄은 `// P2` 로 표시해 뺀 판을 자동으로 만든다 | — |
+| 5 | 계약과 구현이 다른 선(L10 · L26)을 회색 점선으로 표시 | `safety_monitor.py:83-84` |
+| 6 | 형식: drawio 대신 Graphviz(`06-node-graph.dot`). phase 2 줄은 `// P2` 로 표시해 뺀 판을 자동으로 만든다 | — |
 
 v1.1 의 파라미터 이름 열은 옮기지 않았다. 계약에 속하는 파라미터 이름은 `ros-interfaces.md` 6.4절, phase 2 는 `weld-motion.md` 6절에 있다.
