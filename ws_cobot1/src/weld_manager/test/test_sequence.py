@@ -178,7 +178,22 @@ def test_goal_values_follow_the_plan(scan):
     assert first[2].path_tolerance_m == p.path_tolerance_m
     assert first[3].target == line.retreat and first[3].speed == p.travel_speed_mps
     assert all(r.orientation == line.orientation for r in first)
-    assert all(r.timeout_s == p.motion_timeout_s for _, r in ports.calls)
+    # 경로 goal 만 경유점 수 × path_point_dwell_s 만큼 제한 시간이 늘어난다(학민 #191 🔵). 나머지는 motion_timeout_s
+    for _, r in ports.calls:
+        if r.kind is MotionKind.PATH:
+            assert math.isclose(r.timeout_s, p.motion_timeout_s + len(r.waypoints) * p.path_point_dwell_s)
+        else:
+            assert r.timeout_s == p.motion_timeout_s
+    assert first[2].timeout_s > p.motion_timeout_s
+
+
+def test_path_timeout_grows_with_point_count(scan):
+    outcome, ports, plan = run(scan, end=0, path_point_dwell_s=2.0)
+    path = ports.calls[2][1]
+    assert path.kind is MotionKind.PATH and len(path.waypoints) == len(plan.lines[0].path)
+    assert math.isclose(path.timeout_s, 120.0 + 2.0 * len(path.waypoints))
+    outcome, ports, _ = run(scan, end=0, path_point_dwell_s=0.0)      # 0 = 늘리지 않는다
+    assert ports.calls[2][1].timeout_s == 120.0
 
 
 def test_end_line_three_does_only_the_top_loop(scan):
