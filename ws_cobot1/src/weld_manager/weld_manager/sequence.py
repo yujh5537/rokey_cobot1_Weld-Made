@@ -383,11 +383,13 @@ class WeldRunner(_Runner):
         self._move_to(f'{line.name} 접근 1', line.approach1, line.orientation, p.travel_speed_mps)
         self._move_to(f'{line.name} 접근 2', line.approach2, line.orientation, p.approach_speed_mps)
         self._notify(Signal.WELD)
+        # line 모드는 점마다 정지 확인(arrival_grace_s)이 붙어 100 점이면 120 s 를 넘는다(학민 #191 🔵).
+        # 경유점 수만큼 제한 시간을 늘린다. robot_manager 는 goal 의 timeout 을 그대로 지킨다
         self._execute(MotionRequest(
             MotionKind.PATH, f'{line.name} 경로', speed=p.weld_speed_mps,
             orientation=line.orientation, waypoints=line.path, line_index=index,
             path_length_m=line.path_length_m, path_tolerance_m=p.path_tolerance_m,
-            timeout_s=p.motion_timeout_s))
+            timeout_s=p.motion_timeout_s + len(line.path) * p.path_point_dwell_s))
         self._notify(Signal.RETREAT)
         # 5절 표 · 6절(38b55e8): P_ret 까지는 경로(weld_speed), 그 뒤 z_safe 상승은 travel_speed
         self._move_to(f'{line.name} 후퇴', line.retreat, line.orientation, p.travel_speed_mps)
