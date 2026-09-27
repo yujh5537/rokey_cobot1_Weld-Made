@@ -38,6 +38,16 @@
 - 2026-09-27(D35, 문서만): `ExecutePath` 거절 사유에 **출발점 z < `path_min_z_m`** 추가(수락 시점, 604). **출발점을 모르면(유효한 위치 샘플 없음) 604 로 거절**(학민 #199, 1차 SLIDE 의 같은 검사). 학민 #191 리뷰 🟡. robot_manager 코드는 #191 에서 반영(현지). 타입 변경 없음
 - 2026-09-27(문서만): `weld-motion.md` 6절에 weld_manager 파라미터 **`path_point_dwell_s`** 한 줄 — `ExecutePath` 제한 시간 = `motion_timeout_s` + 경유점 수 × 이 값(현지 #191 🔵 답, 구현 #195~#197). 타입 변경 없음
 
+## v0.1.22 (2026-09-27, 브리지 이름 표 · phase 2 대비)
+**타입 변경 없음.** 필드 · 번호를 더하거나 빼지 않았다. `mqtt-schema.md` 1장 enum 규칙에 한 줄을 더했다: **mqtt_bridge 의 이름 표에 없는 값은 메시지를 버리지 않고 `"UNKNOWN_<값>"` 으로 보낸다**(#90). 영향: mqtt_bridge(`encoders.py`) · 웹(모르는 이름을 받아도 나머지 필드를 그대로 쓴다).
+
+- **왜.** 예전에는 표에 없는 값에서 `encode_*` 가 `ValueError` 를 냈고, 구독 보호막이 그 메시지를 통째로 버렸다. **정작 알려야 할 코드일수록 웹이 못 받았다**(#90).
+- **`ROBOT_OPERATION_NAMES[5] = "WELD_PATH"`** 를 같이 넣었다. phase 2 에서 robot_manager 가 `ExecutePath` 실행 중 `OP_WELD_PATH=5` 를 싣는다(계약 v0.2.0 · #184, 발행은 #191). 표에 5 가 없으면 용접 중 `robot/sample` 이 통째로 버려져 웹의 TCP 위치 · 궤적이 멈춘다.
+- 표가 계약과 어긋난 채 조용히 굴러가지 않게 막는 것은 이 규칙이 아니라 `mqtt_bridge/test/test_enum_tables.py` 의 표 대조 시험이다(#161). **`UNKNOWN_<값>` 은 계약에 상수를 더한 뒤 표를 안 고쳐도 된다는 뜻이 아니다** — 이름 표는 계약과 같게 유지한다.
+- 웹 → ROS 방향은 바꾸지 않았다. 웹이 보낸 모르는 이름은 그대로 `INVALID_VALUE` 로 거절한다(모르는 명령을 짐작해 실행하지 않는다).
+- **머리 버전 표기(3행)는 이 PR 에서 건드리지 않았다.** #161 이 `b83cae6` 으로 같은 줄에 v0.1.21 을 넣어서, 양쪽이 같은 줄을 고치면 머지할 때 충돌한다. v0.1.22 한 줄은 두 PR 이 다 들어간 뒤에 따로 더한다.
+- 시험은 `test_encoders.py` 가 아니라 새 파일 `mqtt_bridge/test/test_enum_names.py` 에 두었다. 같은 이유다 — #161 이 `test_encoders.py` 의 import 블록과 파일 끝을 고친다.
+
 ## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
 - 실측 종단에서 `/dsr01/joint_states` publisher가 2개임을 확인했다: `/dsr01/joint_state_broadcaster`는 M0609 J1~J6 6축, `/dsr01/joint_state_publisher`는 M0609 6축 + RG2 6축 합성 스냅샷

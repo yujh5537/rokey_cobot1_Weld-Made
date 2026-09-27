@@ -10,7 +10,13 @@ from mqtt_bridge.conversions import (
 
 SCHEMA_VERSION = "0.1"
 
-ROBOT_OPERATION_NAMES = {0: "NONE", 1: "MOVE_TO", 2: "DESCEND", 3: "SLIDE", 4: "HOME"}
+ROBOT_OPERATION_NAMES = {
+    0: "NONE", 1: "MOVE_TO", 2: "DESCEND", 3: "SLIDE", 4: "HOME",
+    # phase 2 용접 (계약 v0.2.0, #184). robot_manager 가 ExecutePath 실행 중에 이 값을 싣는다(#191).
+    # 이 줄이 없으면 encode_robot_operation 이 ValueError 를 내고 구독 보호막이 robot/sample 을
+    # 통째로 버린다 — 용접 중 웹의 TCP 위치 · 궤적이 멈춘다
+    5: "WELD_PATH",
+}
 REASON_NAMES = {
     0: "OK",
     100: "BUSY", 101: "INVALID_REQUEST", 102: "INVALID_VALUE",
@@ -42,9 +48,19 @@ SAFETY_LEVEL_NAMES = {0: "OK", 1: "WARN", 2: "STOP"}
 
 
 def _enum_name(table, value, label):
-    if value not in table:
-        raise ValueError(f"unknown {label}: {value}")
-    return table[value]
+    """값 -> 이름. **표에 없는 값도 버리지 않고 "UNKNOWN_<값>" 으로 보낸다** (#90).
+
+    예전에는 ValueError 를 냈다. 그러면 구독 보호막(_safe_ros_callback)이 그 메시지를 통째로
+    버리거나 완료 통지가 아예 나가지 않아, **정작 알려야 할 코드일수록 웹이 못 받았다**.
+    이름을 모르는 것보다 소식이 끊기는 것이 나쁘다.
+
+    표가 계약과 어긋난 채로 조용히 굴러가지 않게 하는 것은 이 함수가 아니라
+    `test/test_enum_tables.py` 의 표 대조 시험이다(표에 없는 상수가 생기면 CI 가 실패한다).
+    """
+    name = table.get(value)
+    if name is None:
+        return f"UNKNOWN_{int(value)}"
+    return name
 
 
 def encode_robot_operation(value):
