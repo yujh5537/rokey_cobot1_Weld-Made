@@ -91,5 +91,7 @@ ros2 topic echo /weld/state    # IDLE → PREPARING → (APPROACH → WELDING �
 ## 알려진 문제 · 의존
 
 - robot_manager `on_path_goal_request` 의 순응 · 힘 제어 검사는 해제 *호출 성공* 플래그다(#125 전까지). 호출은 성공했는데 실제로 안 풀린 경우를 이 안전망이 통과시킨다. ExecutePath 는 100 mm/s 까지라 1차 SLIDE 보다 대가가 크다(학민 #191 리뷰 ④).
+- 노드를 다시 띄운 뒤 아직 용접을 한 번도 계획하지 않았으면 `/weld/home` 은 z_safe 를 몰라 **물러난 뒤 바로 OP_HOME(관절 이동)** 이다. `/weld/home` 은 스캔 진행 여부를 보지 않는다(계약 7.1 에 요구 없음). 9/29 관제자는 자세를 보고 누른다(독립 재검 🔵9).
+- D33 의 z_safe 판정 · 복구 출발점은 실패한 goal 의 Result **뒤에 찍힌** `/robot/sample` 만 쓴다(`sample_timeout_s` 안에 없으면 위치 모름 → ERROR). 멈추기 전 샘플로 "z_safe 위" 를 잘못 판정하지 않게 한다(독립 재검 🟡3).
 - `/weld/home` 에서 현재 위치를 모르면(샘플 없음) 물러남 · 올림 없이 OP_HOME 만 보낸다 — 기울인 자세에서 곧장 관절 이동이 나가므로 관제자가 보고 누른다(7.2).
 - 브리지 `weld/*` 중계(P4, 의석) · 브리지 operation/reason 표 PR(머지 순서 0 번)이 아직 없다. 그 전까지 웹 없이 `ros2 action send_goal` 로 시연한다.

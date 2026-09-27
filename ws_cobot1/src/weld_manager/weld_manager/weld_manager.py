@@ -299,6 +299,25 @@ class WeldManager(Node):
         future.add_done_callback(lambda _future: done.set())
         return self._wait(done.is_set, timeout_s, done.wait)
 
+    def wait_sample_after(self, after_ns: int, timeout_s: float):
+        """after_ns 뒤에 찍힌(pose_stamp) 유효 /robot/sample 을 기다린다. (샘플, 문제).
+
+        D33 의 z_safe 판정 · 복구 출발점은 **멈춘 뒤의 자리**여야 한다(ros2-nodes 규칙: 판정 샘플과 정지 뒤 좌표를 구분).
+        Result 를 받은 뒤에 부르므로, 그보다 늦게 찍힌 샘플은 정지 확인 뒤의 자리다(독립 재검 🟡3).
+        """
+        if after_ns <= 0:
+            return None, 'ROS 시계가 0 이다(use_sim_time 인데 /clock 없음?)'
+
+        def fresh():
+            s = self._sample
+            return (s is not None and s.valid
+                    and s.pose_stamp.sec * 1_000_000_000 + s.pose_stamp.nanosec > after_ns)
+
+        with self._status_cond:
+            if not self._wait(fresh, timeout_s, self._status_cond.wait):
+                return None, f'{timeout_s} s 안에 정지 뒤 /robot/sample 이 오지 않았다'
+            return self._sample, ''
+
     def wait_still(self, timeout_s) -> bool:
         """요청 뒤에 찍힌 /robot/status 로 connected && !moving 을 확인한다(요청 전의 옛 moving=false 로 통과시키지 않는다)."""
         asked_at = self.get_clock().now().nanoseconds
@@ -692,7 +711,9 @@ class _NodePorts(Ports):
         return self._node.wait_still(self._p.stop_confirm_timeout_s)
 
     def current_pose(self):
-        sample, why = self._node._fresh_sample(self._p.sample_timeout_s)
+        # 부르는 시점 = 실패한 goal 의 Result 를 받은 직후. 그 뒤에 찍힌 샘플만 쓴다(멈추기 전 샘플로 판정하지 않는다)
+        asked = self._node.get_clock().now().nanoseconds
+        sample, why = self._node.wait_sample_after(asked, self._p.sample_timeout_s)
         if sample is None:
             self._node.log('warn', Reason.NO_SAMPLE, f'팁 위치를 모른다: {why}')
             return None
