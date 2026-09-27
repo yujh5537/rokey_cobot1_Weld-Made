@@ -11,6 +11,7 @@
   <depend>contact_scan_interfaces</depend>
   <depend>builtin_interfaces</depend>
   <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
 
   <exec_depend>python3-paho-mqtt</exec_depend>
 

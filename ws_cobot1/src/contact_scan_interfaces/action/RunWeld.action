@@ -1,0 +1,15 @@
+# RunWeld.action  (/weld/run)
+string request_id
+string scan_id              # 용접할 스캔 결과. "" = result_store 의 가장 최근 성공 결과
+uint8 start_line            # 0~7. 이 선부터 순서대로. 앞 선은 SKIPPED
+uint8 end_line              # 0~7, start_line 이상. 이 선까지. 뒤 선은 SKIPPED. 웹 기본값 7 (goal 에서 0 이면 "0번 선까지"다 — 생략이 아니다)
+bool use_override
+WeldConfig config_override
+---
+string weld_id
+bool success                # 명령 전체(마무리 홈 복귀 포함)의 성공 여부
+uint16 reason_code
+string detail
+WeldResult result           # /weld/result 와 같은 내용. result.success 는 용접선의 성공 여부
+---
+WeldState state

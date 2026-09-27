@@ -7,7 +7,8 @@
 
 import itertools
 import math
-import os
+from pathlib import Path
+import sys
 
 from conftest import FRESH_STATUS
 from scan_manager import geometry_adapter
@@ -70,20 +71,14 @@ HOME_POSITION = (0.42, -0.18, 0.29)
 SIGN = {Direction.POS_X: 1.0, Direction.NEG_X: -1.0, Direction.POS_Y: 1.0, Direction.NEG_Y: -1.0}
 
 
-# 이 조에 배정된 ROS_DOMAIN_ID 는 30~39 다. 30 은 조 공용(실기 · 팀원의 Virtual)이라 쓰지 않는다.
-# 범위 밖 번호는 같은 망의 다른 조와 섞인다.
-TEST_DOMAIN_IDS = range(31, 40)
-
-
-def isolated_ros_env() -> dict:
-    """노드 테스트가 쓸 ROS 환경 변수. 다른 테스트 · 떠 있는 노드 · 실기와 섞이지 않게 한다.
-
-    - ROS_DOMAIN_ID: 31~39 중 하나(PID 로 고른다. 같은 PC 의 다른 테스트 프로세스와 겹칠 확률을 줄인다).
-    - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST: 이 PC 밖으로 나가지 않는다. 가짜 상대 노드에 보내는 goal 이
-      같은 망의 robot_manager(Virtual · 실기)로 갈 길을 막는 것은 이 설정이다(CLAUDE.md 규칙 1).
-    """
-    domain = TEST_DOMAIN_IDS[os.getpid() % len(TEST_DOMAIN_IDS)]
-    return {'ROS_DOMAIN_ID': str(domain), 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'LOCALHOST'}
+# 노드 테스트가 쓸 ROS 환경 변수는 공용 헬퍼가 고른다(#126). PID 로 고르던 방식은 실행마다
+# 1/9 로 겹쳤다. 헬퍼는 살아 있는 프로세스가 쓰는 번호를 /proc 으로 빼고, 남은 번호를 락으로
+# 점유하고, 다 차면 에러로 멈춘다. ROS 를 source 하지 않은 셸에서도 돌게 소스 경로를 대비로 둔다.
+try:
+    from contact_scan_testing import isolated_ros_env  # noqa: E402,F401
+except ImportError:  # pragma: no cover - ROS 를 source 하지 않은 셸
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'contact_scan_interfaces'))
+    from contact_scan_testing import isolated_ros_env  # noqa: E402,F401
 
 
 def make_params(**overrides):

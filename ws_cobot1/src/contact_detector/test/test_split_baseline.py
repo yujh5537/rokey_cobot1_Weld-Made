@@ -237,6 +237,32 @@ def test_descend_after_another_operation_restarts_even_with_the_same_motion_id()
     assert d.contact_hold
 
 
+def ramp_descent(rate_n_per_s, start_s=7.0, seconds=20.0):
+    """settle 뒤 공중에서 일정한 F 로 내려가다 start_s 부터 Fz 가 rate 로 직선으로 오른다(느리게 눌리는 접촉)."""
+    samples = []
+    for i in range(int(seconds / DT)):
+        t = i * DT
+        fz = STATIC_F0[2] + max(t - start_s, 0.0) * rate_n_per_s
+        samples.append(Sample(
+            sample_id=1 + i, pose_stamp=t, force_stamp=t + 0.004, position=(0.4236, -0.1861, Z0 - V_DOWN * t),
+            force=(STATIC_F0[0], STATIC_F0[1], fz), motion_id=1, operation=OP_DESCEND))
+    return samples
+
+
+@pytest.mark.parametrize('rate, found', [(6.0, True), (3.0, False)])
+def test_slow_contact_boundary(rate, found):
+    """#139: 이동 기준은 느린 변화를 흡수한다. 직선 상승이면 |F - F0| 가 rate × (window + lag)/2 = rate × 0.65 s 에서
+    멈추므로 경계는 3.0 / 0.65 ≈ 4.6 N/s. 그보다 느리면 CONTACT 없이 과대 외력까지 눌린다(실기는 약 100 N/s)."""
+    boundary = CONFIG.contact_threshold_n / ((DESCEND_REF.window_s + DESCEND_REF.lag_s) / 2)
+    assert (rate > boundary) == found
+    detections = run(detector(), ramp_descent(rate))
+    if found:
+        assert contact_before_over_force(detections) and not contacts(detections)[0].hold
+    else:
+        assert not contacts(detections)
+        assert TYPE_OVER_FORCE in [x.type for x in detections]
+
+
 def test_config_rejects_bad_descend_ref_values():
     for bad in (dict(window_s=0.0), dict(lag_s=1.0), dict(lag_s=-0.1), dict(min_samples=0),
                 dict(hold_threshold_n=0.0), dict(settle_s=0.5), dict(settle_s=math.nan)):
