@@ -512,6 +512,7 @@ def test_continue_can_be_turned_off(scan):
 
 
 @pytest.mark.parametrize('result', [
+    MotionResult(reason=MR.ROBOT_ERROR, reason_code=0, detail='코드 없음'),      # 204 를 명시하지 않은 실패(재검 🔵6)
     MotionResult(reason=MR.REJECTED, reason_code=604, detail='z < path_min_z_m'),
     MotionResult(reason=MR.STOP_REQUESTED, reason_code=200),
     MotionResult(reason=MR.OVER_FORCE, reason_code=400),
