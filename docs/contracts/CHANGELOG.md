@@ -26,7 +26,8 @@
 - **`ROBOT_OPERATION_NAMES[5] = "WELD_PATH"`** 를 같이 넣었다. phase 2 에서 robot_manager 가 `ExecutePath` 실행 중 `OP_WELD_PATH=5` 를 싣는다(계약 v0.2.0 · #184, 발행은 #191). 표에 5 가 없으면 용접 중 `robot/sample` 이 통째로 버려져 웹의 TCP 위치 · 궤적이 멈춘다.
 - 표가 계약과 어긋난 채 조용히 굴러가지 않게 막는 것은 이 규칙이 아니라 `mqtt_bridge/test/test_enum_tables.py` 의 표 대조 시험이다(#161). **`UNKNOWN_<값>` 은 계약에 상수를 더한 뒤 표를 안 고쳐도 된다는 뜻이 아니다** — 이름 표는 계약과 같게 유지한다.
 - 웹 → ROS 방향은 바꾸지 않았다. 웹이 보낸 모르는 이름은 그대로 `INVALID_VALUE` 로 거절한다(모르는 명령을 짐작해 실행하지 않는다).
-- `mqtt-schema.md` 머리 버전 표기에 **v0.1.21(#161)** 이 빠져 있던 것도 같이 채웠다(문서만).
+- **머리 버전 표기(3행)는 이 PR 에서 건드리지 않았다.** #161 이 `b83cae6` 으로 같은 줄에 v0.1.21 을 넣어서, 양쪽이 같은 줄을 고치면 머지할 때 충돌한다. v0.1.22 한 줄은 두 PR 이 다 들어간 뒤에 따로 더한다.
+- 시험은 `test_encoders.py` 가 아니라 새 파일 `mqtt_bridge/test/test_enum_names.py` 에 두었다. 같은 이유다 — #161 이 `test_encoders.py` 의 import 블록과 파일 끝을 고친다.
 
 ## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.

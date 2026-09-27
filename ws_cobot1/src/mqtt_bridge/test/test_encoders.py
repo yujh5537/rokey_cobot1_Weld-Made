@@ -4,10 +4,9 @@ import json
 import math
 
 from mqtt_bridge.encoders import (
-    ROBOT_OPERATION_NAMES,
-    encode_command_ack, encode_contact_event, encode_reason_name,
-    encode_robot_operation, encode_robot_sample, encode_ros_connection,
-    encode_ros_heartbeat, encode_scan_config, encode_scan_result,
+    encode_command_ack, encode_contact_event, encode_robot_sample,
+    encode_ros_connection, encode_ros_heartbeat, encode_scan_config,
+    encode_scan_result,
 )
 
 
@@ -119,50 +118,3 @@ def test_config_ack_heartbeat_connection():
     assert ack["applied"]["edge_drop_mm"] == 0.5
     assert encode_ros_heartbeat(3, 11)["seq"] == 3
     assert encode_ros_connection(True, 12)["connected"] is True
-
-
-# --- 이름 표 (#90, 계약 v0.1.22) ---------------------------------------------
-
-def _weld_sample(operation):
-    return {
-        "sample_id": 1, "frame_id": "base_link",
-        "pose": {"x": .1, "y": 0.0, "z": .05, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0},
-        "pose_stamp": {"sec": 1, "nanosec": 20_000_000},
-        "wrench": {"fx": 0.0, "fy": 0.0, "fz": -1.0, "tx": 0.0, "ty": 0.0, "tz": 0.0},
-        "force_stamp": {"sec": 1, "nanosec": 24_000_000},
-        "valid": True, "motion_id": 8, "operation": operation,
-    }
-
-
-def test_weld_path_operation_has_a_name():
-    """phase 2 의 OP_WELD_PATH=5. 이 이름이 없으면 용접 중 robot/sample 이 통째로 버려진다."""
-    assert ROBOT_OPERATION_NAMES[5] == "WELD_PATH"
-    assert encode_robot_operation(5) == "WELD_PATH"
-
-
-def test_weld_path_operation_encodes_in_a_sample():
-    """#191 이 싣는 operation=5 가 실제 robot/sample JSON 에서 이름으로 나온다."""
-    assert encode_robot_sample(_weld_sample(5), 1002)["operation"] == "WELD_PATH"
-
-
-def test_unknown_value_becomes_unknown_name_instead_of_raising():
-    """표에 없는 값에서 멈추지 않는다. 이름을 모르는 것보다 소식이 끊기는 것이 나쁘다 (#90)."""
-    assert encode_robot_operation(7) == "UNKNOWN_7"
-    assert encode_reason_name(999) == "UNKNOWN_999"
-
-
-def test_unknown_reason_still_leaves_the_number_usable():
-    """이름을 몰라도 숫자는 그대로 간다. 웹은 reason_code 로 판단할 수 있다."""
-    ack = encode_command_ack("id", False, 999, "모르는 사유", 10, config())
-    assert ack["reason_code"] == 999
-    assert ack["reason"] == "UNKNOWN_999"
-    json.dumps(ack, allow_nan=False)
-
-
-def test_robot_sample_survives_an_unknown_operation():
-    """모르는 operation 하나 때문에 TCP 위치 · 힘이 사라지지 않는다."""
-    out = encode_robot_sample(_weld_sample(7), 1001)
-    assert out["operation"] == "UNKNOWN_7"
-    assert out["pose"]["x_mm"] == 100.0
-    assert out["wrench"]["fz_n"] == -1.0
-    json.dumps(out, allow_nan=False)

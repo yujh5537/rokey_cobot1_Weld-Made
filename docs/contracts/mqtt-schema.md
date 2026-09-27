@@ -1,6 +1,6 @@
 # MQTT 토픽·JSON 스키마 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석) · **v0.1.19** (2026-09-22, T41: M0609 웹 관절 시각화용 `robot/joints` 추가) · **v0.1.20** (2026-09-22, T41: RG2 관절 표시용 `robot/gripper_joints` 분리) · **v0.1.21** (2026-09-23, #161: `robot/status` 에 SLIDE 누름 목표 6개 · ReasonCode 407) · **v0.1.22** (2026-09-27, 브리지 표: 이름 표에 없는 값은 `UNKNOWN_<값>`, #90). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석) · **v0.1.19** (2026-09-22, T41: M0609 웹 관절 시각화용 `robot/joints` 추가) · **v0.1.20** (2026-09-22, T41: RG2 관절 표시용 `robot/gripper_joints` 분리). 변경은 PR + `CHANGELOG.md`로만 한다.
 이 문서 한 장이 ROS 쪽(의석, mqtt_bridge. scan_manager 쪽 접점은 병후)과 웹 쪽(의석, FastAPI)의 유일한 접점이다. 의석의 목업 발행기(`backend/mock_publisher`)와 mqtt_bridge 테스트는 **아래 예시를 그대로** 쓴다.
 
 브로커: 웹 PC의 Mosquitto 1개. 주소·포트는 `docker/.env`.
