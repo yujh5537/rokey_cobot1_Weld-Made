@@ -689,3 +689,44 @@ React 화면의 명령 상태가 동일한지 확인했다.
 Mock 통합 검증이다.
 
 실제 ROS 통합 검증은 별도 통합 단계에서 수행한다.
+
+## 파라미터 · 환경변수
+
+| 이름 | 출발값 | 실기 값 | 근거 |
+|---|---|---|---|
+| `VITE_BASE_TO_FIXTURE_MM` | 없음(미설정 시 변환 생략) | `420.255,-156.675,95.006` | 계약 `units-frames.md` [v0.1.18 잠정]. 부재 윗면 중심 x·y + 작업대 표면 z |
+| `VITE_TABLE_ORIGIN_MM` | 없음 | `420.255,-156.675,95.006` | 작업대 시각 모델 위치. 위와 같은 값 |
+| `DISPLAY_SCALE` (코드 상수) | `0.01` | 0.01 | mm → Three.js 단위 |
+| 로그 패널 보관 | `100` 줄 | 100 | `slice(-100)` |
+| 궤적 점 보관 | `1000` 점 | 1000 | TCP 궤적 |
+
+`VITE_*` 는 **빌드 · dev 서버 기동 시점**에 읽힌다. 바꾸면 `npm run dev` 를 다시 띄워야 한다.
+
+## 측정값 (TR-05, 2026-09-22 실기)
+
+| 항목 | 기준 (BRD 9장) | 측정 | 판정 |
+|---|---|---|---|
+| 화면 반영 지연 | ≤ 200 ms | 평균 2.64 ms · **최대 312 ms** | **FAIL** |
+| 중지 반응 표시 | ≤ 1000 ms | 기준 만족 | 합격 |
+| 설정 등록 버튼 | BRD 4.4.2 | **UI 미구현** | FAIL |
+
+근거: `docs/test-reports/TR-05_20260922.md`. 평균은 기준의 1/75 인데 최대값 하나가 기준을 넘었다. **최대값을 낸 개별 토픽은 분리하지 못했다** — 재시험 때 `topic / scan_id / published_at_ms / received_at_ms / latency_ms` 를 함께 기록한다.
+
+## 알려진 문제 · 열린 이슈
+
+| 번호 | 내용 | 상태 |
+|---|---|---|
+| — | **화면 반영 지연 최대 312 ms > 200 ms** (TR-05 FAIL) | 이슈 미생성. 재시험 필요 |
+| — | **`cmd/scan/set_config` 버튼 미구현** (BRD 4.4.2) | 이슈 미생성 |
+| — | **'재시작' 기능 미구현.** 계약 v0.1.21(#161)로 `ERROR` 에서도 재시작을 받게 됐다 — 허용 목록 `SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)` 뿐이고, `/safety/reset` 뒤에만 가능하다. 버튼 활성 조건이 `phase === 'STOPPED'` 에서 `STOPPED \|\| (ERROR && reason_code ∈ {403,404,407} && 래치 해제)` 로 바뀐다 | 미착수 |
+| — | **retain 스냅샷이 없다.** 브라우저를 새로고침하면 `robot/status` · `scan/state` · `safety/status` 를 다시 받기 전까지 화면이 비어 있다. FastAPI 가 retain 값을 들고 있다가 WebSocket 연결 직후 밀어 주면 된다 | 미착수. phase 2 에서 `weld/state` 가 더해져 retain 토픽이 4개가 된다 |
+| — | **Spring(8080) 미연동.** `vite.config.js` proxy 에 `/api` 가 없고 `frontend/src` 에 8080 호출이 없다. 이력 API 는 만들어져 있다(`/api/history/scans`) | 9/29 뒤 후속 |
+| [#90](../../issues/90) | 표에 없는 코드가 오면 브리지가 메시지를 버린다 → 화면이 멈춘다 | PR #200 이 닫는다 |
+
+## 계약과의 접점
+
+화면에 뜨는 값은 전부 `docs/contracts/mqtt-schema.md` 의 JSON 그대로다. 특히:
+
+- **`null` 을 0 으로 그리지 않는다** (계약 1장 무효 값). `formatNumber()` 가 `Number.isFinite` 로 거른다
+- **`slide_force_estimate_n` 은 추정값이다.** 계약 3.2 표대로 화면에 **"추정"** 이라고 표시한다. 실측으로 쓰면 안 된다 (v0.1.21)
+- `reason_code`(숫자)와 `reason`(이름)을 함께 보여 준다. 이름을 모르면(`UNKNOWN_<n>`) 숫자로 판단한다
