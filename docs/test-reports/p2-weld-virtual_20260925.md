@@ -39,6 +39,21 @@ D33 코드(선 실패 뒤 계속)를 넣고 `run()` 을 `_run_line` 로 나눈 �
 
 정리: `docker rm -f dsr01_emulator`, 노드 종료. `tool_roll_deg` 는 노드 메모리에서만 바꿨다(yaml 은 그대로).
 
+## 4. 9/27 재검 — 스택 C 머리 `2c70131` (독립 재검 🟡2)
+
+9/25 기록 뒤 #198(D30 물러남 · D33 좁힘) · D34 `top_line_offset_dir` · `path_point_dwell_s` 경로 timeout · D33 판정 샘플 시각(🟡3) · 204 명시(🔵6)가 들어가 다시 돌렸다.
+- 빌드: 스택 C 트리 전체를 `build_p2/install_p2` 에 새로 빌드(symlink 없음). 이 트리의 robot_manager 는 스택 base `a81cc2d` 라 **D35(#191 `7ed943c`)는 들어 있지 않다**.
+- 실행: 현지 PC, Claude, `ROS_DOMAIN_ID=36` · LOCALHOST, 에뮬레이터 1 개. `/scan/home` → `/scan/run` → `/weld/run`(L0~L7, `top_line_offset_dir: tool`) → `ros2 param set /weld_manager top_line_offset_dir vertical` → `/weld/run` 다시.
+
+| 항목 | 결과 |
+|---|---|
+| 스캔 | `success=true`, 약 81 s(18:09:47 → 18:11:08) |
+| 용접 · `tool` | `success=true` · 8 선 `DONE` · **246 s** · weld_id `20260927-181112-6925` · 경로 점 27/17/27/17/11/11/11/11 |
+| 용접 · `vertical`(D34) | `success=true` · 8 선 `DONE` · **239 s** · weld_id `20260927-181518-5568` · 경로 점 같음(오프셋만 바뀌고 경로는 그대로). 세로선은 계약대로 항상 `tool`. 접근점 좌표는 robot_manager 로그에 없어 순수 시험(`test_top_line_offset_vertical_moves_approach_straight_up`)으로 확인 |
+| 안전 이벤트 | 작업 중 0 건. 기동 직후 SAMPLE_STALE 2 건(에뮬레이터 연결이 늦게 붙는 동안, 래치 403) → `/safety/reset` 뒤 시작. 기동 절차 문제이고 weld_manager 와 무관 |
+
+기동 절차 메모(Virtual): `sodvir` 의 "Configured and activated dsr_controller2" 뒤에도 에뮬레이터 접속 재시도가 이어질 수 있다. bringup 은 `/robot/status.connected=true` 를 본 뒤 띄우고, 기동 중 래치가 걸렸으면 `/safety/reset` 으로 푼다.
+
 ## 3. 남는 것 (9/29 실기)
 
 - 실기에서 L1 · L5 가 45° 로 도달 불가(M1, D27). D33 대로 그 두 선만 FAILED 로 남고 6 선이 DONE 인지, 실패 선의 "약 2 s"(재전송 1 회 + `arrival_grace_s` × 2)가 실제로 얼마인지.
