@@ -147,7 +147,12 @@ class PathRunner:
         node.get_logger().warning(
             f'{label}: {self.grace_s} s 안에 출발하지 않았다. 다시 보낸다 ({motion.restarts}/{self.restart_max})')
         if not node.call_sync(node.srv_clients['move_stop'], dsr_client.move_stop_request(), 'move_stop'):
-            return (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, f'{label}: 재출발 전 move_stop 응답 없음')
+            # 셋 중 가장 나쁜 경우(학민 #193): 이동 명령이 살아 있는 것을 알면서 세우는 호출까지 실패했다.
+            # 자리를 비우기 전에 멈출 때까지 기다리는 stop_robot 으로 확인한다(_send_failed 와 같은 모양)
+            stopped, why = node.stop_robot(f'{label} 재출발 전 move_stop 실패 뒤 정지 확인', motion)
+            return (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    f'{label}: 재출발 전 move_stop 응답 없음(이동 명령이 살아 있을 수 있다)'
+                    + ('' if stopped else f'. {why}'))
         if not send():
             return self._send_failed(f'{label} 재출발')
         motion.sent_s = node.now_s()

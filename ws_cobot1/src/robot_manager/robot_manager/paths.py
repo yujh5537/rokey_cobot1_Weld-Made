@@ -74,10 +74,12 @@ def _quaternion_problem(q):
 
 
 def path_problem(waypoints: Sequence[Waypoint], frame_id: str, speed_mps: float,
-                 path_tolerance_m: float, limits: PathLimits) -> Optional[str]:
+                 path_tolerance_m: float, limits: PathLimits, start=None) -> Optional[str]:
     """goal 을 거절할 이유(`PATH_REJECTED` 의 detail), 없으면 None. 계약 5.2 의 순서대로 본다.
 
     z 하한은 경유점 **전부**를 수락 시점에 본다. 실행 도중에 걸러서 멈추면 이미 일부를 지난 뒤다.
+    start: 수락 시점의 현재 위치(Base x · y · z). D35(#199): 첫 구간은 현재 위치 → 첫 경유점이라 출발점도 울타리
+    안이어야 한다. **모르면(유효한 위치 샘플이 없다) 거절**한다 — 1차 SLIDE 의 "마지막 위치를 모르면 거절"과 같다.
     """
     n = len(waypoints)
     if n == 0:
@@ -103,6 +105,12 @@ def path_problem(waypoints: Sequence[Waypoint], frame_id: str, speed_mps: float,
         if w.position[2] < limits.min_z_m:
             return (f'경유점 {i} 의 z {w.position[2]:.4f} m 가 path_min_z_m {limits.min_z_m:.4f} '
                     f'보다 낮다')
+    if start is None:
+        return '출발점(현재 위치)을 모른다 — 유효한 위치 샘플이 없다(D35)'
+    if len(start) != 3 or not _finite(*start):
+        return f'출발점 {start!r} 이 숫자가 아니다(D35)'
+    if start[2] < limits.min_z_m:
+        return f'출발점 z {start[2]:.4f} m 가 path_min_z_m {limits.min_z_m:.4f} 보다 낮다(D35)'
     return None
 
 

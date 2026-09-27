@@ -726,8 +726,10 @@ class RobotManager(Node):
         runner = None
         try:
             limits, problem = self.path_limits()
+            # D35(#199): 출발점(현재 위치) z 도 같은 울타리로 본다. 모르면 거절
             problem = problem or paths.path_problem(waypoints, goal.frame_id, goal.speed,
-                                                    goal.path_tolerance_m, limits)
+                                                    goal.path_tolerance_m, limits,
+                                                    start=motion.start_position)
             if problem:     # 로봇은 움직이지 않았다. 샘플의 operation 도 바꾸지 않는다
                 reason, code, detail = ExecutePath.Result.REASON_REJECTED, ReasonCode.PATH_REJECTED, problem
             else:
