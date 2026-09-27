@@ -380,7 +380,13 @@ def plan_line(scan: ScanInput, index: int, params: WeldParams) -> Tuple[LinePlan
         raise PathRejected(f'{spec.name}: {problem}')
     points = weave_points(start, end, offset, frame.weave,
                           params.weave_amplitude_m, params.weave_pitch_m)
-    back = _scale(frame.z, -params.approach_m)            # 툴 축 뒤로
+    # 접근 · 후퇴 오프셋(5절 · D34): 기본은 툴 축 뒤(−d). 윗면선만 top_line_offset_dir='vertical' 이면 수직 위(+z) —
+    # 9/29 첫 2 자세(L0 후퇴점 · L6 접근 1, 플랜지 733 · 729 mm)가 도달 불가일 때 M1 이 실제로 도달한 자세(목표 위 수직)로.
+    # 세로선은 수직 위가 부재 옆면 안이라 항상 툴 축 뒤다
+    if spec.vertical or params.top_line_offset_dir == 'tool':
+        back = _scale(frame.z, -params.approach_m)        # 툴 축 뒤로
+    else:
+        back = (0.0, 0.0, params.approach_m)              # 수직 위로 (작업대 좌표 z)
     p_app = _add(points[0], back)
     p_ret = _add(points[-1], back)
     z_safe = scan.z_top + params.travel_clearance_m
