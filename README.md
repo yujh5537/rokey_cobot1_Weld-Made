@@ -47,6 +47,8 @@ docs/            BRD, 아키텍처, 계약, 결정 기록, 환경, 시험 결과
 
 > **중요:** 실기 파라미터는 `main`의 `real.yaml`을 기준으로 사용한다. 런타임에서 임의로 덮어쓰기보다 bringup 뒤 `ros2 param get`으로 실제 적용값을 확인한다.
 
+> **소스 zip 으로 받았다면 경로에 한글이 없는 곳에 푼다.** 경로에 한글이 있으면 `contact_scan_interfaces` 가 rosidl CMake 단계에서 빌드되지 않는다. 예: `~/collaboration/weld-made` (O) · `~/바탕화면/weld-made` (X).
+
 ## 2. Web PC — W0 / W1 / W2 / W3
 
 ### W0 — 최신 main 동기화
@@ -181,6 +183,8 @@ OK: tool=rg2_probe, tcp=rg2_probe_tip [0.0, 0.0, 252.12]
 ```
 
 Real Driver를 다시 띄웠다면 START 전에 Tool/TCP를 다시 등록하고 마지막 `OK`를 확인한다.
+
+**탐침을 바꾸거나 다시 물렸다면** `apply_tool_tcp.py` 로 등록하는 TCP `z` 만으로는 부족하다. `x · y` 는 같은 자세에서 틀려도 드러나지 않으므로 `docs/env/` 의 `tcp_xy_from_180.py`(J6 를 180° 돌려 x · y 확인)와 필요하면 `pivot_tcp.py`(피벗 보정으로 오프셋 계산)를 같이 실행한다. 두 스크립트는 순수 계산이고 로봇에 연결하지 않는다 — **로봇 조그는 사람이 한다.** 절차는 `docs/contracts/units-frames.md` '탐침 상태 전제조건'.
 
 ### M3 — contact_scan bringup
 
