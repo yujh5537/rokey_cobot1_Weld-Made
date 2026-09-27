@@ -1,6 +1,6 @@
 # MQTT 토픽·JSON 스키마 계약
 
-상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석) · **v0.1.19** (2026-09-22, T41: M0609 웹 관절 시각화용 `robot/joints` 추가) · **v0.1.20** (2026-09-22, T41: RG2 관절 표시용 `robot/gripper_joints` 분리). 변경은 PR + `CHANGELOG.md`로만 한다.
+상태: **v0.1 동결** (2026-09-18, T01 1차 회의 병후·의석) · **v0.1.19** (2026-09-22, T41: M0609 웹 관절 시각화용 `robot/joints` 추가) · **v0.1.20** (2026-09-22, T41: RG2 관절 표시용 `robot/gripper_joints` 분리) · **v0.1.21** (2026-09-23, #161: `robot/status` 에 SLIDE 누름 목표 6개 · ReasonCode 407) · **v0.1.22** (2026-09-27, 브리지 표: 이름 표에 없는 값은 `UNKNOWN_<값>`, #90). 변경은 PR + `CHANGELOG.md`로만 한다.
 이 문서 한 장이 ROS 쪽(의석, mqtt_bridge. scan_manager 쪽 접점은 병후)과 웹 쪽(의석, FastAPI)의 유일한 접점이다. 의석의 목업 발행기(`backend/mock_publisher`)와 mqtt_bridge 테스트는 **아래 예시를 그대로** 쓴다.
 
 브로커: 웹 PC의 Mosquitto 1개. 주소·포트는 `docker/.env`.
@@ -14,7 +14,7 @@
 | 단위 | 길이 **mm**, 힘 N, 토크 N·m, 속도 mm/s, 시간 s. **단위를 키 이름 끝에 붙인다**(`x_mm` · `fz_n` · `z_drop_mm` · `slide_speed_mmps`). ROS(m)에서 mm로의 변환은 **mqtt_bridge에서만** 한다 |
 | 각도 | 자세는 quaternion 그대로 보낸다. **예외: `robot/joints.positions_rad`와 `robot/gripper_joints.positions_rad`는 원본 `sensor_msgs/JointState.position`의 관절각(rad)을 그대로 싣는다.** 화면에 deg가 필요하면 웹이 시각화 단계에서 변환한다 |
 | 시각 | **epoch ms 정수(UTC)**. ROS stamp는 `*_stamp_ms` · `*_at_ms`로 각각 보존한다. mqtt_bridge가 발행 시각 `published_at_ms`를 붙인다. 웹이 보내는 메시지의 발신 시각은 `timestamp_ms` |
-| enum | **문자열 이름**(접두사 제외): `"EDGE_SEARCH"` · `"POS_X"` · `"EDGE"` · `"STOP"` · `"SLIDE"` |
+| enum | **문자열 이름**(접두사 제외): `"EDGE_SEARCH"` · `"POS_X"` · `"EDGE"` · `"STOP"` · `"SLIDE"`. **mqtt_bridge 의 이름 표에 없는 값은 메시지를 버리지 않고 `"UNKNOWN_<값>"` 으로 보낸다** (예: `operation` 이 7 이면 `"UNKNOWN_7"`). 웹은 모르는 이름을 받아도 그 메시지의 나머지 필드를 그대로 쓰고, `reason_code` 처럼 숫자가 함께 오는 곳은 숫자를 기준으로 판단한다. [v0.1.22, #90] |
 | 사유 코드 | `reason_code`(숫자)와 `reason`(이름)을 함께 싣는다. 다른 코드 필드도 같다(`error_code`+`error_name`, `code`+`code_name`). `robot/status`의 `error`는 이름이 아니라 ROS `RobotStatus.error`(bool)와 1:1이다 |
 | 미측정값 | 값은 **`null`**, 짝이 되는 **`*_valid` 키는 항상 유지**한다(키 생략 금지). 0을 쓰지 않는다. mqtt_bridge는 ROS의 `*_valid=false`(값 NaN)를 `null`로 바꾼다 |
 | 식별자 | 명령은 `request_id`(UUID v4, FastAPI 발급), 작업은 `scan_id`. `command_id` · `job_id`라는 이름은 쓰지 않는다 |
