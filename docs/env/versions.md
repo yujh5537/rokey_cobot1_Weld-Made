@@ -9,6 +9,6 @@
 | 두산 에뮬레이터 | doosanrobot/dsr_emulator:3.0.1 (image `878b8557dfa2`) | 2026-09-19 학민 PC |
 | DART / DRCF | Virtual 에뮬레이터: DRCF `GF03020000`, DRFL `GL013303`. **실기 컨트롤러: DRCF `GF02120100`, DRFL `GL013303`** (`sodreal` 로그, `mode : real`) | 2026-09-19 학민 PC, 브링업 로그 · 실기 2026-09-21 확인(로그 118개, 09-16~21) |
 | 로봇 IP (real) | 192.168.1.100:12345 | |
-| 웹 PC: Mosquitto / PostgreSQL / Python / Java / Node | TBD (의석) | |
+| 웹 PC: Mosquitto / PostgreSQL / Python / Java / Node | eclipse-mosquitto:2 · postgres:16 · python:3.12-slim(FastAPI) · gradle:8-jdk21 빌드 → eclipse-temurin:21-jre(Spring) · Node + Vite 8 · React 19 · Three.js 0.186 | 2026-09-27 의석. 앞 넷은 Docker 이미지(`docker/docker-compose.yml` · 두 `Dockerfile`), Node 쪽은 `frontend/package.json`. 구성은 `docs/deliverables/02-network.md` 2.1 |
 
 ws_dsr 구축은 `setup-record-20260916.md`를 따른다. 팀원 4명의 ws_dsr 커밋 해시가 같은지 Day 1에 확인한다.
