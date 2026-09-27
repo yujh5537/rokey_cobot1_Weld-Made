@@ -163,8 +163,11 @@ def _classify_ended(request, result, orientation_tolerance_rad) -> Verdict:
     if reason is MotionReason.OVER_FORCE:
         return _failed(Reason.OVER_FORCE, f'{label}: {result.detail}')
     if reason in (MotionReason.ROBOT_ERROR, MotionReason.REJECTED):
-        # PATH_REJECTED(604) 등 robot_manager 가 준 코드를 그대로 쓴다. 204 만 D33 의 "계속" 대상
-        return _line_failure(result.reason_code or Reason.ROBOT_ERROR, f'{label}: {result.detail}')
+        # PATH_REJECTED(604) 등 robot_manager 가 준 코드를 그대로 쓴다. D33 의 "계속" 대상은 robot_manager 가
+        # **204 를 명시한** 실패뿐이다. 코드 없이 온 이상한 종료(0)는 204 로 기록하되 계속하지 않는다(독립 재검 🔵6)
+        if int(result.reason_code) == int(Reason.ROBOT_ERROR):
+            return _line_failure(Reason.ROBOT_ERROR, f'{label}: {result.detail}')
+        return _failed(result.reason_code or Reason.ROBOT_ERROR, f'{label}: {result.detail}')
     name = getattr(reason, 'name', reason)
     return _failed(Reason.ROBOT_ERROR, f'{label}: {request.kind.name} 에 맞지 않는 종료 사유 {name}')
 
