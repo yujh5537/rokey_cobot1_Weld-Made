@@ -60,6 +60,13 @@ def boolean(value) -> Optional[str]:
     return None if isinstance(value, bool) else 'true 또는 false 여야 한다'
 
 
+OFFSET_DIRS = ('tool', 'vertical')      # top_line_offset_dir (D34)
+
+
+def offset_dir(value) -> Optional[str]:
+    return None if value in OFFSET_DIRS else f'{" | ".join(OFFSET_DIRS)} 중 하나여야 한다'
+
+
 def _array(element_check: Callable, size: Optional[int] = None, what='') -> Callable:
     def check(value) -> Optional[str]:
         if not isinstance(value, (list, tuple)) or not value:
@@ -113,6 +120,9 @@ SPECS: Tuple[ParamSpec, ...] = (
     ParamSpec('tool_profile_r_m', DOUBLE_ARRAY, True, _array(positive),
               '툴 외형: u 부터 다음 u 전까지 축에서 가장 멀리 뻗은 반폭 R [m]'),
     ParamSpec('approach_m', DOUBLE, True, positive, '접근 · 후퇴 거리 [m] (툴 축 뒤로)'),
+    ParamSpec('top_line_offset_dir', STRING, True, offset_dir,
+              '윗면선(L0~L3)의 접근 · 후퇴 오프셋 방향 (D34): tool = 툴 축 뒤(−d), vertical = 수직 위(+z). '
+              '세로선(L4~L7)은 항상 tool. 9/29 첫 2 자세(L0 후퇴점 · L6 접근 1)가 실패하면 vertical 로 바꾼다'),
     ParamSpec('travel_clearance_m', DOUBLE, True, positive, 'z_safe = z_top + 이 값 [m] (작업대 좌표)'),
     ParamSpec('bottom_margin_m', DOUBLE, True, non_negative, '세로선 끝 = support_z + 이 값 [m]'),
     ParamSpec('workspace_margin_m', DOUBLE, True, non_negative, '부재 밖 허용 범위 x · y [m]'),
@@ -123,6 +133,9 @@ SPECS: Tuple[ParamSpec, ...] = (
               '한 선의 goal 이 ROBOT_ERROR(204) 로 끝나면 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(D33). '
               'false 면 첫 실패에서 ERROR'),
     ParamSpec('motion_timeout_s', DOUBLE, True, positive, '단위 goal 제한 시간 [s]'),
+    ParamSpec('path_point_dwell_s', DOUBLE, True, non_negative,
+              'ExecutePath 경유점 하나에 더하는 제한 시간 [s] (line 모드는 점마다 정지 확인 arrival_grace_s 가 붙는다). '
+              'ExecutePath.timeout = motion_timeout_s + 경유점 수 × 이 값 (학민 #191 🔵: 100 점 · 120 s 고정이면 실기 초과)'),
     ParamSpec('tool_check_max_force_n', DOUBLE, True, positive,
               '시작 때 무접촉 |F| 가 이보다 크면 툴 미등록으로 본다 [N] (TOOL_REG_SUSPECT 302)'),
     # 노드가 기다리는 한도 (scan_manager 와 같은 이름 · 뜻, 6절 표 38b55e8)
@@ -163,12 +176,14 @@ class WeldParams:
     tool_profile_u_m: Tuple[float, ...]
     tool_profile_r_m: Tuple[float, ...]
     approach_m: float
+    top_line_offset_dir: str             # 'tool' | 'vertical' (D34)
     travel_clearance_m: float
     bottom_margin_m: float
     workspace_margin_m: float
     path_tolerance_m: float
     continue_on_line_failure: bool       # D33
     motion_timeout_s: float
+    path_point_dwell_s: float
     tool_check_max_force_n: float
     server_wait_timeout_s: float
     stop_confirm_timeout_s: float
