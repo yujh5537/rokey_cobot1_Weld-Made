@@ -241,6 +241,31 @@ def test_line_plan_order_and_heights(params):
     assert close([v * 1000 for v in plan.path[0]], M1['L0'][0], 0.006)
 
 
+def test_top_line_offset_vertical_moves_approach_straight_up(params):
+    """D34: top_line_offset_dir='vertical' 이면 윗면선의 접근 · 후퇴점이 첫 · 마지막 경유점 바로 위 approach_m. 세로선은 그대로."""
+    scan = box_scan((380.0, 461.0, -197.0, -116.0, 176.0, 95.0))
+    tool = with_(top_line_offset_dir='tool')
+    vertical = with_(top_line_offset_dir='vertical')
+    for index in range(4):                                  # 윗면선
+        plan_t, _ = plan_line(scan, index, tool)
+        plan_v, _ = plan_line(scan, index, vertical)
+        assert plan_v.path == plan_t.path[:-1] + plan_v.path[-1:] or plan_v.path[:-1] == plan_t.path[:-1]
+        up = [a - b for a, b in zip(plan_v.approach2, plan_v.path[0])]
+        assert close(up, (0.0, 0.0, vertical.approach_m))    # 수직 위 (Base 와 작업대는 평행 이동뿐)
+        assert plan_v.approach1[:2] == plan_v.approach2[:2] == plan_v.path[0][:2]
+        assert plan_v.orientation == plan_t.orientation      # 자세는 그대로 45°
+        assert not close(plan_t.approach2, plan_v.approach2)
+    for index in range(4, 8):                               # 세로선은 항상 툴 축 뒤
+        plan_t, _ = plan_line(scan, index, tool)
+        plan_v, _ = plan_line(scan, index, vertical)
+        assert close(plan_t.approach2, plan_v.approach2) and close(plan_t.retreat, plan_v.retreat)
+
+
+def test_top_line_offset_dir_values():
+    assert not check({**PARAM_VALUES, 'top_line_offset_dir': 'up'}).ok
+    assert check({**PARAM_VALUES, 'top_line_offset_dir': 'vertical'}).ok
+
+
 def test_vertical_seam_stops_above_support(params):
     scan = box_scan(M1_CUBE)
     plan, _ = plan_line(scan, 4, params)
