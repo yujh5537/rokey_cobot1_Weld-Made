@@ -39,7 +39,7 @@
 | 래치 해제 요청인데 조건이 아직 참 | safety_monitor | `CONDITION_ACTIVE(406)` | 없음 | 거절 | 원인이 사라져야 풀린다 | ✔ |
 | 5점 미확보 | scan_manager | `INSUFFICIENT_POINTS(501)` | — | 실패 | 실패한 방향 확인 | ✔ |
 | 표에 없는 코드 | mqtt_bridge | `UNKNOWN_<n>` | — | 원문 표시 | 계약 표 갱신 (#90) | |
-| *(phase 2)* 경로 goal 거절 | robot_manager | `PATH_REJECTED(604)` | 없음 | 거절 | 경유점 z · 속도 · 점 수 확인 | 미실시 |
+| *(phase 2)* 경로 goal 거절 | robot_manager | `PATH_REJECTED(604)` | 없음 | 거절 | 경유점 z · 속도 · 점 수 확인. **출발점 z 도 `path_min_z_m` 아래면 거절한다**(D35, #199 · 내 #191 리뷰 — 첫 구간은 현재 위치 → 첫 경유점이라 경유점만 보면 시작점이 울타리 밖이다) | 미실시 |
 
 ## 3. `SAMPLE_STALE(403)` 대응 — 시연에서 가장 자주 나온다
 
@@ -65,4 +65,7 @@
 | `sample_stale_ms` 500 으로도 막지 못하는 공백이 있다(9/22 기록 699 · 748 ms 2 건) | #130 |
 | `compliance_released=true` 는 **해제 호출 성공**이라는 뜻이고 실제 제어 모드 조회는 아직 없다 | #125 |
 | tare 를 거치지 않는 수동 goal(`OP_MOVE_TO` · `OP_HOME`)은 툴 미등록을 막지 못한다 | #123 |
-| main 의 안전복귀는 올리지 않고 바로 `OP_HOME` 을 보낸다(PR #161 미머지, 실기 미검증이라 시연 전 머지 안 함) | #161 |
+| main 의 안전복귀는 올리지 않고 바로 `OP_HOME` 을 보낸다 | #161 |
+| **명령이 실패해도 로봇을 세우지 않는 자리가 넷** — 스텝 이동(`NodeStepIO.send`) · `run_motion` 의 첫 전송 · 재출발의 `move_stop` 무응답 · 재출발 재전송. 두산은 실패 응답 뒤에도 늦게 실행할 수 있어(9/24 `amovesx` 3.2 s) "실패 → goal 종료" 만 하면 **움직이는 로봇을 두고 자리를 비운다** | #193 |
+| **`OP_HOME` 은 도착을 확인하지 않는다.** 1 s 뒤 무조건 `TARGET_REACHED` 를 돌려주므로 "안전복귀 완료" 가 홈에 갔다는 증거가 아니다. 관절각 대조를 넣는다(`home_arrival_tolerance_deg` 1.0°) | #178 |
+| **`SetConfig` 로 안전 한계를 완화할 수 있다.** `drop_limit_m` 에 상한 검사가 없어 12 mm 를 넣으면 2 차 감시의 실제 한계(= `drop_limit_m` + 여유)가 **간섭 거리 D 를 넘는다**(계약 7.2). `drop_limit_max_m` 로 막는다 | #194 |
