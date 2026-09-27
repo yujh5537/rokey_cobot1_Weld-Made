@@ -27,6 +27,7 @@ from contact_scan_interfaces.action import Resume
 from contact_scan_interfaces.action import ReturnHome
 from contact_scan_interfaces.action import RunScan
 from contact_scan_interfaces.msg import ContactEvent
+from contact_scan_interfaces.msg import RobotSample
 from contact_scan_interfaces.msg import RobotStatus
 from contact_scan_interfaces.msg import SafetyStatus
 from contact_scan_interfaces.msg import ScanLog
@@ -38,6 +39,7 @@ from contact_scan_interfaces.srv import StopScan
 from contact_scan_interfaces.srv import TareForce
 from contact_scan_qos import QOS_EVENT
 from contact_scan_qos import QOS_LOG
+from contact_scan_qos import QOS_SENSOR
 from contact_scan_qos import QOS_STATE
 from rcl_interfaces.msg import Parameter as ParameterMsg
 from rcl_interfaces.msg import ParameterType
@@ -77,6 +79,7 @@ from .result_store import ResultStore
 from .result_store import ResultStoreError
 from .result_store import Stamp
 from .result_store.records import CONFIG_FIELDS
+from .sequence import damage_suspect_reason as _damage_suspect_reason
 from .sequence import MatchedEvent
 from .sequence import MotionPlanner
 from .sequence import MotionResult
@@ -207,6 +210,8 @@ class ScanManager(Node):
         self._unrecorded_home = False
         self._status_cond = threading.Condition()
         self._robot_status = None
+        # /robot/sample 의 마지막 유효 pose (위치, 자세, pose_stamp). 안전복귀의 올림에 쓴다(계약 7.5)
+        self._robot_pose = None
         self._safety_status = None
         self._store = None
         self._store_dir = None
@@ -231,6 +236,10 @@ class ScanManager(Node):
         clients = ReentrantCallbackGroup()
         self.create_subscription(
             RobotStatus, '/robot/status', self._on_robot_status, QOS_STATE, callback_group=subs)
+        # 안전복귀(계약 7.5)가 "지금 위치를 아는가"를 묻는다. 측정에는 쓰지 않는다 —
+        # 측정값의 출처는 판정 좌표(ContactEvent)다
+        self.create_subscription(
+            RobotSample, '/robot/sample', self._on_robot_sample, QOS_SENSOR, callback_group=subs)
         self.create_subscription(
             SafetyStatus, '/safety/status', self._on_safety_status, QOS_STATE, callback_group=subs)
         self.create_subscription(
@@ -425,6 +434,41 @@ class ScanManager(Node):
         with self._status_cond:
             self._robot_status = msg
             self._status_cond.notify_all()
+
+    def _on_robot_sample(self, msg):
+        """마지막 유효 pose 만 들고 있는다(계약 7.5). 무효 샘플은 버린다 — pose 가 NaN 이다."""
+        if not msg.valid:
+            return
+        with self._status_cond:
+            self._robot_pose = (
+                conversions.position_of(msg.pose),
+                (msg.pose.orientation.x, msg.pose.orientation.y,
+                 msg.pose.orientation.z, msg.pose.orientation.w),
+                msg.pose_stamp)
+
+    def current_pose(self, max_age_s):
+        """안전복귀가 쓸 (위치, 자세). 모르면 None (계약 7.5 ①).
+
+        나이는 수신 시각이 아니라 pose_stamp 로 잰다. /robot/sample 은 SENSOR QoS 라 늦게 붙은
+        구독자에게 옛 샘플이 다시 오지는 않지만, robot_manager 가 살아 있으면서 조회만 막힌 동안
+        마지막 샘플이 그대로 남는다. 시계가 0 이면(use_sim_time 인데 /clock 없음) 잴 수 없으니
+        모르는 것으로 본다 — wait_still() 과 같은 관례다.
+        """
+        with self._status_cond:
+            latest = self._robot_pose
+        if latest is None:
+            return None
+        position, orientation, stamp = latest
+        now_ns = self.get_clock().now().nanoseconds
+        if now_ns <= 0 or not (stamp.sec or stamp.nanosec):
+            return None
+        age_s = (now_ns - (stamp.sec * 1_000_000_000 + stamp.nanosec)) / 1e9
+        if age_s > max_age_s:
+            self.get_logger().warn(
+                f'마지막 유효 TCP pose 가 {age_s:.2f} s 전이다(한도 {max_age_s:.2f} s). '
+                f'지금 위치를 모르는 것으로 본다')
+            return None
+        return position, orientation
 
     def _on_safety_status(self, msg):
         with self._status_cond:
@@ -954,8 +998,12 @@ class ScanManager(Node):
         first = max(self._last_motion_id.get(job.scan_id, 0), resumption.last_motion_id) + 1
 
         def run():
-            # 재시작의 사실을 남기지 못하면(디스크 오류 등) 로봇을 움직이기 전에 끝낸다
-            self._write(self._store.record_resume, job.scan_id)
+            # 재시작의 사실을 남기지 못하면(디스크 오류 등) 로봇을 움직이기 전에 끝낸다.
+            # ERROR 를 잇는 재시작은 남길 곳이 다르다: 실패 기록에 찍는다(FAILED 는 Interruption 을
+            # 남기지 않는다. 계약 9장 허용 목록, v0.1.21)
+            self._write(
+                self._store.record_failure_resume if resumption.from_failure
+                else self._store.record_resume, job.scan_id)
             return ResumeRunner(
                 MotionPlanner(job.params), ports, job.params.direction_order, resumption.plan,
                 first_motion_id=first).run()
@@ -1025,6 +1073,15 @@ class ScanManager(Node):
                 direction_order=[Direction[name] for name in self._direction_order])
             if isinstance(planned, scan_resume.Refusal):
                 return planned
+
+            # 재시작의 첫 모션도 지금 어디 있는지를 알아야 보낼 수 있다(계약 7.6). **접수 때** 막는다 —
+            # 실행 중에 실패하면 실패 기록에 resumed_at 이 찍혀 다시 이을 기회가 사라진다.
+            # 여기서 거절하면 기록이 그대로 남아, 샘플이 돌아온 뒤 다시 RESUME 할 수 있다
+            if self.current_pose(planned.params.pose_max_age_s) is None:
+                return scan_resume.Refusal(
+                    Reason.NOT_SUPPORTED,
+                    '지금 TCP 위치를 모른다(/robot/sample 의 유효 pose 가 없거나 오래됐다). '
+                    '재시작의 첫 모션 목표를 만들 수 없다 — 샘플이 돌아온 뒤 다시 RESUME 한다')
 
             job = _Job(
                 scan_id, planned.params, conversions.config_to_msg(planned.config),
@@ -1364,6 +1421,18 @@ class _NodePorts(Ports):
 
     def wait_still(self):
         return self._node.wait_still(self._params.stop_confirm_timeout_s)
+
+    def current_pose(self):
+        return self._node.current_pose(self._params.pose_max_age_s)
+
+    def damage_suspect_reason(self):
+        """직전 실패가 손상 의심 사유였는가 (계약 7.5 ②).
+
+        상태 기계의 failure 는 다음 START 까지 남는다. 안전복귀는 그 실패 뒤에 오는 명령이므로
+        여기서 보는 것이 맞다. 정상 중지(STOPPED)에는 failure 가 없어 "" 다 — 평소 경로는 그대로다.
+        """
+        return _damage_suspect_reason(
+            self._node.state_machine.failure, self._node.safety_reason_code())
 
     def tare(self):
         node, p = self._node, self._params

@@ -1268,3 +1268,169 @@ def test_move_to_already_at_target_is_not_sent_again(ros, monkeypatch):
         assert rec['finished'], '도착으로 끝난다'
     finally:
         node.destroy_node()
+
+
+# ---- 1차 하강 제한의 기준 z (계약 7.2, v0.1.21 결정 2) ----
+
+def _sample_with(node, z, operation, valid=True):
+    """finish() 가 발행하는 샘플 한 건을 흉내 내 기준 z 잡기만 돌린다."""
+    msg = RobotSample()
+    msg.sample_id = node.sample_id = node.sample_id + 1
+    msg.operation = operation
+    msg.valid = valid
+    msg.pose.position.x, msg.pose.position.y, msg.pose.position.z = 0.42, -0.19, z
+    node.latch_slide_start_z(msg, (0.42, -0.19, z) if valid else None)
+    return msg
+
+
+def test_slide_reference_z_is_the_first_published_slide_sample(ros):
+    """2차 감시(safety_monitor)가 잡는 것과 **같은 메시지의 같은 값**이어야 한다.
+
+    실행 직전의 마지막 위치를 그대로 두면, 순응을 켜면서 z 가 약 0.7 mm 올라온 만큼 1차와 2차의
+    기준이 어긋난다. 어긋난 채로는 2차의 여유(drop_limit_margin_m)가 의미를 잃는다.
+    """
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        node.last_pose = (None, None, (0.42, -0.19, 0.18000))
+        node.motion = Motion(_slide_goal(), node.now_s())
+        node.motion.start_z = 0.18000              # 실행 직전의 임시 기준(감시를 끄지 않는다)
+
+        # 순응이 켜지며 z 가 0.7 mm 올라온 뒤에 첫 OP_SLIDE 샘플이 나간다
+        first = _sample_with(node, 0.18070, RobotSample.OP_SLIDE)
+        assert node.motion.start_z == pytest.approx(0.18070)
+        assert node.motion.start_z == pytest.approx(first.pose.position.z)
+
+        # 그 뒤의 샘플은 기준을 바꾸지 않는다 (한 모션에서 한 번만 잡는다)
+        _sample_with(node, 0.17500, RobotSample.OP_SLIDE)
+        assert node.motion.start_z == pytest.approx(0.18070)
+    finally:
+        node.destroy_node()
+
+
+def test_slide_reference_z_ignores_invalid_and_non_slide_samples(ros):
+    """무효 샘플 · 다른 operation 으로는 기준을 잡지 않는다 (safety_monitor 와 같은 규칙)."""
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=PARAMS)
+    try:
+        node.motion = Motion(_slide_goal(), node.now_s())
+        node.motion.start_z = 0.18000
+        _sample_with(node, 0.17000, RobotSample.OP_SLIDE, valid=False)
+        _sample_with(node, 0.17000, RobotSample.OP_MOVE_TO)
+        _sample_with(node, 0.17000, RobotSample.OP_NONE)
+        assert node.motion.start_z == pytest.approx(0.18000)
+        assert not node.motion.slide_start_latched
+    finally:
+        node.destroy_node()
+
+
+def test_first_stage_stops_above_five_millimetres(ros, monkeypatch):
+    """1차는 drop_limit_m(5 mm)를 **초과**할 때 멈춘다. 정확히 5 mm 는 초과가 아니다.
+
+    2차(safety_monitor)의 10 mm 보다 먼저 걸리는 것이 이 구간의 요점이다.
+    """
+    from contact_scan_interfaces.action import ExecuteMotion
+    from robot_manager import motions
+
+    # 경계는 이진수로 정확한 값으로 본다 (test_motions.py 와 같은 관례)
+    assert not motions.drop_exceeded(1.0, 0.5, 0.5)                      # 정확히 한계
+    assert motions.drop_exceeded(1.0, 0.25, 0.5)                         # 넘으면 멈춘다
+
+    node, goal, calls = _slide_rig(monkeypatch)
+    try:
+        monkeypatch.setattr(node, 'stop_robot', lambda why, motion=None: (True, ''))
+
+        def move_then_drop(motion):
+            calls.append('move_line')
+            node.last_pose = (None, None, (0.42, -0.19, 0.18 - 0.0051))  # 5.1 mm 내려감
+            return True
+        monkeypatch.setattr(node, 'send_move', move_then_drop)
+        result = node.execute_motion(FakeGoalHandle(goal))
+        assert result.reason == ExecuteMotion.Result.REASON_ROBOT_ERROR
+        assert result.reason_code == ReasonCode.DROP_LIMIT
+    finally:
+        node.destroy_node()
+
+
+# ---- SLIDE 누름 목표 세 값 (계약 3.2, v0.1.21 결정 4) ----
+
+def test_force_mode_status_separates_the_three_press_values(ros, monkeypatch):
+    """설정 증분 · 시작 기준 · 추정 합을 섞지 않는다. 합은 **추정**이다."""
+    import math
+
+    node, goal, _calls = _slide_rig(monkeypatch)
+    try:
+        assert node.param('slide_mode') == 'force'
+        node.last_force = (0.0, 0.0, 5.3)                     # SLIDE 직전의 Fz
+        assert node.start_slide_force(node.motion)
+        press = node.slide_press()
+        assert press['mode'] == 'force'
+        assert press['setpoint_n'] == pytest.approx(3.0)      # 설정한 증분
+        assert press['baseline_n'] == pytest.approx(5.3)      # 시작 기준
+        assert press['estimate_n'] == pytest.approx(8.3)      # 추정 최종 = 기준 + 설정
+        # step 전용 값은 force 모드에서 NaN 이다 (0 으로 채우지 않는다)
+        assert math.isnan(press['press_lo_n']) and math.isnan(press['press_hi_n'])
+    finally:
+        node.destroy_node()
+
+
+def test_unknown_baseline_does_not_become_zero(ros, monkeypatch):
+    """기준선을 모르면 합을 내지 않는다. 0 으로 채우면 '설정값 = 실제 누름'이라는 거짓이 된다."""
+    import math
+
+    node, goal, _calls = _slide_rig(monkeypatch)
+    try:
+        node.last_force = None
+        assert node.start_slide_force(node.motion)
+        press = node.slide_press()
+        assert press['setpoint_n'] == pytest.approx(3.0)
+        assert math.isnan(press['baseline_n']) and math.isnan(press['estimate_n'])
+    finally:
+        node.destroy_node()
+
+
+def test_step_mode_status_has_no_rel_values(ros):
+    """step 모드에서는 REL 세 값이 제어 목표가 아니다 → 전부 NaN. 대신 목표 누름 띠를 싣는다."""
+    import math
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=STEP_PARAMS)
+    try:
+        node.motion = Motion(_slide_goal(), node.now_s())
+        press = node.slide_press()
+        assert press['mode'] == 'step'
+        for key in ('setpoint_n', 'baseline_n', 'estimate_n'):
+            assert math.isnan(press[key]), key
+        assert press['press_lo_n'] == pytest.approx(3.0)
+        assert press['press_hi_n'] == pytest.approx(7.0)
+    finally:
+        node.destroy_node()
+
+
+def test_step_mode_never_turns_on_force_control(ros):
+    """step 모드는 순응 · 힘 제어를 켜지 않는다. 그래서 REL 기준선도 생기지 않는다."""
+    from robot_manager.robot_manager import Motion
+
+    node = RobotManager(parameter_overrides=STEP_PARAMS)
+    try:
+        node.motion = Motion(_slide_goal(), node.now_s())
+        assert node.motion.slide_force_baseline is None
+        assert not node.compliance_active and not node.force_ctrl_active
+    finally:
+        node.destroy_node()
+
+
+def test_step_force_limit_is_below_the_global_over_force(ros):
+    """12 N(스텝 자체 중단)과 30 N(전역 안전 한계)은 다른 것이다 (계약 7.2, 결정 8)."""
+    node = RobotManager(parameter_overrides=STEP_PARAMS)
+    try:
+        assert float(node.param('step_max_force_n')) == pytest.approx(12.0)
+        # 전역 한계는 이 노드의 파라미터가 아니다(contact_detector · safety_monitor 가 든다).
+        # yaml 쪽 검사는 contact_scan_bringup/test/test_config.py 에 있다
+        params = node.step_params(_slide_goal())
+        assert params.max_force_n == pytest.approx(12.0)
+        assert params.press_max_m + params.drop_m < float(node.param('drop_limit_m'))
+    finally:
+        node.destroy_node()

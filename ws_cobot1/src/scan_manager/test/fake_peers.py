@@ -24,11 +24,13 @@ from typing import NamedTuple, Tuple
 
 from contact_scan_interfaces.action import ExecuteMotion
 from contact_scan_interfaces.msg import ContactEvent
+from contact_scan_interfaces.msg import RobotSample
 from contact_scan_interfaces.msg import RobotStatus
 from contact_scan_interfaces.msg import SafetyStatus
 from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.srv import TareForce
 from contact_scan_qos import QOS_EVENT
+from contact_scan_qos import QOS_SENSOR
 from contact_scan_qos import QOS_STATE
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.action import ActionServer
@@ -172,8 +174,13 @@ class FakePeers(Node):
         self._events = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
         self._status = self.create_publisher(RobotStatus, '/robot/status', QOS_STATE)
         self._safety = self.create_publisher(SafetyStatus, '/safety/status', QOS_STATE)
+        # 진짜 robot_manager 는 /robot/sample 을 계속 낸다. scan_manager 의 안전복귀가
+        # "지금 위치를 아는가"를 여기서 본다(계약 7.5)
+        self._sample = self.create_publisher(RobotSample, '/robot/sample', QOS_SENSOR)
+        self._sample_id = 0
         self.publish_status = True
         self.publish_safety = True
+        self.publish_sample = True
         self._timer = self.create_timer(STATUS_PERIOD_S, self._publish, callback_group=group)
         self._server = ActionServer(
             self, ExecuteMotion, '/robot/execute_motion', self._execute, callback_group=group,
@@ -206,6 +213,15 @@ class FakePeers(Node):
             self._safety.publish(SafetyStatus(
                 stamp=now, latched=self.latched, reason_code=self.safety_code,
                 level=SafetyStatus.LEVEL_STOP if self.latched else SafetyStatus.LEVEL_OK))
+        if self.publish_sample:
+            self._sample_id += 1
+            sample = RobotSample(
+                sample_id=self._sample_id, frame_id=FRAME, valid=True,
+                pose_stamp=now, force_stamp=now)
+            p, q = sample.pose.position, sample.pose.orientation
+            p.x, p.y, p.z = self.position
+            q.x, q.y, q.z, q.w = DOWN
+            self._sample.publish(sample)
 
     # -- /robot/stop · /contact/tare --
 

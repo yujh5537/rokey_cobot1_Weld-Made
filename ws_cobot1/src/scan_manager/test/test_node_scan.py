@@ -319,7 +319,7 @@ def test_home_is_accepted_while_the_safety_monitor_is_quiet(make_rig):
 
     result = rig.home()
     assert result.success, result.detail
-    assert [Operation(g.operation) for g in rig.peers.goals] == [Operation.HOME]
+    assert [Operation(g.operation) for g in rig.peers.goals] == HOME_MOTIONS
 
 
 def test_a_stale_robot_status_refuses_start_and_home(make_rig):
@@ -758,7 +758,8 @@ def test_stop_is_not_confirmed_by_a_status_older_than_the_request(make_rig):
     rig.stop()
     result = rig._result_of(result_future).result
 
-    assert result.reason_code == Reason.ROBOT_STATUS_LOST
+    # 404(상태가 안 온다)가 아니라 407(정지를 요청했는데 완료를 확인하지 못했다)이다 (계약 6.1)
+    assert result.reason_code == Reason.STOP_UNCONFIRMED
     assert rig.node.state_machine.phase is Phase.ERROR
     assert rig.store().load(result.scan_id).interruptions == []
 
@@ -801,7 +802,7 @@ def test_home_is_not_blocked_by_missing_measurement_parameters(make_rig):
 
     result = rig.home()                                    # 안전복귀는 된다
 
-    assert result.success and rig.operations() == [Operation.HOME]
+    assert result.success and rig.operations() == HOME_MOTIONS
     assert rig.node.state_machine.phase is Phase.IDLE
     assert not rig.result_dir.exists()                     # 작업이 없으니 기록도 없다
 
@@ -847,7 +848,8 @@ def test_operator_session_set_config_stop_home_then_full_scan(rig):
 
     assert rig.home().success
     assert rig.node.state_machine.phase is Phase.STOPPED
-    assert rig.peers.goals[-1].motion_id == first_goals + 1      # 같은 작업의 motion_id 를 잇는다
+    # 안전복귀는 올림 + HOME 두 모션이다(계약 7.5). 같은 작업의 motion_id 를 잇는다
+    assert [g.motion_id for g in rig.peers.goals[-2:]] == [first_goals + 1, first_goals + 2]
 
     rig.peers.behavior.clear()
     done = rig.run(RunScan.Goal(request_id='run-2'))
@@ -925,6 +927,8 @@ def test_each_scan_gets_a_fresh_result_stamp(rig):
 # ---- 재시작 (T26) ----
 # 정상 경로의 goal 순번: 1 기준점, 2 하강, 3 +x 밀기, 4~6 방향 전환, 7 -x 밀기, 8~10, 11 +y 밀기, 12~14, 15 -y 밀기, 16 들어 올림, 17 홈
 SLIDE_POS_X, TO_ORIGIN_XY, SLIDE_POS_Y, FINAL_LIFT = 3, 5, 11, 16
+# 안전복귀(/scan/home)가 보내는 모션. 계약 7.5: 수직 올림 → 도착 확인 → HOME
+HOME_MOTIONS = [Operation.MOVE_TO, Operation.HOME]
 
 
 def stop_at_goal(rig, n, start=None):
@@ -1318,7 +1322,8 @@ def test_a_safe_return_after_a_restart_still_blocks_the_resume(make_rig, rig):
     assert fresh.peers.goals[-1].motion_id == record.last_motion_id
 
     result = resume(fresh)
-    assert result.reason_code == Reason.NOT_SUPPORTED and len(fresh.peers.goals) == 1
+    # 안전복귀의 두 모션만 나갔고 재시작은 하나도 보내지 않았다
+    assert result.reason_code == Reason.NOT_SUPPORTED and len(fresh.peers.goals) == 2
 
 
 def test_a_restarted_node_refuses_like_the_one_that_never_died(make_rig, rig):
@@ -1383,7 +1388,7 @@ def test_a_safe_return_that_could_not_be_recorded_blocks_the_resume_until_a_new_
 
     assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
     assert fresh.node.state_machine.phase is Phase.IDLE
-    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+    assert [Operation(g.operation) for g in fresh.peers.goals] == HOME_MOTIONS
     assert fresh.run().success                                    # 새 작업은 된다
     assert fresh.node._unrecorded_home is False
 
@@ -1400,7 +1405,8 @@ def test_motion_id_is_remembered_as_soon_as_it_is_issued(rig):
     assert rig.stop().accepted
     rig._result_of(running)
     assert rig.home().success
-    assert rig.peers.goals[-1].motion_id == SLIDE_POS_X + 1
+    # 안전복귀는 올림 + HOME 두 모션이다(계약 7.5). 번호는 중지 시점에서 이어진다
+    assert [g.motion_id for g in rig.peers.goals[-2:]] == [SLIDE_POS_X + 1, SLIDE_POS_X + 2]
 
 
 def test_the_unrecorded_safe_return_is_remembered_even_after_a_later_home_adopts_the_scan(make_rig, rig):
@@ -1432,7 +1438,7 @@ def test_the_unrecorded_safe_return_is_remembered_even_after_a_later_home_adopts
     result = resume(fresh)
 
     assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
-    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+    assert [Operation(g.operation) for g in fresh.peers.goals] == HOME_MOTIONS
 
 
 def test_a_safe_return_with_nothing_to_record_does_not_change_the_refusal_code(rig):
