@@ -3,6 +3,7 @@ uint8 OP_MOVE_TO=1          # 지정 좌표로 이동. 접촉 판정 없음
 uint8 OP_DESCEND=2          # -z 저속 하강. CONTACT 로 정상 종료
 uint8 OP_SLIDE=3            # 윗면을 누른 채 수평 이동. EDGE 로 정상 종료
 uint8 OP_HOME=4             # 홈위치(파라미터 home_pose)로 이동
+uint8 OP_WELD_PATH=5        # goal 에는 쓰지 않는다 (ExecutePath 실행 중 표시용, phase 2). 받으면 거절
 uint8 DIR_NONE=0            # ScanState.DIR_* 와 같은 값
 uint8 DIR_POS_X=1
 uint8 DIR_NEG_X=2

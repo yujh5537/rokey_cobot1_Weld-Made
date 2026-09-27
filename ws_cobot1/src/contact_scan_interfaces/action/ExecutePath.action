@@ -1,0 +1,32 @@
+# ExecutePath.action  (/robot/execute_path) — 경유점을 차례로 지나는 직선 이동. 접촉 판정 없음, 힘 · 순응 제어 없음
+string weld_id
+uint32 motion_id            # weld_manager 발급. ExecuteMotion 과 같은 번호 공간
+uint8 line_index            # 관측용 (WeldState.line_index)
+geometry_msgs/Pose[] waypoints   # 차례로 지날 TCP pose. 마지막 점에서 정지한다. 첫 점까지도 직선으로 간다
+string frame_id             # waypoints 의 프레임
+float64 speed               # m/s (TCP 직선 속도)
+float64 path_tolerance_m    # 경유점 도착 허용치 (line 은 중간 점마다 · 마지막 점). 넘으면 ROBOT_ERROR. <= 0 · NaN 은 PATH_REJECTED
+builtin_interfaces/Duration timeout
+---
+uint8 REASON_TARGET_REACHED=0   # ExecuteMotion.REASON_* 와 같은 값
+uint8 REASON_TIMEOUT=4
+uint8 REASON_STOP_REQUESTED=5
+uint8 REASON_CANCELED=6
+uint8 REASON_OVER_FORCE=7
+uint8 REASON_ROBOT_ERROR=8
+uint8 REASON_REJECTED=9
+geometry_msgs/Pose pose         # 정지 시점 pose
+string frame_id
+builtin_interfaces/Time pose_stamp
+uint8 reason
+uint16 reason_code              # ReasonCode
+string detail
+float64 distance_travelled
+uint16 waypoints_done           # 지난 경유점 수 (spline 이면 진행 거리로 추정)
+---
+geometry_msgs/Pose pose
+string frame_id
+builtin_interfaces/Time pose_stamp
+float64 distance_travelled
+uint16 waypoint_index           # 향하고 있는 경유점
+builtin_interfaces/Duration elapsed

@@ -60,7 +60,9 @@ ROBOT_MODE_AUTONOMOUS = 1
 DRL_STATE = {0: 'PLAY', 1: 'STOP', 2: 'HOLD'}
 
 # 홈 관절각 기본값: docs/contracts/units-frames.md (T03). 실기에서 다른 자세를 쓰려면 --home-joint
-HOME_JOINT_DEG = [-24.14, 17.03, 51.68, -0.18, 111.39, -204.84]
+# 2026-09-23 새 홈(계약 v0.1.18, #169). 옛 홈 [-24.14, 17.03, 51.68, -0.18, 111.39, -204.84] 은
+# J6 가 ±180° 밖이라 다른 자세에서 movej 하면 손목이 약 170° 돈다. real.yaml 의 home_joint_deg 와 같은 값이다
+HOME_JOINT_DEG = [-21.19, 15.24, 52.97, -0.08, 111.80, -15.14]
 
 
 def parse_args(argv):
@@ -210,7 +212,8 @@ def restore_mode(ck, previous):
 
 
 def move_home(ck, joint, real):
-    # J6 기본값 -204.84 deg 는 ±180 밖이다. 현재 자세에 따라 J6 가 크게 돌 수 있다(#60 · ok778ts123 리뷰)
+    # ±180° 밖 관절각이면 현재 자세에 따라 크게 돌 수 있다(#60 · ok778ts123 리뷰).
+    # 옛 홈의 J6 −204.84 deg 가 그런 값이었다. 새 홈(v0.1.18)은 −15.14 로 범위 안이다
     if any(abs(j) > 180.0 for j in joint):
         print(f'주의: 홈 관절각 {fmt(joint)} 에 ±180° 밖 값이 있다. 현재 자세에 따라 크게 돌 수 있다.')
         if real:

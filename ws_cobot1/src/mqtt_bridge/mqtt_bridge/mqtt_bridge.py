@@ -1,6 +1,7 @@
 """ROS 2 <-> MQTT bridge node."""
 
 import json
+import math
 import os
 import queue
 import time
@@ -18,6 +19,7 @@ from contact_scan_interfaces.srv import ResetSafety, SetConfig, StopScan
 from contact_scan_qos import QOS_EVENT, QOS_HEARTBEAT, QOS_LOG, QOS_SENSOR, QOS_STATE
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 
 from mqtt_bridge.command_guard import CommandGuard
 from mqtt_bridge.decoders import (
@@ -93,6 +95,7 @@ def _scan_config_dict(config):
         "contact_threshold_n": config.contact_threshold_n,
         "edge_drop_m": config.edge_drop_m,
         "debounce_n": config.debounce_n,
+        "debounce_set": config.debounce_set,
         "over_force_n": config.over_force_n,
         "descend_speed_mps": config.descend_speed_mps,
         "slide_speed_mps": config.slide_speed_mps,
@@ -166,6 +169,17 @@ def _scan_result_dedup_key(msg):
     return (msg.scan_id, int(msg.stamp.sec), int(msg.stamp.nanosec))
 
 
+_ARM_JOINT_NAMES = tuple(f"joint_{index}" for index in range(1, 7))
+_RG2_JOINT_NAMES = (
+    "rg2_finger_joint",
+    "rg2_left_inner_knuckle_joint",
+    "rg2_left_inner_finger_joint",
+    "rg2_right_outer_knuckle_joint",
+    "rg2_right_inner_knuckle_joint",
+    "rg2_right_inner_finger_joint",
+)
+
+
 class MqttBridge(Node):
     def __init__(self):
         super().__init__("mqtt_bridge")
@@ -174,6 +188,7 @@ class MqttBridge(Node):
             ("broker_host", "127.0.0.1"), ("broker_port", 1883),
             ("topic_prefix", ""), ("dedup_cache_size", 100),
             ("cmd_expiry_s", 5.0), ("sample_publish_hz", 10.0),
+            ("joint_publish_hz", 20.0), ("joint_state_topic", "/dsr01/joint_states"),
             ("heartbeat_hz", 1.0), ("keepalive_s", 60),
         ):
             self.declare_parameter(name, default)
@@ -182,6 +197,10 @@ class MqttBridge(Node):
         self._port = int(self.get_parameter("broker_port").value)
         self._prefix = normalize_topic_prefix(str(self.get_parameter("topic_prefix").value))
         self._sample_hz = float(self.get_parameter("sample_publish_hz").value)
+        self._joint_hz = float(self.get_parameter("joint_publish_hz").value)
+        if not math.isfinite(self._joint_hz) or self._joint_hz <= 0:
+            raise ValueError("joint_publish_hz must be a finite positive number")
+        self._joint_state_topic = str(self.get_parameter("joint_state_topic").value)
         self._heartbeat_hz = float(self.get_parameter("heartbeat_hz").value)
         self._keepalive = int(self.get_parameter("keepalive_s").value)
 
@@ -194,15 +213,32 @@ class MqttBridge(Node):
         self._mqtt_connected = False
         self._heartbeat_seq = 0
         self._sample_period = 1.0 / self._sample_hz
+        self._joint_period = 1.0 / self._joint_hz
         self._last_sample = 0.0
+        self._last_joint = 0.0
+        self._last_gripper_joint = 0.0
         self._last_scan_id = ""
         self._scan_phase = ScanState.PHASE_IDLE
         self._pending_stop = []
+
+        self._last_error_scan_id = ""
+        self._last_error_code = ReasonCode.ROBOT_ERROR
+        self._last_error_detail = ""
+
         self._recent_results = []
 
         self.create_subscription(
             RobotSample, "/robot/sample",
             _safe_ros_callback(self.get_logger(), "/robot/sample", self._on_robot_sample),
+            QOS_SENSOR,
+        )
+        self.create_subscription(
+            JointState, self._joint_state_topic,
+            _safe_ros_callback(
+                self.get_logger(),
+                self._joint_state_topic,
+                self._on_joint_state,
+            ),
             QOS_SENSOR,
         )
         self.create_subscription(
@@ -412,19 +448,73 @@ class MqttBridge(Node):
         req.reason = data["reason"]
         req.detail = data["detail"]
         future = self._stop_client.call_async(req)
-        future.add_done_callback(partial(self._on_stop_response, data["request_id"]))
+        future.add_done_callback(partial(
+            self._on_stop_response,
+            data["request_id"],
+            self._scan_phase,
+            self._last_scan_id,
+        ))
 
-    def _on_stop_response(self, request_id, future):
+    def _on_stop_response(
+        self,
+        request_id,
+        request_phase,
+        request_scan_id,
+        future,
+    ):
         try:
             response = future.result()
         except Exception as exc:
             self._ack(request_id, False, ReasonCode.ROBOT_ERROR, str(exc))
             return
-        self._ack(request_id, bool(response.accepted), int(response.reason_code), response.detail)
-        if response.accepted:
-            self._pending_stop.append(request_id)
-            if self._scan_phase == ScanState.PHASE_STOPPED:
-                self._finish_stops()
+
+        self._ack(
+            request_id,
+            bool(response.accepted),
+            int(response.reason_code),
+            response.detail,
+        )
+
+        if not response.accepted:
+            return
+
+        idle_phases = (
+            ScanState.PHASE_IDLE,
+            ScanState.PHASE_DONE,
+            ScanState.PHASE_ERROR,
+            ScanState.PHASE_STOPPED,
+        )
+
+        if request_phase in idle_phases:
+            self._command_result(
+                request_id,
+                request_scan_id,
+                True,
+                ReasonCode.STOP_REQUESTED,
+                response.detail,
+            )
+            return
+
+        self._pending_stop.append((request_id, request_scan_id))
+
+        if self._last_scan_id != request_scan_id:
+            return
+
+        if self._scan_phase == ScanState.PHASE_STOPPED:
+            self._finish_stops(
+                request_scan_id,
+                True,
+                ReasonCode.STOP_REQUESTED,
+                "",
+            )
+        elif self._scan_phase == ScanState.PHASE_ERROR:
+            reason_code, detail = self._stop_error(request_scan_id)
+            self._finish_stops(
+                request_scan_id,
+                False,
+                reason_code,
+                detail,
+            )
 
     def _dispatch_set_config(self, body):
         data = decode_scan_set_config(body)
@@ -478,6 +568,89 @@ class MqttBridge(Node):
         }
         self._publish("robot/sample", encode_robot_sample(data, now_ms()), 0, False)
 
+    def _on_joint_state(self, msg):
+        now = time.monotonic()
+
+        names = list(msg.name)
+        positions = [float(value) for value in msg.position]
+
+        if (not names or len(names) != len(positions)
+                or len(set(names)) != len(names)
+                or not all(name for name in names)
+                or not all(math.isfinite(value) for value in positions)):
+            self.get_logger().warning(
+                f"{self._joint_state_topic}: invalid JointState "
+                f"names={len(names)} positions={len(positions)}"
+            )
+            return
+
+        stamp_ms = (
+            int(msg.header.stamp.sec) * 1000
+            + int(msg.header.stamp.nanosec) // 1_000_000
+        )
+        if stamp_ms <= 0:
+            stamp_ms = now_ms()
+
+        by_name = dict(zip(names, positions))
+
+        # /dsr01/joint_states has two publishers in the current bringup.
+        # - joint_state_broadcaster: M0609 six joints only
+        # - joint_state_publisher: M0609 + RG2 merged snapshot
+        # Keep robot/joints sourced only from the six-axis broadcaster so
+        # the browser does not alternate between 6-joint and 12-joint payloads.
+        if set(names) == set(_ARM_JOINT_NAMES):
+            if now - self._last_joint < self._joint_period:
+                return
+
+            self._last_joint = now
+            self._publish(
+                "robot/joints",
+                {
+                    "schema_version": "0.1",
+                    "frame_id": "base_link",
+                    "names": list(_ARM_JOINT_NAMES),
+                    "positions_rad": [
+                        by_name[name]
+                        for name in _ARM_JOINT_NAMES
+                    ],
+                    "stamp_ms": stamp_ms,
+                    "published_at_ms": now_ms(),
+                },
+                0,
+                False,
+            )
+            return
+
+        # The merged joint_state_publisher snapshot contains the RG2 mimic
+        # joints. Publish only those joints on a separate display-only topic.
+        if all(name in by_name for name in _RG2_JOINT_NAMES):
+            if now - self._last_gripper_joint < self._joint_period:
+                return
+
+            self._last_gripper_joint = now
+            self._publish(
+                "robot/gripper_joints",
+                {
+                    "schema_version": "0.1",
+                    "frame_id": "rg2_base_link",
+                    "names": list(_RG2_JOINT_NAMES),
+                    "positions_rad": [
+                        by_name[name]
+                        for name in _RG2_JOINT_NAMES
+                    ],
+                    "stamp_ms": stamp_ms,
+                    "published_at_ms": now_ms(),
+                },
+                0,
+                False,
+            )
+            return
+
+        self.get_logger().warning(
+            f"{self._joint_state_topic}: unsupported JointState layout "
+            f"names={names}"
+        )
+
     def _on_robot_status(self, msg):
         data = {
             "stamp": _time_dict(msg.stamp), "connected": msg.connected,
@@ -491,21 +664,65 @@ class MqttBridge(Node):
     def _on_scan_state(self, msg):
         self._scan_phase = msg.phase
         self._last_scan_id = msg.scan_id
+
         data = {
-            "stamp": _time_dict(msg.stamp), "scan_id": msg.scan_id,
-            "phase": msg.phase, "direction": msg.direction,
-            "progress": msg.progress, "progress_total": msg.progress_total,
+            "stamp": _time_dict(msg.stamp),
+            "scan_id": msg.scan_id,
+            "phase": msg.phase,
+            "direction": msg.direction,
+            "progress": msg.progress,
+            "progress_total": msg.progress_total,
             "motion_id": msg.motion_id,
         }
-        self._publish("scan/state", encode_scan_state(data, now_ms()), 1, True)
-        if msg.phase == ScanState.PHASE_STOPPED:
-            self._finish_stops()
 
-    def _finish_stops(self):
-        pending = list(self._pending_stop)
-        self._pending_stop.clear()
-        for request_id in pending:
-            self._command_result(request_id, self._last_scan_id, True, ReasonCode.STOP_REQUESTED, "")
+        self._publish(
+            "scan/state",
+            encode_scan_state(data, now_ms()),
+            1,
+            True,
+        )
+
+        if msg.phase == ScanState.PHASE_STOPPED:
+            self._finish_stops(
+                msg.scan_id,
+                True,
+                ReasonCode.STOP_REQUESTED,
+                "",
+            )
+
+        elif msg.phase == ScanState.PHASE_ERROR:
+            reason_code, detail = self._stop_error(msg.scan_id)
+
+            self._finish_stops(
+                msg.scan_id,
+                False,
+                reason_code,
+                detail,
+            )
+
+    def _stop_error(self, scan_id):
+        if self._last_error_scan_id == scan_id:
+            return self._last_error_code, self._last_error_detail
+
+        return ReasonCode.ROBOT_ERROR, ""
+
+    def _finish_stops(self, scan_id, success, reason_code, detail):
+        remaining = []
+
+        for request_id, pending_scan_id in self._pending_stop:
+            if pending_scan_id != scan_id:
+                remaining.append((request_id, pending_scan_id))
+                continue
+
+            self._command_result(
+                request_id,
+                scan_id,
+                success,
+                reason_code,
+                detail,
+            )
+
+        self._pending_stop = remaining
 
     def _on_scan_result(self, msg):
         result_key = _scan_result_dedup_key(msg)
@@ -517,14 +734,35 @@ class MqttBridge(Node):
         self._publish("scan/result", encode_scan_result(_scan_result_dict(msg), now_ms()), 1, False)
 
     def _on_scan_log(self, msg):
+        if msg.level == ScanLog.LEVEL_ERROR and msg.scan_id:
+            self._last_error_scan_id = msg.scan_id
+            self._last_error_code = (
+                int(msg.code)
+                if int(msg.code) != ReasonCode.OK
+                else ReasonCode.ROBOT_ERROR
+            )
+            self._last_error_detail = msg.message
+
         data = {
-            "stamp": _time_dict(msg.stamp), "scan_id": msg.scan_id,
-            "level": msg.level, "phase": msg.phase, "direction": msg.direction,
-            "motion_id": msg.motion_id, "code": msg.code, "message": msg.message,
-            "frame_id": msg.frame_id, "pose": _pose_dict(msg.pose),
+            "stamp": _time_dict(msg.stamp),
+            "scan_id": msg.scan_id,
+            "level": msg.level,
+            "phase": msg.phase,
+            "direction": msg.direction,
+            "motion_id": msg.motion_id,
+            "code": msg.code,
+            "message": msg.message,
+            "frame_id": msg.frame_id,
+            "pose": _pose_dict(msg.pose),
             "pose_valid": msg.pose_valid,
         }
-        self._publish("scan/log", encode_scan_log(data, now_ms()), 1, False)
+
+        self._publish(
+            "scan/log",
+            encode_scan_log(data, now_ms()),
+            1,
+            False,
+        )
 
     def _on_contact_event(self, msg):
         data = {

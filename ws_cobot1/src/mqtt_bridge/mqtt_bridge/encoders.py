@@ -5,6 +5,7 @@ from mqtt_bridge.conversions import (
     meters_to_mm,
     non_finite_to_none,
     ros_time_to_epoch_ms,
+    value_or_none,
 )
 
 SCHEMA_VERSION = "0.1"
@@ -220,7 +221,10 @@ def encode_scan_config(config):
     return {
         "contact_threshold_n": non_finite_to_none(config["contact_threshold_n"]),
         "edge_drop_mm": non_finite_to_none(meters_to_mm(config["edge_drop_m"])),
-        "debounce_n": config["debounce_n"],
+        "debounce_n": value_or_none(
+            config["debounce_n"],
+            config["debounce_set"],
+        ),
         "over_force_n": non_finite_to_none(config["over_force_n"]),
         "descend_speed_mmps": non_finite_to_none(
             meters_per_second_to_mm_per_second(config["descend_speed_mps"])

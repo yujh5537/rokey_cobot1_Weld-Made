@@ -32,12 +32,176 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
-from robot_manager import dsr_client, motion_state, motions
+from robot_manager import dsr_client, motion_state, motions, step_slide
 from robot_manager.call_queue import CallQueue
 from robot_manager.conversions import posx_to_pose_fields, tool_force_to_wrench_fields
 
 NAN = float('nan')
 LOOP_PERIOD_S = 0.02       # 모션 감시 주기
+STEP_EVENT_ID_BASE = 1 << 32   # 스텝 모드 EDGE 의 event_id. contact_detector 는 1 부터 센다
+# 스텝 모드 파라미터 (slide_mode: step 일 때만 필요). 값은 contact_scan_bringup/config/real.yaml
+STEP_DOUBLE_PARAMS = (
+    'step_coarse_m', 'step_fine_m', 'step_z_m', 'step_press_step_m', 'step_press_max_m', 'step_lift_m',
+    'step_nudge_m', 'step_release_n', 'step_follow_lo_n', 'step_follow_hi_n', 'step_max_force_n',
+    'step_side_hit_n', 'step_drop_m', 'step_z_tol_m', 'step_max_slope_deg',
+    'step_settle_s', 'step_still_m', 'step_still_window_s', 'step_move_timeout_s')
+
+
+class StepAbort(Exception):
+    """스텝 모드 도중 정지 · 취소 · 과대 외력 · 시간 초과. result = (reason, reason_code, detail)."""
+
+    def __init__(self, result):
+        super().__init__(result[2])
+        self.result = result
+
+
+class NodeStepIO(step_slide.StepIO):
+    """step_slide 가 쓰는 로봇 입출력. 두산 호출은 노드의 줄(CallQueue)을 그대로 탄다.
+
+    이동은 지금처럼 amovel(ASYNC)로 보내고 멈춤을 위치로 확인한다. SYNC 로 부르면 이동하는 동안 줄이 막혀
+    샘플이 끊기고 safety_monitor 의 SAMPLE_STALE(300 ms)에 걸린다. 기다리는 동안 매번 check() 로
+    취소 · 정지 요청 · 과대 외력 · 하강 제한 · 시간 초과를 본다.
+    """
+
+    def __init__(self, node, goal_handle, motion, speed_mps, timeout_s):
+        self.node, self.goal_handle, self.motion = node, goal_handle, motion
+        self.speed = speed_mps
+        self.timeout_s = timeout_s
+        self.next_feedback = 0.0
+        p = node.param
+        self.settle_s = float(p('step_settle_s'))
+        self.samples = int(p('step_force_samples'))
+        self.still_m = float(p('step_still_m'))
+        self.still_window_s = float(p('step_still_window_s'))
+        self.move_timeout_s = float(p('step_move_timeout_s'))
+        self.drop_limit = float(p('drop_limit_m'))
+
+    def log(self, text):
+        self.node.get_logger().info(text)
+
+    def position(self):
+        pose = self.node.last_pose
+        if pose is None:
+            raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, '위치를 모른다'))
+        return tuple(pose[2])
+
+    def check(self):
+        node, motion = self.node, self.motion
+        now = node.now_s()
+        elapsed = now - motion.started_s
+        if now >= self.next_feedback:
+            self.next_feedback = now + float(node.param('feedback_period_s'))
+            node.publish_feedback(self.goal_handle, motion, elapsed)
+        if self.goal_handle.is_cancel_requested:
+            stopped, why = node.stop_robot('Action 취소')
+            raise StepAbort((ExecuteMotion.Result.REASON_CANCELED, ReasonCode.CANCELED, 'Action 취소')
+                            if stopped else
+                            (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, f'Action 취소. {why}'))
+        request = node.take_stop_request()
+        if request is not None:
+            reason_code, detail = request
+            stopped, why = node.stop_robot(f'정지 요청 ({detail})')
+            if not stopped:
+                node.restore_stop_request(request)
+                raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                                 f'정지 요청 ({detail}). {why}'))
+            raise StepAbort((ExecuteMotion.Result.REASON_STOP_REQUESTED,
+                             reason_code or ReasonCode.STOP_REQUESTED, detail))
+        if motion.event is not None:                   # 스텝 모드에서는 OVER_FORCE 만 여기 온다
+            raise StepAbort(node.stop_for_event(motion))
+        position = node.last_pose[2] if node.last_pose else None
+        if motions.drop_exceeded(motion.start_z, position[2] if position else None, self.drop_limit):
+            stopped, why = node.stop_robot('하강 제한 초과')
+            raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.DROP_LIMIT,
+                             f'SLIDE 하강 제한 {self.drop_limit} m 초과' + ('' if stopped else f'. {why}')))
+        if elapsed > self.timeout_s:
+            stopped, why = node.stop_robot('제한 시간 초과')
+            raise StepAbort((ExecuteMotion.Result.REASON_TIMEOUT, ReasonCode.TIMEOUT,
+                             f'{self.timeout_s:.1f} s 안에 끝나지 않았다' + ('' if stopped else f'. {why}')))
+        if not node.connected:
+            raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_DISCONNECTED,
+                             '로봇 연결이 끊겼다'))
+
+    def sleep(self, seconds):
+        end = self.node.now_s() + seconds
+        while self.node.now_s() < end:
+            self.check()
+            time.sleep(min(LOOP_PERIOD_S, max(0.0, end - self.node.now_s())))
+
+    def send(self, d):
+        request = dsr_client.move_line_request([v * dsr_client.MM_PER_M for v in d] + [0.0, 0.0, 0.0],
+                                               self.speed, relative=True)
+        if not self.node.call_sync(self.node.srv_clients['move_line'], request, 'move_line'):
+            raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                             '스텝 이동 명령 실패'))
+
+    def move_rel(self, d):
+        """상대 이동을 보내고 멈출 때까지 기다린다.
+
+        멈춤 = step_still_window_s 동안 위치 변화가 step_still_m 이하. 이동 시간(거리/속도)이 지나기 전에는
+        멈춤으로 보지 않는다(출발 전 정지를 도착으로 보지 않는다 — 9/22 가짜 도착). 누른 채 z 를 내리면
+        명령만큼 다 가지 않을 수 있어(9/21 실기 −0.05 명령에 −0.02) 목표 도달은 요구하지 않는다.
+        단, 0.2 mm 이상 명령했는데 30 % 도 못 갔으면 명령이 실행되지 않은 것(#153)으로 보고 한 번 다시 보낸다.
+        """
+        dist = math.sqrt(sum(v * v for v in d))
+        if dist < 1e-7:
+            return
+        start = self.position()
+        self.send(d)
+        sent = self.node.now_s()
+        min_s = dist / self.speed
+        resent = False
+        track = deque()
+        last_id = None
+        while True:
+            self.check()
+            time.sleep(LOOP_PERIOD_S)
+            now = self.node.now_s()
+            sample = self.node.last_force_sample
+            if sample is not None and sample[0] != last_id and self.node.last_pose is not None:
+                last_id = sample[0]
+                track.append((now, self.node.last_pose[2]))
+            while track and track[0][0] < now - self.still_window_s:
+                track.popleft()
+            pos = self.node.last_pose[2] if self.node.last_pose else start
+            moved = math.dist(pos, start)
+            started = moved >= 0.3 * dist or dist < 0.0002
+            still = (len(track) >= 3 and max(math.dist(track[0][1], q) for _, q in track) <= self.still_m)
+            if now - sent >= min_s and still and started:
+                return
+            if now - sent > min_s + self.move_timeout_s:
+                if not started and not resent:
+                    self.node.get_logger().warning(
+                        f'스텝 이동 {dist * 1000:.2f} mm 가 출발하지 않았다. 다시 보낸다')
+                    self.node.call_sync(self.node.srv_clients['move_stop'], dsr_client.move_stop_request(),
+                                        'move_stop')
+                    target = [s + v for s, v in zip(start, d)]
+                    here = self.position()
+                    self.send([t - h for t, h in zip(target, here)])
+                    sent, resent = self.node.now_s(), True
+                    continue
+                raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                                 f'스텝 이동 {dist * 1000:.2f} mm 가 {min_s + self.move_timeout_s:.1f} s 안에 '
+                                 f'멈추지 않았다 (간 거리 {moved * 1000:.2f} mm)'))
+
+    def force(self):
+        """멈춘 뒤 step_settle_s 기다리고, 그 뒤 새로 받은 샘플 step_force_samples 개의 평균."""
+        self.sleep(self.settle_s)
+        first = self.node.last_force_sample
+        last_id = first[0] if first else None
+        values = []
+        deadline = self.node.now_s() + 1.0 + 0.2 * self.samples
+        while len(values) < self.samples:
+            self.check()
+            if self.node.now_s() > deadline:
+                raise StepAbort((ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                                 f'외력 샘플 {self.samples} 개를 받지 못했다 ({len(values)} 개)'))
+            sample = self.node.last_force_sample
+            if sample is not None and sample[0] != last_id:
+                last_id = sample[0]
+                values.append(sample[1])
+            time.sleep(0.005)
+        return tuple(sum(v[i] for v in values) / len(values) for i in range(3))
 
 
 class Attempt:
@@ -64,10 +228,15 @@ class Motion:
         self.start_position = None
         self.start_z = None
         self.moved = False              # 한 번이라도 움직였는가 (도착 판정용)
+        self.sent_s = None              # 이동 명령 응답을 받은 시각. 도착 유예(arrival_grace_s)는 여기서부터 잰다
+        self.restarts = 0               # SLIDE 옆 이동 명령을 다시 보낸 횟수 (#153)
+        self.moving_now = True          # 감시 루프가 방금 위치로 본 "지금 움직이는가". 모르면 True
+        self.force_released_s = None    # 정지하며 힘 제어를 먼저 푼 시각. release_all 이 순응 해제 전 남은 램프만 기다린다
         self.compliance_on = False
         self.force_on = False
         self.event = None               # 정지 사유가 된 ContactEvent
         self.stop_at_accept = None      # 수락 시점에 남아 있던 /robot/stop 요청 (OP_HOME 전용, #115)
+        self.step_mode = False          # SLIDE 를 스텝 모드로 실행 중 (EDGE 는 robot_manager 가 확정한다)
 
 
 class RobotManager(Node):
@@ -85,6 +254,7 @@ class RobotManager(Node):
         # (2026-09-20 확인, docs/env/api-check-log.md). 그래서 위치 변화로 본다.
         self.declare_parameter('moving_eps_m', 0.0002)
         self.declare_parameter('moving_window_s', 0.3)
+        self.declare_parameter('moved_min_m', 0.001)
         # 계약 이름 (ros-interfaces.md 6.4). 값은 contact_scan_bringup/config/*.yaml 에 둔다
         # 아래 셋은 기본값을 두지 않는다. yaml 에 없으면 기동하지 않는다 (CLAUDE.md 규칙 7,
         # 현지 리뷰 PR #73). 특히 drop_limit_m 은 계약 7.2 가 safety_monitor 와 같은 값을
@@ -103,16 +273,24 @@ class RobotManager(Node):
         self.declare_parameter('feedback_period_s', 0.1)
         # 명령 후 이 시간 안에 움직이기 시작하지 않으면 도착으로 본다 (병후 리뷰, PR #73)
         self.declare_parameter('arrival_grace_s', 1.0)
+        self.declare_parameter('move_restart_max', 1)
         # OP_MOVE_TO 도착 판정 허용치. 멈춘 것과 도착한 것은 다르다 (병후 리뷰, PR #73)
         self.declare_parameter('arrival_tolerance_m', Parameter.Type.DOUBLE)
         # release_force 의 전환 시간. 0 이면 즉시 전환이라 해제 순간 참조 외력이 점프한다
         # (두산 매뉴얼 5.1.4 알아두기, 현지 리뷰 PR #73)
         self.declare_parameter('release_force_time_s', 0.3)
+        # SLIDE 방식. force = 순응 · 힘 제어로 끊지 않고 민다(기존). step = 위치 제어로 한 스텝 가고 멈춘 뒤
+        # 힘을 읽어 z 를 맞추며 긁는다(step_slide.py, 9/17 tactile_probe 프로토타입). step 이면 step_* 가 필요하다
+        self.declare_parameter('slide_mode', 'force')
+        for name in STEP_DOUBLE_PARAMS:
+            self.declare_parameter(name, Parameter.Type.DOUBLE)
+        self.declare_parameter('step_force_samples', 3)
 
         self.frame_id = self.get_parameter('frame_id').value
         self.service_timeout_s = float(self.get_parameter('service_timeout_s').value)
         self.moving_eps_m = float(self.get_parameter('moving_eps_m').value)
         self.moving_window_s = float(self.get_parameter('moving_window_s').value)
+        self.moved_min_m = float(self.get_parameter('moved_min_m').value)
         sample_hz = float(self.get_parameter('sample_rate_hz').value)
         status_hz = float(self.get_parameter('status_rate_hz').value)
         if sample_hz <= 0.0 or status_hz <= 0.0:
@@ -129,6 +307,9 @@ class RobotManager(Node):
                                slow_s=slow_call_warn_s if slow_call_warn_s > 0.0 else None)
 
         self.sample_pub = self.create_publisher(RobotSample, '/robot/sample', QOS_SENSOR)
+        # 스텝 모드 SLIDE 의 EDGE 만 낸다. event_id 는 contact_detector 와 겹치지 않게 STEP_EVENT_ID_BASE 위를 쓴다
+        self.event_pub = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
+        self.step_event_count = 0
         self.status_pub = self.create_publisher(RobotStatus, '/robot/status', QOS_STATE)
         self.create_subscription(ContactEvent, '/contact/event', self.on_event, QOS_EVENT,
                                  callback_group=group)
@@ -140,6 +321,7 @@ class RobotManager(Node):
         self.positions = deque()
         self.last_pose = None          # 마지막 유효 샘플의 (Pose, stamp, (x, y, z))
         self.last_force = None         # 마지막 유효 샘플의 (Fx, Fy, Fz) [N]. REL 기준선 확인용
+        self.last_force_sample = None  # (sample_id, (Fx, Fy, Fz)). 스텝 모드가 "새로 받은 샘플"만 평균내려고 쓴다
         self.connected = False
         self.moving = False
         self.compliance_active = False
@@ -297,6 +479,7 @@ class RobotManager(Node):
             msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z = fx, fy, fz
             msg.wrench.torque.x, msg.wrench.torque.y, msg.wrench.torque.z = tx, ty, tz
             self.last_force = (fx, fy, fz)
+            self.last_force_sample = (msg.sample_id, (fx, fy, fz))
             force_ok = True
         except ValueError:
             msg.wrench.force.x = msg.wrench.force.y = msg.wrench.force.z = NAN
@@ -358,6 +541,9 @@ class RobotManager(Node):
                 f'이벤트 무시: type={event.type} motion_id={event.motion_id} (현재 '
                 f'{motion.goal.motion_id if motion else "없음"})')
             return
+        if motion.step_mode and event.type == ContactEvent.TYPE_EDGE:
+            # 스텝 모드는 EDGE 를 스스로 확정한다. contact_detector 의 EDGE 와 자기가 낸 EDGE 모두 정지에 쓰지 않는다
+            return
         wanted = {RobotSample.OP_DESCEND: ContactEvent.TYPE_CONTACT,
                   RobotSample.OP_SLIDE: ContactEvent.TYPE_EDGE}.get(motion.goal.operation)
         if wanted is None or event.type != wanted:
@@ -400,7 +586,14 @@ class RobotManager(Node):
         if op == RobotSample.OP_SLIDE:
             if goal.direction not in motions.DIRECTION_VECTORS:
                 return 'INVALID_VALUE: SLIDE direction'
-            if float(self.param('slide_target_force_n')) <= 0.0:
+            if self.param('slide_mode') == 'step':
+                try:
+                    self.step_params(goal)
+                except (ValueError, ParameterUninitializedException) as exc:
+                    return f'INVALID_VALUE: 스텝 모드 파라미터 — {exc}'
+            elif self.param('slide_mode') != 'force':
+                return f'INVALID_VALUE: slide_mode {self.param("slide_mode")!r} (force | step)'
+            elif float(self.param('slide_target_force_n')) <= 0.0:
                 return 'INVALID_VALUE: slide_target_force_n 이 설정되지 않았다'
             # 기준 z 를 모르면 1차 하강 제한(계약 7.2)이 감시 없이 도는 것과 같다. 조회가
             # 실패 중인 상황이 바로 감시가 필요한 상황이라 거절한다 (현지 리뷰, PR #73)
@@ -480,11 +673,15 @@ class RobotManager(Node):
                 'SLIDE 기준 z 를 잡지 못했다(마지막 위치 없음). 1차 하강 제한을 걸 수 없어 거절한다')
             return (ExecuteMotion.Result.REASON_REJECTED, ReasonCode.INVALID_VALUE,
                     'start_z 없음. 하강 제한 감시 불가')
+        if goal.operation == RobotSample.OP_SLIDE and self.param('slide_mode') == 'step':
+            motion.step_mode = True
+            return self.run_step_slide(goal_handle, motion)
         if goal.operation == RobotSample.OP_SLIDE and not self.start_slide_force(motion):
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                     '순응 · 힘 제어를 켜지 못했다')
         if not self.send_move(motion):
             return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, '이동 명령 실패')
+        motion.sent_s = self.now_s()
         return self.watch(goal_handle, motion)
 
     def send_move(self, motion):
@@ -562,14 +759,26 @@ class RobotManager(Node):
             now = self.now_s()
             elapsed = now - motion.started_s
             position = self.last_pose[2] if self.last_pose else None
-            if self.moving:
+            # "움직였는가"와 "지금 움직이는가"를 같은 순간의 위치 목록 하나로 본다.
+            # - 움직였는가: 위치로 확인된 이동만. self.moving 은 모르면 True 라 샘플 공백 한 번이 "움직였다"로
+            #   남고 출발 전에 도착으로 판정된다 (9/22 실기 728 · 732 · 847 · 943)
+            # - 지금 움직이는가: 상태 타이머가 갱신한 self.moving 은 최대 한 주기 늦다. 출발 순간 위치로는
+            #   이미 움직였는데 self.moving 은 아직 False 라 "움직였다 + 멈췄다 = 도착"이 된다 (9/22 1061 · 1062)
+            points = deque(self.positions)   # 샘플 콜백이 덧붙이는 중에도 한 번에 복사한다
+            motion_state.trim(points, now, self.moving_window_s)
+            motion.moving_now = motion_state.is_moving(points, self.moving_eps_m, self.moving_window_s)
+            # - 움직였다는 것은 동작 방향으로 moved_min_m 넘게 간 것이다. SLIDE 는 힘 제어를 켜는 동안 z 로
+            #   0.3~0.5 mm 움직이는데, 옆 이동 명령이 늦으면 그 사이 멈춘 순간이 도착이 된다 (9/22 1083)
+            travel = (motions.lateral_m if goal.operation == RobotSample.OP_SLIDE
+                      else motions.travelled_m)(motion.start_position, position)
+            if motion_state.has_moved(points, self.moving_eps_m) and travel > self.moved_min_m:
                 motion.moved = True
             if now >= next_feedback:
                 next_feedback = now + feedback_period
                 self.publish_feedback(goal_handle, motion, elapsed)
 
             if goal_handle.is_cancel_requested:
-                stopped, why = self.stop_robot('Action 취소')
+                stopped, why = self.stop_robot('Action 취소', motion)
                 if not stopped:   # 취소를 접수했다고 멈춘 것이 아니다 (병후 리뷰, PR #73)
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'Action 취소. {why}')
@@ -577,7 +786,7 @@ class RobotManager(Node):
             request = self.take_stop_request()
             if request is not None:
                 reason_code, detail = request
-                stopped, why = self.stop_robot(f'정지 요청 ({detail})')
+                stopped, why = self.stop_robot(f'정지 요청 ({detail})', motion)
                 if not stopped:   # 접수했다고 멈춘 것이 아니다 (계약 4.1)
                     # 확인 못 했으니 되돌려 놓는다. 동작 없음 경로(stop_idle)와 같은 약속이다:
                     # 멈췄는지 모르는 로봇에 다음 goal 을 보내지 않는다 (#113). 안전복귀(OP_HOME)만은
@@ -592,12 +801,12 @@ class RobotManager(Node):
                 return self.stop_for_event(motion)
             if goal.operation == RobotSample.OP_SLIDE and motions.drop_exceeded(
                     motion.start_z, position[2] if position else None, drop_limit):
-                stopped, why = self.stop_robot('하강 제한 초과')
+                stopped, why = self.stop_robot('하강 제한 초과', motion)
                 return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.DROP_LIMIT,
                         f'SLIDE 하강 제한 {drop_limit} m 초과'
                         + ('' if stopped else f'. {why}'))
             if elapsed > timeout_s:
-                stopped, why = self.stop_robot('제한 시간 초과')
+                stopped, why = self.stop_robot('제한 시간 초과', motion)
                 if not stopped:
                     return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                             f'{timeout_s:.1f} s 안에 끝나지 않았다. {why}')
@@ -606,8 +815,139 @@ class RobotManager(Node):
             if not self.connected:
                 return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_DISCONNECTED,
                         '로봇 연결이 끊겼다')
-            if self.arrived(motion, elapsed):
+            # 유예는 수락이 아니라 이동 명령을 보낸 뒤부터 잰다. 수락 → 실행 대기 · 힘 제어 켜기 · move 서비스
+            # 응답에 1 s 넘게 걸리면 로봇이 출발하기도 전에 유예가 끝나 도착으로 판정된다
+            # (9/22 실기 1022: 감시 시작 0.26 s 만에 "접촉 없음", 로봇은 그 0.02 s 뒤 출발해 감시 없이 하강)
+            since_sent = now - (motion.sent_s or motion.started_s)
+            # 유예가 지나도록 출발하지 않았으면 도착이 아니라 "명령이 실행되지 않았다"다.
+            # 드라이버가 amovel 을 실행하지 않는 일이 있다.
+            #  - SLIDE: 힘 제어를 켠 뒤 보낸 명령이 9/22 실기 32 회 중 8 회 실행되지 않았다 (#153)
+            #  - MOVE_TO: 9/23 실기 12:52, 모서리 뒤 올림(50 mm)이 86 ms 만에 끝나고 한 걸음도 가지 않았다.
+            #    도착 허용치(arrival_tolerance_m) 검사가 잡아 ROBOT_ERROR 로 끝났지만, 다시 보내면 이어갈 수 있다
+            if (not motion.moved and not self.moving and not motion.moving_now
+                    and since_sent > float(self.param('arrival_grace_s'))
+                    and self.not_started(motion)):
+                failed = self.restart_move(motion)
+                if failed is not None:
+                    return failed
+                continue
+            if self.arrived(motion, since_sent):
                 return self.finished_without_event(motion)
+
+    def step_params(self, goal):
+        """스텝 모드 파라미터. 없거나 범위 밖이면 ValueError / ParameterUninitializedException."""
+        v = {name: float(self.param(name)) for name in STEP_DOUBLE_PARAMS}
+        params = step_slide.StepParams(
+            coarse_m=v['step_coarse_m'], fine_m=v['step_fine_m'], z_step_m=v['step_z_m'],
+            press_step_m=v['step_press_step_m'], press_max_m=v['step_press_max_m'], lift_m=v['step_lift_m'],
+            nudge_m=v['step_nudge_m'], release_n=v['step_release_n'], follow_lo_n=v['step_follow_lo_n'],
+            follow_hi_n=v['step_follow_hi_n'], max_force_n=v['step_max_force_n'],
+            side_hit_n=v['step_side_hit_n'], drop_m=v['step_drop_m'], z_tol_m=v['step_z_tol_m'],
+            max_slope_deg=v['step_max_slope_deg'], max_slide_m=float(goal.max_distance))
+        params.validate()
+        if params.press_max_m + params.drop_m >= float(self.param('drop_limit_m')):
+            raise ValueError('step_press_max_m + step_drop_m 이 drop_limit_m 보다 작아야 한다 (하강 제한에 먼저 걸린다)')
+        for name in ('step_settle_s', 'step_still_m', 'step_still_window_s', 'step_move_timeout_s'):
+            if not v[name] > 0.0:
+                raise ValueError(f'{name} 은 0 보다 커야 한다')
+        if int(self.param('step_force_samples')) < 1:
+            raise ValueError('step_force_samples 는 1 이상이어야 한다')
+        return params
+
+    def run_step_slide(self, goal_handle, motion):
+        """SLIDE 스텝 모드. 위치 제어만 쓴다 → 순응 · 힘 제어를 켜지 않는다(release_all 할 것이 없다).
+
+        모서리를 찾으면 EDGE ContactEvent 를 직접 낸다. scan_manager 는 지금처럼 Result.event_id 로 짝을 맞춘다.
+        """
+        goal = motion.goal
+        timeout_s = (goal.timeout.sec + goal.timeout.nanosec / 1e9) or float(self.param('motion_timeout_s'))
+        io = NodeStepIO(self, goal_handle, motion, float(goal.speed), timeout_s)
+        try:
+            edge = step_slide.run(io, motions.direction_vector(goal.direction), self.step_params(goal))
+        except StepAbort as abort:
+            return abort.result
+        except step_slide.StepFailure as failure:
+            self.get_logger().warning(f'스텝 긁기 실패 ({failure.kind}): {failure}')
+            if failure.kind == step_slide.NO_EDGE:
+                return (ExecuteMotion.Result.REASON_MAX_DISTANCE, ReasonCode.NO_EDGE, str(failure))
+            if failure.kind == step_slide.OVER_FORCE:
+                return (ExecuteMotion.Result.REASON_OVER_FORCE, ReasonCode.OVER_FORCE, str(failure))
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    f'스텝 긁기 {failure.kind}: {failure}')
+        motion.event = self.publish_step_edge(goal, edge)
+        self.get_logger().info(
+            f'스텝 긁기 EDGE: ({edge.position[0]:.5f}, {edge.position[1]:.5f}, {edge.position[2]:.5f}) m, '
+            f'긁은 거리 {edge.travelled_m * 1000:.1f} mm, 더 내려간 깊이 {edge.z_drop_m * 1000:.2f} mm, '
+            f'걸린 시간 {self.now_s() - motion.started_s:.1f} s')
+        return (ExecuteMotion.Result.REASON_EDGE, ReasonCode.OK, '')
+
+    def publish_step_edge(self, goal, edge):
+        self.step_event_count += 1
+        event = ContactEvent()
+        event.event_id = STEP_EVENT_ID_BASE + self.step_event_count
+        event.scan_id = goal.scan_id
+        event.motion_id = goal.motion_id
+        event.sample_id = self.sample_id
+        event.type = ContactEvent.TYPE_EDGE
+        event.source = 'robot_step'
+        event.frame_id = self.frame_id
+        if self.last_pose and self.last_pose[0] is not None:
+            event.pose.orientation = self.last_pose[0].orientation
+        event.pose.position.x, event.pose.position.y, event.pose.position.z = edge.position
+        fx, fy, fz = edge.force_delta
+        event.wrench.force.x, event.wrench.force.y, event.wrench.force.z = fx, fy, fz
+        now = self.get_clock().now().to_msg()
+        event.pose_stamp = event.force_stamp = event.detect_stamp = now
+        event.force_delta_n = math.sqrt(fx * fx + fy * fy + fz * fz)
+        event.z_drop_m = edge.z_drop_m
+        event.z_drop_valid = True
+        event.debounce_count = 1
+        self.event_pub.publish(event)
+        return event
+
+
+    def not_started(self, motion):
+        """다시 보낼 만한 "출발하지 않음"인가.
+
+        MOVE_TO 는 목표에 이미 닿아 있으면(0 mm 이동 명령) 움직이지 않는 것이 정상이다.
+        그래서 아직 허용치 밖에 있을 때만 "출발하지 않았다"로 본다. 위치를 모르면 다시 보내지 않는다
+        (모르는 상태에서 이동 명령을 또 보내지 않는다).
+        SLIDE 는 목표 자세가 없으므로 그대로 본다.
+        """
+        op = motion.goal.operation
+        if op == RobotSample.OP_SLIDE:
+            return True
+        if op != RobotSample.OP_MOVE_TO:
+            return False
+        gap = self.distance_to_target(motion)
+        return gap is not None and gap > float(self.param('arrival_tolerance_m'))
+
+    def restart_move(self, motion):
+        """출발하지 않은 이동 명령을 다시 보낸다. 다시 보냈으면 None, 끝내야 하면 결과.
+
+        먼저 move_stop 으로 남은 명령을 비운다. 첫 명령이 늦게 출발하면 두 명령이 겹쳐 두 번 갈 수 있다.
+        순응 · 힘 제어는 켠 채 둔다(윗면을 누르고 있어야 한다). 해제는 기존대로 finally 의 release_all 이 한다.
+        """
+        limit = int(self.param('move_restart_max'))
+        what = '밀기' if motion.goal.operation == RobotSample.OP_SLIDE else '이동'
+        if motion.restarts >= limit:
+            stopped, why = self.stop_robot(f'{what} 출발 실패', motion)
+            detail = (f'{what}가 출발하지 않았다: 이동 명령 {motion.restarts + 1} 번 모두 '
+                      f'{self.param("arrival_grace_s")} s 안에 움직이지 않았다')
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    detail + ('' if stopped else f'. {why}'))
+        motion.restarts += 1
+        self.get_logger().warning(
+            f'{what}가 {self.param("arrival_grace_s")} s 안에 출발하지 않았다. '
+            f'이동 명령을 다시 보낸다 ({motion.restarts}/{limit})')
+        if not self.call_sync(self.srv_clients['move_stop'], dsr_client.move_stop_request(), 'move_stop'):
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    f'{what} 재출발 전 move_stop 응답 없음')
+        if not self.send_move(motion):
+            return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
+                    f'{what} 재출발 이동 명령 실패')
+        motion.sent_s = self.now_s()
+        return None
 
     def arrived(self, motion, elapsed):
         """로봇이 멈췄으면 명령한 만큼 갔다고 본다.
@@ -618,7 +958,7 @@ class RobotManager(Node):
         **멈춘 것과 도착한 것은 다르다.** 여기서는 "멈췄다"만 판정하고, 목표에 실제로
         닿았는지는 `finished_without_event`가 본다 (병후 리뷰, PR #73).
         """
-        if self.moving:
+        if self.moving or motion.moving_now:   # 어느 한쪽이라도 움직인다면 기다린다
             return False
         return motion.moved or elapsed > float(self.param('arrival_grace_s'))
 
@@ -656,14 +996,14 @@ class RobotManager(Node):
     def stop_for_event(self, motion):
         event = motion.event
         if event.type == ContactEvent.TYPE_OVER_FORCE:
-            stopped, why = self.stop_robot('과대 외력')
+            stopped, why = self.stop_robot('과대 외력', motion)
             if not stopped:
                 return (ExecuteMotion.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR,
                         f'과대 외력 {event.force_delta_n:.2f} N. {why}')
             return (ExecuteMotion.Result.REASON_OVER_FORCE, ReasonCode.OVER_FORCE,
                     f'과대 외력 {event.force_delta_n:.2f} N')
         stopped, why = self.stop_robot(
-            '접촉' if event.type == ContactEvent.TYPE_CONTACT else '접촉 소실')
+            '접촉' if event.type == ContactEvent.TYPE_CONTACT else '접촉 소실', motion)
         if not stopped:
             # 정지를 확인하지 못했는데 정상 코드로 돌려주면 scan_manager 는 STOPPED 로 가고
             # 로봇은 아직 움직인다. 계약 4.1 의 "접수와 정지 완료는 다르다" (병후 리뷰, PR #73)
@@ -753,7 +1093,7 @@ class RobotManager(Node):
         if stopped:
             self.clear_stop_request(entry)
 
-    def stop_robot(self, why):
+    def stop_robot(self, why, motion=None):
         """move_stop 뒤 실제로 멈출 때까지 기다린다. 접수와 정지 완료는 다르다(계약 4.1).
 
         `(정지 확인됨, 사유)`를 돌려준다. 확인하지 못했으면 호출한 쪽이 결과를
@@ -766,6 +1106,11 @@ class RobotManager(Node):
         self.get_logger().info(f'정지: {why}')
         accepted = self.call_sync(self.srv_clients['move_stop'], dsr_client.move_stop_request(),
                                   'move_stop')
+        # SLIDE 는 멈춤을 기다리기 전에 힘 제어부터 푼다. move_stop 은 옆 이동만 세우고, 힘 제어는 목표 힘을
+        # 채우려 계속 누른다. 모서리를 벗어난 뒤면 받칠 면이 없어 팁이 내려가고 멈춤이 확인되지 않는다
+        # (9/22 실기 1123: 옆 이동은 0.12 s 에 섰는데 z 가 2.5 mm/s 로 1.7 s 동안 2.8 mm 내려가 정지 확인 실패)
+        if motion is not None and motion.force_on:
+            self.release_force_early(motion)
         deadline = self.now_s() + float(self.param('stop_settle_s'))
         while self.moving and self.now_s() < deadline:
             time.sleep(LOOP_PERIOD_S)
@@ -778,6 +1123,17 @@ class RobotManager(Node):
             detail = 'move_stop 응답은 없었으나 움직임은 멈췄다'
             self.get_logger().warn(detail)
         return True, ''  
+
+    def release_force_early(self, motion):
+        """정지 중에 힘 제어만 먼저 푼다. 순응은 release_all 이 램프가 끝난 뒤 푼다."""
+        ramp_s = float(self.param('release_force_time_s'))
+        if self.call_sync(self.srv_clients['force_off'], dsr_client.force_off_request(ramp_s),
+                          'release_force'):
+            motion.force_on = False
+            motion.force_released_s = self.now_s()
+            self.force_ctrl_active = False
+        else:
+            self.get_logger().error('정지 중 release_force 실패. release_all 에서 다시 부른다')
 
     def release_all(self, motion):
         """순응 · 힘 제어 해제. 모든 종료 경로에서 부른다(CLAUDE.md 규칙 2).
@@ -802,6 +1158,11 @@ class RobotManager(Node):
             # 이 대기는 어떤 락도 잡지 않은 채 Action 스레드에서만 돈다. 샘플 타이머는 따로 돈다
             if motion.compliance_on:
                 time.sleep(ramp_s)
+        if motion is not None and motion.compliance_on and motion.force_released_s is not None:
+            # 정지하며 힘 제어를 먼저 풀었다. 램프가 아직 안 끝났으면 남은 만큼만 기다린다
+            left = float(self.param('release_force_time_s')) - (self.now_s() - motion.force_released_s)
+            if left > 0:
+                time.sleep(left)
         if motion is not None and motion.compliance_on:
             if self.call_sync(self.srv_clients['compliance_off'], dsr_client.compliance_off_request(),
                               'release_compliance_ctrl'):

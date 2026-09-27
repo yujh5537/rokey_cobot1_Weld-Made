@@ -2,6 +2,77 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+
+> phase 2(용접) 계약은 **v0.2.x** 로 번호를 매기고 1차 v0.1.x 와 병행한다. 최신이 위.
+
+## v0.2.0 (2026-09-23, phase 2 용접 인터페이스, docs/phase2)
+**타입 추가**(`WeldConfig` · `WeldState` · `WeldLine` · `WeldResult` · `StopWeld` · `RunWeld` · `ExecutePath`)와 **기존 타입의 상수 추가**(`RobotSample` · `ExecuteMotion` 에 `OP_WELD_PATH=5`, ReasonCode 6xx 5 개). 기존 필드는 바꾸지 않았다. 전문과 동작 규칙은 `docs/phase2/weld-ros-interfaces.md`, MQTT 는 `docs/phase2/weld-mqtt-schema.md`, 모션 정의는 `docs/phase2/weld-motion.md`.
+- **왜**: 1차(스캔) 완료 뒤 2차 프로젝트 "스캔 결과로 용접 모션"을 같은 레포 · 같은 인터페이스 패키지에서 진행한다(병후, 2026-09-23). phase 2 는 기존 계약 · BRD 의 구속을 받지 않지만, 타입 동기화 검사(`test_contract_sync`)와 ReasonCode 번호 규칙(추가만, 변경 없음)은 그대로 쓴다
+- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름, 의석) · 새 노드 weld_manager · 웹
+- `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
+- 리뷰 반영(2026-09-23 저녁): 학민 — robot_manager `path_min_z_m` · 순응 검사 근거 · `path_acc_ratio` 단위. 의석 — 토픽별 `schema_version` · null 단독 규칙 · 브리지 표 PR 을 P1 앞에. 현지 — 스탠드오프 정의(구 표면 ↔ 이음선) · 세로선 툴 외형 검사 · 미요청 정지 = ERROR · 오래된 `/weld/state` 무시 · roll 선별 배열 · `/robot/sample` 구독 · 속도 하한. 자체 노드 6 개(1장 · `.claude/rules/ros2-nodes.md` 예외)
+- 현지 2차(2026-09-23 밤): `RunWeld.end_line` · `WeldResult.end_line` 추가("L0 만" 시험을 계약상 가능하게) · 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` · weld_manager 는 속도 상한을 검사하지 않는다(D29, 3.1)
+- 현지 3차(2026-09-24): 후퇴점은 ExecutePath 안(weld_speed) · 대기 한도 3 개 · `orientation_tolerance_deg` · z_safe 아래면 수직 상승(D30) · 휴지 중 `/weld/stop` 은 `/robot/stop` 을 부르지 않음 · `ExecuteMotion.scan_id` 자리에 `weld_id`
+- 현지 4차(2026-09-24, 드라이버 소스 확인): `ExecutePath` 실행 방식을 `path_mode` line(기본) / spline 으로, `move_line`+radius 는 ASYNC 에서 radius 가 버려져 제외 · `path_max_points` 200 → 100(`MAX_SPLINE_POINT`, 컨트롤러가 `pos_cnt` 를 검사하지 않음). 호출 확인은 #186 M4(D31)
+- 2026-09-25(병후 결정): **D12 갱신** — P1 robot_manager `ExecutePath` 구현은 현지(PR #191), 리뷰 학민. **D32** — `path_tolerance_m` 은 line 모드의 중간 점 도착 판정에도 쓰고 `≤ 0` · NaN 은 604(현지 해석 채택). **D31 결과** — spline 은 Virtual 응답 지연으로 사용 불가(현지 9/24), line 만. 5.2 에 명령 실패 뒤 정지 확인 규칙(#191 · #193). `weld-motion.md` 5절에 선 사이 이동은 z_safe 두 점 사이에서만(학민 M1 충돌 사례). **D33** — 한 선의 204 실패는 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(`continue_on_line_failure`, 5.1 · 3.2 · weld-motion 5 · 6절. M1: L1 · L5 도달 불가 → D27 기대는 6 선). 타입 변경 없음(`ExecutePath.action` 주석만)
+- 2026-09-26(병후 결정, 현지 #184 리뷰): **D33 좁힘** — 다음 선으로 계속하는 것은 z_safe 위에서 난 204(도달 불가 · 출발 안 함)뿐. z_safe 아래의 204 는 복구 이동(−d 물러남 → z_safe) 뒤 ERROR. **D30 갱신** — 시작 때 z_safe 아래면 −d 물러남 → 상승(복구 · 7.2 안전복귀와 같은 순서). 타입 변경 없음
+- 2026-09-26(#198, 문서만): 1차 `ros-interfaces.md` 5.1 · 5.3 에 `WELD_ACTIVE(601)` 와 검사 순서(BUSY → 601 → 래치 → 로봇) · phase 2 7.1 에 같은 순서 한 줄(600 과 대칭) · `weld-motion.md` 6절에 scan_manager 파라미터 `weld_state_timeout_s`(5.0) 줄. 새 버전 번호 없음
+- 2026-09-26 밤(#198): D33 "z_safe 위" 판정 = `z ≥ z_safe − path_tolerance_m`(학민 ③ · 현지 제안 1, 코드와 일치) · 3.2 복구 이동 중 stop → STOPPED · **D34** 접근 · 후퇴점 도달성 — 9/29 2 자세 선확인, 윗면선 오프셋 방향 파라미터 `top_line_offset_dir`(`tool`/`vertical`) 추가(weld_manager, 타입 변경 없음)
+
+## v0.1.20 (2026-09-23, T41 · #179)
+`mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
+- 실측 종단에서 `/dsr01/joint_states` publisher가 2개임을 확인했다: `/dsr01/joint_state_broadcaster`는 M0609 J1~J6 6축, `/dsr01/joint_state_publisher`는 M0609 6축 + RG2 6축 합성 스냅샷
+- `robot/joints`는 정확히 M0609 6축인 스냅샷만 사용한다. 12축 합성 메시지가 M0609 웹 자세를 번갈아 덮지 않게 한다
+- 새 `robot/gripper_joints`는 합성 스냅샷에서 RG2 6축만 추려 QoS 0 · retain=false로 발행한다
+- 두 토픽 모두 표시 전용이다. 로봇/그리퍼 제어 입력으로 사용하지 않는다
+- 9/23 실기 통합값을 동결점에 반영: real `tare_max_std_n=1.0`(tare RMS 0.636~0.813 N에서 0.3 N이 두 번 TARE_UNSTABLE), `step_release_n=2.5`(1.5 N에서 F0 치우침으로 윗면 위 거짓 접촉 후 −y no_contact(204)). sim은 가상 외력이므로 기존 0.3 N을 유지한다
+- 웹 모델은 pinned M0609 URDF의 `link_6 -> tool0` 고정 RPY와 m0609_rg2_bringup의 `tool0 -> rg2_base_link` 장착 RPY를 반영한다
+
+## v0.1.19 (2026-09-23, T41 · #179)
+`mqtt-schema.md`에 웹 M0609 디지털 트윈 표시용 **`robot/joints`**를 추가했다. 영향: mqtt_bridge · FastAPI(`robot/#` 기존 구독으로 자동 전달) · frontend · mock_publisher.
+- ROS 원본은 Doosan `joint_state_broadcaster`의 `/dsr01/joint_states` (`sensor_msgs/JointState`). mqtt_bridge가 기본 20 Hz로 다운샘플해 QoS 0 · retain=false로 발행한다
+- payload는 `names[]`와 같은 인덱스의 `positions_rad[]`, `stamp_ms`, `published_at_ms`를 가진다. 자세 quaternion 규칙은 그대로이며 관절각만 rad 예외로 추가한다
+- `robot/joints`는 **표시 전용**이다. 웹에서 역으로 로봇 제어에 사용하지 않는다
+- RG2는 현재 탐침 고정 파지 운용이라 웹에서는 고정 자세로 표시한다. RG2 폭 피드백 토픽 계약은 추가하지 않았다
+
+## v0.1.18 (2026-09-23, #147 · #142 새 작업대 · 새 홈 · 좌표 잠정)
+**타입 변경 없음.** 2026-09-22 작업대 교체(눌림 발견) 뒤 학민 실측값으로 `units-frames.md` 와 real 값을 바꾼다. **좌표 계열은 잠정**(z=0 1 점, 테이프 두께 · 부재 캘리퍼 미확정)이고, 확정되면 `support_z_m` · z=0 두 줄만 후속으로 고친다.
+- 홈 관절각 **[-21.19, 15.24, 52.97, -0.08, 111.80, -15.14] deg**(J6 을 ±180° 안으로). 옛 홈과 그 팁 좌표 · 높이는 무효. 홈은 좌표 기준이 아니다
+- z=0 **95.006 mm**(1 점, (524.97, −172.03)). 탐침 상태 전제조건의 기준점 · 기준값도 같이 바꿨다
+- 작업대 원점 **(420.255, −156.675, 95.006)** = 부재 윗면 중심 + 작업대 표면. `search_origin_pose` = 그 위 윗면 + 40 mm(218.0), 자세는 새 홈(수직). `max_descend_m` 0.120 → 0.050
+- 팁 반지름 0.225 → **약 2 mm**(9/21 교체분, 캘리퍼 확정 전). 교체 절차의 "같은 제품이라 그대로" 가정이 틀렸음을 적었다. TCP [0, 0, 252.12] 는 유지(탐침을 9/21 뒤 바꾸지 않았다)
+- `support_z_m` 0 → 0.002(테이프 두께 잠정). real `detect_latency_s` 0.020 → 0.0(스텝 모드는 멈춘 뒤 EDGE 확정, v0.1.15 7.2 후속)
+- 세션 시작 점검 2 에 **START 전 툴 · TCP 등록 확인 두 줄**을 넣었다(2026-09-23 등록 누락 비상정지 2 회)
+- 배치 원칙 1 · 2 · 6 은 바뀌었다는 표시만 하고 #147 에서 다시 쓴다
+영향: robot_manager(`home_joint_deg`) · scan_manager(좌표 · 편향 보정, real 값만). 번호: #161 이 v0.1.17 을 쓴다.
+
+## v0.1.16 (2026-09-23, #130 최신성 한계)
+**타입 변경 없음.** real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다(6.3절). 6.3 의 "한계를 올리기 전에 원인을 없앤다"는 원칙의 **예외**이며, 이유 · 남는 위험(687 ms 공백) · 되돌릴 조건을 6.3 과 real.yaml 주석에 같이 남겼다. 코드 기본값과 sim 값은 바꾸지 않았다(sim 은 이미 500). 영향: safety_monitor(실기 값만).
+
+## v0.1.15 (2026-09-22, SLIDE 스텝 모드)
+타입 변경 없음. `ros-interfaces.md` 2.1 의 `/contact/event` 발행자에 robot_manager 를 더하고, 7.2 에 **SLIDE 스텝 모드**를 적었다. 영향: robot_manager(`slide_mode` · `step_*` 파라미터, `step_slide.py`) · contact_detector(스텝 모드 SLIDE 에서는 EDGE 를 내도 쓰이지 않는다) · scan_manager(절차 · 짝 맞추기 변경 없음. `motion_timeout_s` 120 s) · mqtt_bridge(`source` 값 `robot_step` 추가). `ContactEvent.msg` · 2.1 메시지 정의의 `source` 주석에 `robot_step` 을 더했다(주석만, 타입 · 빌드 영향 없음).
+- 9/22 실기: 힘 제어 밀기는 방향별 실제 누름이 1.5~8.6 N(같은 6 N 설정), 방향 전환 뒤 떠서 모서리를 놓침(#155), 가짜 EDGE(#154), 옆 이동 명령 누락(#153), 가짜 도착(#152). 뿌리가 같다 — 움직이는 중에 힘을 읽고 누름을 힘 제어에 맡긴다
+- 9/17 `tactile_probe/edge_scan.py` 프로토타입(같은 M0609)은 위치 제어로 한 스텝 가고 멈춘 뒤 힘을 읽어 z 를 맞추며 긁어 원점 + 네 방향을 한 번에 끝냈다(`~/tactile_probe_logs/scan_20260917_171305.csv`). 이것을 robot_manager `slide_mode: step` 으로 옮겼다. `force` 는 기존 그대로
+- 스텝 모드의 EDGE 는 "힘 빠짐 → 더 내려가 보기 → 확정 → 가는 스텝 다듬기"가 동작과 한 몸이라 robot_manager 가 확정하고 `/contact/event` 로 낸다(`source robot_step`, `event_id ≥ 2³²`, `z_drop_valid` 항상 true). 짝 맞추기와 scan_manager 절차는 그대로
+- 소실 기준은 `step_follow_lo_n`(3 N)이다. `step_release_n`은 처음 누를 때의 닿음 기준으로만 쓴다. **v0.1.15 당시 출발값은 1.5 N**이었고, 9/23 실기 통합에서 F0 치우침으로 윗면보다 약 1.4 mm 위 거짓 접촉 후 −y `no_contact(204)`가 발생해 real 값을 **2.5 N**으로 조정했다(v0.1.20, #179). 9/22 18:2x 실기에서는 모서리를 넘은 반지름 약 2 mm 팁이 모서리 각에 걸려 ΔFz 1~2 N 이 남고, 기준 힘 F0 이 실행마다 ±0.6 N 흔들려 당시 1.5 N을 넘나들었다. 다듬기는 윗면 위로 들고 마지막으로 3 N 이상 누른 자리보다 한 스텝 뒤에서 긁는 방향으로 들어와 F0 을 다시 재고 다시 누른다(18:40 네 방향 성공)
+- 후속: 편향 보정의 속도 × 지연 항(스텝 모드는 0 이어야 한다, scan_manager), `edge_bias_offset_m` 을 스텝 모드 기준으로 다시 잰다(T30)
+
+## v0.1.14 (2026-09-21, 새 탐침 TCP x · y, #137)
+타입 변경 없음. `units-frames.md`의 탐침 TCP x · y 를 옛 탐침 값 (−1.30, 3.71)에서 **(0, 0)** 으로 확정했다. 영향: robot_manager · contact_detector 가 발행하는 모든 Base x · y(컨트롤러 TCP 등록값을 따른다) · `apply_tool_tcp.py` 기본값 · 실기 세션 절차. (v0.1.13 은 #132 에 예약돼 있어 번호가 머지 순서와 다를 수 있다.)
+- **측정**: J6 관절만 +180° 돌려도 팁이 작업대 십자 위에 그대로 있었다(옛 값이면 7.8 mm 옮겨 간다). TCP [0, 0, 252.12] 로 툴 z 축 90° 회전해도 팁이 제자리였다. 새 TCP 로 읽은 홈 팁 x · y 가 홈 플랜지 x · y 와 0.14 mm 안. 눈 정밀도로 약 ±0.25 mm. 원본: `docs/env/tool-tcp-register.md` 9절
+- **이전 기록**: 2026-09-21 새 탐침으로 기록한 절대 x · y 는 홈 자세에서 실제보다 (−1.25, −3.73) mm 어긋나 있다. 폭 · 길이 · z 는 영향 없음
+- **값을 바꾸지 않은 것**: 작업대 원점 (423.56, −186.06) · 기준점 (525.19, −172.09) · `search_origin_pose` · `base_to_fixture` 는 옛 탐침(피벗 ±1 mm)으로 잰 실제 위치라 그대로다. 새 탐침의 홈 팁 x · y 는 (424.40, −183.22)로 원점과 2.96 mm 떨어진다(v0.1.11 의 0.87 mm 는 틀린 TCP 로 읽은 값). 홈 → 기준점 이동이 약 3 mm 가 된다
+- `search_origin_pose` · `base_to_fixture` 를 켜는 조건 ②(TCP x · y 확인)가 끝났다. ①(#109)도 PR #127 로 끝났다(9/21 18:38 실기 홈 출발 하강 6 회 공중 거짓 CONTACT 0 회(`890a8de`, bag `docs/test-reports/data/20260921_pm/bag_t30_1838`), 머지본의 `descend_ref_settle_s` 5.5 s 는 bag 6 개 재생으로 확인). 켤 때는 TCP 를 [0, 0, 252.12] 로 등록한 세션이어야 한다
+
+## v0.1.13 (2026-09-21, 힘 꺾임 EDGE, #128)
+타입 변경 없음. `ros-interfaces.md` 3.3 의 EDGE 규칙에 **힘 꺾임**을 더했다. 기본 꺼짐. 영향: contact_detector(판정 · 파라미터 4개 추가) · scan_manager(편향 보정의 δ가 작아진다, 아래) · 실기 절차.
+- 2026-09-21 실기 밀기 4회를 기록에서 다시 넣었다: z 추세선 방식은 **한 번도 EDGE 를 내지 못했다**. 모서리 뒤 z 가 일정 속도(0.2~0.35 mm/s, 한 번은 2 mm/s)로 떨어져 추세선이 기울기를 따라간다. 반면 Fz 는 모서리에서 0.4 s 안에 약 2~4 N 꺾인다
+- `edge_force_drop_n > 0` 이면: 판정을 켠 뒤 원시 Fz 가 `[t − edge_force_window_s, t − edge_force_lag_s]` 중앙값보다 `edge_force_drop_n` 넘게 낮은 샘플이 연속 `debounce_n` 회면 EDGE. SLIDE 시작 뒤 `edge_force_settle_s` 동안은 보지 않는다. z 추세선과 둘 중 먼저 확정된 것을 낸다
+- 재생 결과(1.0 N): 464.43 · 464.53 · 464.59 · 466.70 (기대 463.56, 마지막은 눌린 채 시작한 1회)
+- `z_drop_m`: 힘으로 확정하면 판정 첫 샘플의 추세선 대비 하강량(음수면 0, 실기 0~0.1 mm). 추세선이 없으면 `z_drop_valid = false`. **scan_manager 편향 보정(`bias.py` `overshoot_m`)이 δ 로 쓰므로 켜기 전에 병후 확인이 필요하다**
+- 켜는 것은 팀 결정이다. BRD 4.1.2 는 z 급강하를 주 신호, 외력 감소를 보조 신호로 둔다
+- 새 contact_detector 파라미터(계약 이름 아님): `edge_force_drop_n`(0 = 끔) · `edge_force_window_s` · `edge_force_lag_s` · `edge_force_settle_s`
+
 ## v0.1.12 (2026-09-21, 하강 · 밀기 기준 분리, #109)
 타입 변경 없음. `ros-interfaces.md`의 **`/contact/tare` 설명(2장)과 판정 규칙(3.3)**을 고쳤다. 영향: contact_detector(판정 · 파라미터 7개 추가) · scan_manager(절차 변경 없음) · 실기 절차.
 - 2026-09-21 실기: 외력 추정값이 마지막 이동 방향 · 자세에 따라 2~3 N 치우친다. 정지 F₀ 로 하강하면 큐브 45 mm 위에서 거짓 CONTACT(5-2), 이동 중 F₀ 는 판정 오차 0.016 mm(5-5 · 5-8), 다른 자세의 F₀ 는 1.4 mm 만에 거짓 접촉(5-11). 밀기 중에는 허공에서도 Fx −5 N(5-1)

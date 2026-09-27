@@ -37,7 +37,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
     - 9/21 실기 하강 23 회 재생: 한 번 잡은 F0(홈 정지 · 하강 중 1회)는 1~2 회 공중 거짓 CONTACT(윗면 38 · 44 · 78 mm 위), 이동 기준은 0 회이고 윗면 z 는 같다. 공중 최대 `|F − F0|` 2.92 N(도중에 멈춘 하강), 홈 출발 정상 하강 2.26 N
     - 샘플 공백으로 구간을 비우지 않는다. 시간 창이라 오래된 샘플은 저절로 빠진다
   - **이동 기준이 없는 동안**(출발 뒤 `descend_ref_settle_s`(5.5 s. 출발 약 4 s 뒤 계단식 치우침이 구간을 지나갈 때까지), 구간 안 샘플이 `descend_ref_min_samples` 보다 적을 때) **CONTACT 를 끄지 않고 둔하게 본다**: `/contact/tare` 의 F0(없으면 이번 DESCEND 첫 샘플의 F)와 `descend_hold_threshold_n`(6 N). 끄면 그 사이에 닿았을 때 과대 외력(30 N)까지 막을 것이 없다(현지 리뷰, PR #127). 이렇게 확정한 CONTACT 는 로그에 경고로 남는다(더 눌린 좌표)
-  - 한계: 느리게 오르는 접촉(부드러운 부재)은 흐름으로 흡수될 수 있다. 기준 큐브 · 탐침(43 N/mm, 3 mm/s 면 초당 약 130 N)은 해당하지 않는다
+  - 한계: 느리게 오르는 접촉(부드러운 부재)은 흐름으로 흡수될 수 있다. 직선으로 오르는 힘이면 |F − F0| 가 기울기 × (window_s + lag_s)/2 = 0.65 s 에서 멈추므로, **약 4.6 N/s(= 3.0 / 0.65)보다 느리면 CONTACT 가 나지 않는다**(settle 안은 F0 고정이라 6 N 에서 잡힌다). 기울기 = 접촉 강성 × 하강 속도. 9/21 실기 CONTACT 20 회: 이론 43 N/mm × 3 mm/s ≈ 130 N/s, 3 N 을 넘은 힘 갱신 구간 중앙값 105 N/s, 보수적 평균(0.5 → 3 N) 최소 15 N/s. 창 · 임계 · 하강 속도를 바꾸면 다시 본다(#139, `test_slow_contact_boundary`)
   - `/contact/tare`(정지)는 툴 등록 점검(`TOOL_REG_SUSPECT`)과 둔한 판정의 기준으로 남는다. DESCEND 가 아닐 때(밀기의 보고값 `|F − F0|`)는 마지막 CONTACT 의 이동 기준과 `/contact/tare` 중 **나중 것**을 쓴다
   - 하강 중에 파라미터를 바꾸면 detector 를 새로 만들어 구간을 다시 쌓는다(그동안 둔한 판정). 이미 닿아 있을 때는 바꾸지 않는다
 - **EDGE**: `operation == OP_SLIDE` 이고 기준값이 있는 상태에서(판정을 켜는 조건은 F0 를 쓰지 않지만, F0 가 하나도 없으면 EDGE 를 판정하지 않는다. 보고값 `force_delta_n` 때문)
@@ -48,6 +48,11 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
   - 밀기 시작 z 대비 누적 하강량으로 재지 않는다. 모서리가 아닌데 z 가 내려가는 경우가 셋 있다: SLIDE 시작 때 틈(`recontact_margin_m`)을 메우는 하강(계약 7.3), 기울어진 윗면(0.87° 면 80 mm 에 1.2 mm), 탐침이 홀더 안으로 서서히 밀리는 것(PR #80). 앞의 것은 1 이, 뒤의 둘은 2 가 거른다
   - **가를 수 없는 것**: 탐침이 한 번에 툭 미끄러져 들어가면 모서리와 같은 모양이다(테스트에 한계로 고정해 두었다). 기구 쪽에서 막아야 한다
   - 추세선에는 최근 `debounce_n` 개 샘플을 넣지 않고 기다리게 한다(임계 직전의 내려앉는 샘플이 기준선을 끌어내리지 않게). 조건이 성립한 동안에는 기준선을 얼린다
+  - **추세선의 한계(#128)**: 모서리 뒤 z 가 **일정 속도로** 떨어지면 추세선이 그 기울기를 따라가 조건이 성립하지 않는다. 2026-09-21 실기 밀기 4회 모두 EDGE 가 안 나왔다(떨어지는 속도 0.2~0.35 mm/s, 한 번은 2 mm/s)
+  3. **힘 꺾임(`edge_force_drop_n > 0` 일 때, 기본 꺼짐)**: 1 로 판정을 켠 뒤, 원시 Fz 가 `[t − edge_force_window_s, t − edge_force_lag_s]` 구간의 중앙값보다 `edge_force_drop_n` 넘게 낮은 샘플이 연속 `debounce_n` 회 → 확정. F0 를 쓰지 않는다. SLIDE 시작 뒤 `edge_force_settle_s` 동안은 보지 않는다(눌린 채 시작하면 순응이 켜진 뒤 1 s 가까이 Fz 가 풀린다). 2 와 3 중 먼저 확정된 것을 내고, 로그에 `EDGE(z)` · `EDGE(force)` 로 남긴다
+     - 실기 밀기 4회 재생(1.0 N): 판정 x 464.43 · 464.53 · 464.59 · 466.70 (기대 모서리 463.56. 마지막은 9.8 N 으로 눌린 채 시작한 1회). 모서리 앞 잡음은 중앙값보다 최대 0.65 N 낮았다
+     - 힘 꺾임으로 확정하면 그 순간의 z 하강(`z_drop_m`)은 0~0.1 mm 로 작다. 음수는 0 으로 싣는다. 추세선이 없으면 `z_drop_valid = false`
+     - 공백(`stale_age_ms`)이 나면 기준 구간도 버린다. 꺾임이 공백 안에서 끝나면 힘으로는 놓친다
   - `z_drop_m` = 판정 샘플에서 추세선보다 내려간 양(편향 보정의 δ)
   - 누름 확인 직후 곧바로 모서리가 오면 늦게 잡히고 `z_drop_m` 이 작게 실린다. 밀기는 모서리에서 충분히 떨어져 시작한다
 - **OVER_FORCE**: 모든 동작에서 원시 `|F| > over_force_n` 이 연속 `over_force_debounce_n` 회. tare 와 무관. 구간마다 1 회
@@ -64,7 +69,7 @@ Virtual Mode 에서는 힘 제어가 동작하지 않고 외력도 0 근처라(B
 ## 파라미터
 값은 `contact_scan_bringup/config/sim.yaml` · `real.yaml` 에만 둔다. 코드에 기본값이 없어서 값이 빠지면 노드가 기동하지 않는다.
 `source` · `contact_threshold_n` · `edge_drop_m` · `debounce_n` · `over_force_n` (계약 이름. SetConfig 가 실행 중에 바꾸며, 범위를 벗어나면 거절한다. 기준값 F0 는 유지된다) ·
-`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_ref_settle_s` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109)
+`over_force_debounce_n` · `edge_arm_force_n` · `edge_trend_window_s` · `edge_trend_min_samples` · `stale_age_ms` · `tare_duration_s` · `tare_min_samples` · `tare_max_std_n` · `tare_max_force_n` · `descend_ref_window_s` · `descend_ref_lag_s` · `descend_ref_min_samples` · `descend_ref_settle_s` · `descend_hold_threshold_n` · `edge_arm_still_window_s` · `edge_arm_still_m` · `edge_arm_travel_m`(#109) · `edge_force_drop_n` · `edge_force_window_s` · `edge_force_lag_s` · `edge_force_settle_s`(#128)
 
 `source: sim` 일 때만: `sim_box_frame_id` · `sim_box_origin_m`(밑면 중심) · `sim_box_size_m` · `sim_stiffness_n_per_m` · `sim_tip_radius_m` · `sim_fall_speed_mps` · `sim_slide_press_n`
 
