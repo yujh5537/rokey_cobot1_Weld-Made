@@ -130,15 +130,30 @@ W3 는 메인 PC 의 M3 · M4 를 확인한 뒤에 한다.
 | 컨트롤러 | 실기 DRCF `GF02120100` · DRFL `GL013303` | `versions.md` |
 | `ws_dsr` 소스 | `github.com/ahnisinc/cobot_rg2` @ `4d5657f` | `versions.md` |
 
-### 4.2 현지가 채워 주면 좋을 것
+### 4.2 메인 PC · 로봇 쪽 (현지 보완, 2026-09-27)
 
-- [ ] **두 PC 의 물리 연결** — 같은 스위치인지 · 유선/무선 · 대역
-- [ ] **로봇 네트워크** — 메인 PC 와 컨트롤러가 같은 서브넷인지, 메인 PC 에 NIC 가 2 개인지(사내망 + 로봇망)
-- [ ] **방화벽** — 1883 · 12345 · DDS 포트를 따로 연 것이 있는지
-- [ ] **DDS 멀티캐스트** — 도메인 30 에 팀원의 Virtual 노드가 같이 보이는 문제가 있었는지
-- [ ] **weld_manager**(phase 2) 가 bringup 6 번째 노드로 들어간 뒤의 구성 — 그림의 점선 상자
+확인 수준을 같이 적는다. **"현지 PC 확인"** 은 현지 PC(Ubuntu 24.04, 실기 연결 가능)에서 2026-09-27 에 명령으로 본 것이고, 실습장 시연 메인 PC(9/23 실기는 학민 PC)도 같은지는 **9/29 에 확인**한다(아래 명령).
 
----
+| 항목 | 값 | 확인 수준 · 근거 |
+|---|---|---|
+| **로봇망** | 컨트롤러 `192.168.1.100:12345`(DRFL TCP), 서브넷 `192.168.1.0/24`. 메인 PC 는 **로봇 전용 유선 NIC**(현지 PC: USB 이더넷 어댑터)로 같은 서브넷에 붙는다 | 컨트롤러 주소: `versions.md` · 루트 README M1. NIC: 현지 PC `ip -brief addr` — 유선 NIC 가 `192.168.1.x/24`. 시연 PC 는 9/29 확인 |
+| **NIC 개수** | **2 개** — ① 유선: 로봇망 ② 그 밖 망(무선 또는 실습장 LAN): 웹 PC 의 MQTT 브로커로 | 현지 PC 확인(유선 1 · 무선 1). 실습장에서 ② 가 웹 PC 와 같은 망인지는 9/29 `nc -vz <웹 PC 주소> 1883`(루트 README M0) |
+| **두 PC 의 물리 연결** | 같은 LAN 이어야 한다(메인 PC → 웹 PC 브로커 `:1883`). 유선 · 무선 · 스위치 구성은 **미확인** | 9/23 실기 종단이 MQTT 로 동작한 것(#179)까지가 확인된 것이다. 연결 매체는 기록이 없다 — 9/29 사진 · `ip route` 로 적는다 |
+| **방화벽** | 따로 연 포트 없음. 현지 PC 는 `ufw` 꺼짐(`ENABLED=no`) | 현지 PC `/etc/ufw/ufw.conf`. 메인 PC 는 **나가는** 연결(1883 · 12345)만 쓰므로 받는 포트가 필요 없다. DDS 는 메인 PC 안에서만 돈다. 시연 PC 는 9/29 `sudo ufw status` |
+| **DDS 도메인** | 도메인 **30** 은 조(A-3 · C-3) 공용이라 **팀원의 노드가 같이 보인다**. 9/22 16:03 실기 중 노드 시험이 도메인 30 에 가짜 이벤트를 넣은 일이 있었다 | 파트 문서 `docs/phase1/detection-safety-geometry.md` 5.6 → 노드 시험은 31~39 중 빈 번호를 락으로 점유(#126, PR #172). Virtual · sim 확인은 `ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST` + 31~39(`docs/phase2/tasks/_common.md`). **실기 세션 중에는 다른 PC 에서 도메인 30 으로 아무것도 띄우지 않는다** |
+| **Discovery Server** | 쓰지 않는다. TurtleBot4 설정(`/etc/turtlebot4_discovery/setup.bash`)이 DOMAIN 2 + 디스커버리 서버를 강제해 두산 통신을 막으므로 `.bashrc` 에서 꺼 둔다 | `setup-record-20260916.md` |
+| **RMW** | `rmw_fastrtps_cpp` (`.bashrc`) | 현지 PC 확인 · `versions.md` |
+| **weld_manager**(phase 2) | bringup **6 번째 노드**(설치되지 않았으면 건너뜀). 새 포트 · 새 망 없음 — robot_manager 와는 DDS(`/robot/execute_path` · `/robot/execute_motion`), 웹과는 mqtt_bridge 의 `weld/*` · `cmd/weld/*`(P4, 의석)로만 잇는다 | `bringup.launch.py`(#197) · `docs/phase2/weld-ros-interfaces.md` 2장 · `weld-mqtt-schema.md`. 그림의 점선은 #191 · #195~#197 머지 뒤 실선으로 |
+
+**9/29 실습장에서 시연 메인 PC 로 확인할 것**(학민 · 현지, 실기 명령 아님 — 읽기만):
+```bash
+ip -brief addr                     # 유선 NIC 가 192.168.1.x/24 인지, 웹 PC 망 NIC 가 무엇인지
+ip route get 192.168.1.100         # 로봇으로 나가는 NIC
+nc -vz <웹 PC 주소> 1883            # MQTT 브로커 (루트 README M0)
+echo $ROS_DOMAIN_ID $RMW_IMPLEMENTATION $ROS_DISCOVERY_SERVER   # 30 · rmw_fastrtps_cpp · (비어 있음)
+sudo ufw status
+```
+결과는 이 표의 "확인 수준" 칸을 고친다. 주소는 적지 않는다(5장 끝 문단).
 
 ## 5. 주소 · 포트 한 곳에
 
@@ -165,4 +180,4 @@ W3 는 메인 PC 의 M3 · M4 를 확인한 뒤에 한다.
 | 3 | 프런트 ↔ Spring(8080) 미연동 | 이력 화면 붙이기, 9/29 뒤 후속 |
 | 4 | 브로커 인증 없음(`allow_anonymous true`) | 폐쇄망 전제. 외부 공개 시 재검토 |
 | 5 | `/docker-entrypoint-initdb.d` 는 **빈 볼륨일 때만** 실행된다 | 기존 `postgres_data` 볼륨에서는 `002_business_schema.sql` 수동 적용 — `backend/spring/README.md` |
-| 6 | 그림에 phase 2 `weld_manager` 는 점선(예정) | P2 머지 뒤 실선으로 |
+| 6 | 그림에 phase 2 `weld_manager` 는 점선(예정) | P2(#191 · #195~#197) 머지 뒤 실선으로. 그림에 로봇망 유선 NIC · 웹 PC 망 NIC 라벨 두 개를 더한다 — draw.io 가 현지 PC 에 없어 이 PR 에서는 글로만 채웠다 |
