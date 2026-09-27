@@ -89,8 +89,9 @@ def test_sim_and_real_result_dirs_differ():
 WELD_PARAMS = [
     'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
     'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'approach_m',
-    'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
-    'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'tool_check_max_force_n', 'server_wait_timeout_s',
+    'top_line_offset_dir', 'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
+    'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'path_point_dwell_s',
+    'tool_check_max_force_n', 'server_wait_timeout_s',
     'stop_confirm_timeout_s', 'sample_timeout_s', 'state_publish_period_s', 'scan_state_timeout_s',
     'result_dir', 'result_frame_id', 'motion_frame_id',
 ]
@@ -109,6 +110,23 @@ def test_weld_manager_has_contract_params(file_name):
 def test_continue_on_line_failure_is_a_bool(file_name):
     """D33 스위치는 bool 만 받는다(weld_manager 는 1 · 'true' 를 거절한다)."""
     assert isinstance(_params(file_name)['weld_manager']['continue_on_line_failure'], bool)
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_top_line_offset_dir_is_tool_or_vertical(file_name):
+    """D34: 9/29 는 yaml 한 줄 전환. 값은 두 가지뿐이다."""
+    assert _params(file_name)['weld_manager']['top_line_offset_dir'] in ('tool', 'vertical')
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_path_timeout_covers_max_points(file_name):
+    """학민 #191 🔵: robot_manager 의 최대 경유점(path_max_points)을 실어도 제한 시간이 이동 시간을 덮어야 한다.
+    100 점 · 위빙 경로(선 길이 약 100 mm + 진폭 왕복) / weld_speed + 점 수 × dwell 을 계산값으로 본다."""
+    params = _params(file_name)
+    weld, robot = params['weld_manager'], params['robot_manager']
+    n = robot['path_max_points']
+    travel_s = (0.100 + n * 2 * weld['weave_amplitude_m']) / weld['weld_speed_mps']
+    assert weld['motion_timeout_s'] + n * weld['path_point_dwell_s'] > travel_s + n * robot['arrival_grace_s']
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
