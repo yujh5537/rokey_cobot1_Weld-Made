@@ -9,6 +9,13 @@
     python3 docs/env/weld_pose_check.py --dry-run                 # 목록만 출력. ROS 없이 된다
     python3 docs/env/weld_pose_check.py                            # Virtual(에뮬레이터) — 먼저 여기서 오류를 잡는다
     python3 docs/env/weld_pose_check.py --real-ok --vel 10         # 실기. 입회자 비상정지 대기, 사람이 돌린다(CLAUDE.md 규칙 1)
+    python3 docs/env/weld_pose_check.py --approach --only L0,L6 --dry-run   # 접근 · 후퇴점 (D34)
+
+**--approach (D34, 2026-09-26)**: 용접 자세 16 개가 아니라 phase 2 가 실제로 지나는 **접근 · 후퇴점**을 간다
+(`weld-motion.md` 5절: `P_app = p_0 + approach_m·(−d)` · `P_ret = p_N + approach_m·(−d)` · `z_safe = z_top + travel_clearance`).
+M1 은 목표 x · y 위로 **수직으로만** 띄웠는데 이 점들은 **툴 축 뒤**(45° 면 바깥 + 위)라 플랜지가 더 멀리 나간다.
+그래서 용접 자세가 도달해도 접근점이 도달 못 할 수 있다 — L0 후퇴점 733 · L6 접근 1 728 mm 가 M1 의 도달 712 · 실패 738
+사이 빈 구간이다. 선마다 `app_safe → app → ret_safe → ret` 네 점을 내고, `*_safe` 는 z_safe 높이라 부재에서 멀다.
 
 - 좌표 · 자세는 `scratchpad/weld_poses.py`(병후) 계산값. 큐브 좌표가 바뀌었으면 --cube 로 다시 준다(x- x+ y- y+ z_top z_support, mm).
 - `move_line` 은 SYNC 로 부른다(끝날 때까지 서비스가 기다린다). 그래서 --timeout 을 넉넉히 둔다.
@@ -41,6 +48,14 @@ def parse_args(argv):
     p.add_argument('--safe-z', type=float, default=None,
                    help='자세 사이를 옮길 높이 [mm, Base]. 기본 = 큐브 윗면 + --lift.\n                        세로선(L4~L7)은 목표 위 30 mm 가 큐브 옆구리라 이 높이 없이 옮기면 큐브를 통과한다')
     p.add_argument('--vel', type=float, default=20.0, help='movel 속도 [mm/s]. 실기는 10')
+    p.add_argument('--approach', action='store_true',
+                   help='용접 자세 대신 접근 · 후퇴점을 간다 (D34). weld-motion.md 5절')
+    p.add_argument('--approach-m', type=float, default=30.0,
+                   help='접근 · 후퇴 거리 [mm]. 툴 축 뒤(−d). 계약 approach_m 출발값 30')
+    p.add_argument('--travel-clearance', type=float, default=50.0,
+                   help='z_safe = 큐브 윗면 + 이 값 [mm]. 계약 travel_clearance_m 출발값 50')
+    p.add_argument('--tcp-z', type=float, default=252.12,
+                   help='플랜지 → 팁 거리 [mm]. --dry-run 의 플랜지 거리 계산에만 쓴다(등록값과 같게)')
     p.add_argument('--only', default='', help='선 이름 목록 (예: L0,L4). 비면 전부')
     p.add_argument('--file', default='weld_pose_check.csv')
     p.add_argument('--timeout', type=float, default=60.0, help='movel SYNC 대기 [s]')
@@ -88,8 +103,11 @@ def quaternion_to_zyz_deg(x, y, z, w):
     return wrap(math.degrees(a)), math.degrees(2.0 * half_b), wrap(math.degrees(c))
 
 
-def weld_poses(cube, standoff, tilt_deg, bottom_margin):
-    """[(선, 위치, [x, y, z, a, b, c]), ...] — 16 자세."""
+def line_poses(cube, standoff, tilt_deg, bottom_margin):
+    """[(선, 위치, [x, y, z, a, b, c], d), ...] — 16 자세와 그 선의 툴 축 d(단위 벡터).
+
+    d 는 플랜지에서 팁으로 가는 방향이다. 접근 · 후퇴점은 여기서 −d 쪽으로 물러난 점이다(`--approach`).
+    """
     x_neg, x_pos, y_neg, y_pos, z_top, z_sup = cube
     r2 = math.sqrt(0.5)
     v = [(x_neg, y_neg, z_top), (x_pos, y_neg, z_top), (x_pos, y_pos, z_top), (x_neg, y_pos, z_top)]
@@ -111,8 +129,73 @@ def weld_poses(cube, standoff, tilt_deg, bottom_margin):
         off = tuple(-standoff * ci for ci in d)
         for where, pt in (('start' if name < 'L4' else 'top', s), ('end' if name < 'L4' else 'bottom', e)):
             p = tuple(pi + oi for pi, oi in zip(pt, off))
-            out.append((name, where, [round(p[0], 2), round(p[1], 2), round(p[2], 2), round(a, 2), round(b, 2), round(c, 2)]))
+            out.append((name, where, [round(p[0], 2), round(p[1], 2), round(p[2], 2), round(a, 2), round(b, 2), round(c, 2)], d))
     return out
+
+
+def weld_poses(cube, standoff, tilt_deg, bottom_margin):
+    """[(선, 위치, [x, y, z, a, b, c]), ...] — 16 용접 자세."""
+    return [(n, w, p) for n, w, p, _ in line_poses(cube, standoff, tilt_deg, bottom_margin)]
+
+
+def approach_poses(cube, standoff, tilt_deg, bottom_margin, approach_m, travel_clearance):
+    """[(선, 위치, [x, y, z, a, b, c]), ...] — 접근 · 후퇴점 (D34, weld-motion.md 5절).
+
+    선마다 네 점이다. `p_0`(start · top) 쪽은 접근, `p_N`(end · bottom) 쪽은 후퇴다:
+
+        app_safe   (P_app.x, P_app.y, z_safe)    ← 선 사이 이동 높이. 부재에서 멀다
+        app        P_app = p_0 + approach_m·(−d)
+        ret_safe   (P_ret.x, P_ret.y, z_safe)
+        ret        P_ret = p_N + approach_m·(−d)
+
+    자세(a, b, c)는 그 선의 용접 자세와 같다 — 접근 · 후퇴는 자세를 바꾸지 않고 툴 축으로만 움직인다.
+    """
+    z_safe = cube[4] + travel_clearance
+    first = {'start', 'top'}
+    out = []
+    for name, where, posx, d in line_poses(cube, standoff, tilt_deg, bottom_margin):
+        back = [round(posx[i] - approach_m * d[i], 2) for i in range(3)] + posx[3:]
+        high = back[:2] + [round(z_safe, 2)] + posx[3:]
+        label = 'app' if where in first else 'ret'
+        # 세로선(L4~L7)은 두 끝의 x · y 가 같아 app_safe 와 ret_safe 가 같은 점이다. 한 번만 간다
+        if not any(e[0] == name and e[2] == high for e in out):
+            out.append((name, f'{label}_safe', high))
+        out.append((name, label, back))
+    return sorted(out, key=lambda e: (e[0], e[1] != 'app_safe', e[1] != 'app', e[1] != 'ret_safe'))
+
+
+def selected_poses(args):
+    """--approach 여부에 따른 자세 목록. --only 로 선을 고른다."""
+    if args.approach:
+        poses = approach_poses(args.cube, args.standoff, args.tilt, args.bottom_margin,
+                               args.approach_m, args.travel_clearance)
+    else:
+        poses = weld_poses(args.cube, args.standoff, args.tilt, args.bottom_margin)
+    if args.only:
+        want = args.only.split(',')
+        poses = [e for e in poses if e[0] in want]
+    return poses
+
+
+def flange_distance(posx, d, tcp_z):
+    """베이스 원점 ↔ 플랜지 거리 [mm]. `flange = 팁 − tcp_z · d`.
+
+    45° 로 기울이면 플랜지가 팁 반대쪽으로 tcp_z 만큼 밀려난다 — 도달 한계를 정하는 것은 팁이 아니라 이 값이다.
+    M1(2026-09-23) 실측: **712.1 은 도달 · 738.5 는 실패.** 그 사이는 아직 모른다(D34).
+    """
+    flange = [posx[i] - tcp_z * d[i] for i in range(3)]
+    return math.sqrt(sum(c * c for c in flange))
+
+
+def travel_height(args):
+    """자세 사이를 옮길 높이. --approach 면 z_safe 아래로 내려가지 않는다."""
+    if args.safe_z is not None:
+        return args.safe_z
+    height = args.cube[4] + args.lift
+    if args.approach:
+        # 접근 · 후퇴점 자체가 z_safe 에 있다. 그보다 낮은 높이로 옮기면 올라갔다 내려오기를 반복한다
+        height = max(height, args.cube[4] + args.travel_clearance)
+    return height
 
 
 # ---------- ROS ----------
@@ -157,9 +240,11 @@ def run(args):
         w = csv.writer(fh)
         if new_file:
             w.writerow(HEADER)
-        safe_z = args.safe_z if args.safe_z is not None else args.cube[4] + args.lift
-        print(f'자세 사이 이동 높이(안전 높이) = {safe_z:.2f} mm  '
-              f'(큐브 윗면 {args.cube[4]:.2f} + {args.lift:.0f})')
+        safe_z = travel_height(args)
+        print(f'자세 사이 이동 높이(안전 높이) = {safe_z:.2f} mm  (큐브 윗면 {args.cube[4]:.2f} 기준)')
+        if args.approach:
+            print(f'접근 · 후퇴점 모드 (D34): approach_m = {args.approach_m:.0f} mm · '
+                  f'z_safe = {args.cube[4] + args.travel_clearance:.2f} mm')
 
         def to_safe_z():
             """현재 자세 그대로 수직으로 안전 높이까지 올린다. 이미 위면 아무것도 안 한다."""
@@ -177,9 +262,7 @@ def run(args):
             g = max(abs(a - b) for a, b in zip(p[:3], target[:3]))
             return g <= ARRIVE_TOL_MM, g
 
-        for line, where, posx in weld_poses(args.cube, args.standoff, args.tilt, args.bottom_margin):
-            if args.only and line not in args.only.split(','):
-                continue
+        for line, where, posx in selected_poses(args):
             above = posx[:2] + [posx[2] + args.lift] + posx[3:]
             over = posx[:2] + [max(safe_z, above[2])] + posx[3:]   # 목표 x·y 위 안전 높이
             print(f'\n[{line} {where}] 안전 높이 {over[2]:.0f} → 위 {args.lift:.0f} mm → {fmt(above)}')
@@ -249,10 +332,14 @@ def fmt(vals):
 
 def main(argv=None):
     args = parse_args(sys.argv[1:] if argv is None else argv)
-    poses = weld_poses(args.cube, args.standoff, args.tilt, args.bottom_margin)
     if args.dry_run:
-        for line, where, posx in poses:
-            print(f'{line:3} {where:7} {fmt(posx)}')
+        axis = {n: d for n, _, _, d in line_poses(args.cube, args.standoff, args.tilt,
+                                                 args.bottom_margin)}
+        print(f'{"선":3} {"위치":9} {"posx [mm, deg]":62} 플랜지 [mm]  (M1: 712 도달 · 738 실패)')
+        for line, where, posx in selected_poses(args):
+            fl = flange_distance(posx, axis[line], args.tcp_z)
+            mark = '✅' if fl <= 712.1 else ('❌' if fl >= 738.5 else '⚠️ 빈 구간')
+            print(f'{line:3} {where:9} {fmt(posx):62} {fl:9.1f}  {mark}')
         return 0
     if not args.real_ok:
         print('실기라면 --real-ok 를 붙인다(사람이 로봇 앞에서). Virtual 이면 그냥 진행한다.')
