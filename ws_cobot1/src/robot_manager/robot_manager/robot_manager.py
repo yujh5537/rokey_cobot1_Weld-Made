@@ -290,6 +290,21 @@ class PathGoal:
         self.motion_id = request.motion_id
 
 
+class PathGoal:
+    """ExecutePath goal 을 `Motion` 자리에 넣는 어댑터.
+
+    goal 자리(`self.motion`)를 ExecuteMotion 과 같이 써야 BUSY 가 양쪽으로 걸린다(계약 5.2). 그런데
+    `on_event` 는 `motion.goal.operation` 을 읽고 ExecutePath goal 에는 그 필드가 없다. 기존 코드를
+    고치지 않고 `operation = OP_WELD_PATH` 를 가진 이 객체를 넣는다. `on_event` 는 이 동작에 맞는
+    이벤트가 없다고 보고 무시하며, 과대 외력만 그보다 먼저 `motion.event` 에 걸린다.
+    """
+    operation = RobotSample.OP_WELD_PATH
+
+    def __init__(self, request):
+        self.request = request
+        self.motion_id = request.motion_id
+
+
 class RobotManager(Node):
 
     def __init__(self, **kwargs):

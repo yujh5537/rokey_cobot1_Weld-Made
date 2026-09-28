@@ -28,3 +28,9 @@ def test_every_source_has_config_file():
     config_dir = LAUNCH_FILE.parents[1] / 'config'
     for source, file_name in module.CONFIG_BY_SOURCE.items():
         assert (config_dir / file_name).is_file(), f'source={source} 의 {file_name} 이 없다'
+
+
+def test_weld_manager_is_a_node():
+    """phase 2: 자체 노드 6 개. 설치되지 않았으면 launch 가 건너뛴다."""
+    nodes = _load().NODES
+    assert 'weld_manager' in nodes and len(nodes) == len(set(nodes)) == 6

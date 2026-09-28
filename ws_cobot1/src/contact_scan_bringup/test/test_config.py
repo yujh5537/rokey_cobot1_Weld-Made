@@ -191,3 +191,83 @@ def test_sim_and_real_result_dirs_differ():
     """
     dirs = {f: _params(f)['scan_manager']['result_dir'] for f in SOURCE_BY_FILE}
     assert len(set(dirs.values())) == len(dirs), f'sim 과 real 의 result_dir 이 같다 {dirs}'
+
+
+# phase 2 weld_manager 절 (docs/phase2/weld-motion.md 6절). 이름은 계약에 속한다
+WELD_PARAMS = [
+    'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
+    'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'approach_m',
+    'top_line_offset_dir', 'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
+    'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'path_point_dwell_s',
+    'tool_check_max_force_n', 'server_wait_timeout_s',
+    'stop_confirm_timeout_s', 'sample_timeout_s', 'state_publish_period_s', 'scan_state_timeout_s',
+    'result_dir', 'result_frame_id', 'motion_frame_id',
+]
+# M2(#186 툴 치수)를 재기 전이라 real.yaml 에는 두지 않는다(미측정값을 채우지 않는다, 규칙 4)
+TOOL_PROFILE = ['tool_profile_u_m', 'tool_profile_r_m']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_manager_has_contract_params(file_name):
+    weld = _params(file_name)['weld_manager']
+    missing = [name for name in WELD_PARAMS if name not in weld]
+    assert not missing, f'{file_name}: weld_manager 에 {missing} 가 없다'
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_continue_on_line_failure_is_a_bool(file_name):
+    """D33 스위치는 bool 만 받는다(weld_manager 는 1 · 'true' 를 거절한다)."""
+    assert isinstance(_params(file_name)['weld_manager']['continue_on_line_failure'], bool)
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_top_line_offset_dir_is_tool_or_vertical(file_name):
+    """D34: 9/29 는 yaml 한 줄 전환. 값은 두 가지뿐이다."""
+    assert _params(file_name)['weld_manager']['top_line_offset_dir'] in ('tool', 'vertical')
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_path_timeout_covers_max_points(file_name):
+    """학민 #191 🔵: robot_manager 의 최대 경유점(path_max_points)을 실어도 제한 시간이 이동 시간을 덮어야 한다.
+    100 점 · 위빙 경로(선 길이 약 100 mm + 진폭 왕복) / weld_speed + 점 수 × dwell 을 계산값으로 본다."""
+    params = _params(file_name)
+    weld, robot = params['weld_manager'], params['robot_manager']
+    n = robot['path_max_points']
+    travel_s = (0.100 + n * 2 * weld['weave_amplitude_m']) / weld['weld_speed_mps']
+    assert weld['motion_timeout_s'] + n * weld['path_point_dwell_s'] > travel_s + n * robot['arrival_grace_s']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_tool_profile_is_both_or_neither(file_name):
+    """외형 두 배열은 같이 있거나 같이 없다. 있으면 길이가 같고 u 는 오름차순이다."""
+    weld = _params(file_name)['weld_manager']
+    present = [name for name in TOOL_PROFILE if name in weld]
+    assert len(present) in (0, 2), f'{file_name}: {present} 만 있다'
+    if present:
+        u, r = weld['tool_profile_u_m'], weld['tool_profile_r_m']
+        assert len(u) == len(r) and u == sorted(set(u)) and all(v > 0 for v in r)
+
+
+@pytest.mark.parametrize('file_name, node, name', [
+    (f, 'scan_manager', 'result_dir') for f in SOURCE_BY_FILE] + [
+    (f, 'scan_manager', 'tip_radius_m') for f in SOURCE_BY_FILE])
+def test_weld_manager_shares_values_with_scan_manager(file_name, node, name):
+    """result_dir 이 다르면 weld_manager 가 스캔 결과를 못 찾고, tip_radius_m 이 다르면 스탠드오프 정의가 어긋난다(계약 6절)."""
+    params = _params(file_name)
+    assert params['weld_manager'][name] == params[node][name]
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_frame_matches_robot_manager(file_name):
+    """ExecutePath 는 frame_id 가 robot_manager.frame_id 와 다르면 604 로 거절한다."""
+    params = _params(file_name)
+    assert params['weld_manager']['motion_frame_id'] == params['robot_manager']['frame_id']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_speeds_fit_robot_limits(file_name):
+    """용접 속도는 robot_manager 상한 이하, 하한은 이동 판정 최저 속도(eps / 창)보다 커야 한다(#152)."""
+    params = _params(file_name)
+    weld, robot = params['weld_manager'], params['robot_manager']
+    assert weld['weld_speed_mps'] <= robot['path_max_speed_mps']
+    assert weld['weld_speed_min_mps'] > robot['moving_eps_m'] / robot['moving_window_s']
