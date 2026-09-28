@@ -152,7 +152,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `server_wait_timeout_s` | double | ● | > 0 | 상대 서버의 미기동 판단 |
 | `safety_status_timeout_s` | double | ● | > 0 | `/safety/status`의 마지막 `stamp`가 이보다 오래되면 **끊김**으로 보고 `START` · `RESUME`을 거절한다. 안전복귀는 막지 않는다. safety_monitor의 `status_publish_period_s`(1.0)의 여러 배로 둔다 |
 | `robot_status_timeout_s` | double | ● | > 0 | `/robot/status`의 마지막 `stamp`가 이보다 오래되면 끊김으로 보고 `START` · `RESUME` · `HOME`을 거절한다. robot_manager의 발행 주기(10 Hz)와 부하에 따른 공백(이슈 #130)을 감안한다 |
-| `weld_state_timeout_s` | double | ● | > 0 | `/weld/state`의 마지막 `stamp`가 이보다 오래되면 **용접이 없다고 보고 통과시킨다**(phase 2 계약 7.1, 출발값 5.0 = weld_manager `state_publish_period_s` 1.0의 5배). 규칙은 `safety_status_timeout_s`와 같고 **결과는 반대**다. 재시작은 기록의 설정으로 돌지만 이 값은 **지금 노드의 값**을 쓰므로, 없거나 0 이하면 `RESUME`도 `INVALID_VALUE`로 거절한다 |
+| `weld_state_timeout_s` | double | ● | > 0 | `/weld/state`의 마지막 `stamp`가 이보다 오래되면 **용접이 없다고 보고 통과시킨다**(phase 2 계약 7.1, 출발값 5.0 = weld_manager `state_publish_period_s` 1.0의 5배). 규칙은 `safety_status_timeout_s`와 같고 **결과는 반대**다. 재시작은 기록의 설정으로 돌지만 이 값은 **지금 노드의 값**을 쓰므로, 없거나 0 이하면 `RESUME`도 `INVALID_VALUE`로 거절한다. 필수 항목이라 기록의 `node_params`에도 남는다 — 그래서 **이 파라미터가 생기기 전(phase 2 P5 이전)에 만든 기록은 재시작이 `INVALID_VALUE`("기록의 설정으로 이을 수 없다")로 거절된다**(#161의 `pose_max_age_s`와 같다). 새 START로 시작한다 |
 | `result_frame_id` · `motion_frame_id` | string | — (`workpiece_fixture` · `base_link`) | | 프레임 이름(가칭) |
 | `direction_order` | string[] | — (`POS_X, NEG_X, POS_Y, NEG_Y`) | 네 방향을 한 번씩 | 모서리 탐색 순서. **기동할 때만 읽는다**(상태 기계가 순서를 들고 있다). 나머지는 START 때마다 읽는다 |
 
