@@ -59,6 +59,8 @@ VALUES = {
     'safety_status_timeout_s': 5.0,
     'robot_status_timeout_s': 2.0,
     'pose_max_age_s': 1.0,
+    # /weld/state 끊김 한도(phase 2 계약 7.1). real.yaml 과 같은 값이다. 가짜 상대 노드는 용접 시험에서만 발행한다
+    'weld_state_timeout_s': 5.0,
 }
 SCAN_ID = '20260920-120000-0001'
 READY = Conditions(robot_connected=True, safety_latched=False, **FRESH_STATUS)

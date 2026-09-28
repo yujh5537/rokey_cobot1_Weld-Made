@@ -1,6 +1,7 @@
 """scan_manager 상태 기계 (순수 Python, rclpy 없음).
 
-기준: docs/contracts/ros-interfaces.md v0.1.1 의 3.4 · 4.1 · 4.3 · 5.1~5.3 · 7.1 · 7.4절.
+기준: docs/contracts/ros-interfaces.md v0.1.1 의 3.4 · 4.1 · 4.3 · 5.1~5.3 · 7.1 · 7.4절,
+용접과의 배타(WELD_ACTIVE 601)는 docs/phase2/weld-ros-interfaces.md 7.1절.
 전이도와 전이표는 이 패키지의 README.md 에 있다.
 
 입력은 두 종류다.
@@ -26,6 +27,8 @@ from typing import Callable, Optional
 from .contract_enums import Direction
 from .contract_enums import Phase
 from .contract_enums import Reason
+from .contract_enums import WELD_REST_PHASES
+from .contract_enums import WeldPhase
 
 
 class Command(Enum):
@@ -169,7 +172,7 @@ def status_stale(topic: str, limit_name: str, age_s, timeout_s) -> Optional[str]
 
 @dataclass(frozen=True)
 class Conditions:
-    """명령 시점의 보호 조건. None 은 "아직 수신하지 못함"이며 거절 사유가 된다.
+    """명령 시점의 보호 조건. None 은 "아직 수신하지 못함"이며 거절 사유가 된다(/weld/state 만 예외).
 
     ``*_age_s`` 는 마지막으로 받은 상태 메시지의 stamp 가 지난 시간이다. 노드가 재고(잴 수 없으면 None),
     한계 시간과 비교해 "끊김"을 판정하는 것은 여기다(``status_stale``). 끊김을 False 나 0 으로 적지 않는다.
@@ -181,6 +184,39 @@ class Conditions:
     safety_status_age_s: Optional[float] = None   # /safety/status.stamp 의 나이(s)
     robot_status_timeout_s: Optional[float] = None   # 끊김으로 보는 한도. None = 파라미터 없음
     safety_status_timeout_s: Optional[float] = None
+    # /weld/state (phase 2, 계약 7.1). 위와 달리 **None 은 거절 사유가 아니다** — 못 받았으면 용접이 없다고 본다
+    weld_phase: Optional[int] = None               # /weld/state.phase. None = 한 번도 못 받음
+    weld_state_age_s: Optional[float] = None       # /weld/state.stamp 의 나이(s). None = 잴 수 없음
+    weld_state_timeout_s: Optional[float] = None   # None = 파라미터 없음
+
+
+def weld_phase_name(phase: int) -> str:
+    """거절 detail 에 싣는 이름. 표에 없는 값은 브리지와 같은 UNKNOWN_<n> 이다(#200)."""
+    try:
+        return f'{WeldPhase(phase).name}({int(phase)})'
+    except ValueError:
+        return f'UNKNOWN_{int(phase)}({int(phase)})'
+
+
+def weld_active(conditions: 'Conditions') -> Optional[str]:
+    """용접이 로봇을 잡고 있는가. 잡고 있으면 거절 detail, 아니면 None (weld-ros-interfaces.md 7.1).
+
+    **판정할 수 없으면 통과다(fail-open).** 한 번도 못 받음 · 마지막 stamp 가 weld_state_timeout_s 보다
+    오래됨 · ROS 시계 0 · 한도 파라미터 없음은 전부 "용접이 없다"로 본다. /weld/state 는 TRANSIENT_LOCAL 이라
+    weld_manager 가 WELDING 중에 죽으면 마지막 값이 남아, 끊김을 거절로 보면 스캔이 영영 601 로 막힌다.
+    같은 status_stale 을 쓰지만 결과는 /safety/status · /robot/status 와 **반대다**(그쪽은 판정 불가 = 거절).
+    weld_manager 쪽은 반대로 /scan/state 가 없거나 오래되면 INVALID_REQUEST(101)로 거절한다(fail-closed).
+    이 비대칭은 의도된 것이다 — weld_manager 가 없는 1차 동작을 그대로 두기 위해서다.
+    """
+    if conditions.weld_phase is None:
+        return None
+    if status_stale(
+            '/weld/state', 'weld_state_timeout_s',
+            conditions.weld_state_age_s, conditions.weld_state_timeout_s):
+        return None
+    if conditions.weld_phase in WELD_REST_PHASES:
+        return None
+    return f'weld phase={weld_phase_name(conditions.weld_phase)}'
 
 
 @dataclass(frozen=True)
@@ -389,6 +425,12 @@ class ScanStateMachine:
                 return Reason.NOT_SUPPORTED, '홈 안전복귀 뒤의 재접근 절차는 TBD'
 
         if command in (Command.START, Command.RESUME):
+            # 용접 중이면 WELD_ACTIVE(601). 순서는 BUSY → 601 → 래치 → 로봇이다(계약 1차 5.1 · 5.3,
+            # phase 2 7.1, 9/26 결정): weld_manager 의 600 이 래치 앞에 있는 것과 대칭이다.
+            # ERROR 재시작(허용 목록)도 이 블록을 지나므로 같이 막힌다. 안전복귀(HOME)는 여기 들어오지 않는다.
+            weld = weld_active(conditions)
+            if weld:
+                return Reason.WELD_ACTIVE, weld
             if conditions.safety_latched is None:
                 return Reason.SAFETY_LATCHED, '/safety/status 미수신'
             # 끊김을 래치보다 먼저 본다: 끊긴 뒤의 latched 는 죽은 감시자가 남긴 옛 값이라 믿을 수 없다.

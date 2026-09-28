@@ -118,6 +118,8 @@ SPECS: Tuple[ParamSpec, ...] = (
               '/robot/status 가 끊긴 것으로 보는 한도. 발행 주기의 여러 배로 둔다'),
     ParamSpec('pose_max_age_s', DOUBLE, True, positive,
               '안전복귀(계약 7.5)가 "지금 위치를 안다"고 보는 /robot/sample 나이의 한도'),
+    ParamSpec('weld_state_timeout_s', DOUBLE, True, positive,
+              '/weld/state 끊김 한도 (계약 phase 2 7.1). 이보다 오래되면 용접이 없다고 본다'),
     ParamSpec('result_frame_id', STRING, False, _non_empty_text,
               'ScanResult 의 프레임(가칭)', default='workpiece_fixture'),
     ParamSpec('motion_frame_id', STRING, False, _non_empty_text,
@@ -166,6 +168,7 @@ class ScanParams:
     safety_status_timeout_s: float
     robot_status_timeout_s: float
     pose_max_age_s: float
+    weld_state_timeout_s: float
     result_frame_id: str
     motion_frame_id: str
     direction_order: Tuple[Direction, ...]

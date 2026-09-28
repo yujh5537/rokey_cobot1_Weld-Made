@@ -1,11 +1,11 @@
 # scan_manager
 
 스캔 순서(윗면 → ±X/±Y → 형상 계산 → 마무리 복귀)와 작업 중지 · 안전복귀 · 재시작을 조정하는 노드다. 담당은 병후다.
-기준은 `docs/contracts/ros-interfaces.md` v0.1.1이고, 이 문서와 계약이 다르면 계약이 맞다.
+기준은 `docs/contracts/ros-interfaces.md` v0.1.1이고(용접과의 배타 `WELD_ACTIVE(601)`는 `docs/phase2/weld-ros-interfaces.md` 7.1), 이 문서와 계약이 다르면 계약이 맞다.
 
 | 파일 | 내용 | rclpy |
 |---|---|---|
-| `scan_manager/contract_enums.py` | `Phase` · `Direction` · `Reason` · `Operation` · `MotionReason`. 계약 3.4절 · 5.4절 · 6.1절 상수의 사본 | 쓰지 않음 |
+| `scan_manager/contract_enums.py` | `Phase` · `Direction` · `Reason` · `Operation` · `MotionReason`. 계약 3.4절 · 5.4절 · 6.1절 상수의 사본. phase 2 의 `WeldPhase`(`WeldState.PHASE_*`) · `WELD_REST_PHASES`(7.1 휴지 4 개) | 쓰지 않음 |
 | `scan_manager/state_machine.py` | 이벤트 · 전이표 · `ScanStateMachine` | 쓰지 않음 |
 | `scan_manager/params.py` | 파라미터 이름 · 필수 여부 · 범위 검사, `ScanParams`. 모션 · 보정 수치에는 코드 예비값이 없다 | 쓰지 않음 |
 | `scan_manager/sequence.py` | 시퀀스: `MotionPlanner`(goal 값 · 방향 전환 3단계 · 마무리 순서), `classify`(모션 결과 → 도달 · 측정 · 중지 · 실패), `ScanRunner` · `ResumeRunner` · `run_home`(순서. 바깥일은 `Ports` 뒤에 둔다), `ResumePlan` | 쓰지 않음 |
@@ -152,6 +152,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 | `server_wait_timeout_s` | double | ● | > 0 | 상대 서버의 미기동 판단 |
 | `safety_status_timeout_s` | double | ● | > 0 | `/safety/status`의 마지막 `stamp`가 이보다 오래되면 **끊김**으로 보고 `START` · `RESUME`을 거절한다. 안전복귀는 막지 않는다. safety_monitor의 `status_publish_period_s`(1.0)의 여러 배로 둔다 |
 | `robot_status_timeout_s` | double | ● | > 0 | `/robot/status`의 마지막 `stamp`가 이보다 오래되면 끊김으로 보고 `START` · `RESUME` · `HOME`을 거절한다. robot_manager의 발행 주기(10 Hz)와 부하에 따른 공백(이슈 #130)을 감안한다 |
+| `weld_state_timeout_s` | double | ● | > 0 | `/weld/state`의 마지막 `stamp`가 이보다 오래되면 **용접이 없다고 보고 통과시킨다**(phase 2 계약 7.1, 출발값 5.0 = weld_manager `state_publish_period_s` 1.0의 5배). 규칙은 `safety_status_timeout_s`와 같고 **결과는 반대**다. 재시작은 기록의 설정으로 돌지만 이 값은 **지금 노드의 값**을 쓰므로, 없거나 0 이하면 `RESUME`도 `INVALID_VALUE`로 거절한다 |
 | `result_frame_id` · `motion_frame_id` | string | — (`workpiece_fixture` · `base_link`) | | 프레임 이름(가칭) |
 | `direction_order` | string[] | — (`POS_X, NEG_X, POS_Y, NEG_Y`) | 네 방향을 한 번씩 | 모서리 탐색 순서. **기동할 때만 읽는다**(상태 기계가 순서를 들고 있다). 나머지는 START 때마다 읽는다 |
 
@@ -176,6 +177,15 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 **goal 거절 방식.** ROS 2의 goal reject에는 사유 필드가 없고, main의 mqtt_bridge는 reject를 `BUSY`로 고정해 낸다. 그래서 **goal은 항상 accept하고, 거절할 요청은 phase를 바꾸지 않은 채 바로 Result(`success=false`, `reason_code`=1xx, `scan_id=""`)로 끝낸다(abort).** 실제 사유(`SAFETY_LATCHED` · `INVALID_VALUE` …)가 `scan/command_result`로 웹에 간다. 계약 5.1~5.3절의 "거절" 문구와 다르므로 계약 문서 PR에서 문구를 맞춘다. 거절 처리는 `ScanManager._reject` 한 곳에 있다.
 Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하나로 한다(정지 확인과 중단 위치 기록이 거기에 묶여 있다). Feedback은 보내지 않는다(같은 내용이 `/scan/state`에 있다).
 
+## 구독
+| 토픽 | QoS | 쓰는 곳 |
+|---|---|---|
+| `/robot/status` | STATE | 연결 · 정지 완료 확인, `START` · `RESUME` · `HOME`의 관문 |
+| `/safety/status` | STATE | 래치 · 사유, `START` · `RESUME`의 관문 |
+| `/robot/sample` | SENSOR | 마지막 유효 pose. 안전복귀 · 재시작의 올림 목표에만 쓴다 |
+| `/contact/event` | EVENT | 판정 좌표(측정값의 출처) |
+| `/weld/state` | STATE | **phase 2**. 용접 중이면 `START` · `RESUME`을 `WELD_ACTIVE(601)`로 거절한다(계약 7.1). 못 받았거나 끊겼으면 용접이 없다고 본다. 안전복귀는 보지 않는다. 끊김을 주기 점검 로그에 알리지 않는다(용접 상태가 없는 것은 정상이다) |
+
 ## 발행
 | 토픽 | 시점 |
 |---|---|
@@ -186,7 +196,7 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 `result.json`(원본)은 GEOMETRY에서만 쓴다(성공 또는 형상 계산 실패). 모션 실패 · 중단으로 끝난 작업은 `/scan/result`만 발행하고 원본을 쓰지 않는다. 원본은 한 번만 쓸 수 있어서, 재시작이 끝까지 간 뒤에 쓸 자리를 남겨 둔다. 원본을 쓴 직후에 중지된 작업의 재시작은 그 파일을 읽어 재발행한다.
 
 ## executor · 스레드
-`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 여섯이다: 구독(`/robot/status` · `/safety/status` · `/contact/event`, 순서 보장), Action 서버(Reentrant), Service 서버(`/scan/stop`), **`/scan/set_config` 전용**, 클라이언트(Reentrant), 기동 뒤 되읽기 전용(한 번만 도는 타이머. 상태 발행 타이머를 막지 않게 뺐다). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
+`MultiThreadedExecutor`(스레드 수는 CPU 수, 최소 4). 콜백 그룹은 여섯이다: 구독(`/robot/status` · `/robot/sample` · `/safety/status` · `/contact/event` · `/weld/state`, 순서 보장), Action 서버(Reentrant), Service 서버(`/scan/stop`), **`/scan/set_config` 전용**, 클라이언트(Reentrant), 기동 뒤 되읽기 전용(한 번만 도는 타이머. 상태 발행 타이머를 막지 않게 뺐다). 쓰기 전용 스레드 1개가 result_store의 모든 쓰기를 넣은 순서대로 한다.
 
 `/scan/set_config`를 따로 둔 이유: 전파가 상대 노드의 응답을 기다리므로, `/scan/stop`과 같은 MutuallyExclusive 그룹이면 그동안 정지가 아예 돌지 못한다(규칙 3: 정지는 독립된 명령이다).
 
@@ -220,7 +230,7 @@ Action의 cancel 요청은 받지 않는다. 작업 중지는 `/scan/stop` 하�
 | `RESUME` | `/scan/resume` goal | `scan_id`(goal 값, `""` = 가장 최근 중단 작업) · `conditions` |
 | `SET_CONFIG` | `/scan/set_config` | 없음. phase는 바뀌지 않고 접수 여부만 판정한다 |
 
-`Conditions(robot_connected, safety_latched)`는 명령 시점의 `/robot/status.connected`와 `/safety/status.latched`다. `None`은 "아직 받지 못함"이고 거절 사유가 된다.
+`Conditions(robot_connected, safety_latched)`는 명령 시점의 `/robot/status.connected`와 `/safety/status.latched`다. `None`은 "아직 받지 못함"이고 거절 사유가 된다. **`weld_phase`(`/weld/state.phase`)만 예외다** — `None`이면 용접이 없다고 본다(아래 "용접과의 배타").
 
 여기에 **최신성**이 붙는다(이슈 #120). `Conditions`는 두 상태 메시지의 `*_age_s`(마지막 `stamp`가 지난 시간)와 `*_timeout_s`(한도)를 같이 싣는다. **노드는 재기만 하고, 끊겼는지 판정하는 것은 순수 함수 `status_stale()`이다** — 그래서 경계(정확히 한계 시간 · 미래 `stamp` · 시계 0 · 한도 파라미터 없음)를 ROS 없이 시험할 수 있고, 주기 점검 로그도 관문과 같은 함수를 쓴다.
 
@@ -300,10 +310,10 @@ stateDiagram-v2
 
 | Command | 판정 순서 |
 |---|---|
-| `START` | `BUSY`(100) → `SAFETY_LATCHED`(103) → `ROBOT_DISCONNECTED`(104) |
+| `START` | `BUSY`(100) → `WELD_ACTIVE`(601) → `SAFETY_LATCHED`(103) → `ROBOT_DISCONNECTED`(104) |
 | `SET_CONFIG` | `BUSY` |
-| `HOME` | `BUSY` → `ROBOT_DISCONNECTED`. 안전 래치도 `/safety/status` 끊김도 막지 않는다 |
-| `RESUME` | `BUSY` → `NO_RESUMABLE_SCAN`(105) 또는 `NOT_SUPPORTED`(107) → `SAFETY_LATCHED` → `ROBOT_DISCONNECTED` |
+| `HOME` | `BUSY` → `ROBOT_DISCONNECTED`. 안전 래치도 `/safety/status` 끊김도 **용접 중(601)도** 막지 않는다 |
+| `RESUME` | `BUSY` → `NO_RESUMABLE_SCAN`(105) 또는 `NOT_SUPPORTED`(107) → `WELD_ACTIVE` → `SAFETY_LATCHED` → `ROBOT_DISCONNECTED` |
 | `STOP` | 거절 없음 |
 
 103 · 104 안에서의 순서와 `detail`(새 ReasonCode를 만들지 않는다. 사람이 읽는 문구로 가른다):
@@ -315,6 +325,19 @@ stateDiagram-v2
 | 나이를 잴 수 없다(ROS 시계 0) | 103 · 104 | `… 최신성을 판정할 수 없다(ROS 시계가 0 이다)` |
 | 한도 파라미터가 없다 · 0 이하다 | `START` · `HOME`은 **`INVALID_VALUE`(102)**. 파라미터 검사가 상태 기계보다 **먼저** 돌고 두 한도는 필수 항목이라 빠진 이름이 detail에 실린다. `RESUME`은 기록을 읽기 전에 상태 기계에 먼저 물으므로 103 · 104다 | `… 최신성을 판정할 수 없다(<이름> 파라미터가 없다)` (RESUME · 주기 점검 로그) |
 | 래치 중이다 · 연결이 끊겼다 | 103 · 104 | (빈 문자열) |
+
+**용접과의 배타 `WELD_ACTIVE(601)` (phase 2 계약 7.1, 1차 5.1 · 5.3).** `START` · `RESUME` 공용 관문의 **맨 앞**(BUSY 다음, 래치 앞)이다. weld_manager 의 `SCAN_ACTIVE(600)`가 래치 앞에 있는 것과 대칭이라, 래치와 용접이 동시면 601이 나온다(9/26 결정). ERROR 재시작(허용 목록)도 이 관문을 지난다. 판정은 순수 함수 `weld_active()`다.
+
+| `/weld/state` | 판정 | `detail` |
+|---|---|---|
+| 신선하고 phase 가 IDLE · DONE · ERROR · STOPPED | 통과 | |
+| 신선하고 그 밖(PREPARING · APPROACH · WELDING · RETREAT · STOPPING · **HOMING**) | 601 | `weld phase=WELDING(3)` |
+| 신선하고 표에 없는 값 | 601 (휴지는 허용 목록이다) | `weld phase=UNKNOWN_12(12)` |
+| 한 번도 못 받았다(weld_manager 미기동) | 통과 | |
+| 마지막 `stamp`가 `weld_state_timeout_s`보다 오래됐다(WELDING 중에 죽었다) | 통과 | |
+| 나이를 잴 수 없다(ROS 시계 0) · 한도 파라미터가 없다 | 통과. 단 한도가 없으면 `START`는 파라미터 검사에서, `RESUME`은 상태 기계 앞의 검사에서 `INVALID_VALUE`로 먼저 막힌다 | |
+
+**판정할 수 없으면 통과다(fail-open).** `/safety/status` · `/robot/status`는 같은 경우가 전부 거절(fail-closed)인데 여기는 반대다. `/weld/state`는 TRANSIENT_LOCAL이라 weld_manager가 WELDING 중에 죽으면 마지막 값이 남아, 끊김을 거절로 보면 스캔이 영영 601로 막힌다. weld_manager 쪽은 반대로 `/scan/state`가 없거나 오래되면 `INVALID_REQUEST(101)`로 거절한다 — 이 비대칭은 의도된 것이다(weld_manager가 없는 1차 동작 유지).
 
 `RESUME`의 105 · 107:
 
@@ -333,7 +356,7 @@ stateDiagram-v2
 - 기존 START · RESUME 관문(래치 · 상태 최신성 · 연결)을 그대로 통과해야 한다. 안전복귀를 한 뒤에는 여전히 재시작할 수 없다(재접근 절차 TBD).
 - 재개 지점은 **실패한 그 단계**다. `Signal.FAILED`는 허용 목록일 때만 그 단계를 남기고, 그 밖에는 지운다. 기록 쪽은 `FailureRecord.pose`(올림 목표) · `FailureRecord.resumed_at`(같은 실패로 두 번 재시작하지 않는다)을 쓴다.
 
-상태 기계 밖의 거절. "직전 명령을 마무리하는 중"(`BUSY`) · "기록에 남기지 못한 안전복귀" · (IDLE일 때) `result_dir` 검사는 상태 기계의 판정 **앞**에서, 나머지는 상태 기계가 받을 수 있다고 한 작업의 기록을 읽은 뒤에 한다(`ScanManager._begin_resume` · `resume.plan_resume`):
+상태 기계 밖의 거절. "직전 명령을 마무리하는 중"(`BUSY`) · "기록에 남기지 못한 안전복귀" · 지금 노드의 `weld_state_timeout_s` 검사 · (IDLE일 때) `result_dir` 검사는 상태 기계의 판정 **앞**에서, 나머지는 상태 기계가 받을 수 있다고 한 작업의 기록을 읽은 뒤에 한다(`ScanManager._begin_resume` · `resume.plan_resume`):
 
 | 상황 | 사유 |
 |---|---|
@@ -341,7 +364,7 @@ stateDiagram-v2
 | 그 작업의 기록이 없다 · 읽을 수 없다 · STOPPED · ERROR가 아니다 · 이미 재시작한 중지뿐이다 · 재개 지점이 소비됐다 · 확정 방향이 탐색 순서의 앞부분이 아니다 · 기록된 좌표의 `frame_id`가 `motion_frame_id`와 다르다 | `NO_RESUMABLE_SCAN` |
 | 기록에 남기지 못한 안전복귀가 있었다(다음 START까지) | `NOT_SUPPORTED` |
 | 직전 명령이 휴지 phase를 발행했지만 아직 끝나지 않았다(마지막 상태 기록을 쓰는 중) | `BUSY` |
-| 기록의 설정(`config` · `node_params`)이 지금의 파라미터 검사를 통과하지 못한다 · 기록의 탐색 순서가 이 노드의 `direction_order`와 다르다 · (IDLE인데) `result_dir`이 없다 | `INVALID_VALUE`(102) |
+| 기록의 설정(`config` · `node_params`)이 지금의 파라미터 검사를 통과하지 못한다 · 기록의 탐색 순서가 이 노드의 `direction_order`와 다르다 · (IDLE인데) `result_dir`이 없다 · 지금 노드의 `weld_state_timeout_s`가 없다 · 0 이하다(601 판정의 한도. 없으면 용접 중에도 통과해 버린다) | `INVALID_VALUE`(102) |
 
 프로세스가 재시작된 뒤에는 `restore()`로 되돌린 상태 기계가 위의 105 · 107을 그대로 낸다. 되돌리지 않은 경우(기록 없음 · 더 새 작업 · 동작 중인 phase로 끝난 기록)는 IDLE이므로 `NO_RESUMABLE_SCAN`이고 detail에 이유가 실린다.
 

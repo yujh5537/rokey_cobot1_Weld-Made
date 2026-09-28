@@ -334,6 +334,9 @@ scan_manager:
     # 넘으면 올리지도 HOME 하지도 않고 NOT_SUPPORTED 로 끝낸다 — 사람이 펜던트로 조그한다.
     # 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
     pose_max_age_s: 1.0      # robot_manager 실측 약 43 Hz(23 ms) 의 40 배 이상. 정지 중 687 ms 공백 기록(#130)보다 크게 둔다
+    weld_state_timeout_s: 5.0        # weld_manager.state_publish_period_s(1.0) 의 5 배. 계약 phase 2 7.1.
+                                     #   /weld/state 의 마지막 stamp 가 이보다 오래되면 용접이 없다고 본다(START · 재시작 통과).
+                                     #   1차 safety_status_timeout_s 와 규칙은 같고 결과는 반대다(그쪽은 끊기면 거절)
 
 mqtt_bridge:
   ros__parameters:

@@ -33,6 +33,7 @@ from contact_scan_interfaces.msg import SafetyStatus
 from contact_scan_interfaces.msg import ScanLog
 from contact_scan_interfaces.msg import ScanResult
 from contact_scan_interfaces.msg import ScanState
+from contact_scan_interfaces.msg import WeldState
 from contact_scan_interfaces.srv import SetConfig
 from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.srv import StopScan
@@ -213,6 +214,8 @@ class ScanManager(Node):
         # /robot/sample 의 마지막 유효 pose (위치, 자세, pose_stamp). 안전복귀의 올림에 쓴다(계약 7.5)
         self._robot_pose = None
         self._safety_status = None
+        # /weld/state 의 마지막 메시지(phase 2, 계약 7.1). None = 한 번도 못 받음 = 용접이 없다고 본다
+        self._weld_state = None
         self._store = None
         self._store_dir = None
         self._begun = None
@@ -244,6 +247,9 @@ class ScanManager(Node):
             SafetyStatus, '/safety/status', self._on_safety_status, QOS_STATE, callback_group=subs)
         self.create_subscription(
             ContactEvent, '/contact/event', self._matcher.offer, QOS_EVENT, callback_group=subs)
+        # 용접 중이면 START · RESUME 을 WELD_ACTIVE(601)로 거절한다(phase 2 계약 7.1). 안전복귀는 보지 않는다
+        self.create_subscription(
+            WeldState, '/weld/state', self._on_weld_state, QOS_STATE, callback_group=subs)
         self._motion_client = ActionClient(
             self, ExecuteMotion, '/robot/execute_motion', callback_group=clients)
         self._tare_client = self.create_client(TareForce, '/contact/tare', callback_group=clients)
@@ -474,6 +480,10 @@ class ScanManager(Node):
         with self._status_cond:
             self._safety_status = msg
 
+    def _on_weld_state(self, msg):
+        with self._status_cond:
+            self._weld_state = msg
+
     def _status_age_s(self, msg, now_ns):
         """상태 메시지의 stamp 가 지난 시간(s). 잴 수 없으면 None.
 
@@ -492,20 +502,24 @@ class ScanManager(Node):
         return None if value is None or scan_params.positive(value) else float(value)
 
     def conditions(self) -> Conditions:
-        """명령 시점의 보호 조건. 아직 받지 못한 것은 None 이고 거절 사유가 된다.
+        """명령 시점의 보호 조건. 아직 받지 못한 것은 None 이고 거절 사유가 된다(/weld/state 는 예외).
 
         최신성은 **재기만** 한다. 한계 시간과 비교해 거절하는 규칙은 상태 기계(status_stale)에 있다.
         """
         now_ns = self.get_clock().now().nanoseconds
         with self._status_cond:
-            robot, safety = self._robot_status, self._safety_status
+            robot, safety, weld = self._robot_status, self._safety_status, self._weld_state
         return Conditions(
             robot_connected=None if robot is None else bool(robot.connected),
             safety_latched=None if safety is None else bool(safety.latched),
             robot_status_age_s=None if robot is None else self._status_age_s(robot, now_ns),
             safety_status_age_s=None if safety is None else self._status_age_s(safety, now_ns),
             robot_status_timeout_s=self._timeout_param('robot_status_timeout_s'),
-            safety_status_timeout_s=self._timeout_param('safety_status_timeout_s'))
+            safety_status_timeout_s=self._timeout_param('safety_status_timeout_s'),
+            # 용접 상태는 못 받았거나 끊겼으면 "용접 없음"이다(상태 기계의 weld_active). 0 으로 채우지 않는다
+            weld_phase=None if weld is None else int(weld.phase),
+            weld_state_age_s=None if weld is None else self._status_age_s(weld, now_ns),
+            weld_state_timeout_s=self._timeout_param('weld_state_timeout_s'))
 
     def _watch_status_freshness(self):
         """끊김 · 회복을 각각 한 번씩 알린다. 막지는 않는다(이슈 #120).
@@ -1046,6 +1060,15 @@ class ScanManager(Node):
                 return scan_resume.Refusal(
                     Reason.NOT_SUPPORTED,
                     '기록에 남기지 못한 안전복귀가 있었다. 홈 안전복귀 뒤의 재접근 절차는 TBD')
+            # 용접 배타(601)의 한도는 **지금 노드의** 값이다. 재시작은 기록의 설정으로 돌기 때문에 START 처럼
+            # 필수 파라미터 누락에 먼저 걸리지 않는다 — 한도가 없으면 상태 기계가 "판정 불가 = 용접 없음"으로
+            # 통과시켜 용접 중에도 접수된다(fail-open, 계약 phase 2 7.1). 그래서 여기서 START 와 같은 코드로 막는다
+            if self._timeout_param('weld_state_timeout_s') is None:
+                value = self.get_parameter_or('weld_state_timeout_s').value
+                return scan_resume.Refusal(
+                    Reason.INVALID_VALUE,
+                    '없는 필수 파라미터: weld_state_timeout_s' if value is None
+                    else f'범위 밖: weld_state_timeout_s = {value!r}: {scan_params.positive(value)}')
             not_adopted = ''
             if machine.phase is Phase.IDLE:
                 if not self.get_parameter_or('result_dir').value:

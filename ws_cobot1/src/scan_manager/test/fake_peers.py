@@ -5,6 +5,8 @@
 - /robot/execute_motion: 동시에 1개. 실행 중 · 미연결 · speed <= 0(OP_HOME 제외)이면 goal 을 거절한다.
 - /contact/event: DESCEND → CONTACT, SLIDE → EDGE. 발행 시점(Result 앞 · 뒤 · 없음)을 바꿀 수 있다.
 - /robot/status: 주기 발행. stamp 는 발행 시각이다.
+- /weld/state: weld_manager 자리(phase 2 계약 7.1). weld_phase 가 None 이 아니면 그 phase 를 주기 발행한다.
+  None 이면 발행하지 않는다(미기동 · 죽음). TRANSIENT_LOCAL 이라 멈춰도 scan_manager 에는 마지막 값이 남는다.
 - 가상 직육면체까지의 거리가 goal 의 max_distance 를 넘으면 REASON_MAX_DISTANCE 로 끝낸다
   (yaml 의 max_descend_m · max_slide_m · 기준점이 상자를 실제로 덮는지 드러난다).
 - 상자는 Box 로 받는다. 기본값은 sequence_helpers 의 상수(테스트 안의 가상값)이고,
@@ -27,6 +29,7 @@ from contact_scan_interfaces.msg import ContactEvent
 from contact_scan_interfaces.msg import RobotSample
 from contact_scan_interfaces.msg import RobotStatus
 from contact_scan_interfaces.msg import SafetyStatus
+from contact_scan_interfaces.msg import WeldState
 from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.srv import TareForce
 from contact_scan_qos import QOS_EVENT
@@ -181,6 +184,9 @@ class FakePeers(Node):
         self.publish_status = True
         self.publish_safety = True
         self.publish_sample = True
+        # weld_manager 가 없으면 /weld/state 도 없다. 용접 배타(601)를 보는 시험만 phase 를 넣는다
+        self._weld = self.create_publisher(WeldState, '/weld/state', QOS_STATE)
+        self.weld_phase = None
         self._timer = self.create_timer(STATUS_PERIOD_S, self._publish, callback_group=group)
         self._server = ActionServer(
             self, ExecuteMotion, '/robot/execute_motion', self._execute, callback_group=group,
@@ -222,6 +228,10 @@ class FakePeers(Node):
             p.x, p.y, p.z = self.position
             q.x, q.y, q.z, q.w = DOWN
             self._sample.publish(sample)
+        weld_phase = self.weld_phase
+        if weld_phase is not None:
+            self._weld.publish(WeldState(
+                stamp=now, phase=int(weld_phase), line_index=WeldState.LINE_NONE, line_total=8))
 
     # -- /robot/stop · /contact/tare --
 

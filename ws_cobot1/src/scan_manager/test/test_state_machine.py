@@ -1,11 +1,15 @@
 """전이표: 정상 경로 · 실패 경로 · 허용되지 않는 전이 (계약 3.4절 · 7.4절)."""
 
+from dataclasses import replace
+
 from conftest import drive
 from conftest import READY
 import pytest
 from scan_manager.contract_enums import Direction
 from scan_manager.contract_enums import Phase
 from scan_manager.contract_enums import Reason
+from scan_manager.contract_enums import WELD_REST_PHASES
+from scan_manager.contract_enums import WeldPhase
 from scan_manager.state_machine import ACTIVE_PHASES
 from scan_manager.state_machine import Command
 from scan_manager.state_machine import COMMAND_TRANSITIONS
@@ -360,3 +364,172 @@ def test_restore_rejects_what_the_table_could_never_produce(sm, kwargs):
     with pytest.raises(ValueError):
         sm.restore(**arguments)
     assert sm.phase is Phase.IDLE and sm.snapshot().scan_id == ''
+
+
+# ---- 용접과의 배타: WELD_ACTIVE(601) (phase 2 계약 7.1, 1차 5.1 · 5.3) ----
+# 휴지 = IDLE · DONE · ERROR · STOPPED. 그 밖이면 START · RESUME 을 601 로 거절한다. 안전복귀는 막지 않는다.
+# 판정할 수 없으면(미수신 · 끊김 · 시계 0 · 한도 없음) 용접이 없다고 보고 통과시킨다 — 안전 · 로봇 상태와 반대다.
+
+WELD_TIMEOUT_S = 5.0   # real.yaml 과 같은 값
+
+
+def welding(phase=WeldPhase.WELDING, base=READY, **changes):
+    """/weld/state 를 방금 받았다(나이 0). changes 로 나이 · 한도 · 다른 조건을 바꾼다."""
+    return replace(base, **{
+        'weld_phase': int(phase), 'weld_state_age_s': 0.0,
+        'weld_state_timeout_s': WELD_TIMEOUT_S, **changes})
+
+
+# 명령별로 그 명령을 받는 휴지 phase 에서 시작한다
+FROM = {Command.START: Phase.IDLE, Command.RESUME: Phase.STOPPED}
+
+
+def _ask(command, conditions, machine=None):
+    machine = machine or at(FROM[command])
+    scan_id = '20260928-120000-0601' if command is Command.START else ''
+    return machine, machine.request(command, conditions=conditions, scan_id=scan_id)
+
+
+@pytest.mark.parametrize('command', FROM)
+def test_fresh_welding_refuses_start_and_resume_with_601(command):
+    machine, outcome = _ask(command, welding())
+    before = machine.snapshot()
+    assert not outcome.accepted and outcome.reason is Reason.WELD_ACTIVE
+    assert outcome.detail == 'weld phase=WELDING(3)'
+    assert machine.snapshot() == before                     # 거절은 상태를 바꾸지 않는다
+
+
+# 계약 7.1 에서 옮겨 적은 목록이다. 코드의 WELD_REST_PHASES 에서 만들지 않는다(같이 틀리면 못 잡는다)
+WELD_BUSY = (
+    WeldPhase.PREPARING, WeldPhase.APPROACH, WeldPhase.WELDING, WeldPhase.RETREAT,
+    WeldPhase.STOPPING, WeldPhase.HOMING)
+WELD_REST = (WeldPhase.IDLE, WeldPhase.DONE, WeldPhase.ERROR, WeldPhase.STOPPED)
+
+
+@pytest.mark.parametrize('command', FROM)
+@pytest.mark.parametrize('phase', WELD_BUSY)
+def test_every_non_rest_weld_phase_refuses(command, phase):
+    _machine, outcome = _ask(command, welding(phase))
+    assert outcome.reason is Reason.WELD_ACTIVE and phase.name in outcome.detail
+
+
+@pytest.mark.parametrize('command', FROM)
+@pytest.mark.parametrize('phase', WELD_REST)
+def test_rest_weld_phases_pass(command, phase):
+    _machine, outcome = _ask(command, welding(phase))
+    assert outcome.accepted, outcome
+
+
+def test_the_rest_set_is_exactly_the_contract_four():
+    """휴지 목록을 늘리는 것은 계약 변경이다. HOMING 은 휴지가 아니다(로봇을 잡고 있다)."""
+    assert WELD_REST_PHASES == set(WELD_REST)
+    assert set(WELD_BUSY) | set(WELD_REST) == set(WeldPhase)    # 표의 10 개를 빠짐없이 나눴다
+
+
+@pytest.mark.parametrize('command', FROM)
+@pytest.mark.parametrize('value', [10, 255])
+def test_a_phase_value_outside_the_table_is_not_rest(command, value):
+    """휴지는 허용 목록이다. 살아 있는 weld_manager 가 모르는 값을 보내면 휴지로 보지 않는다."""
+    _machine, outcome = _ask(command, welding(value))
+    assert outcome.reason is Reason.WELD_ACTIVE
+    assert outcome.detail == f'weld phase=UNKNOWN_{value}({value})'
+
+
+@pytest.mark.parametrize('command', FROM)
+@pytest.mark.parametrize('conditions', [
+    pytest.param(READY, id='never_received'),                         # weld_manager 미기동 = 1차 동작
+    pytest.param(welding(weld_state_age_s=WELD_TIMEOUT_S + 0.1), id='stale'),   # WELDING 중에 죽었다
+    pytest.param(welding(weld_state_age_s=None), id='clock_zero'),
+    pytest.param(welding(weld_state_timeout_s=None), id='no_limit_parameter'),
+])
+def test_what_cannot_be_judged_passes(command, conditions):
+    """fail-open: 계약 7.1 의 "미수신 · 끊김 = 용접 없음" 을 판정 불가까지 넓힌 것이다.
+
+    /safety/status 에서는 같은 경우가 전부 거절이다(test_commands.py). 결과가 반대인 것이 의도다.
+    """
+    _machine, outcome = _ask(command, conditions)
+    assert outcome.accepted, outcome
+
+
+@pytest.mark.parametrize('command', FROM)
+def test_weld_state_is_live_up_to_the_limit_and_when_the_stamp_is_ahead(command):
+    """끊김은 한도를 **엄격히** 넘어야 한다. stamp 가 미래(나이 음수)면 발행이 살아 있다(status_stale 과 같은 규칙)."""
+    for age in (WELD_TIMEOUT_S, -1.0):
+        _machine, outcome = _ask(command, welding(weld_state_age_s=age))
+        assert outcome.reason is Reason.WELD_ACTIVE, age
+
+
+@pytest.mark.parametrize('start', [Phase.IDLE, Phase.STOPPED, Phase.ERROR, Phase.DONE])
+def test_home_is_not_blocked_by_welding(start):
+    """안전복귀는 독립된 명령이다(규칙 3, 계약 7.1)."""
+    outcome = at(start).request(Command.HOME, conditions=welding())
+    assert outcome.accepted and outcome.state.phase is Phase.HOMING
+
+
+def test_stop_and_set_config_are_not_blocked_by_welding():
+    running = at(Phase.EDGE_SEARCH)
+    assert running.request(Command.STOP, conditions=welding()).state.phase is Phase.STOPPING
+    assert at(Phase.IDLE).request(Command.SET_CONFIG, conditions=welding()).accepted
+
+
+@pytest.mark.parametrize('command', FROM)
+@pytest.mark.parametrize('changes', [
+    pytest.param({'safety_latched': True}, id='latched'),
+    pytest.param({'safety_latched': None}, id='safety_never_received'),
+    pytest.param({'safety_status_age_s': 60.0}, id='safety_stale'),
+])
+def test_601_comes_before_the_latch(command, changes):
+    """검사 순서 BUSY → 601 → 래치 → 로봇 (9/26 결정). 래치와 용접이 동시면 601 이다."""
+    _machine, outcome = _ask(command, welding(**changes))
+    assert outcome.reason is Reason.WELD_ACTIVE
+    # 용접이 끝나면 원래의 사유가 드러난다
+    _machine, outcome = _ask(command, welding(WeldPhase.IDLE, **changes))
+    assert outcome.reason is Reason.SAFETY_LATCHED
+
+
+@pytest.mark.parametrize('command', FROM)
+@pytest.mark.parametrize('changes', [
+    pytest.param({'robot_connected': False}, id='disconnected'),
+    pytest.param({'robot_connected': None}, id='robot_never_received'),
+])
+def test_601_comes_before_the_robot_connection(command, changes):
+    _machine, outcome = _ask(command, welding(**changes))
+    assert outcome.reason is Reason.WELD_ACTIVE
+    _machine, outcome = _ask(command, welding(WeldPhase.DONE, **changes))
+    assert outcome.reason is Reason.ROBOT_DISCONNECTED
+
+
+@pytest.mark.parametrize('command', FROM)
+def test_busy_comes_before_601(command):
+    _machine, outcome = _ask(command, welding(), machine=at(Phase.EDGE_SEARCH))
+    assert outcome.reason is Reason.BUSY
+
+
+def test_resume_specific_refusals_stay_ahead_of_601():
+    """RESUME 고유의 판정(재개할 것이 없다 · 허용 목록 밖)은 공용 블록보다 앞이다. 그대로 둔다."""
+    _machine, outcome = _ask(Command.RESUME, welding(), machine=at(Phase.IDLE))
+    assert outcome.reason is Reason.NO_RESUMABLE_SCAN
+    forbidden = at(Phase.EDGE_SEARCH)
+    forbidden.notify(Signal.FAILED, reason_code=Reason.OVER_FORCE)
+    _machine, outcome = _ask(Command.RESUME, welding(), machine=forbidden)
+    assert outcome.reason is Reason.NOT_SUPPORTED
+
+
+@pytest.mark.parametrize('code', sorted(RESUMABLE_FAILURE_CODES))
+def test_resume_of_an_allowed_error_is_refused_while_welding(code):
+    """ERROR 재시작(허용 목록, #161)도 공용 블록을 지난다 — 용접 중이면 601."""
+    machine = at(Phase.EDGE_SEARCH)
+    machine.notify(Signal.FAILED, reason_code=code)
+    _machine, outcome = _ask(Command.RESUME, welding(), machine=machine)
+    assert outcome.reason is Reason.WELD_ACTIVE and machine.phase is Phase.ERROR
+    _machine, outcome = _ask(Command.RESUME, welding(WeldPhase.STOPPED), machine=machine)
+    assert outcome.accepted and outcome.state.phase is Phase.RESUMING
+
+
+@pytest.mark.parametrize('command', FROM)
+def test_check_gives_the_same_601_as_request(command):
+    machine = at(FROM[command])
+    scan_id = '20260928-120000-0602' if command is Command.START else ''
+    verdict = machine.check(command, conditions=welding(), scan_id=scan_id)
+    assert verdict == (Reason.WELD_ACTIVE, 'weld phase=WELDING(3)')
+    assert machine.request(command, conditions=welding(), scan_id=scan_id).reason is verdict[0]
