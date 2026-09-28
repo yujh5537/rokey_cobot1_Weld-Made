@@ -10,7 +10,13 @@ from mqtt_bridge.conversions import (
 
 SCHEMA_VERSION = "0.1"
 
-ROBOT_OPERATION_NAMES = {0: "NONE", 1: "MOVE_TO", 2: "DESCEND", 3: "SLIDE", 4: "HOME"}
+ROBOT_OPERATION_NAMES = {
+    0: "NONE", 1: "MOVE_TO", 2: "DESCEND", 3: "SLIDE", 4: "HOME",
+    # phase 2 용접 (계약 v0.2.0, #184). robot_manager 가 ExecutePath 실행 중에 이 값을 싣는다(#191).
+    # 이 줄이 없으면 encode_robot_operation 이 ValueError 를 내고 구독 보호막이 robot/sample 을
+    # 통째로 버린다 — 용접 중 웹의 TCP 위치 · 궤적이 멈춘다
+    5: "WELD_PATH",
+}
 REASON_NAMES = {
     0: "OK",
     100: "BUSY", 101: "INVALID_REQUEST", 102: "INVALID_VALUE",
@@ -24,8 +30,11 @@ REASON_NAMES = {
     306: "TARE_TIMEOUT", 307: "NO_SAMPLE",
     400: "OVER_FORCE", 401: "OVER_SPEED", 402: "OUT_OF_WORKSPACE",
     403: "SAMPLE_STALE", 404: "ROBOT_STATUS_LOST", 405: "HB_EXPIRED",
-    406: "CONDITION_ACTIVE",
+    406: "CONDITION_ACTIVE", 407: "STOP_UNCONFIRMED",
     500: "INVALID_SHAPE", 501: "INSUFFICIENT_POINTS",
+    # 6xx 용접 (phase 2, 계약 v0.2.0 #184). 이름만 — WELD_PATH 동작 이름 · UNKNOWN_<n> 규칙은 의석의 브리지 표 PR
+    600: "SCAN_ACTIVE", 601: "WELD_ACTIVE", 602: "NO_SCAN_RESULT",
+    603: "LINE_OUT_OF_RANGE", 604: "PATH_REJECTED",
 }
 SCAN_PHASE_NAMES = {
     0: "IDLE", 1: "PREPARING", 2: "TOP_SEARCH", 3: "EDGE_SEARCH",
@@ -39,9 +48,19 @@ SAFETY_LEVEL_NAMES = {0: "OK", 1: "WARN", 2: "STOP"}
 
 
 def _enum_name(table, value, label):
-    if value not in table:
-        raise ValueError(f"unknown {label}: {value}")
-    return table[value]
+    """값 -> 이름. **표에 없는 값도 버리지 않고 "UNKNOWN_<값>" 으로 보낸다** (#90).
+
+    예전에는 ValueError 를 냈다. 그러면 구독 보호막(_safe_ros_callback)이 그 메시지를 통째로
+    버리거나 완료 통지가 아예 나가지 않아, **정작 알려야 할 코드일수록 웹이 못 받았다**.
+    이름을 모르는 것보다 소식이 끊기는 것이 나쁘다.
+
+    표가 계약과 어긋난 채로 조용히 굴러가지 않게 하는 것은 이 함수가 아니라
+    `test/test_enum_tables.py` 의 표 대조 시험이다(표에 없는 상수가 생기면 CI 가 실패한다).
+    """
+    name = table.get(value)
+    if name is None:
+        return f"UNKNOWN_{int(value)}"
+    return name
 
 
 def encode_robot_operation(value):
@@ -133,6 +152,15 @@ def encode_robot_status(status, published_at_ms):
         "force_ctrl_active": status["force_ctrl_active"],
         "motion_id": status["motion_id"],
         "operation": encode_robot_operation(status["operation"]),
+        # SLIDE 누름 목표 (계약 3.2, v0.1.21). 모르는 값은 NaN → null 이다. 0 으로 채우지 않는다.
+        # slide_force_estimate_n 은 **추정**이다(기준 + 설정). 실측 누름이 아니다 —
+        # 웹은 이 값을 "실측"이라고 표시하면 안 된다
+        "slide_mode": status["slide_mode"],
+        "slide_force_setpoint_n": non_finite_to_none(status["slide_force_setpoint_n"]),
+        "slide_force_baseline_n": non_finite_to_none(status["slide_force_baseline_n"]),
+        "slide_force_estimate_n": non_finite_to_none(status["slide_force_estimate_n"]),
+        "step_press_lo_n": non_finite_to_none(status["step_press_lo_n"]),
+        "step_press_hi_n": non_finite_to_none(status["step_press_hi_n"]),
         "detail": status["detail"],
         "published_at_ms": published_at_ms,
     }
