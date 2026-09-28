@@ -140,7 +140,7 @@ def architecture(phase2):
     ax.text(10.25, 4.55, '/robot/execute_motion (A)\n/robot/stop (S)', ha='center', linespacing=1.2,
             bbox=dict(boxstyle='round,pad=0.06', facecolor='#EFF1FB', edgecolor='none'), **lab)
     arrow(ax, (11.15, 3.4), (9.35, 3.9), None)
-    ax.text(10.35, 3.45, '/robot/status', ha='center', **lab)
+    ax.text(10.35, 3.45, '/robot/status · sample', ha='center', **lab)
     # contact_detector ↔ robot_manager
     arrow(ax, (11.55, 5.0), (11.55, 4.0), None)
     ax.text(11.62, 4.72, '/contact/event', ha='left', **lab)

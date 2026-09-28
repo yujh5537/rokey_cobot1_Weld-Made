@@ -60,7 +60,7 @@ digraph nodes {
   // ── robot_manager → ──
   rm -> cd     [label="[L13] /robot/sample · T · RobotSample"];
   rm -> saf    [label="[L14] /robot/sample · T · RobotSample\n[L17] /robot/status · T · RobotStatus"];
-  rm -> sm     [label="[L16] /robot/status · T · RobotStatus\n[L28] /contact/event · T · ContactEvent\n(스텝 모드 SLIDE 의 EDGE)"];
+  rm -> sm     [label="[L16] /robot/status · T · RobotStatus\n[L28] /contact/event · T · ContactEvent (스텝 EDGE)\n[L30] /robot/sample · T (마지막 유효 pose, v0.1.21)"];
   rm -> bridge [label="[L15] /robot/sample · T\n[L18] /robot/status · T\n[L29] /contact/event · T (스텝 EDGE)"];
 
   // ── contact_detector → ──

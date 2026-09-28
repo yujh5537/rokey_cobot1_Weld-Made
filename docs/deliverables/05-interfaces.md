@@ -1,4 +1,4 @@
-근거: `docs/contracts/ros-interfaces.md` · `docs/contracts/mqtt-schema.md`(1차, CHANGELOG 최신 v0.1.20) · `docs/phase2/weld-ros-interfaces.md` · `docs/phase2/weld-mqtt-schema.md`(v0.2.0 · phase 2) · `ws_cobot1/src/contact_scan_interfaces/` (origin/main `07fa721`, 2026-09-27)
+근거: `docs/contracts/ros-interfaces.md` · `docs/contracts/mqtt-schema.md`(1차, CHANGELOG 최신 v0.1.20) · `docs/phase2/weld-ros-interfaces.md` · `docs/phase2/weld-mqtt-schema.md`(v0.2.0 · phase 2) · `ws_cobot1/src/contact_scan_interfaces/` (origin/main `7286e8e`, 2026-09-28)
 
 # 05. 토픽 · 서비스 · 액션 인터페이스 정의서 (요약본)
 
@@ -6,12 +6,13 @@
 
 - 타입 패키지: `contact_scan_interfaces`(msg 15 · srv 6 · action 6). `.msg` · `.srv` · `.action` 파일은 계약 문서의 타입 전문을 그대로 옮긴 것이고, 둘이 어긋나면 `test/test_contract_sync.py` 가 CI 에서 실패한다.
 - 공통 규칙: ROS 내부 단위는 m · rad · N, 웹 표시는 mm(변환은 mqtt_bridge 에서만). **미측정값은 0 이 아니라 NaN + `*_valid=false`**(MQTT 에서는 `null`). 좌표는 `frame_id` 로 기준을 밝힌다.
-- **phase 2(용접)** 행은 **[P2]** 로 표시했다. 계약은 main 에 있고 구현은 PR 진행 중이다(2026-09-27).
+- **phase 2(용접)** 행은 **[P2]** 로 표시했다. 계약은 main 에 있고 구현은 PR 진행 중이다(2026-09-28).
+- v0.1.21(#161, 9/27 머지): scan_manager 가 `/robot/sample` 을 구독하고, `ReasonCode` 에 407 `STOP_UNCONFIRMED`, `RobotStatus` 에 SLIDE 누름 목표 필드가 더해졌다. v0.1.22(#200): MQTT 이름 표에 없는 값은 버리지 않고 `"UNKNOWN_<값>"` 으로 보낸다(`robot/sample.operation` 5 = `"WELD_PATH"`).
 
 ## 1. 토픽
 | 이름 | 타입 | 발행 | 구독 | QoS | 뜻 |
 |---|---|---|---|---|---|
-| `/robot/sample` | RobotSample | robot_manager | contact_detector · safety_monitor · mqtt_bridge · [P2] weld_manager | SENSOR | TCP pose + 외력 + 실행 중 동작(`motion_id` · `operation`). scan_manager 는 구독하지 않는다 |
+| `/robot/sample` | RobotSample | robot_manager | contact_detector · safety_monitor · mqtt_bridge · scan_manager(v0.1.21) · [P2] weld_manager | SENSOR | TCP pose + 외력 + 실행 중 동작(`motion_id` · `operation`). scan_manager 는 **마지막 유효 pose 만** 들고 안전복귀의 올림 목표 · 재시작의 위치 확인에 쓴다(측정값은 여전히 판정 좌표) |
 | `/robot/status` | RobotStatus | robot_manager | scan_manager · safety_monitor · mqtt_bridge · [P2] weld_manager | STATE | 연결 · 동작 · 오류 · 제어 상태. 정지 완료 확인의 근거 |
 | `/contact/event` | ContactEvent | contact_detector · robot_manager(스텝 모드 EDGE) | robot_manager · scan_manager · mqtt_bridge | EVENT | CONTACT · EDGE · OVER_FORCE. 판정 확정 즉시 1 회 |
 | `/scan/state` | ScanState | scan_manager | contact_detector · safety_monitor* · mqtt_bridge · [P2] weld_manager | STATE | 단계 · 방향 · 진행 n/4 |
@@ -24,7 +25,7 @@
 | [P2] `/weld/result` | WeldResult | weld_manager | mqtt_bridge | STATE | 용접 결과(8 선 계획 · 상태) |
 | [P2] `/weld/log` | ScanLog | weld_manager | mqtt_bridge | LOG | 시간순 로그(`scan_id` 자리에 `weld_id`) |
 
-\* 계약에는 있지만 2026-09-27 main 의 safety_monitor 는 이 두 토픽을 구독하지 않는다(웹 heartbeat 감시 · `HB_EXPIRED` 405 미구현, `integration-audit_20260921.md` T33). mqtt_bridge 는 `/web/heartbeat` 를 발행한다.
+\* 계약에는 있지만 2026-09-28 main 의 safety_monitor 는 이 두 토픽을 구독하지 않는다(웹 heartbeat 감시 · `HB_EXPIRED` 405 미구현, `integration-audit_20260921.md` T33). mqtt_bridge 는 `/web/heartbeat` 를 발행한다.
 
 QoS 프로파일(`contact_scan_qos` 모듈, 발행 · 구독 양쪽이 같은 정의를 import): SENSOR = BEST_EFFORT · VOLATILE · KEEP_LAST 5 / STATE = RELIABLE · TRANSIENT_LOCAL · KEEP_LAST 1 / EVENT = RELIABLE · VOLATILE · KEEP_LAST 50 / LOG = RELIABLE · VOLATILE · KEEP_LAST 100 / HEARTBEAT = BEST_EFFORT · VOLATILE · KEEP_LAST 1.
 
@@ -76,7 +77,7 @@ QoS 프로파일(`contact_scan_qos` 모듈, 발행 · 구독 양쪽이 같은 �
 | 1xx | 요청 거절 | 100 `BUSY` · 103 `SAFETY_LATCHED` · 104 `ROBOT_DISCONNECTED` · 105 `NO_RESUMABLE_SCAN` · 108 `PARAM_SET_FAILED` |
 | 2xx | 동작 종료 | 200 `STOP_REQUESTED` · 202 `MAX_DISTANCE` · 203 `TIMEOUT` · 204 `ROBOT_ERROR` · 205 `DROP_LIMIT` |
 | 3xx | 접촉 · 툴 | 300 `NO_CONTACT` · 301 `NO_EDGE` · 302 `TOOL_REG_SUSPECT` · 303~307 tare · 샘플 |
-| 4xx | 안전 | 400 `OVER_FORCE` · 403 `SAMPLE_STALE` · 404 `ROBOT_STATUS_LOST` · 405 `HB_EXPIRED`(감시 미구현) · 406 `CONDITION_ACTIVE` |
+| 4xx | 안전 | 400 `OVER_FORCE` · 403 `SAMPLE_STALE` · 404 `ROBOT_STATUS_LOST` · 405 `HB_EXPIRED`(감시 미구현) · 406 `CONDITION_ACTIVE` · 407 `STOP_UNCONFIRMED`(v0.1.21) |
 | 5xx | 형상 | 500 `INVALID_SHAPE` · 501 `INSUFFICIENT_POINTS` |
 | [P2] 6xx | 용접 | 600 `SCAN_ACTIVE` · 601 `WELD_ACTIVE` · 602 `NO_SCAN_RESULT` · 603 `LINE_OUT_OF_RANGE` · 604 `PATH_REJECTED` |
 

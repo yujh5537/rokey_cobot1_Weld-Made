@@ -1,4 +1,4 @@
-근거: `docs/design/contact-scan-node-diagram-v1.1.md` · `.drawio`(출발, 40 선) · `docs/contracts/ros-interfaces.md` 2장 · 6.4절 · `docs/contracts/mqtt-schema.md` 2장 · `docs/phase2/weld-ros-interfaces.md` 2장 · `docs/phase2/weld-mqtt-schema.md` 1장 (origin/main `07fa721`, 2026-09-27)
+근거: `docs/design/contact-scan-node-diagram-v1.1.md` · `.drawio`(출발, 40 선) · `docs/contracts/ros-interfaces.md` 2장 · 6.4절 · `docs/contracts/mqtt-schema.md` 2장 · `docs/phase2/weld-ros-interfaces.md` 2장 · `docs/phase2/weld-mqtt-schema.md` 1장 (origin/main `7286e8e`, 2026-09-28)
 
 # 06. ROS2 노드 구조도 (v1.2)
 
@@ -8,15 +8,15 @@
 
 - 선 라벨 = **이름 · 종류(T Topic / S Service / A Action) · 타입**. `[L..]` 번호가 아래 표의 행이다. 같은 두 노드 사이의 같은 방향 선은 화살표 하나에 모았다.
 - phase 2(주황 점선)를 뺀 판: [`06-node-graph-no-phase2.png`](06-node-graph-no-phase2.png).
-- 자체 노드 6 개: 1차 5 개 + `weld_manager`(phase 2, **구현 PR 진행 중** — #191 · #195~#197, 2026-09-27 머지 전). 네임스페이스 없음, 실행 파일명 = 노드명, 노드별 패키지(`ws_cobot1/src/`).
+- 자체 노드 6 개: 1차 5 개 + `weld_manager`(phase 2, **구현 PR 진행 중** — #191 · #195~#197 · P5 #204, 2026-09-28 머지 전). 네임스페이스 없음, 실행 파일명 = 노드명, 노드별 패키지(`ws_cobot1/src/`).
 - 메시지 필드 · QoS 는 계약 문서에 있다. 요약은 [05 인터페이스 정의서](05-interfaces.md).
-- 이 그림은 **계약**의 연결이다. 2026-09-27 main 의 코드와 대조해 다른 곳은 L10 · L26 두 선(safety_monitor 가 구독하지 않음)뿐이고, 회색 점선으로 표시했다. 나머지 노드의 발행 · 구독은 계약과 같다.
+- 이 그림은 **계약**의 연결이다. 2026-09-28 main 의 코드와 대조해 다른 곳은 L10 · L26 두 선(safety_monitor 가 구독하지 않음)뿐이고, 회색 점선으로 표시했다. 나머지 노드의 발행 · 구독은 계약과 같다.
 
 ## 1. 노드
 
 | 노드 | 패키지 | 발행 | 구독 | 서버 | 클라이언트 |
 |---|---|---|---|---|---|
-| `scan_manager` | scan_manager | `/scan/state` · `/scan/result` · `/scan/log` | `/robot/status` · `/contact/event` · `/safety/status` · (P2) `/weld/state` | A `/scan/run` · `/scan/home` · `/scan/resume`, S `/scan/stop` · `/scan/set_config` | A `/robot/execute_motion`, S `/robot/stop` · `/contact/tare` · `*/set_parameters` |
+| `scan_manager` | scan_manager | `/scan/state` · `/scan/result` · `/scan/log` | `/robot/status` · `/robot/sample`(v0.1.21) · `/contact/event` · `/safety/status` · (P2) `/weld/state` | A `/scan/run` · `/scan/home` · `/scan/resume`, S `/scan/stop` · `/scan/set_config` | A `/robot/execute_motion`, S `/robot/stop` · `/contact/tare` · `*/set_parameters` |
 | `robot_manager` | robot_manager | `/robot/sample` · `/robot/status` · `/contact/event`(스텝 EDGE) | `/contact/event` | A `/robot/execute_motion` · (P2) `/robot/execute_path`, S `/robot/stop` | 두산 `dsr_msgs2` · RG2 |
 | `contact_detector` | contact_detector | `/contact/event` | `/robot/sample` · `/scan/state` | S `/contact/tare` | — |
 | `safety_monitor` | safety_monitor | `/safety/status` | `/robot/sample` · `/robot/status` (계약의 `/scan/state` · `/web/heartbeat` 는 9/27 main 미구현 — 아래 L10 · L26) | S `/safety/reset` | S `/robot/stop` |
@@ -25,7 +25,7 @@
 
 ## 2. 연결 표 (한 줄 = 선 하나)
 
-### 2.1 자체 인터페이스 (`contact_scan_interfaces`) — 29 선
+### 2.1 자체 인터페이스 (`contact_scan_interfaces`) — 30 선
 | # | 이름 | 종류 | 타입 | 보내는 쪽 | 받는 쪽 | 뜻 |
 |---|---|---|---|---|---|---|
 | L01 | `/scan/run` | A | RunScan | mqtt_bridge | scan_manager | 새 작업 시작 |
@@ -57,6 +57,7 @@
 | L27 | `/safety/reset` | S | ResetSafety | mqtt_bridge | safety_monitor | 래치 해제(조건 해소 때만) |
 | L28 | `/contact/event` | T | ContactEvent | robot_manager | scan_manager | **v1.2 추가.** 스텝 모드 SLIDE 의 EDGE(계약 v0.1.15) |
 | L29 | `/contact/event` | T | ContactEvent | robot_manager | mqtt_bridge | **v1.2 추가.** 같은 이벤트의 표시 |
+| L30 | `/robot/sample` | T | RobotSample | robot_manager | scan_manager | **v1.2 추가(계약 v0.1.21, #161).** 마지막 유효 pose 만 — 안전복귀의 올림 목표 · 재시작의 위치 확인. 측정값은 여전히 판정 좌표(`/contact/event`) |
 
 ### 2.2 표준 ROS 인터페이스 — 4 선
 | # | 이름 | 종류 | 타입 | 보내는 쪽 | 받는 쪽 | 뜻 |
@@ -105,13 +106,14 @@
 | W16 | MQTT `cmd/weld/+` | 외부 | — | 브로커 | mqtt_bridge | |
 | W17 | MQTT `weld/state` · `weld/result` · `weld/log` · `weld/command_result` | 외부 | — | mqtt_bridge | 브로커 | |
 
-합계: 자체 29 + 표준 4 + 외부 8 + 검토안 2 = **1차 43 선**, phase 2 **17 선**, 모두 **60 선**.
+합계: 자체 30 + 표준 4 + 외부 8 + 검토안 2 = **1차 44 선**, phase 2 **17 선**, 모두 **61 선**.
 
 ## 3. v1.1 → v1.2 에서 바뀐 것
 
 | # | 바뀐 것 | 근거 |
 |---|---|---|
 | 1 | L28 · L29: robot_manager 가 스텝 모드 SLIDE 의 EDGE 를 `/contact/event` 로 낸다(실기 기본 `slide_mode: step`) | 계약 v0.1.15, PR #160 |
+| 1b | L30: scan_manager 가 `/robot/sample` 을 구독한다(마지막 유효 pose, 안전복귀 · 재시작용) | 계약 v0.1.21, PR #161 |
 | 2 | P04: `/dsr01/joint_states` 를 mqtt_bridge 가 표시 전용으로 중계 | 계약 v0.1.19 · v0.1.20, PR #179 |
 | 3 | W01~W17: phase 2 weld_manager · ExecutePath · 배타 규칙 · MQTT `weld/*` | 계약 v0.2.0, PR #184 · #198 |
 | 4 | 표기: 선마다 **타입**을 적었다(v1.1 은 이름 · 뜻만). 같은 두 노드 사이의 같은 방향 선은 그림에서 한 화살표에 모았다 | 강사 요구 "주고받는 데이터 형식 · 이름 · 연결 관계" |
