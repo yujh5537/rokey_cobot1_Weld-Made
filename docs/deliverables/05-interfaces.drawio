@@ -1,0 +1,411 @@
+<mxfile host="app.diagrams.net" agent="contact-scan-deliverables" version="24.7.8">
+  <diagram id="command-flow" name="명령 한 번의 흐름 — 접수 ≠ 완료">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="2688" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c1" value="명령 한 번의 흐름 — 접수(cmd/ack) ≠ 완료(scan/command_result)" style="text;html=1;align=left;verticalAlign=middle;fontSize=28;fontColor=#12294D;fontStyle=1;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="2300" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="근거: docs/contracts/mqtt-schema.md 3장 · ros-interfaces.md 1장 · 7.1 · 코드 origin/main 2335057 (2026-09-28) · 화살표 색 = 갈래(01 · 06 과 같다) · 점선 = 응답 · 회색 쪽지 = 그 노드 안에서 하는 일" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontColor=#4A5666;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="66" width="2300" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="&lt;b style=&quot;font-size:17px&quot;&gt;브라우저&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;React + Three.js&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3E7EC;strokeColor=#A9B3BE;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="30" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="150" y="204" as="sourcePoint" />
+            <mxPoint x="150" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c5" value="&lt;b style=&quot;font-size:17px&quot;&gt;FastAPI&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;:8000&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1DCEB;strokeColor=#C79BBD;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="350" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="204" as="sourcePoint" />
+            <mxPoint x="470" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c7" value="&lt;b style=&quot;font-size:17px&quot;&gt;MQTT 브로커&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;Mosquitto :1883&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCE2E9;strokeColor=#94A0AE;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="670" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="790" y="204" as="sourcePoint" />
+            <mxPoint x="790" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c9" value="&lt;b style=&quot;font-size:17px&quot;&gt;mqtt_bridge&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;ROS 2 ↔ MQTT&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D3DCF5;strokeColor=#22357F;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="990" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="204" as="sourcePoint" />
+            <mxPoint x="1110" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c11" value="&lt;b style=&quot;font-size:17px&quot;&gt;scan_manager&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;상태기계&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D3DCF5;strokeColor=#22357F;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="204" as="sourcePoint" />
+            <mxPoint x="1430" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c13" value="&lt;b style=&quot;font-size:17px&quot;&gt;robot_manager&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;모션 · 드라이버 창구&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D3DCF5;strokeColor=#22357F;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1630" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1750" y="204" as="sourcePoint" />
+            <mxPoint x="1750" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c15" value="&lt;b style=&quot;font-size:17px&quot;&gt;contact_detector&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:12px&quot;&gt;접촉 판정&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D3DCF5;strokeColor=#22357F;strokeWidth=2;fontColor=#12294D;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1950" y="140" width="240" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="" style="endArrow=none;html=1;strokeColor=#9AA3AD;strokeWidth=1.5;dashed=1;dashPattern=6 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="2070" y="204" as="sourcePoint" />
+            <mxPoint x="2070" y="2658" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c17" value="&lt;b&gt;작업 시작 → 완료 (1.1 ~ 1.4 절)&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8EDFA;strokeColor=none;fontSize=15;fontColor=#12294D;align=left;verticalAlign=middle;spacingLeft=12;opacity=90;" vertex="1" parent="1">
+          <mxGeometry x="20" y="230" width="2330" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="① 버튼 &quot;시작&quot; → POST /commands/scan/start" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="150" y="300" as="sourcePoint" />
+            <mxPoint x="470" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c19" value="request_id(UUID v4) · timestamp_ms · schema_version &quot;0.1&quot; 을 붙인다" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="305.0" y="340" width="330" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="② cmd/scan/start (QoS 1 · retain=false)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="420" as="sourcePoint" />
+            <mxPoint x="790" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e21" value="③ REST 응답 {status: PUBLISHED} · WS command/status" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="478" as="sourcePoint" />
+            <mxPoint x="150" y="478" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e22" value="④ cmd/scan/start" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="790" y="536" as="sourcePoint" />
+            <mxPoint x="1110" y="536" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c23" value="공통 검사: 형식 → 중복(최근 100) → 만료(5 s). 실패면 cmd/ack 거절(101 · 106)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="945.0" y="576" width="330" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" value="⑤ /scan/run goal (Action)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="656" as="sourcePoint" />
+            <mxPoint x="1430" y="656" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e25" value="⑥ goal 수락 (늘 받는다 — 거절 사유는 Result 로)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="714" as="sourcePoint" />
+            <mxPoint x="1110" y="714" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e26" value="⑦ cmd/ack {accepted: true} = &lt;b&gt;접수&lt;/b&gt;" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="772" as="sourcePoint" />
+            <mxPoint x="790" y="772" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e27" value="⑧ cmd/ack" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="790" y="830" as="sourcePoint" />
+            <mxPoint x="470" y="830" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e28" value="⑨ WS command/status ACCEPTED" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="888" as="sourcePoint" />
+            <mxPoint x="150" y="888" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c29" value="관문 100 · 108 · 102 · 601 · 103 · 104 → scan_id 발급 → progress.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1265.0" y="928" width="330" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e30" value="⑩ /robot/execute_motion MOVE_TO → (tare) → DESCEND" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#A78BE4;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="1008" as="sourcePoint" />
+            <mxPoint x="1750" y="1008" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e31" value="⑪ /robot/sample 50 Hz (operation · motion_id)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#DB8368;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1750" y="1066" as="sourcePoint" />
+            <mxPoint x="2070" y="1066" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e32" value="⑫ /contact/event CONTACT (판정 좌표)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#C99A1E;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="2070" y="1124" as="sourcePoint" />
+            <mxPoint x="1750" y="1124" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e33" value="⑫ 같은 이벤트 → z_top 기록" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#C99A1E;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="2070" y="1182" as="sourcePoint" />
+            <mxPoint x="1430" y="1182" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e34" value="⑬ Result {정지 pose, reason, event_id}" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#A78BE4;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1750" y="1240" as="sourcePoint" />
+            <mxPoint x="1430" y="1240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c35" value="SLIDE × 4 (실기 스텝 모드: EDGE 는 robot_manager 가 낸다) → GEOMETRY" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1265.0" y="1280" width="330" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e36" value="⑭ /scan/state · /scan/result (1 회) · /scan/log" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="1360" as="sourcePoint" />
+            <mxPoint x="1110" y="1360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e37" value="⑮ scan/state (retain) · scan/result · scan/log (mm · null)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="1418" as="sourcePoint" />
+            <mxPoint x="790" y="1418" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e38" value="⑯ → WS 방송 · scan/result 는 DB upsert" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="790" y="1476" as="sourcePoint" />
+            <mxPoint x="470" y="1476" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c39" value="HOMING(올림 → OP_HOME) → DONE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1280.0" y="1516" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e40" value="⑰ RunScan Result {success, reason_code}" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="1590" as="sourcePoint" />
+            <mxPoint x="1110" y="1590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e41" value="⑱ scan/command_result {success: true} = &lt;b&gt;완료&lt;/b&gt;" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="1648" as="sourcePoint" />
+            <mxPoint x="790" y="1648" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e42" value="⑲ scan/command_result" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="790" y="1706" as="sourcePoint" />
+            <mxPoint x="470" y="1706" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e43" value="⑳ WS command/status SUCCEEDED" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="1764" as="sourcePoint" />
+            <mxPoint x="150" y="1764" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c44" value="&lt;b&gt;작업 중지 — 정지 경로 ① (1.5 절)&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FBEDEC;strokeColor=none;fontSize=15;fontColor=#12294D;align=left;verticalAlign=middle;spacingLeft=12;opacity=90;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1824" width="2330" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="e45" value="① 버튼 &quot;중지&quot; → POST /commands/scan/stop" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="150" y="1894" as="sourcePoint" />
+            <mxPoint x="470" y="1894" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e46" value="② cmd/scan/stop" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="1952" as="sourcePoint" />
+            <mxPoint x="790" y="1952" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e47" value="③ cmd/scan/stop" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="790" y="2010" as="sourcePoint" />
+            <mxPoint x="1110" y="2010" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c48" value="만료 검사 제외 (늦게 와도 거절하지 않는다)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="960.0" y="2050" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e49" value="④ /scan/stop (Service · requester='mqtt_bridge')" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="2124" as="sourcePoint" />
+            <mxPoint x="1430" y="2124" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e50" value="⑤ accepted = 접수 ≠ 정지 완료" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#5F7FD8;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="2182" as="sourcePoint" />
+            <mxPoint x="1110" y="2182" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e51" value="⑥ cmd/ack {accepted: true}" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="2240" as="sourcePoint" />
+            <mxPoint x="790" y="2240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e52" value="⑦ /robot/stop + goal cancel (응답을 기다리지 않는다)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#D9736C;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="2298" as="sourcePoint" />
+            <mxPoint x="1750" y="2298" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c53" value="move_stop → finally 순응 · 힘 제어 해제" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1600.0" y="2338" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e54" value="⑧ /robot/status connected &amp;&amp; !moving (요청 뒤 stamp)" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#DB8368;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1750" y="2412" as="sourcePoint" />
+            <mxPoint x="1430" y="2412" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c55" value="STOPPED (5 s 안에 확인 못 하면 407 → ERROR) · 자동 홈 · 재시작 없음" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#C2CBD5;fontSize=12;fontColor=#33465C;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1265.0" y="2452" width="330" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="e56" value="⑨ /scan/state phase=STOPPED" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1430" y="2532" as="sourcePoint" />
+            <mxPoint x="1110" y="2532" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e57" value="⑩ scan/command_result {success: true, reason: STOP_REQUESTED} = &lt;b&gt;완료&lt;/b&gt;" style="endArrow=blockThin;endFill=1;endSize=9;html=1;strokeColor=#4FA79B;strokeWidth=2.4;fontSize=13;fontColor=#16202B;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;dashed=1;dashPattern=8 5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1110" y="2590" as="sourcePoint" />
+            <mxPoint x="790" y="2590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="stop-paths" name="정지 경로 3 가지">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c1" value="정지 경로 3 가지 — 요청 · 접수 · 완료 확인은 다르다" style="text;html=1;align=left;verticalAlign=middle;fontSize=28;fontColor=#12294D;fontStyle=1;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="2300" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="근거: docs/contracts/ros-interfaces.md 7.1 · 7.2 · 7.5 (v0.1.21) · 코드 origin/main 2335057 · 완료는 어느 경로든 /robot/status 의 connected &amp;&amp; !moving 으로만 본다" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontColor=#4A5666;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="66" width="2300" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5F7FD8;strokeWidth=3;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="2320" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="&lt;b&gt;① 웹 작업 중지&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5F7FD8;strokeColor=#5F7FD8;fontSize=17;fontColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=16;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="2320" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="&lt;b style=&quot;font-size:17px&quot;&gt;관제자&lt;/b&gt;&lt;br/&gt;버튼 &quot;중지&quot;" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="80" y="220" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="&lt;b style=&quot;font-size:17px&quot;&gt;mqtt_bridge&lt;/b&gt;&lt;br/&gt;cmd/scan/stop → /scan/stop&lt;br/&gt;(만료 검사 제외)" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="535" y="220" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#5F7FD8;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c5" target="c6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" value="&lt;b style=&quot;font-size:17px&quot;&gt;scan_manager&lt;/b&gt;&lt;br/&gt;/robot/stop + goal cancel&lt;br/&gt;StopScan.accepted = 접수" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="990" y="220" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#5F7FD8;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c6" target="c8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" value="&lt;b style=&quot;font-size:17px&quot;&gt;robot_manager&lt;/b&gt;&lt;br/&gt;move_stop · 순응 해제" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="220" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#5F7FD8;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c8" target="c10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c12" value="&lt;b style=&quot;font-size:17px&quot;&gt;완료 확인&lt;/b&gt;&lt;br/&gt;scan_manager 가 connected · !moving&lt;br/&gt;→ STOPPED (못 하면 407)" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EEF7F5;strokeColor=#2E8B7A;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1900" y="220" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#5F7FD8;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c10" target="c12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c14" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C99A1E;strokeWidth=3;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="440" width="2320" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="c15" value="&lt;b&gt;② 접촉 · 엣지 · 과대 외력&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C99A1E;strokeColor=#C99A1E;fontSize=17;fontColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=16;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="440" width="2320" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c16" value="&lt;b style=&quot;font-size:17px&quot;&gt;contact_detector&lt;/b&gt;&lt;br/&gt;CONTACT · EDGE · OVER_FORCE&lt;br/&gt;(스텝 EDGE 는 robot_manager)" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="80" y="510" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="c17" value="&lt;b style=&quot;font-size:17px&quot;&gt;/contact/event&lt;/b&gt;&lt;br/&gt;판정 확정 즉시 1 회" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="535" y="510" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#C99A1E;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c16" target="c17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c19" value="&lt;b style=&quot;font-size:17px&quot;&gt;robot_manager&lt;/b&gt;&lt;br/&gt;motion_id 대조 → 자체 정지&lt;br/&gt;OVER_FORCE 는 대조 없이" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="990" y="510" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#C99A1E;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c17" target="c19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c21" value="&lt;b style=&quot;font-size:17px&quot;&gt;ExecuteMotion Result&lt;/b&gt;&lt;br/&gt;정지 pose + 사유&lt;br/&gt;(접수 단계 없음)" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="510" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e22" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#C99A1E;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c19" target="c21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c23" value="&lt;b style=&quot;font-size:17px&quot;&gt;완료 확인&lt;/b&gt;&lt;br/&gt;Result + /robot/status" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EEF7F5;strokeColor=#2E8B7A;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1900" y="510" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#C99A1E;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c21" target="c23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c25" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D9736C;strokeWidth=3;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="2320" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="c26" value="&lt;b&gt;③ 안전 이상&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D9736C;strokeColor=#D9736C;fontSize=17;fontColor=#FFFFFF;align=left;verticalAlign=middle;spacingLeft=16;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="730" width="2320" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="c27" value="&lt;b style=&quot;font-size:17px&quot;&gt;safety_monitor&lt;/b&gt;&lt;br/&gt;400 · 205 · 403 · 404&lt;br/&gt;기동 3 s 유예" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="80" y="800" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="c28" value="&lt;b style=&quot;font-size:17px&quot;&gt;래치&lt;/b&gt;&lt;br/&gt;첫 원인 유지&lt;br/&gt;해제는 /safety/reset 만" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="535" y="800" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e29" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#D9736C;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c27" target="c28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c30" value="&lt;b style=&quot;font-size:17px&quot;&gt;/robot/stop&lt;/b&gt;&lt;br/&gt;requester='safety_monitor'&lt;br/&gt;웹 경유 없음" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="990" y="800" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e31" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#D9736C;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c28" target="c30">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c32" value="&lt;b style=&quot;font-size:17px&quot;&gt;robot_manager&lt;/b&gt;&lt;br/&gt;move_stop · Result.reason_code = 사유" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EAF4FC;strokeColor=#C4DCF0;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1445" y="800" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e33" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#D9736C;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c30" target="c32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c34" value="&lt;b style=&quot;font-size:17px&quot;&gt;완료 확인&lt;/b&gt;&lt;br/&gt;SafetyStatus.stop_confirmed&lt;br/&gt;0.6 s 넘으면 2 s 마다 다시 요청" style="rounded=1;arcSize=18;whiteSpace=wrap;html=1;fillColor=#EEF7F5;strokeColor=#2E8B7A;strokeWidth=2;fontColor=#1B5CA6;align=center;verticalAlign=middle;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1900" y="800" width="380" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e35" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#D9736C;strokeWidth=3;endArrow=blockThin;endFill=1;endSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="c32" target="c34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c36" value="&lt;b&gt;두 겹 감시&lt;/b&gt; — 과대 외력(30 N)과 하강 제한(SLIDE 첫 z 기준 5 mm)은 ②(또는 robot_manager 1 차)와 ③(safety_monitor 2 차, 하강은 + 여유 5 mm = 10 mm)이 따로 본다. 값은 SetConfig 가 P01 · P02 · P03 로 같이 전파한다.&lt;br/&gt;&lt;b&gt;정지 KPI 두 가지&lt;/b&gt; — 물리 정지 1 s 이내(로봇 실측) · STOPPED 표시 3 s 이내(상태 전이). accepted 는 둘 다 아니다.&lt;br/&gt;&lt;b&gt;정지 뒤&lt;/b&gt; — 홈 복귀 · 재시작을 자동으로 부르지 않는다. 안전복귀 · 재시작 · 안전 해제는 사람이 누르는 독립 명령이다." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDF6;strokeColor=#C2A57C;strokeWidth=1.4;dashed=1;dashPattern=6 4;fontSize=15;fontColor=#4A3620;align=left;verticalAlign=middle;spacingLeft=14;spacingRight=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1020" width="2320" height="150" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
