@@ -121,7 +121,7 @@
 | 8 선 중 DONE 수 | 기대: 윗면 3(L0 · L2 · L3) + 세로 3(L4 · L6 · L7), L1 · L5 는 FAILED 기록 | Virtual 강제 실패 시험: L7 을 FAILED(204)로 기록 → 마무리 복귀 → DONE(success=false) 확인. L7 이 마지막 선이라 '다음 선으로 계속'은 이 시험으로 보이지 않았다 | 9/29 채움 |
 | 경유점 도착 오차 | ±3 mm(D18) | 9/23 M1 정지 자세 위치 오차 최대 0.14 mm(자세 도달 시험, 경로 주행 아님) | 9/29 채움 |
 | 무접촉 | 과대 외력 · 거짓 접촉으로 인한 정지 0 회 | Virtual 에는 힘이 없어 **미실시** | 9/29 채움 |
-| 스캔 · 용접 배타 | 동시 시작 0 회 | weld_manager 의 600 거절은 노드 시험에 있다(PR #197 `test_node_weld.py`). scan_manager 601 은 **PR #204(draft, 머지 전)** | 9/29 채움 |
+| 스캔 · 용접 배타 | 동시 시작 0 회 | weld_manager 의 600 거절은 노드 시험에 있다(PR #197 `test_node_weld.py`). scan_manager 601 은 PR #204 로 **9/28 main 머지**(sim 시험) | 9/29 채움 |
 
 - 소요 시간은 KPI 로 두지 않는다. 참고로 8 선 line 모드 약 4 분(계산값, weld-motion 4절)이고 Virtual 실측은 246 s 다.
 - **수락 기준**: 좌표를 교시하지 않은 상태에서, 스캔 결과만으로 최소 윗면 한 선을 45° 자세 · 스탠드오프 · 위빙으로 끝까지 따라가고, 그 과정과 결과(선별 상태)가 관제 화면과 결과 파일에 남는다.
@@ -130,9 +130,9 @@
 
 | 요구 | 계약 절 | 구현 (담당 · PR, 2026-09-27) |
 |---|---|---|
-| FR-W01~W07 · W10 · W11 | weld-motion 1~5절 · weld-ros-interfaces 5 · 7절 | weld_manager — 현지, PR #195 → #196 → #197 (draft) |
-| FR-W04 · 5장 안전(ExecutePath 수락 검사) | weld-ros-interfaces 5.2절 | robot_manager `/robot/execute_path` — 현지, PR #191 (draft) · D35 출발점 z 검사는 계약에 반영(#199, 9/27 머지) |
-| FR-W09 | weld-ros-interfaces 7.1절 | scan_manager 601 — 병후(P5), PR #204 (draft) |
+| FR-W01~W07 · W10 · W11 | weld-motion 1~5절 · weld-ros-interfaces 5 · 7절 | weld_manager — 현지, PR #195 → #196 → #197 (머지 전) |
+| FR-W04 · 5장 안전(ExecutePath 수락 검사) | weld-ros-interfaces 5.2절 | robot_manager `/robot/execute_path` — 현지, PR #191 (머지 전) · D35 출발점 z 검사는 계약에 반영(#199, 9/27 머지) |
+| FR-W09 | weld-ros-interfaces 7.1절 | scan_manager 601 — 병후(P5), PR #204 (9/28 머지) |
 | FR-W12 | weld-mqtt-schema | mqtt_bridge `weld/*` — 의석(P4) · 웹 — 의석(P3), PR 없음 |
 | 6 · 7장 실측 | measurements-20260923 | 학민 · 병후, PR #186 (9/28 머지) |
 
@@ -140,4 +140,4 @@
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
-| 0.1 | 2026-09-27 | 최초 작성(병후). 1차 BRD v3.2.0 은 고치지 않고 phase 2 만 별도 문서로(병후 결정 9/27). 내용은 `docs/phase2/` 계약 v0.2.0 과 결정 D1~D34를 요구사항 형식으로 옮긴 것이다 |
+| 0.1 | 2026-09-27 | 최초 작성(병후). 1차 BRD v3.2.0 은 고치지 않고 phase 2 만 별도 문서로(병후 결정 9/27). 내용은 `docs/phase2/` 계약 v0.2.0 과 결정 D1~D35 를 요구사항 형식으로 옮긴 것이다 |

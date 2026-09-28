@@ -1,4 +1,4 @@
-근거: `docs/architecture.md` · `docs/design/contact-scan-system-architecture-v1.6.drawio` · `docs/contracts/ros-interfaces.md` 2장 · `docs/contracts/mqtt-schema.md` 2장 · `docs/phase2/weld-ros-interfaces.md` 2장 · `docker/docker-compose.yml` · `backend/app/main.py` · `frontend/vite.config.js` (origin/main `7286e8e`, 2026-09-28)
+근거: `docs/architecture.md` · `docs/design/contact-scan-system-architecture-v1.6.drawio` · `docs/contracts/ros-interfaces.md` 2장 · `docs/contracts/mqtt-schema.md` 2장 · `docs/phase2/weld-ros-interfaces.md` 2장 · `docker/docker-compose.yml` · `backend/app/main.py` · `frontend/vite.config.js` (origin/main `2335057`, 2026-09-28)
 
 # 01. 시스템 아키텍처 (v1.7)
 
@@ -48,15 +48,15 @@
 
 ## 4. phase 2 (용접) — 더한 것과 구현 상태
 
-계약은 v0.2.0 으로 main 에 있다(`docs/phase2/`, PR #184 · #198 · #199). **구현은 아직 main 에 없다**(2026-09-28 기준). 그림에서 주황 점선으로 구분했다.
+계약은 v0.2.0 으로 main 에 있다(`docs/phase2/`, PR #184 · #198 · #199). **구현은 P5(scan_manager 601, #204)만 main 에 있고, 나머지는 머지 전이다**(2026-09-28 기준). 그림에서 주황 점선으로 구분했다.
 
 | 더한 것 | 계약 | 구현 | 상태 (9/27) |
 |---|---|---|---|
-| `weld_manager` 노드 (6 번째 자체 노드) | `weld-ros-interfaces.md` · `weld-motion.md` | 현지, PR #195 → #196 → #197 | draft. Virtual 8 선 DONE 246 s(sim 가상 박스 100 × 60 × 40 mm, `docs/test-reports/p2-weld-virtual_20260925.md`, #197 브랜치) |
-| `/robot/execute_path` (ExecutePath, 경유점 직선 이동) | 5.2절 | 현지, PR #191 | draft. Virtual line 모드 확인, spline 은 응답 지연으로 쓰지 않는다(D31) |
+| `weld_manager` 노드 (6 번째 자체 노드) | `weld-ros-interfaces.md` · `weld-motion.md` | 현지, PR #195 → #196 → #197 | 머지 전(OPEN). Virtual 8 선 DONE 246 s(sim 가상 박스 100 × 60 × 40 mm, `docs/test-reports/p2-weld-virtual_20260925.md`, #197 브랜치) |
+| `/robot/execute_path` (ExecutePath, 경유점 직선 이동) | 5.2절 | 현지, PR #191 | 머지 전(OPEN). Virtual line 모드 확인, spline 은 응답 지연으로 쓰지 않는다(D31) |
 | mqtt_bridge `cmd/weld/*` · `weld/*` 중계 | `weld-mqtt-schema.md` | 의석(P4) | PR 없음. 앞 단계인 이름 표(`operation` 5 = `WELD_PATH`)는 #200 으로 main |
 | 웹 용접 화면 | 같은 문서 3절 | 의석(P3) | PR 없음 |
-| scan_manager 의 스캔 · 용접 배타(601) | 7.1절 | 병후(P5), PR #204 | draft |
+| scan_manager 의 스캔 · 용접 배타(601) | 7.1절 | 병후(P5), PR #204 | **9/28 main 머지** |
 
 실기 확인은 2026-09-29 예정이다. 9/23 측정에서 45° 자세로 16 자세 중 12 에 도달했고 L1 · L5 는 도달하지 못했다(`docs/phase2/measurements-20260923.md`, #186). 세로선 아래 4 자세는 계약 z 보다 17.12 mm 위에서 확인했고 계약 z 에서는 미실시다.
 
@@ -70,7 +70,7 @@
 | 4 | `/dsr01/joint_states` → mqtt_bridge 표시 전용 중계 | 계약 v0.1.19 · v0.1.20 (PR #179) |
 | 5 | phase 2: weld_manager · ExecutePath · `/weld/*` · `cmd/weld/*` (구현 PR 진행 중 표시) | 계약 v0.2.0 (PR #184 · #198) |
 | 5b | 안전 감사 후속(v0.1.21, #161): scan_manager 의 `/robot/sample` 구독(안전복귀 올림 목표) · 안전복귀 5 단계 · 오류 뒤 재시작 허용 목록(403 · 404 · 407) | `docs/contracts/ros-interfaces.md` 7.5 · 9 장 |
-| 6 | 계약과 구현이 다른 곳을 표시: safety_monitor 의 heartbeat 감시 · `/scan/state` 구독 미구현, 설정 등록 화면 버튼 미구현 | `safety_monitor.py:83-84`, `integration-audit_20260921.md` T33, TR-05 |
+| 6 | 계약과 구현이 다른 곳을 표시: safety_monitor 의 heartbeat 감시 · `/scan/state` 구독 미구현, 설정 등록 화면 버튼 미구현 | `safety_monitor.py:87-88`, `integration-audit_20260921.md` T33, TR-05 |
 | 7 | 형식: drawio 대신 matplotlib 스크립트(`figures.py`). phase 2 를 뺀 판을 같은 스크립트로 만든다 | — |
 
 그림 다시 만들기: `python3 docs/deliverables/figures.py` (matplotlib · graphviz · Noto Sans CJK KR 글꼴 필요).

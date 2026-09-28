@@ -265,10 +265,10 @@ def s_01_background(prs, templ):
 def s_01_point(prs, templ):
     s = frame_slide(prs, templ, '01', '센서를 더하지 않고 로봇이 만져서 찾는다 — 그 과정을 실시간 3D 로 보여준다',
                     '* 01-② 특화 포인트')
-    picture(s, HERE / 'compare-alternatives.png', LEFT, 2.45, w=8.1)
-    chip(s, 8.85, 2.5, 3.98, 1.3, '무센서 탐침 = 촉각', '로봇 관절 토크로 추정한 외력', fill=PALE_BLUE, edge=BLUE)
-    chip(s, 8.85, 3.95, 3.98, 1.3, '실시간 3D 관제', '단계 · 접촉점 · 형상을 바로', fill=PALE_BLUE, edge=BLUE)
-    chip(s, 8.85, 5.4, 3.98, 1.3, '스캔 → 용접 모션', '[뺄 수 있음]', fill=OR_FILL, edge=ORANGE, head_color=ORANGE,
+    picture(s, HERE / 'compare-alternatives.png', LEFT, 2.45, w=8.3)
+    chip(s, 8.95, 2.5, 3.88, 1.3, '무센서 탐침 = 촉각', '로봇 관절 토크로 추정한 외력', fill=PALE_BLUE, edge=BLUE)
+    chip(s, 8.95, 3.95, 3.88, 1.3, '실시간 3D 관제', '단계 · 접촉점 · 형상을 바로', fill=PALE_BLUE, edge=BLUE)
+    chip(s, 8.95, 5.4, 3.88, 1.3, '스캔 → 용접 모션', '[뺄 수 있음]', fill=OR_FILL, edge=ORANGE, head_color=ORANGE,
          sub_color=ORANGE, name='[뺄 수 있음] 01-② 용접')
     footnote(s, '출처: BRD v3.2.0 3.2(대안 비교 · 가격) · 1.5(기술적 가치), ADR 0001. 비전 가격은 E12. 목표가 1,000 만원은 가정 A7')
     notes(s, '비슷한 문제를 푸는 방법을 나란히 놓았습니다. 지금의 재티칭은 매번 사람이 필요하고, 와이어 터치센싱은 감지 기능이 있는 용접 '
@@ -342,7 +342,7 @@ def s_02_team(prs, templ):
                                              'align': PP_ALIGN.CENTER}) for p in pkgs], fill=LIGHT)
         text_box(s, x, 4.8, w, 1.2, [(ln, {'size': 13, 'after': 1, 'align': PP_ALIGN.CENTER})
                                      for ln in work.split('\n')])
-        text_box(s, x, 5.95, w, 0.35, [(f'산출물 {deliv}', {'size': 12, 'color': GRAY, 'align': PP_ALIGN.CENTER})])
+        text_box(s, x, 5.95, w, 0.35, [(f'산출물 {deliv}', {'size': 13, 'color': GRAY, 'align': PP_ALIGN.CENTER})])
     chip(s, LEFT, 6.4, WIDTH, 0.55, '멘토 이일주 — 주제 선정 피드백 · 질의응답 · 중간 점검', None, fill=LIGHT, head_size=15)
     footnote(s, '출처: ws_cobot1/src/README.md 담당 표 · docs/deliverables/README.md 2 · 3 절 · docs/presentation/outline-v1.md')
     notes(s, '팀은 네 명이고, ROS 노드를 나눠 맡았습니다. 저는 스캔 전체 순서를 쥐는 scan_manager 를 맡아 윗면 · 모서리 탐색 순서와 '
@@ -361,7 +361,7 @@ def s_03_schedule(prs, templ):
     rows = [['단계', '기간', '한 일', '결과물'],
             ['기획', '9/14 ~ 9/17', '주제 · 요구사항 · 설계 초안', 'BRD · 설계 문서'],
             ['계약 동결', '9/18', '토픽 · 서비스 · MQTT · 좌표 규칙', '계약 v0.1'],
-            ['모듈 개발', '9/19 ~ 9/20', '노드별 병렬 구현 · sim', '패키지 5 + 웹'],
+            ['모듈 개발', '9/19 ~ 9/20', '노드별 병렬 구현 · sim', '노드 5 + 웹'],
             ['통합 · 실기', '9/21 ~ 9/23', 'sim → 에뮬레이터 → 실기', '실기 종단 성공'],
             ['[뺄 수 있음] phase 2', '9/24 ~ 9/29', '스캔 결과로 용접 모션', 'docs/phase2'],
             ['발표', '9/30', '결과 보고 · 평가', '발표 · 영상 · 소스']]
@@ -385,13 +385,13 @@ def s_03_procedure(prs, templ):
     for i, (head, sub) in enumerate(chips):
         chip(s, LEFT + i * 4.18, 5.35, 3.97, 1.3, head, sub, fill=PALE_BLUE, edge=BLUE, head_size=19, sub_size=14)
     footnote(s, '출처: docs/conventions.md · docs/contracts/CHANGELOG.md(v0.1.1 ~ v0.1.20, 9/18~9/23 의 19 항목) · '
-                'contact_scan_interfaces test_contract_sync')
+                'contact_scan_interfaces test_contract_sync. 9/23 main 머지 기준')
     notes(s, '진행 순서는 이 그림과 같습니다. 요구사항에서 계약을 만들고, 계약을 기준으로 네 명이 병렬로 개발했습니다. 검증은 로봇 '
              '없이 가상 접촉을 만드는 sim, 두산 에뮬레이터, 그리고 실기 순서로 올라갔고, 결과는 시험 보고서로 남겼습니다. 실기에서 '
-             '잰 값은 파라미터 파일과 계약 개정으로만 되돌렸는데, 9/18 에 동결한 계약을 9/23 까지 열아홉 번 고쳤습니다.\n'
+             '잰 값은 파라미터 파일과 계약 개정으로만 되돌렸는데, 9/18 에 동결한 계약을 9/23 실기까지 열아홉 번 고쳐 main 에 넣었습니다.\n'
              '(세부: 계약이 코드보다 우선이라 이름 · 필드 · 단위가 바뀌면 계약 문서 · 인터페이스 패키지 · 변경 이력을 한 PR 에서 '
              '같이 고치고, 둘이 어긋나면 동기화 시험이 CI 에서 실패한다. 입력원은 launch 인자 source:=sim | robot_force 하나로 바꾼다. '
-             'CHANGELOG 는 v0.1.1 ~ v0.1.20 의 19 항목(v0.1.17 은 번호만 비어 있다))')
+             'CHANGELOG 는 v0.1.1 ~ v0.1.20 의 19 항목(v0.1.17 은 번호만 비어 있다). v0.1.21 도 9/23 날짜로 적혔지만 main 머지는 9/27 이라 세지 않았다)')
 
 
 def s_03_method(prs, templ):
@@ -417,7 +417,8 @@ def s_03_method(prs, templ):
 # ── 04 수행 경과 ────────────────────────────────────────────────────────
 def s_04_arch(prs, templ):
     s = frame_slide(prs, templ, '04', '두 PC 와 로봇 — 접촉 판정과 정지는 메인 PC 안에서 끝난다', '* 04-① 시스템 아키텍처')
-    picture(s, HERE / 'arch-simple.png', LEFT, 2.45, w=WIDTH)
+    pic = picture(s, HERE / 'arch-simple.png', LEFT, 2.45, w=WIDTH)
+    pic.name = '[뺄 수 있음] 04-① 그림(용접 포함) — 빼면 arch-simple-no-phase2.png'
     footnote(s, '출처: 산출물 01 시스템 아키텍처 v1.7(상세 그림) · 06 ROS2 노드 구조도 v1.2(선 하나하나) · docs/contracts/ros-interfaces.md 2 장')
     notes(s, '전체 구성입니다. 왼쪽 웹 PC 에는 관제 화면과 웹 서버, MQTT 브로커가 있고, 가운데 메인 PC 에서 ROS 2 노드 다섯 개가 '
              '돕니다. 스캔 순서는 scan_manager 가, 접촉 판정은 contact_detector 가, 로봇 호출은 robot_manager 한 곳이 맡고, 로봇 '
@@ -439,8 +440,8 @@ def s_04_sequence(prs, templ):
              '중지는 멈추고 기록만 남기고, 재시작은 확정된 값은 두고 멈춘 단계부터 잇고, 안전복귀는 위치를 확인하고 수직으로 올린 뒤 '
              '홈으로 갑니다. 셋은 서로를 부르지 않고, 실패하면 그 자리에서 멈출 뿐 자동으로 홈에 가지 않습니다.\n'
              '(세부: 상태 이름 = PREPARING → TOP_SEARCH → EDGE_SEARCH ×4 → GEOMETRY → HOMING → DONE, 중지 = STOPPING → STOPPED, '
-             '실패 = ERROR. 재시작은 기록(progress.json)만 보고 잇는다 — 프로세스가 죽었다 떠도 같은 자리에서(sim · 시험으로 확인, 실기 '
-             '미실시). 오류 뒤 재시작은 v0.1.21 부터 SAMPLE_STALE 403 · ROBOT_STATUS_LOST 404 · STOP_UNCONFIRMED 407 만, '
+             '실패 = ERROR. 재시작은 기록(progress.json)만 보고 잇는다 — 중지한 뒤 프로세스를 다시 띄워도 같은 자리에서(sim 시험, 실기 미실시). '
+             '스캔 도중 프로세스가 죽으면 멈춘 자리를 몰라 잇지 않는다(NO_RESUMABLE_SCAN). 오류 뒤 재시작은 v0.1.21 부터 SAMPLE_STALE 403 · ROBOT_STATUS_LOST 404 · STOP_UNCONFIRMED 407 만, '
              '/safety/reset 뒤에 받는다. 안전복귀는 손상 의심(400 · 205 · 402)이나 위치 불명이면 멈추고 사람이 조그한다. 출처: README · 계약)')
 
 
@@ -453,7 +454,7 @@ def s_04_geometry(prs, templ):
             ['보정량 d', '1.27~1.34 mm', '계산'],
             ['크기', '83.0 × 80.6\n× 80.8 mm', '실측'],
             ['캘리퍼 대비', '+1.50 / −0.36\n/ +0.26 mm', '±3 mm 안'],
-            ['10 회 반복', '미실시', 'TR-02']]
+            ['10 회 반복', '미실시', 'KPI']]
     table(s, 8.9, 2.5, 3.93, [1.4, 1.63, 0.9], rows, size=13, row_h=0.72, header_size=13,
           colors={(4, 2): BLUE, (5, 1): RED, (5, 2): RED})
     footnote(s, '출처: 9/23 실기 scan 20260923-183211-3702 result.json(docs/phase2/fixtures) · 캘리퍼 대비는 #180 학민 코멘트(9/23) · '
@@ -480,17 +481,17 @@ def s_04_eval(prs, templ):
             ['지속성', [('○ 중지 · 복귀 · 재시작 독립', G), ('△ 재시작은 sim · 시험만, 실기 미실시', A)], '04-④ · 04-⑧']]
     table(s, LEFT, 2.42, WIDTH, [1.75, 7.8, 2.78], rows, size=14, row_h=0.69, header_size=14)
     table(s, LEFT, 6.6, WIDTH, [1.75, 7.8, 2.78],
-          [['[뺄 수 있음] 용접', '8 선 용접 모션 — Virtual 8 / 8 완주, 실기는 9/29', 'docs/phase2']],
+          [['[뺄 수 있음] 용접', '8 선 용접 모션 — Virtual 8 / 8 완주, 실기는 9/29', 'PR #197 (머지 전)']],
           size=13, row_h=0.4, header_fill=OR_FILL, header_text=ORANGE, name='[뺄 수 있음] 04-⑦ 용접 행')
     footnote(s, '출처: deliverables README 5 절 · TR-01(9/23) · TR-05(9/22 sim, 설정 버튼 미구현) · TR-10(9/22 sim) · #180 · PR #179. '
-                '438 s = 액션 전체')
+                '438 s = #180 학민 실측(본문 합계 435 s)')
     notes(s, '평가 기준 다섯 항목에 저희가 한 것과 증거를 붙였습니다. 동그라미는 된 것, 가위표는 목표에 못 미친 것입니다. 기능은 교시 '
              '없이 형상까지 나오고 치수도 목표 안이지만, 탐색 시간은 438 초로 목표의 3.6 배이고 설정 등록 버튼은 아직 화면에 없습니다. '
              '검출 하중은 평균만 보면 통과지만 열 번 중 두 번이 5 N 을 넘어 미달로 적었고, 관제 반영 지연도 최대 312 ms 로 '
              '미달입니다. 재시작은 sim 과 시험으로만 확인했습니다.\n'
              '(세부: 검출 하중 평균 4.49 N · 2/10 초과(5.15 · 5.29 N), 중지 반응 706 · 600 ms 는 sim 측정(TR-05), 반영 지연 312 ms '
              'FAIL, 저장 · 조회 일치는 TR-10 sim. 실기 종단(9/23)은 성공했지만 연속 회차 기록이 없어 "연속"이라고 쓰지 않는다. 438 s 는 '
-             'RunScan 액션 전체(마무리 복귀 포함) — KPI 구간은 이보다 수 초 짧다. [합치기 체크] 용접을 빼면 주황 표 "[뺄 수 있음] '
+             '#180 학민 코멘트의 실측(이슈 본문 구간 합계는 435 s). [합치기 체크] 용접을 빼면 주황 표 "[뺄 수 있음] '
              '04-⑦ 용접 행"만 지운다)')
 
 
@@ -517,7 +518,7 @@ def s_04_problem(prs, templ):
 def s_04_weld1(prs, templ):
     s = frame_slide(prs, templ, '04', '스캔 결과만으로 모서리 8 선을 용접 자세로 따라간다 — 닿지 않고 띄워서',
                     '* 04-⑨ phase 2 용접 (1/2)  [뺄 수 있음]')
-    picture(s, HERE / 'weld-pose-weave.png', LEFT, 2.5, w=7.5)
+    picture(s, HERE / 'weld-pose-weave.png', LEFT, 2.5, w=7.6)
     tiles = [('계약 먼저', 'v0.2.0 · 1차 계약은 그대로'), ('45° · 3 mm 띄움', '힘 · 순응 제어 없음'),
              ('지그재그 경유점', '위빙 = 점마다 멈추며'), ('실패 선만 FAILED', '나머지는 계속')]
     for i, (head, sub) in enumerate(tiles):
@@ -547,8 +548,8 @@ def s_04_weld2(prs, templ):
             ['도착 오차 · 무접촉', '실기 · 9/29', '[9/29 채움]']]
     table(s, LEFT, 2.5, WIDTH, [3.7, 2.8, 5.83], rows, size=17, row_h=0.62, header_size=16,
           fills={4: OR_FILL, 5: OR_FILL, 6: OR_FILL}, colors={(4, 2): ORANGE, (5, 2): ORANGE, (6, 2): ORANGE})
-    footnote(s, '출처: docs/phase2/measurements-20260923.md(M1, 세로 아래 4 자세는 계약 z + 17 mm 에서) · docs/test-reports/p2-weld-virtual_20260925.md'
-                '(가상 박스 100×60×40 mm, PR #197)')
+    footnote(s, '출처: phase2/measurements-20260923.md(M1, 세로 아래 4 자세는 계약 z + 17 mm) · '
+                'p2-weld-virtual_20260925.md(가상 박스 100×60×40 mm, PR #197 머지 전)')
     notes(s, '용접 쪽 결과입니다. 9/23 실기에서 기울인 자세의 도달성을 먼저 쟀는데, 16 자세 중 12 개에 닿았고 L1 · L5 두 선은 로봇 팔 '
              '길이가 모자라 닿지 않았습니다. 그래서 한 선이 실패해도 그 선만 실패로 남기고 다음 선으로 가게 만들었습니다. 에뮬레이터에서는 '
              '여덟 선을 모두 끝까지 돌았고, 실기 결과는 9/29 에 [여기에 채웁니다].\n'

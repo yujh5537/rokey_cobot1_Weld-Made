@@ -1,4 +1,4 @@
-근거: `docs/design/contact-scan-node-diagram-v1.1.md` · `.drawio`(출발, 40 선) · `docs/contracts/ros-interfaces.md` 2장 · 6.4절 · `docs/contracts/mqtt-schema.md` 2장 · `docs/phase2/weld-ros-interfaces.md` 2장 · `docs/phase2/weld-mqtt-schema.md` 1장 (origin/main `7286e8e`, 2026-09-28)
+근거: `docs/design/contact-scan-node-diagram-v1.1.md` · `.drawio`(출발, 40 선) · `docs/contracts/ros-interfaces.md` 2장 · 6.4절 · `docs/contracts/mqtt-schema.md` 2장 · `docs/phase2/weld-ros-interfaces.md` 2장 · `docs/phase2/weld-mqtt-schema.md` 1장 (origin/main `2335057`, 2026-09-28)
 
 # 06. ROS2 노드 구조도 (v1.2)
 
@@ -8,7 +8,7 @@
 
 - 선 라벨 = **이름 · 종류(T Topic / S Service / A Action) · 타입**. `[L..]` 번호가 아래 표의 행이다. 같은 두 노드 사이의 같은 방향 선은 화살표 하나에 모았다.
 - phase 2(주황 점선)를 뺀 판: [`06-node-graph-no-phase2.png`](06-node-graph-no-phase2.png).
-- 자체 노드 6 개: 1차 5 개 + `weld_manager`(phase 2, **구현 PR 진행 중** — #191 · #195~#197 · P5 #204, 2026-09-28 머지 전). 네임스페이스 없음, 실행 파일명 = 노드명, 노드별 패키지(`ws_cobot1/src/`).
+- 자체 노드 6 개: 1차 5 개 + `weld_manager`(phase 2, **구현 PR 진행 중** — #191 · #195~#197 은 2026-09-28 머지 전. scan_manager 쪽 `/weld/state` 구독(601 거절, W07 받는 쪽)은 P5 #204 로 main). 네임스페이스 없음, 실행 파일명 = 노드명, 노드별 패키지(`ws_cobot1/src/`).
 - 메시지 필드 · QoS 는 계약 문서에 있다. 요약은 [05 인터페이스 정의서](05-interfaces.md).
 - 이 그림은 **계약**의 연결이다. 2026-09-28 main 의 코드와 대조해 다른 곳은 L10 · L26 두 선(safety_monitor 가 구독하지 않음)뿐이고, 회색 점선으로 표시했다. 나머지 노드의 발행 · 구독은 계약과 같다.
 
@@ -117,7 +117,7 @@
 | 2 | P04: `/dsr01/joint_states` 를 mqtt_bridge 가 표시 전용으로 중계 | 계약 v0.1.19 · v0.1.20, PR #179 |
 | 3 | W01~W17: phase 2 weld_manager · ExecutePath · 배타 규칙 · MQTT `weld/*` | 계약 v0.2.0, PR #184 · #198 |
 | 4 | 표기: 선마다 **타입**을 적었다(v1.1 은 이름 · 뜻만). 같은 두 노드 사이의 같은 방향 선은 그림에서 한 화살표에 모았다 | 강사 요구 "주고받는 데이터 형식 · 이름 · 연결 관계" |
-| 5 | 계약과 구현이 다른 선(L10 · L26)을 회색 점선으로 표시 | `safety_monitor.py:83-84` |
+| 5 | 계약과 구현이 다른 선(L10 · L26)을 회색 점선으로 표시 | `safety_monitor.py:87-88` |
 | 6 | 형식: drawio 대신 Graphviz(`06-node-graph.dot`). phase 2 줄은 `// P2` 로 표시해 뺀 판을 자동으로 만든다 | — |
 
 v1.1 의 파라미터 이름 열은 옮기지 않았다. 계약에 속하는 파라미터 이름은 `ros-interfaces.md` 6.4절, phase 2 는 `weld-motion.md` 6절에 있다.

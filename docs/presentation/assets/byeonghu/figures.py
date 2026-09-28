@@ -89,7 +89,8 @@ def fig_compare():
             cx = x0 + cw * (j + 0.5)
             mark(ax, cx - 0.47, y, kind, r=0.19)
             t(ax, cx - 0.2, y, kw, size=12, ha='left', color=TEXT)
-    t(ax, W / 2, 0.22, '○ 유리   △ 조건부   × 불리   —  BRD 3.2 · 1.5 를 기호로 옮김', size=12, color=GRAY)
+    t(ax, 0.2, 0.22, '○ 유리  △ 조건부  × 불리  (BRD 3.2 · 1.5)', size=12, color=GRAY, ha='left')
+    t(ax, W - 0.1, 0.22, '우리 약점: 탐색 시간 · 단순 형상(MVP)', size=13, color=RED, bold=True, ha='right')
     return save(fig, 'compare-alternatives.png', dpi=250)
 
 
@@ -159,7 +160,7 @@ def fig_value():
     t(ax, 4.52, 4.17, '지금: 직접교시', size=17, bold=True, color=TEXT)
     t(ax, 10.0, 4.17, '우리: 접촉 탐색', size=17, bold=True, color='white')
     rows = [
-        ('교체 1 회\n사람 시간', '약 1 h', '가정 A3 (0.5~2 h)', '0.1 h', '가정 A4 + 로봇 탐색 7.3 분(실측)'),
+        ('교체 1 회\n사람 시간', '약 1 h', '가정 A3 (0.5~2 h)', '0.1 h', '가정 A4 · 로봇은 따로 7.3 분'),
         ('연간\n교시 시간', '500 h', '교체 하루 2 회 × 250 일', '50 h', '같은 가정 · 계산값'),
         ('정확도', '숙련도에\n좌우', 'BRD 1.3', '±3 mm 안', '+1.50 / −0.36 / +0.26 mm\n9/23 실기 1 회'),
         ('자동화', '점마다\n손으로', '끌어서 기록', '버튼 1 번', '놓고 · 시작 · 확인'),
@@ -199,7 +200,7 @@ def fig_procedure():
     x_real = 0.1 + 5 * (w + gap) + w / 2
     x_contract = 0.1 + 1 * (w + gap) + w / 2
     arrow(ax, (x_real, y0), (x_contract, y0), color=ORANGE, lw=2.4, conn='arc3,rad=-0.1', ms=18)
-    t(ax, (x_real + x_contract) / 2, 0.14, '실측 → yaml · 계약 개정 (9/18 → 9/23, 19 회)', size=14, color=ORANGE, bold=True)
+    t(ax, (x_real + x_contract) / 2, 0.14, '실측 → yaml · 계약 개정 (9/23 까지 v0.1.20)', size=14, color=ORANGE, bold=True)
     return save(fig, 'method-procedure.png', dpi=200)
 
 
@@ -283,7 +284,7 @@ def fig_scan_flow():
     lanes = [
         ('중지', AMBER, '#FFF5CC', '멈춤 확인 → 멈춘 자리 · 측정값 기록'),
         ('재시작', BLUE, PALE_BLUE, '확정값 유지 → 멈춘 단계부터  (오류 뒤는 403 · 404 · 407 만)'),
-        ('안전복귀', GRAY, '#EDEDED', '위치 확인 → 수직 올림 → 도착 확인 → 홈'),
+        ('안전복귀', GRAY, '#EDEDED', '위치 · 손상 확인 → 수직 올림 → 도착 확인 → 홈'),
         ('실패', RED, PALE_RED, '그 자리에서 멈춤 · 원인 · 위치 기록 · 자동 복귀 없음'),
     ]
     for i, (name, col, face, desc) in enumerate(lanes):

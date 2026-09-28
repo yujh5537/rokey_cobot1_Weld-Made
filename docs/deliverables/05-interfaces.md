@@ -1,4 +1,4 @@
-근거: `docs/contracts/ros-interfaces.md` · `docs/contracts/mqtt-schema.md`(1차, CHANGELOG 최신 v0.1.20) · `docs/phase2/weld-ros-interfaces.md` · `docs/phase2/weld-mqtt-schema.md`(v0.2.0 · phase 2) · `ws_cobot1/src/contact_scan_interfaces/` (origin/main `7286e8e`, 2026-09-28)
+근거: `docs/contracts/ros-interfaces.md` · `docs/contracts/mqtt-schema.md`(1차, CHANGELOG 최신 v0.1.22) · `docs/phase2/weld-ros-interfaces.md` · `docs/phase2/weld-mqtt-schema.md`(v0.2.0 · phase 2) · `ws_cobot1/src/contact_scan_interfaces/` (origin/main `2335057`, 2026-09-28)
 
 # 05. 토픽 · 서비스 · 액션 인터페이스 정의서 (요약본)
 
@@ -6,7 +6,7 @@
 
 - 타입 패키지: `contact_scan_interfaces`(msg 15 · srv 6 · action 6). `.msg` · `.srv` · `.action` 파일은 계약 문서의 타입 전문을 그대로 옮긴 것이고, 둘이 어긋나면 `test/test_contract_sync.py` 가 CI 에서 실패한다.
 - 공통 규칙: ROS 내부 단위는 m · rad · N, 웹 표시는 mm(변환은 mqtt_bridge 에서만). **미측정값은 0 이 아니라 NaN + `*_valid=false`**(MQTT 에서는 `null`). 좌표는 `frame_id` 로 기준을 밝힌다.
-- **phase 2(용접)** 행은 **[P2]** 로 표시했다. 계약은 main 에 있고 구현은 PR 진행 중이다(2026-09-28).
+- **phase 2(용접)** 행은 **[P2]** 로 표시했다. 계약은 main 에 있고, 구현은 scan_manager 의 601 거절(P5 #204)만 main 이며 나머지는 PR 진행 중이다(2026-09-28).
 - v0.1.21(#161, 9/27 머지): scan_manager 가 `/robot/sample` 을 구독하고, `ReasonCode` 에 407 `STOP_UNCONFIRMED`, `RobotStatus` 에 SLIDE 누름 목표 필드가 더해졌다. v0.1.22(#200): MQTT 이름 표에 없는 값은 버리지 않고 `"UNKNOWN_<값>"` 으로 보낸다(`robot/sample.operation` 5 = `"WELD_PATH"`).
 
 ## 1. 토픽
