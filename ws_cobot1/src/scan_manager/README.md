@@ -53,7 +53,7 @@ T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig
 | `REASON_TIMEOUT` · `REASON_OVER_FORCE` | `TIMEOUT(203)` · `OVER_FORCE(400)` |
 | `REASON_ROBOT_ERROR` · `REASON_REJECTED` | Result의 `reason_code` 그대로(`DROP_LIMIT(205)` 포함) |
 
-중지 경로: 정지 완료 확인(`Ports.wait_still`, 요청보다 뒤에 찍힌 `/robot/status`) → `record_stop` → `STOP_CONFIRMED`. 확인하지 못하면 `ROBOT_STATUS_LOST(404)`로 ERROR.
+중지 경로: 정지 완료 확인(`Ports.wait_still`, 요청보다 뒤에 찍힌 `/robot/status`) → `record_stop` → `STOP_CONFIRMED`. 확인하지 못하면 **`STOP_UNCONFIRMED(407)`** 로 ERROR다(v0.1.21). 404 와 섞지 않는다 — 404 는 "상태가 안 온다", 407 은 "정지를 요청했는데 완료를 확인하지 못했다"이고, 재시작 허용 여부를 사유로 판단하므로 갈려 있어야 한다.
 중단 위치(`Interruption.pose`)는 **로봇이 마지막으로 멈춘 자리**다: 그 모션의 `Result.pose`, 보내지 않은 goal(중지가 먼저 접수됨)이면 그 앞 모션의 `Result.pose`, 재시작 뒤 모션을 하나도 보내지 않고 다시 중지됐으면 직전 중지의 좌표. `Result.pose`가 채워지지 않았으면 `null`이다(추측하지 않는다).
 
 ## 재시작 (`resume.py` · `sequence.ResumeRunner`)
@@ -90,7 +90,27 @@ T19a(시퀀스 · 서버 · geometry 연결) · T26(재시작) · T19b(SetConfig
 - **작업의 기록에 남기지 못한 안전복귀**(기록을 읽지 못해 어느 작업의 복귀인지 몰랐다 · `result_dir` 없음 · 쓰기 실패)가 있었으면, 다음 START까지 재시작을 `NOT_SUPPORTED`로 거절한다. 기록은 "복귀한 적 없음"인데 로봇은 홈에 있을 수 있다. IDLE일 때만 보지 않는다: 거절된 HOME도 기록에서 상태를 되돌려 IDLE을 벗어나게 한다. 기록할 작업이 **확실히 없던** 복귀(기록 없음 · 가장 최근 작업이 DONE)는 해당하지 않는다. 이 표시는 메모리에만 있다: 그 뒤에 프로세스가 또 재시작되면 알 수 없다(→ "알려진 한계"와 같은 뿌리다. 현재 좌표를 모른다).
 - 거절된 재시작은 `RESUMING`에 들어가지 않는다(판정 → 기록 읽기 → 계획을 **접수 전에** 끝낸다). 다만 위의 되돌림(IDLE → STOPPED · ERROR)은 거절과 무관하게 일어난다. 전이가 아니라 기록에 있는 사실이다.
 
-**알려진 한계.** scan_manager는 현재 TCP 좌표를 모른다(`/robot/sample`을 구독하지 않는다. 계약 2.1절. `RobotStatus`에는 pose가 없다). 그래서 **중지 뒤에 누가 조그 · 직접 교시로 로봇을 옮겼는지 알 수 없다.** 재시작의 첫 모션은 기록된 중단 좌표 기준의 절대 `OP_MOVE_TO`라서, 옮겨진 자리에서는 그 좌표 위로 직선 이동한다. 중지 뒤에 로봇을 손으로 옮겼다면 재시작하지 말고 안전복귀 → 새 작업으로 한다. 현재 좌표와 중단 좌표의 비교는 계약 변경이 필요해 T19b · 팀 안건으로 넘겼다.
+**알려진 한계.** **재시작**은 여전히 현재 TCP 좌표를 보지 않는다. 첫 모션이 기록된 중단 좌표 기준의 절대 `OP_MOVE_TO`라서, 중지 뒤에 누가 조그 · 직접 교시로 옮겼다면 그 좌표 위로 직선 이동한다. 중지 뒤에 로봇을 손으로 옮겼다면 재시작하지 말고 안전복귀 → 새 작업으로 한다. 현재 좌표와 중단 좌표를 **비교**하는 것은 아직 팀 안건이다.
+(v0.1.21부터 노드는 `/robot/sample`을 구독해 마지막 유효 pose를 들고 있다. 그 값은 **안전복귀의 올림 목표**에만 쓴다 — 아래 "안전복귀". 측정값의 출처는 여전히 판정 좌표(`ContactEvent`)다.)
+
+## 안전복귀 (`/scan/home`, 계약 7.5 · v0.1.21 결정 7)
+사람이 요청한다. 중지 · 실패가 자동으로 부르지 않는다(CLAUDE.md 규칙 3).
+
+```
+① 손상 의심 사유로 끝났나?  그러면 여기서 멈춘다 (NOT_SUPPORTED)
+② 지금 TCP 위치를 아는가?   모르면 여기서 멈춘다 (NOT_SUPPORTED)
+③ 수직 올림 (OP_MOVE_TO, x · y 와 자세는 그대로, z + lift_height_m)
+④ 올림이 TARGET_REACHED 인가?  아니면 HOME 을 보내지 않는다
+⑤ OP_HOME
+```
+- **①** `OVER_FORCE(400)` · `DROP_LIMIT(205)` · `OUT_OF_WORKSPACE(402)`로 끝났으면 탐침 · 부재가 상했을 수 있다. 눈으로 확인하고 **사람이 펜던트로 조그**한다. 접촉이 원인이 아닌 실패(`TIMEOUT` · `NO_CONTACT` · `SAMPLE_STALE` · `ROBOT_ERROR` …)는 막지 않는다 — 전부 막으면 복귀 수단이 사라진다. 정상 중지(STOPPED)에는 실패 사유가 없으므로 평소 경로는 그대로다.
+- **②** `/robot/sample`의 마지막 유효 pose가 없거나 `pose_max_age_s`보다 오래되면 "모른다"로 본다. 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
+- **③** 올림은 **지금 자세를 그대로** 목표로 준다. `search_origin_pose`(TBD일 수 있다)에 기대지 않고, 닿아 있을 수 있는 자리에서 자세를 돌리지도 않는다.
+- **④** 2026-09-21 실기에서 **올림이 실패했는데 HOME이 나간 사례가 2회** 있었다(#130).
+- 올림도 HOME과 같이 **안전 래치를 보지 않는다**. `/robot/status` 끊김은 여전히 막는다.
+- 이 절차는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s` · **`lift_height_m` · `move_speed_mps` · `pose_max_age_s`**를 본다. 측정 · 보정 파라미터는 보지 않는다.
+- **스캔 마무리 복귀(7.4절)는 이 절차가 아니다.** 그쪽은 측정이 끝난 뒤 자기 정지 좌표로 올린다. robot_manager의 스텝 모드 안의 1 mm 들기(`step_lift_m`)도 다른 것이다.
+- **J6 −204.84°의 실제 회전 방향은 실기에서 사람이 확인한다**(아직 확인되지 않았다).
 
 ## 실행 · 테스트
 ```bash
@@ -107,7 +127,7 @@ ros2 launch contact_scan_bringup bringup.launch.py source:=sim   # yaml 을 읽�
 두 테스트 모두 `ROS_DOMAIN_ID`를 따로 잡고 가짜 `/robot/execute_motion` · `/contact/tare` · `/robot/stop` 서버와 가짜 `/contact/event` · `/robot/status` · `/safety/status` 발행기를 같은 프로세스에 띄운다. 로봇 · 드라이버 · Virtual Mode를 쓰지 않는다.
 
 ## 파라미터
-값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s`만 본다(측정 파라미터가 비었다고 홈 복귀를 막지 않는다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
+값은 `contact_scan_bringup/config/*.yaml`의 `scan_manager:` 절에 둔다. **모션 · 보정 수치에는 코드 예비값이 없다.** 값이 없어도 노드는 기동해 IDLE로 있고, 필수(●) 항목이 비어 있으면 START를 `INVALID_VALUE(102)`로 거절하며 detail에 빠진 이름을 나열한다. 안전복귀(HOME)는 `motion_timeout_s` · `stop_confirm_timeout_s` · `server_wait_timeout_s` · `robot_status_timeout_s` · `lift_height_m` · `move_speed_mps` · `pose_max_age_s`만 본다(측정 · 보정 파라미터가 비었다고 홈 복귀를 막지 않는다. 뒤의 셋은 계약 7.5의 수직 올림에 쓴다). 기동 로그에도 나온다. yaml의 수치는 sim 전용 가상값이거나 설계 출발값이며 실측값이 아니다.
 
 | 이름 | 형 | 필수 | 범위 | 뜻 |
 |---|---|---|---|---|
@@ -304,14 +324,21 @@ stateDiagram-v2
 | 마무리 HOMING 중에 중지된 작업(7.4절) | `NO_RESUMABLE_SCAN` |
 | goal의 `scan_id`가 중단된 작업과 다르다 | `NO_RESUMABLE_SCAN` |
 | 중지 뒤에 안전복귀(`HOME`)를 접수했다(끝까지 갔는지와 무관, 5.3절) | `NOT_SUPPORTED` |
-| ERROR(이상 상태별 재시작 허용 조건이 TBD, 9장) | `NOT_SUPPORTED` |
+| ERROR인데 실패 사유가 **재시작 허용 목록 밖**이다(계약 9장, v0.1.21) | `NOT_SUPPORTED` |
+
+**ERROR 뒤의 재시작 (v0.1.21 결정 1).** `ERROR`로 끝난 작업은 **허용 목록에 있는 사유일 때만** `/safety/reset` 뒤 `/scan/resume`을 받는다.
+- 허용: `SAMPLE_STALE(403)` · `ROBOT_STATUS_LOST(404)` · `STOP_UNCONFIRMED(407)`. 셋 다 **측정값이 오염되지 않는** 사유다 — 샘플 · 상태가 끊겼거나 정지 완료를 확인하지 못했을 뿐, 탐침이 무언가에 세게 닿지 않았다.
+- 불허: `OVER_FORCE(400)` · `DROP_LIMIT(205)` · 알 수 없는 오류(`ROBOT_ERROR`) · **목록에 없는 새 사유**(allowlist라 저절로 허용되지 않는다). 안전 점검 · 복귀 뒤 **새 START**만 가능하다.
+- **자동 재개는 없다.** 사람이 `/safety/reset`을 하고 `/scan/resume`을 보내야 한다. 조건이 아직 참이면 reset이 `CONDITION_ACTIVE(406)`로 거절되고, 래치가 남아 있으면 resume도 `SAFETY_LATCHED(103)`로 거절된다.
+- 기존 START · RESUME 관문(래치 · 상태 최신성 · 연결)을 그대로 통과해야 한다. 안전복귀를 한 뒤에는 여전히 재시작할 수 없다(재접근 절차 TBD).
+- 재개 지점은 **실패한 그 단계**다. `Signal.FAILED`는 허용 목록일 때만 그 단계를 남기고, 그 밖에는 지운다. 기록 쪽은 `FailureRecord.pose`(올림 목표) · `FailureRecord.resumed_at`(같은 실패로 두 번 재시작하지 않는다)을 쓴다.
 
 상태 기계 밖의 거절. "직전 명령을 마무리하는 중"(`BUSY`) · "기록에 남기지 못한 안전복귀" · (IDLE일 때) `result_dir` 검사는 상태 기계의 판정 **앞**에서, 나머지는 상태 기계가 받을 수 있다고 한 작업의 기록을 읽은 뒤에 한다(`ScanManager._begin_resume` · `resume.plan_resume`):
 
 | 상황 | 사유 |
 |---|---|
 | 팁을 들어 올려야 하는데(윗면 확정 뒤) 중단 좌표가 기록에 없다(`Result.pose` 미기재) | `NO_RESUMABLE_SCAN` |
-| 그 작업의 기록이 없다 · 읽을 수 없다 · STOPPED가 아니다 · 이미 재시작한 중지뿐이다 · 재개 지점이 소비됐다 · 확정 방향이 탐색 순서의 앞부분이 아니다 · 기록된 좌표의 `frame_id`가 `motion_frame_id`와 다르다 | `NO_RESUMABLE_SCAN` |
+| 그 작업의 기록이 없다 · 읽을 수 없다 · STOPPED · ERROR가 아니다 · 이미 재시작한 중지뿐이다 · 재개 지점이 소비됐다 · 확정 방향이 탐색 순서의 앞부분이 아니다 · 기록된 좌표의 `frame_id`가 `motion_frame_id`와 다르다 | `NO_RESUMABLE_SCAN` |
 | 기록에 남기지 못한 안전복귀가 있었다(다음 START까지) | `NOT_SUPPORTED` |
 | 직전 명령이 휴지 phase를 발행했지만 아직 끝나지 않았다(마지막 상태 기록을 쓰는 중) | `BUSY` |
 | 기록의 설정(`config` · `node_params`)이 지금의 파라미터 검사를 통과하지 못한다 · 기록의 탐색 순서가 이 노드의 `direction_order`와 다르다 · (IDLE인데) `result_dir`이 없다 | `INVALID_VALUE`(102) |

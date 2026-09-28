@@ -21,7 +21,7 @@ MM = 1e-3
 Z0 = 0.080
 # 테스트용 값이다. 실기 · sim 의 값은 contact_scan_bringup/config/*.yaml 에 있다
 PARAMS = {
-    'over_force_n': 30.0, 'drop_limit_m': 5 * MM,
+    'over_force_n': 30.0, 'drop_limit_m': 5 * MM, 'drop_limit_margin_m': 5 * MM,
     'sample_stale_ms': 300, 'robot_status_timeout_ms': 600, 'confirm_n': 1,
     'startup_grace_s': 0.0,      # 테스트는 유예 없이 본다. 실제 값은 yaml 에 있다
     'stop_confirm_timeout_s': 0.3, 'stop_retry_period_s': 0.4,
@@ -151,13 +151,25 @@ def test_over_force_requests_stop_and_latches(rig):
 
 
 def test_drop_limit_uses_first_slide_sample(rig):
+    """2차 한계는 drop_limit_m(5 mm) + drop_limit_margin_m(5 mm) = 10 mm 다 (계약 7.2)."""
     rig.status(moving=True)
     rig.send(z=Z0, operation=RobotSample.OP_SLIDE)
-    rig.send(z=Z0 - 4.9 * MM, operation=RobotSample.OP_SLIDE)
+    rig.send(z=Z0 - 9.9 * MM, operation=RobotSample.OP_SLIDE)
     assert rig.stop_requests == []
-    rig.send(z=Z0 - 5.2 * MM, operation=RobotSample.OP_SLIDE)
+    rig.send(z=Z0 - 10.2 * MM, operation=RobotSample.OP_SLIDE)
     assert rig.wait_stop()[0].reason == ReasonCode.DROP_LIMIT
     assert rig.last.reason_code == ReasonCode.DROP_LIMIT
+
+
+def test_first_stage_window_does_not_latch_the_second(rig):
+    """1차(5 mm)가 멈추는 구간에서는 2차가 정지 요청도 래치도 하지 않는다 (#53 결정)."""
+    rig.status(moving=True)
+    rig.send(z=Z0, operation=RobotSample.OP_SLIDE)
+    for drop_mm in (5.1, 6.0, 7.5, 9.9):
+        rig.send(z=Z0 - drop_mm * MM, operation=RobotSample.OP_SLIDE)
+    rig.pump(0.2)
+    assert rig.stop_requests == []
+    assert not rig.last.latched
 
 
 def test_stop_is_requested_once_per_condition(rig):

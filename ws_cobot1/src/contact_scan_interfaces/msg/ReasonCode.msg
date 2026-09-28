@@ -41,7 +41,14 @@ uint16 SAMPLE_STALE=403         # 샘플 최신성 위반
 uint16 ROBOT_STATUS_LOST=404    # 로봇 상태 미수신
 uint16 HB_EXPIRED=405           # 웹 heartbeat 만료
 uint16 CONDITION_ACTIVE=406     # 래치 해제 요청 시 조건이 아직 참
+uint16 STOP_UNCONFIRMED=407     # 정지를 요청했지만 완료(connected && !moving)를 확인하지 못함
 
 # 5xx 형상
 uint16 INVALID_SHAPE=500        # 폭 0 이하 · 높이 음수
 uint16 INSUFFICIENT_POINTS=501  # 5점 미확보
+# 6xx 용접 (phase 2, docs/phase2/weld-ros-interfaces.md)
+uint16 SCAN_ACTIVE=600          # 스캔이 진행 중이라 용접 시작 거절
+uint16 WELD_ACTIVE=601          # 용접이 진행 중이라 스캔 시작 · 재시작 거절
+uint16 NO_SCAN_RESULT=602       # 용접할 스캔 결과가 없거나 무효 (box_valid=false)
+uint16 LINE_OUT_OF_RANGE=603    # start_line 이 0~7 밖
+uint16 PATH_REJECTED=604        # robot_manager 가 경로를 거절 (점 수 · 속도 · 프레임 · 작업영역)
