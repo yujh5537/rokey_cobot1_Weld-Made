@@ -876,7 +876,13 @@ class RobotManager(Node):
                 reason, code, detail = runner.run()
         except Exception as exc:                       # 예상 못 한 오류도 아래 정리를 거친다
             self.get_logger().error(f'경로 실행 중 오류: {exc}')
-            reason, code, detail = ExecutePath.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, str(exc)
+            # amovel may already be running when feedback or monitoring raises.
+            # Confirm stop before releasing the shared motion slot.
+            stopped, why = self.stop_robot('경로 실행 예외 뒤 정지 확인', motion)
+            detail = str(exc) if stopped else f'{exc}; 정지 확인 실패: {why}'
+            if not stopped:
+                self.restore_stop_request((ReasonCode.ROBOT_ERROR, detail))
+            reason, code = ExecutePath.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR
         finally:
             # 켜는 것은 없지만 1차와 같은 정리를 거친다(켜진 것이 없으면 아무것도 부르지 않는다)
             if not self.release_all(motion):
