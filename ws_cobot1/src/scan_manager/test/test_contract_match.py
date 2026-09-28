@@ -9,12 +9,15 @@ from scan_manager.contract_enums import MotionReason
 from scan_manager.contract_enums import Operation
 from scan_manager.contract_enums import Phase
 from scan_manager.contract_enums import Reason
+from scan_manager.contract_enums import WELD_REST_PHASES
+from scan_manager.contract_enums import WeldPhase
 
 pytest.importorskip('contact_scan_interfaces')
 
 from contact_scan_interfaces.action import ExecuteMotion  # noqa: E402
 from contact_scan_interfaces.msg import ReasonCode  # noqa: E402
 from contact_scan_interfaces.msg import ScanState  # noqa: E402
+from contact_scan_interfaces.msg import WeldState  # noqa: E402
 
 
 def _constants(msg_type, prefix=''):
@@ -33,6 +36,13 @@ def _members(enum_type):
 def test_phase_matches_scan_state():
     assert _members(Phase) == _constants(ScanState, 'PHASE_')
     assert len(Phase) == 11
+
+
+def test_weld_phase_matches_weld_state():
+    """phase 2 계약 3.2 · 7.1. 휴지 4 개는 WeldState 상수 그대로다."""
+    assert _members(WeldPhase) == _constants(WeldState, 'PHASE_')
+    assert {int(p) for p in WELD_REST_PHASES} == {
+        WeldState.PHASE_IDLE, WeldState.PHASE_DONE, WeldState.PHASE_ERROR, WeldState.PHASE_STOPPED}
 
 
 def test_direction_matches_scan_state_and_execute_motion():
@@ -58,3 +68,4 @@ def test_rejection_codes_used_by_state_machine():
     assert Reason.ROBOT_DISCONNECTED == ReasonCode.ROBOT_DISCONNECTED == 104
     assert Reason.NO_RESUMABLE_SCAN == ReasonCode.NO_RESUMABLE_SCAN == 105
     assert Reason.NOT_SUPPORTED == ReasonCode.NOT_SUPPORTED == 107
+    assert Reason.WELD_ACTIVE == ReasonCode.WELD_ACTIVE == 601

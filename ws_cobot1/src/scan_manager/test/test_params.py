@@ -48,6 +48,20 @@ def test_missing_required_names_are_listed():
         assert name in result.describe()
 
 
+def test_weld_state_timeout_is_required_and_positive():
+    """phase 2 계약 7.1. 없으면 START 를 거절한다(코드 예비값 없음, 규칙 7). 0 · 음수는 범위 밖이다."""
+    spec = P.SPEC_BY_NAME['weld_state_timeout_s']
+    assert spec.required and spec.default is None
+    missing = P.check({k: v for k, v in VALUES.items() if k != 'weld_state_timeout_s'})
+    assert not missing.ok and missing.missing == ('weld_state_timeout_s',)
+    for bad in (0.0, -1.0, math.nan):
+        result = P.check({**VALUES, 'weld_state_timeout_s': bad})
+        assert not result.ok and result.invalid[0].startswith('weld_state_timeout_s = ')
+    assert make_params().weld_state_timeout_s == VALUES['weld_state_timeout_s']
+    # 안전복귀는 용접 상태를 보지 않는다(계약 7.1). 이 값이 없어도 막지 않는다
+    assert 'weld_state_timeout_s' not in P.HOME_PARAM_NAMES
+
+
 def test_empty_values_list_every_required_name():
     result = P.check({})
     assert set(result.missing) == {spec.name for spec in P.SPECS if spec.required}
