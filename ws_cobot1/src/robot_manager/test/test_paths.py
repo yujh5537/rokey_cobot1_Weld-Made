@@ -21,8 +21,8 @@ def line_of(n, z=0.2):
     return [wp(0.4 + 0.001 * i, 0.0, z) for i in range(n)]
 
 
-def check(waypoints, frame_id='base_link', speed=0.01, tol=0.003, limits=LIMITS):
-    return path_problem(waypoints, frame_id, speed, tol, limits)
+def check(waypoints, frame_id='base_link', speed=0.01, tol=0.003, limits=LIMITS, start=(0.4, 0.0, 0.2)):
+    return path_problem(waypoints, frame_id, speed, tol, limits, start=start)
 
 
 # ---- 파라미터 ----------------------------------------------------------------------------
@@ -118,6 +118,19 @@ def test_z_floor_checks_every_point_at_accept():
 
 def test_z_floor_boundary_is_allowed():
     assert check([wp(0.4, 0.0, LIMITS.min_z_m)]) is None
+    assert check(line_of(3), start=(0.4, 0.0, LIMITS.min_z_m)) is None
+
+
+def test_start_point_is_checked_too():
+    """D35(#199): 첫 구간은 현재 위치 → 첫 경유점이라 출발점도 울타리 안이어야 한다. 모르면 거절."""
+    problem = check(line_of(3), start=(0.4, 0.0, 0.0999))
+    assert '출발점 z' in problem and 'path_min_z_m' in problem
+    assert '출발점' in check(line_of(3), start=None)
+    assert '출발점' in check(line_of(3), start=(0.4, NAN, 0.2))
+    # 경유점 문제가 먼저다(계약 5.2 순서). 출발점은 마지막에 본다
+    low = line_of(3)
+    low[2] = wp(0.404, 0.0, 0.0)
+    assert '경유점 2' in check(low, start=None)
 
 
 def test_contract_order_count_before_frame():

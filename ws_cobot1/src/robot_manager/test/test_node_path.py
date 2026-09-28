@@ -457,13 +457,43 @@ def test_failed_command_is_followed_by_a_confirmed_stop(ros, monkeypatch, mode):
         node.destroy_node()
 
 
-def test_unknown_start_position_sends_nothing(ros, monkeypatch):
+def test_unknown_start_position_is_rejected_with_604(ros, monkeypatch):
+    """D35(#199): 출발점을 모르면(유효 샘플 없음) 수락 직후 · 움직이기 전에 PATH_REJECTED(604). 1차 SLIDE 와 같은 검사."""
     node, arm = make_node(monkeypatch)
     try:
         node.last_pose = None
+        result, handle = run(node, path_goal(n=2))
+        assert (result.reason, result.reason_code) == (R.REASON_REJECTED, ReasonCode.PATH_REJECTED)
+        assert '출발점' in result.detail and arm.labels() == [] and handle.state == 'aborted'
+        assert_cleaned(node)
+    finally:
+        node.destroy_node()
+
+
+def test_start_point_below_min_z_is_rejected_with_604(ros, monkeypatch):
+    """D35: 경유점이 전부 울타리 위여도 출발점 z 가 path_min_z_m 아래면 604. 첫 구간(현재 위치 → 첫 점)도 울타리 안이어야 한다."""
+    node, arm = make_node(monkeypatch)
+    try:
+        arm.set_position((START[0], START[1], 0.0999))
         result, _ = run(node, path_goal(n=2))
-        assert result.reason_code == ReasonCode.ROBOT_ERROR and '출발 위치' in result.detail
+        assert result.reason_code == ReasonCode.PATH_REJECTED and '출발점 z' in result.detail
         assert arm.labels() == []
+    finally:
+        node.destroy_node()
+
+
+def test_failed_move_stop_before_restart_is_followed_by_a_confirmed_stop(ros, monkeypatch):
+    """학민 🔴(#191 · #193): 재출발 전 move_stop 이 실패하면 이동 명령이 살아 있을 수 있다. stop_robot 으로 세우고 확인한 뒤 204."""
+    node, arm = make_node(monkeypatch, ignore=1)
+    try:
+        real = arm.call_sync
+        monkeypatch.setattr(node, 'call_sync', lambda c, r, label: False if label == 'move_stop' else real(c, r, label))
+        result, _ = run(node, path_goal(n=2))
+        assert (result.reason, result.reason_code) == (R.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR)
+        assert '재출발 전 move_stop' in result.detail
+        assert len(arm.stops) == 1 and 'move_stop 실패 뒤 정지 확인' in arm.stops[0]
+        # 가짜 move_stop 은 덮어써서 기록되지 않는다. 실패한 move_stop 뒤에 새 이동 명령(재출발)을 보내지 않았는지만 본다
+        assert arm.labels().count('move_line') == 1, '실패한 move_stop 뒤에 새 이동 명령을 보내지 않는다'
         assert_cleaned(node)
     finally:
         node.destroy_node()
