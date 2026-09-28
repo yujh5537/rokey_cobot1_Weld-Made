@@ -159,6 +159,19 @@ def test_home_return_params_exist(file_name):
         assert scan[name] > 0 and math.isfinite(scan[name]), f'{file_name}: {name} = {scan[name]}'
 
 
+def test_weld_state_timeout_is_positive_and_the_same_in_sim_and_real():
+    """scan_manager 가 /weld/state 를 끊긴 것으로 보는 한도 (phase 2 계약 7.1, 출발값 5.0).
+
+    필수 파라미터라 없으면 START 가 거절된다. 끊기면 용접이 없다고 보고 통과시키는 값이라
+    sim 과 real 이 다르면 Virtual 에서 본 배타 동작이 실기에서 달라진다.
+    """
+    values = {f: _params(f)['scan_manager'].get('weld_state_timeout_s') for f in SOURCE_BY_FILE}
+    for file_name, value in values.items():
+        assert value is not None, f'{file_name}: scan_manager.weld_state_timeout_s 이 없다'
+        assert value > 0 and math.isfinite(value), f'{file_name}: weld_state_timeout_s = {value}'
+    assert len(set(values.values())) == 1, f'sim 과 real 의 weld_state_timeout_s 가 다르다 {values}'
+
+
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
 def test_result_dir_is_absolute(file_name):
     """result_dir 은 절대경로여야 한다 (#187).
