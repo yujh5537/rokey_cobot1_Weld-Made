@@ -20,6 +20,26 @@
 - 실기 브링업이 떠 있는 동안 에뮬레이터를 띄우지 않는다.
 - 이상하면 먼저 **비상정지**. 그 다음 "3~5 절 재점검"(`units-frames.md` 탐침 상태 전제조건).
 
+## 9/28 사전 확인 (Virtual, 학민)
+
+내일 아침에 처음 띄우다 막히는 것을 없애려고 전날 한 번 올려 봤다. 격리(`ROS_DOMAIN_ID=99` ·
+`ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`)에서 에뮬레이터 + 드라이버 + `bringup source:=sim` 까지.
+
+| | 결과 |
+|---|---|
+| 작업공간 | main(`004f862`, #161 · #199 · #200 포함)으로 갱신 후 `colcon build` **7 패키지 성공** |
+| 드라이버 | `dsr_controller2` 활성화 성공. 기동 중 `Overrun` 경고(900 ms)는 컨트롤러 전환 1 회뿐 |
+| 여섯 노드 | `robot_manager` · `contact_detector` · `safety_monitor` · `scan_manager` · `mqtt_bridge` 전부 기동, 오류 0 |
+| `/robot/status` | #161 의 새 필드 확인 — `slide_mode: force`(sim) · `slide_force_setpoint_n: 3.0` · 나머지 **NaN** |
+| `safety_monitor` | `drop_limit_m=0.005 drop_limit_margin_m=0.005`(2차 10 mm) 로그 확인 |
+| `/robot/sample` | 발행 확인. 다만 에뮬레이터 초기 자세는 **관절 전부 0(특이점)** 이라 팁이 z 1.035 m 다 |
+
+⚠️ **`ros2 topic echo` 에 `--no-daemon` 을 붙이면** `/robot/sample` 이 "does not appear to be published yet ·
+Could not determine the type" 로 실패한다(BEST_EFFORT 토픽). **`--no-daemon` 없이** 쓴다. 0 절의 명령은 그대로 쓰면 된다.
+
+⚠️ 기동 직후 `scan_manager` 가 "다른 노드의 값을 읽지 못했다(safety_monitor.over_force_n · drop_limit_m)" 를 한 번 경고한다.
+파라미터 되읽기 시점 문제이고 `ScanConfig` 의 그 칸이 NaN 으로 남는다는 뜻이다. 기동 순서 문제라 실기에서도 볼 수 있다 — **정상으로 본다.**
+
 ## 0. 세션 시작 점검 (3 분) — 이게 실패하면 아래 전부 무효다
 
 ```bash
