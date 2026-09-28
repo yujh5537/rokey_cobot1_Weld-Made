@@ -1,6 +1,6 @@
 """산출물 01 · 06 그림을 만든다 (원본 = 이 파일 + 06-node-graph.dot).
 
-    python3 docs/deliverables/figures.py          # matplotlib · graphviz(dot) · Noto Sans CJK KR 필요
+    python3 docs/deliverables/archive/v1-matplotlib-graphviz/figures.py          # matplotlib · graphviz(dot) · Noto Sans CJK KR 필요
 
 - 01-system-architecture.png            : 두 PC · 로봇 컨트롤러 · 노드 · 데이터 흐름 (phase 2 포함, 주황 점선)
 - 01-system-architecture-no-phase2.png  : 같은 그림에서 phase 2 만 뺀 판 (9/29 에 용접을 빼면 슬라이드 그림만 바꾼다)
