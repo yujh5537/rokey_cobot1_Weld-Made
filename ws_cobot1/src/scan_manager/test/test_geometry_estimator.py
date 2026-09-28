@@ -200,9 +200,9 @@ def test_missing_direction_keeps_what_was_measured():
 @pytest.mark.parametrize('broken', [
     EdgeObservation(None, 0.1 * MM, SLIDE_V),
     EdgeObservation(float('nan'), 0.1 * MM, SLIDE_V),
-    EdgeObservation(0.043, None, SLIDE_V),               # 하강량을 모르면 보정할 수 없다. 보정 없이 통과시키지 않는다
-    EdgeObservation(0.043, float('nan'), SLIDE_V),
-    EdgeObservation(0.043, 0.1 * MM, None),
+    EdgeObservation(0.043, -0.1 * MM, SLIDE_V),          # 음수 · inf 하강량은 미측정이 아니라 잘못된 값이다
+    EdgeObservation(0.043, float('inf'), SLIDE_V),
+    EdgeObservation(0.043, 0.1 * MM, None),              # 속도를 모르면 보정할 수 없다. 보정 없이 통과시키지 않는다
 ])
 def test_incomplete_edge_observation_is_missing_point(broken):
     edges = observe_edges(SHARP)
@@ -211,6 +211,44 @@ def test_incomplete_edge_observation_is_missing_point(broken):
     assert box.error == GEOM_MISSING_POINT and 'POS_X' in box.detail
     assert box.x_pos is None
     assert_no_box(box)
+
+
+# ---------------------------------------------------------------- δ 를 모를 때 (#146)
+# 힘 꺾임 EDGE(#128)는 추세선 없이 확정되면 δ 가 없다(z_drop_valid=false → None). 기하 항 d 를 0 으로 둔다.
+
+ROUNDED = BiasParams(TIP_R, 0.040, 1.7 * MM, 0.15 * MM)
+
+
+@pytest.mark.parametrize('params', [SHARP, ROUNDED])
+@pytest.mark.parametrize('unknown', [None, float('nan')])
+def test_unknown_drop_corrects_with_zero_overshoot(params, unknown):
+    assert edge_correction_m(unknown, SLIDE_V, params) == pytest.approx(
+        -params.edge_round_radius_m + SLIDE_V * params.detect_latency_s + params.edge_bias_offset_m)
+
+
+@pytest.mark.parametrize('params', [SHARP, ROUNDED])
+def test_unknown_drop_in_one_direction_still_recovers_the_box(params):
+    # 구가 둥근 부분에 막 들어선 순간(d = 0)에 판정했고, POS_X 만 δ 를 모른다
+    edges = observe_edges(params, overshoot=0.0)
+    edges[Direction.POS_X] = EdgeObservation(edges[Direction.POS_X].coordinate_m, None, SLIDE_V)
+    box = estimate_box(observe_top(params), edges, 0.0, params)
+    assert box.success and box.error == ''
+    for name, value in TRUE.items():
+        assert getattr(box, name) == pytest.approx(value, abs=1e-9), name
+    correction = box.bias_corrections[Direction.POS_X]
+    assert correction.valid and correction.inputs['z_drop_m'] is None      # δ 를 0 으로 저장하지 않는다(규칙 4)
+
+
+def test_unknown_drop_error_is_at_most_tip_reach():
+    # d 는 0 ~ (R + r) 이므로 d = 0 가정의 오차는 방향당 최대 R + r 이다.
+    # 최악: 팁이 모서리를 완전히 벗어난 뒤(d = R + r) 판정했는데 δ 를 모른다
+    edges = observe_edges(SHARP, overshoot=TIP_R)
+    edges[Direction.POS_X] = EdgeObservation(edges[Direction.POS_X].coordinate_m, None, SLIDE_V)
+    box = estimate_box(observe_top(SHARP), edges, 0.0, SHARP)
+    assert box.success
+    assert box.x_pos - TRUE['x_pos'] == pytest.approx(TIP_R, abs=1e-9)       # 바깥으로 0.225 mm 덜 보정
+    assert box.x_neg == pytest.approx(TRUE['x_neg'], abs=1e-9)              # δ 를 아는 방향은 그대로
+    assert box.width - 80 * MM == pytest.approx(TIP_R, abs=1e-9)
 
 
 def test_missing_top_or_support():

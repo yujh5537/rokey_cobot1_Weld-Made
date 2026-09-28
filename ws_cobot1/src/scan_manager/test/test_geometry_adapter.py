@@ -104,10 +104,16 @@ def test_missing_edge_is_insufficient_points_and_keeps_what_was_measured(params)
     assert output.bias_corrections[Direction.NEG_Y].raw_coordinate_m is None
 
 
-def test_unknown_z_drop_is_not_passed_through_uncorrected(params):
+def test_unknown_z_drop_is_corrected_with_zero_overshoot(params):
+    # #146: δ 를 모르면(z_drop_valid=false) 실패가 아니라 기하 항 d = 0 으로 보정한다. δ 는 None 그대로 남는다.
+    # 이 정방향 모델은 δ ≥ R + r(기하 항 R + r)이라, d = 0 가정은 방향당 R + r 만큼 덜 보정한다(오차의 최대치)
     output = compute(params, *measurements(params, z_drop=None))
-    assert output.shape.reason_code == Reason.INSUFFICIENT_POINTS
-    assert not output.shape.x_pos.valid
+    shape = output.shape
+    assert shape.success and shape.reason_code == Reason.OK
+    reach = params.tip_radius_m + params.edge_round_radius_m
+    assert shape.width == pytest.approx(2 * HALF[Direction.POS_X] + 2 * reach)
+    assert shape.length == pytest.approx(2 * HALF[Direction.POS_Y] + 2 * reach)
+    assert all(c.valid and c.inputs['z_drop_m'] is None for c in output.bias_corrections.values())
 
 
 def test_non_positive_width_is_invalid_shape(params):

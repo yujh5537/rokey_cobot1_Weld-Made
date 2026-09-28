@@ -21,12 +21,18 @@
   보정량은 음수일 수 있다(R 이 크고 δ 가 작으면 판정 좌표가 공칭 모서리 안쪽이다).
   모따기(C)는 다루지 않는다.
 
+  δ 를 모르면(ContactEvent.z_drop_valid=false → None, 또는 NaN) d = 0 으로 둔다(#146).
+  힘 꺾임 EDGE(#128)는 추세선 없이도 확정되는데, 그때 δ 가 없다. d 는 0 ~ (R + r) 이므로 이 가정의 오차는
+  방향당 최대 (R + r)이다. 힘 꺾임은 구가 모서리를 막 넘기 시작할 때 나므로 d ≈ 0 이 실제에 가깝다.
+  δ 자체를 0 으로 저장하는 것이 아니다. 음수 · inf 는 미측정이 아니라 잘못된 값이라 그대로 거절한다.
+
 윗면(CONTACT) — 팁이 내려가다 닿는다. 판정이 늦은 만큼(속도 x 지연) 더 내려간 좌표가 기록되므로 그만큼 올린다.
 
 단위: m · s · m/s. 수치는 전부 인자로 받는다. 이 파일에 기본값을 두지 않는다.
 """
 import math
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -59,10 +65,18 @@ def overshoot_m(z_drop_m: float, tip_radius_m: float, edge_round_radius_m: float
     return math.sqrt(2.0 * reach * delta - delta * delta)
 
 
-def edge_correction_m(z_drop_m: float, slide_speed_mps: float, params: BiasParams) -> float:
-    """모서리 판정 좌표에서 진행 방향 반대로 뺄 거리. 음수일 수 있다."""
+def _unmeasured(value) -> bool:
+    """None 또는 NaN. 음수 · inf · bool 은 미측정이 아니라 잘못된 값이다(_check 가 거절한다)."""
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
+def edge_correction_m(z_drop_m: Optional[float], slide_speed_mps: float, params: BiasParams) -> float:
+    """모서리 판정 좌표에서 진행 방향 반대로 뺄 거리. 음수일 수 있다. δ 를 모르면 d = 0 이다(모듈 설명)."""
     speed = _check(slide_speed_mps, 'slide_speed_mps', minimum=0.0)
-    d = overshoot_m(z_drop_m, params.tip_radius_m, params.edge_round_radius_m)
+    if _unmeasured(z_drop_m):
+        d = 0.0
+    else:
+        d = overshoot_m(z_drop_m, params.tip_radius_m, params.edge_round_radius_m)
     return d - params.edge_round_radius_m + speed * params.detect_latency_s + params.edge_bias_offset_m
 
 
