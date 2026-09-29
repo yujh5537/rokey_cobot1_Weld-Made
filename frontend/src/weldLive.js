@@ -1,5 +1,5 @@
-// The live arc uses the visible probe tip and the saved seam in one world frame.
-import { PROBE_TIP_RADIUS_M } from './sceneFrames.js'
+// During WELD_PATH, project the visible probe tip onto the saved seam.
+// Physical contact is not required; sparks stay on the finite edge.
 
 const ACTIVE_PHASES = new Set(['PREPARING', 'APPROACH', 'WELDING', 'RETREAT', 'HOMING', 'STOPPING'])
 const BEAD_STEP_M = 0.00025
@@ -44,7 +44,6 @@ export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOrigin
   const projection = tip.reduce((sum, value, i) => sum + (value - a[i]) * direction[i], 0)
   const t = Math.max(0, Math.min(1, projection / lengthSquared))
   const nearest = a.map((value, i) => value + t * direction[i])
-  if (Math.hypot(...tip.map((value, i) => value - nearest[i])) > PROBE_TIP_RADIUS_M) return null
   return [...nearest, line]
 }
 
