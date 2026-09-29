@@ -246,13 +246,14 @@ function App() {
   const [weld, setWeld] = useState(null)
   const [weldError, setWeldError] = useState('')
   const [weldPending, setWeldPending] = useState(false)
-  async function commandWeld(command) {
+  async function commandWeld(command, line) {
     setWeldPending(true)
     setWeldError('')
     try {
       const payload = command === 'start'
-        ? { scan_id: scanResult?.scan_id, start_line: 0, end_line: 7 }
+        ? { scan_id: scanResult?.scan_id, start_line: line, end_line: line }
         : {}
+      if (command === 'start' && (!Number.isInteger(line) || line < 0 || line > 7)) throw new Error('L0~L7 중 용접할 선을 선택하세요')
       if (command === 'start' && !payload.scan_id) throw new Error('성공한 스캔 결과가 필요합니다')
       if (command === 'start' && fixtureFrameMismatch) throw new Error('부재·로봇 좌표계가 다릅니다')
       const response = await fetch(`/commands/weld/${command}`, {
@@ -261,7 +262,7 @@ function App() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`)
-      addLog(`용접 ${command} 요청: ${result.request_id}`)
+      addLog(`용접 ${command === 'start' ? `L${line} 시작` : command} 요청: ${result.request_id}`)
     } catch (error) { setWeldError(error.message) }
     finally { setWeldPending(false) }
   }
@@ -1927,10 +1928,12 @@ function App() {
           </div>
           <div className="weld-controls">
             <strong>형상 생성 후 용접 · 8선</strong>
-            <button disabled={!weld || weld.active || weldPending || safetyLatched || fixtureFrameMismatch || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
-              onClick={() => commandWeld('start')}>용접 시작</button>
-            <button disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button>
-            <span role="status">{!weld ? '용접 상태 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · ${weld.line + 1}/${weld.line_total || 8}선`}</span>
+            {Array.from({ length: 8 }, (_, line) => (
+              <button key={line} disabled={!weld || weld.active || weldPending || safetyLatched || fixtureFrameMismatch || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
+                onClick={() => commandWeld('start', line)}>L{line} 용접 시작</button>
+            ))}
+            <button className="danger" disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button>
+            <span role="status">{!weld ? '용접 상태 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · L${weld.line}`}</span>
             {fixtureFrameMismatch && <p role="alert">부재·로봇 좌표계 불일치: 저장된 ROS fixture 기준점은 재설정해야 합니다.</p>}
             {(weldError || weld?.detail) && <p role="alert">{weldError || weld.detail}</p>}
           </div>

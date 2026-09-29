@@ -48,6 +48,8 @@ export function createWeldEffect(scene) {
     beads.count = count
     beads.instanceMatrix.needsUpdate = true
     glow.visible = Boolean(state?.arc && state?.contact)
+    // End the arc immediately, including particles already emitted. Keep the beads.
+    if (!glow.visible) particles.length = 0
     if (glow.visible) {
       const p = state.contact
       glow.position.set(p[0] * 10, p[2] * 10, -p[1] * 10)

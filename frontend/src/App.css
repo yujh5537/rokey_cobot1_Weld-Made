@@ -229,7 +229,8 @@ summary {
   gap: 9px;
 }
 
-.control-panel button {
+.control-panel button,
+.weld-controls button {
   min-height: 46px;
   padding: 10px 12px;
   border: 1px solid var(--border-strong);
@@ -243,23 +244,27 @@ summary {
   transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
 
-.control-panel button:hover:not(:disabled) {
+.control-panel button:hover:not(:disabled),
+.weld-controls button:hover:not(:disabled) {
   border-color: var(--accent);
   transform: translateY(-1px);
 }
 
-.control-panel button:focus-visible {
+.control-panel button:focus-visible,
+.weld-controls button:focus-visible {
   outline: 3px solid var(--accent-soft);
   outline-offset: 2px;
 }
 
-.control-panel button.primary {
+.control-panel button.primary,
+.weld-controls button.primary {
   border-color: var(--accent);
   background: var(--accent);
   color: #07111c;
 }
 
-.control-panel button.danger {
+.control-panel button.danger,
+.weld-controls button.danger {
   border-color: var(--danger-border);
   background: var(--danger-soft);
   color: var(--danger);
@@ -269,7 +274,8 @@ summary {
   grid-column: 1 / -1;
 }
 
-.control-panel button:disabled {
+.control-panel button:disabled,
+.weld-controls button:disabled {
   cursor: not-allowed;
   opacity: 0.38;
 }
@@ -601,6 +607,6 @@ tbody tr:hover { background: var(--accent-soft); }
 }
 
 .weld-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 18px; }
-.weld-controls button { padding: 8px 14px; }
+
 .weld-controls span { color: #9eb3c9; font-size: 13px; }
 .weld-controls p { flex-basis: 100%; color: #ff9a82; margin: 0; }

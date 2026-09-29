@@ -26,7 +26,7 @@ export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOrigin
       state.scan_id !== scanResult.scan_id || sample.frameId !== 'base_link' ||
       sample.operation !== 'WELD_PATH' || !Number.isInteger(state.motion_id) ||
       state.motion_id <= 0 || sample.motionId !== state.motion_id ||
-      !Number.isFinite(state.line_progress) || state.line_progress <= 0) return null
+      !Number.isFinite(state.line_progress) || state.line_progress <= 0 || state.line_progress >= 1) return null
 
   const line = state.line
   if (!Number.isInteger(line) || line < 0 || line > 7) return null
