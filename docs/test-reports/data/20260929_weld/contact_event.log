@@ -1,0 +1,1560 @@
+event_id: 1
+scan_id: ''
+motion_id: 902
+sample_id: 21708
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.524980712890625
+    y: -0.17203736877441406
+    z: 0.09498995208740234
+  orientation:
+    x: -0.051560427034283436
+    y: -0.9986698764825909
+    z: 3.68708419667001e-06
+    w: -1.2517770655677752e-05
+wrench:
+  force:
+    x: -1.6499879360198975
+    y: 0.913556694984436
+    z: 5.955116271972656
+  torque:
+    x: -0.0590917244553566
+    y: -0.05915255844593048
+    z: 0.28317055106163025
+pose_stamp:
+  sec: 1790641853
+  nanosec: 121765850
+force_stamp:
+  sec: 1790641853
+  nanosec: 123038728
+detect_stamp:
+  sec: 1790641853
+  nanosec: 162366917
+force_delta_n: 3.0440909056513545
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 1
+scan_id: 20260929-101735-5216
+motion_id: 2
+sample_id: 6093
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.42030078125
+    y: -0.15669084167480468
+    z: 0.1779596405029297
+  orientation:
+    x: -0.051550453186283055
+    y: -0.9986703860300031
+    z: 3.1932239822917044e-05
+    w: -9.911258915963515e-05
+wrench:
+  force:
+    x: 1.8487372398376465
+    y: 2.9795353412628174
+    z: 5.844821929931641
+  torque:
+    x: -1.0170243978500366
+    y: 1.1803914308547974
+    z: -0.36291030049324036
+pose_stamp:
+  sec: 1790644673
+  nanosec: 922692229
+force_stamp:
+  sec: 1790644673
+  nanosec: 923749019
+detect_stamp:
+  sec: 1790644673
+  nanosec: 964569139
+force_delta_n: 3.2878754570787696
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 2
+scan_id: 20260929-101735-5216
+motion_id: 3
+sample_id: 9576
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.46217172241210935
+    y: -0.1567801513671875
+    z: 0.17802450561523436
+  orientation:
+    x: -0.05153701752366908
+    y: -0.9986709905599962
+    z: 0.00012240344085568338
+    w: -0.0004164805860699202
+wrench:
+  force:
+    x: -2.2643237113952637
+    y: 0.8506029844284058
+    z: 1.1453267335891724
+  torque:
+    x: -0.1909632384777069
+    y: -0.6444506049156189
+    z: 0.11491916328668594
+pose_stamp:
+  sec: 1790644746
+  nanosec: 462621323
+force_stamp:
+  sec: 1790644746
+  nanosec: 463460846
+detect_stamp:
+  sec: 1790644746
+  nanosec: 503481661
+force_delta_n: 4.646635113011867
+z_drop_m: 0.0005343152666565931
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967297
+scan_id: 20260929-101735-5216
+motion_id: 3
+sample_id: 9969
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.46266473388671875
+    y: -0.15664112854003906
+    z: 0.17760320281982422
+  orientation:
+    x: 0.0515432724823617
+    y: 0.9986707619441725
+    z: 4.5665048632154045e-06
+    w: -1.66973672687338e-05
+wrench:
+  force:
+    x: 2.362549364566803
+    y: -0.9874203130602837
+    z: 2.064810037612915
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790644754
+  nanosec: 804947876
+force_stamp:
+  sec: 1790644754
+  nanosec: 804947876
+detect_stamp:
+  sec: 1790644754
+  nanosec: 804947876
+force_delta_n: 3.289388828655883
+z_drop_m: 0.0004874801635742221
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 4294967298
+scan_id: 20260929-101735-5216
+motion_id: 7
+sample_id: 15362
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.37751605224609375
+    y: -0.15669888305664062
+    z: 0.17754412841796874
+  orientation:
+    x: -0.05156042663905592
+    y: -0.99866986882746
+    z: 4.291492355890766e-05
+    w: -0.00011687280146767641
+wrench:
+  force:
+    x: -0.033226191997528076
+    y: -0.30062270164489746
+    z: 1.63295179605484
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790644865
+  nanosec: 972760499
+force_stamp:
+  sec: 1790644865
+  nanosec: 972760499
+detect_stamp:
+  sec: 1790644865
+  nanosec: 972760499
+force_delta_n: 1.6607256115378186
+z_drop_m: 0.0004574279785156121
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 3
+scan_id: 20260929-101735-5216
+motion_id: 11
+sample_id: 20267
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.42016473388671877
+    y: -0.11760720825195313
+    z: 0.17911558532714844
+  orientation:
+    x: 0.051542075608649957
+    y: 0.9986708228581891
+    z: 9.497175771496603e-06
+    w: -4.3857761611411236e-05
+wrench:
+  force:
+    x: -0.4424736797809601
+    y: -0.6664983034133911
+    z: 2.131624698638916
+  torque:
+    x: 0.2745572328567505
+    y: 0.08599146455526352
+    z: 0.18547949194908142
+pose_stamp:
+  sec: 1790644967
+  nanosec: 62483520
+force_stamp:
+  sec: 1790644967
+  nanosec: 63350621
+detect_stamp:
+  sec: 1790644967
+  nanosec: 103283138
+force_delta_n: 4.295162202087965
+z_drop_m: 0.0005205879971779959
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967299
+scan_id: 20260929-101735-5216
+motion_id: 11
+sample_id: 20532
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.4201473388671875
+    y: -0.11711112213134765
+    z: 0.17866890716552736
+  orientation:
+    x: 0.05154287351057396
+    y: 0.9986707819798413
+    z: 8.61229024920894e-06
+    w: -3.6549608291024835e-05
+wrench:
+  force:
+    x: 1.2570082545280457
+    y: 0.7231084275990725
+    z: 2.4769556522369385
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790644972
+  nanosec: 710327361
+force_stamp:
+  sec: 1790644972
+  nanosec: 710327361
+detect_stamp:
+  sec: 1790644972
+  nanosec: 710327361
+force_delta_n: 2.870237769447849
+z_drop_m: 0.0004828262329101829
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 4
+scan_id: 20260929-101735-5216
+motion_id: 15
+sample_id: 22765
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.420268798828125
+    y: -0.16171598815917967
+    z: 0.180286865234375
+  orientation:
+    x: -0.05158024114954087
+    y: -0.9986688526340805
+    z: 1.1749052590660471e-05
+    w: -3.692484648161996e-05
+wrench:
+  force:
+    x: -1.681398630142212
+    y: 4.417453765869141
+    z: -1.2011240720748901
+  torque:
+    x: -1.794990062713623
+    y: -1.0345265865325928
+    z: -0.42872267961502075
+pose_stamp:
+  sec: 1790645018
+  nanosec: 142237764
+force_stamp:
+  sec: 1790645018
+  nanosec: 143236040
+detect_stamp:
+  sec: 1790645018
+  nanosec: 202285269
+force_delta_n: 5.121614287997279
+z_drop_m: 0.0005473094163131464
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967300
+scan_id: 20260929-101735-5216
+motion_id: 15
+sample_id: 23251
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.42031375122070314
+    y: -0.16118446350097657
+    z: 0.17881011199951172
+  orientation:
+    x: -0.05155298003906987
+    y: -0.9986702597465206
+    z: 1.6488492023483292e-05
+    w: -4.769735728961241e-05
+wrench:
+  force:
+    x: 1.5335408250490823
+    y: 0.05694460868835449
+    z: 2.8821189403533936
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790645028
+  nanosec: 557426576
+force_stamp:
+  sec: 1790645028
+  nanosec: 557426576
+detect_stamp:
+  sec: 1790645028
+  nanosec: 557426576
+force_delta_n: 3.2652105195369345
+z_drop_m: 0.0004901809692382797
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 5
+scan_id: 20260929-102734-1466
+motion_id: 2
+sample_id: 35446
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.42031375122070314
+    y: -0.15669854736328126
+    z: 0.1778137969970703
+  orientation:
+    x: -0.051552048474859925
+    y: -0.998670294291471
+    z: 5.4701874794053734e-05
+    w: -0.00016311203887747785
+wrench:
+  force:
+    x: 3.197579860687256
+    y: 2.244878053665161
+    z: 10.437089920043945
+  torque:
+    x: -0.5329205393791199
+    y: 2.187999725341797
+    z: -0.3447510302066803
+pose_stamp:
+  sec: 1790645272
+  nanosec: 922304368
+force_stamp:
+  sec: 1790645272
+  nanosec: 923235275
+detect_stamp:
+  sec: 1790645272
+  nanosec: 964096265
+force_delta_n: 5.641106955931482
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 6
+scan_id: 20260929-102734-1466
+motion_id: 3
+sample_id: 39013
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4625947265625
+    y: -0.15677285766601562
+    z: 0.17787171936035157
+  orientation:
+    x: -0.05153914586810432
+    y: -0.9986708932968573
+    z: 0.00011514395868034392
+    w: -0.0003873844497778104
+wrench:
+  force:
+    x: -2.2670464515686035
+    y: 0.8645167946815491
+    z: 1.4555964469909668
+  torque:
+    x: -0.14522641897201538
+    y: -0.5402683615684509
+    z: 0.10095060616731644
+pose_stamp:
+  sec: 1790645347
+  nanosec: 63197352
+force_stamp:
+  sec: 1790645347
+  nanosec: 64242830
+detect_stamp:
+  sec: 1790645347
+  nanosec: 104082263
+force_delta_n: 6.302542033413693
+z_drop_m: 0.0005092977299582524
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967301
+scan_id: 20260929-102734-1466
+motion_id: 3
+sample_id: 39300
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.46280264282226563
+    y: -0.15667271423339843
+    z: 0.17735994720458986
+  orientation:
+    x: 0.05155883109107821
+    y: 0.998669955540215
+    z: 2.4611678332544735e-05
+    w: -7.894359928369303e-05
+wrench:
+  force:
+    x: 1.7389501730600994
+    y: -0.7873433033625286
+    z: 2.3718903462092085
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790645353
+  nanosec: 368162528
+force_stamp:
+  sec: 1790645353
+  nanosec: 368162528
+detect_stamp:
+  sec: 1790645353
+  nanosec: 368162528
+force_delta_n: 3.0446216507434887
+z_drop_m: 0.00045345306396485374
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 7
+scan_id: 20260929-102734-1466
+motion_id: 7
+sample_id: 44233
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.3771698608398438
+    y: -0.1566342010498047
+    z: 0.178697021484375
+  orientation:
+    x: 0.05154872451713342
+    y: 0.9986704768925511
+    z: 3.084864205419829e-05
+    w: -8.143845849606071e-05
+wrench:
+  force:
+    x: -0.3098284602165222
+    y: 2.957977771759033
+    z: -0.5122376084327698
+  torque:
+    x: -1.3226218223571777
+    y: -0.3992314338684082
+    z: -0.2579416036605835
+pose_stamp:
+  sec: 1790645454
+  nanosec: 762278549
+force_stamp:
+  sec: 1790645454
+  nanosec: 763196249
+detect_stamp:
+  sec: 1790645454
+  nanosec: 803526902
+force_delta_n: 6.201591306068224
+z_drop_m: 0.0005213730783011072
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967302
+scan_id: 20260929-102734-1466
+motion_id: 7
+sample_id: 44623
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.37761932373046875
+    y: -0.15667454528808594
+    z: 0.17771331787109373
+  orientation:
+    x: 0.05156228870777278
+    y: 0.9986697792078548
+    z: 1.8479176746328555e-05
+    w: -4.624576542189416e-05
+wrench:
+  force:
+    x: -0.9829565087954203
+    y: 0.29166364669799805
+    z: 1.1814711888631186
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790645463
+  nanosec: 8144280
+force_stamp:
+  sec: 1790645463
+  nanosec: 8144280
+detect_stamp:
+  sec: 1790645463
+  nanosec: 8144280
+force_delta_n: 1.5643354343305296
+z_drop_m: 0.0004953613281249714
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 4294967303
+scan_id: 20260929-102734-1466
+motion_id: 11
+sample_id: 49776
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.4201852416992187
+    y: -0.11703298950195312
+    z: 0.17854290771484374
+  orientation:
+    x: -0.05154234156922444
+    y: -0.9986708091016102
+    z: 1.0763301385776003e-05
+    w: -4.4249835237012226e-05
+wrench:
+  force:
+    x: 0.17275175452232355
+    y: 1.0306320786476135
+    z: 1.6821550130844118
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790645569
+  nanosec: 491801225
+force_stamp:
+  sec: 1790645569
+  nanosec: 491801225
+detect_stamp:
+  sec: 1790645569
+  nanosec: 491801225
+force_delta_n: 1.9803260181780826
+z_drop_m: 0.0004731597900390627
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 1
+scan_id: 20260929-103910-9945
+motion_id: 2
+sample_id: 2407
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4203186950683594
+    y: -0.15669134521484376
+    z: 0.17782662963867188
+  orientation:
+    x: -0.05154260684079439
+    y: -0.9986707819951263
+    z: 5.400937211852829e-05
+    w: -0.00016109713209636327
+wrench:
+  force:
+    x: 2.9685587882995605
+    y: 1.9067736864089966
+    z: 8.88320541381836
+  torque:
+    x: -0.5195119380950928
+    y: 1.6787596940994263
+    z: -0.29234254360198975
+pose_stamp:
+  sec: 1790645968
+  nanosec: 841326124
+force_stamp:
+  sec: 1790645968
+  nanosec: 842326096
+detect_stamp:
+  sec: 1790645968
+  nanosec: 882738537
+force_delta_n: 5.281729929258729
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 1
+scan_id: 20260929-104144-6505
+motion_id: 2
+sample_id: 1634
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4202996520996094
+    y: -0.15668101501464843
+    z: 0.17772044372558593
+  orientation:
+    x: -0.051541410502279825
+    y: -0.9986708532788225
+    z: 2.9341904001053535e-05
+    w: -9.462471561752411e-05
+wrench:
+  force:
+    x: 1.9594595432281494
+    y: 2.3119425773620605
+    z: 6.655052185058594
+  torque:
+    x: -0.6272047162055969
+    y: 1.4152365922927856
+    z: -0.3165486752986908
+pose_stamp:
+  sec: 1790646122
+  nanosec: 938060595
+force_stamp:
+  sec: 1790646122
+  nanosec: 938921203
+detect_stamp:
+  sec: 1790646122
+  nanosec: 978276139
+force_delta_n: 3.50279181045021
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 2
+scan_id: 20260929-104144-6505
+motion_id: 3
+sample_id: 5187
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4631422119140625
+    y: -0.1566301727294922
+    z: 0.17838304138183594
+  orientation:
+    x: 0.05154540018378663
+    y: 0.9986706522175715
+    z: 3.1178284689086618e-06
+    w: -1.0464360628634043e-05
+wrench:
+  force:
+    x: -2.9586708545684814
+    y: 0.6220222115516663
+    z: -1.6221318244934082
+  torque:
+    x: -0.32117611169815063
+    y: -1.6121746301651
+    z: 0.16576208174228668
+pose_stamp:
+  sec: 1790646196
+  nanosec: 978671559
+force_stamp:
+  sec: 1790646196
+  nanosec: 979571559
+detect_stamp:
+  sec: 1790646197
+  nanosec: 20074760
+force_delta_n: 6.957070331853215
+z_drop_m: 0.0005180930222395685
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967297
+scan_id: 20260929-104144-6505
+motion_id: 3
+sample_id: 5663
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.46242074584960935
+    y: -0.15665084838867188
+    z: 0.17725484466552735
+  orientation:
+    x: -0.05154872452188629
+    y: -0.9986704769846301
+    z: 2.4863295005395193e-05
+    w: -8.234849542899967e-05
+wrench:
+  force:
+    x: 2.0644999742507935
+    y: -0.4144001007080078
+    z: 2.1740724444389343
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790646206
+  nanosec: 943930442
+force_stamp:
+  sec: 1790646206
+  nanosec: 943930442
+detect_stamp:
+  sec: 1790646206
+  nanosec: 943930442
+force_delta_n: 3.026628252828057
+z_drop_m: 0.0008098526000976658
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 3
+scan_id: 20260929-104144-6505
+motion_id: 7
+sample_id: 10725
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.37724774169921876
+    y: -0.15666612243652345
+    z: 0.1785641632080078
+  orientation:
+    x: -0.051549123630629336
+    y: -0.9986704596021811
+    z: 9.412536341760947e-06
+    w: -2.970330773162647e-05
+wrench:
+  force:
+    x: -0.20682069659233093
+    y: 2.9226531982421875
+    z: -0.47189125418663025
+  torque:
+    x: -1.2761023044586182
+    y: -0.35419347882270813
+    z: -0.24565547704696655
+pose_stamp:
+  sec: 1790646311
+  nanosec: 119485164
+force_stamp:
+  sec: 1790646311
+  nanosec: 121127617
+detect_stamp:
+  sec: 1790646311
+  nanosec: 158108618
+force_delta_n: 4.08745771767144
+z_drop_m: 0.0005136738951516118
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967298
+scan_id: 20260929-104144-6505
+motion_id: 7
+sample_id: 11278
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.37705441284179686
+    y: -0.15663433837890625
+    z: 0.17744556427001953
+  orientation:
+    x: 0.05155165029456271
+    y: 0.9986703296600562
+    z: 1.3873927983184244e-06
+    w: -2.580111990441627e-06
+wrench:
+  force:
+    x: 0.20148718357086182
+    y: -0.014535665512084961
+    z: 1.4001296758651733
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790646322
+  nanosec: 973215627
+force_stamp:
+  sec: 1790646322
+  nanosec: 973215627
+detect_stamp:
+  sec: 1790646322
+  nanosec: 973215627
+force_delta_n: 1.414627682449878
+z_drop_m: 0.0007605514526367319
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 4
+scan_id: 20260929-104144-6505
+motion_id: 11
+sample_id: 16049
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.42010562133789064
+    y: -0.11663347625732422
+    z: 0.17947682189941405
+  orientation:
+    x: 0.05155550624898333
+    y: 0.9986701210096798
+    z: 3.319733819566644e-05
+    w: -0.00013444649195764284
+wrench:
+  force:
+    x: -2.297919273376465
+    y: -0.015621651895344257
+    z: -1.2083203792572021
+  torque:
+    x: -0.12279721349477768
+    y: -1.2003085613250732
+    z: 0.16065654158592224
+pose_stamp:
+  sec: 1790646421
+  nanosec: 858197327
+force_stamp:
+  sec: 1790646421
+  nanosec: 859092857
+detect_stamp:
+  sec: 1790646421
+  nanosec: 898977169
+force_delta_n: 6.424364225715377
+z_drop_m: 0.0005496150601404515
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967299
+scan_id: 20260929-104144-6505
+motion_id: 11
+sample_id: 16516
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.4201573181152344
+    y: -0.11723140716552734
+    z: 0.17850819396972656
+  orientation:
+    x: -0.05154633102973988
+    y: -0.9986706037584291
+    z: 7.5444773258435925e-06
+    w: -2.9819932148578052e-05
+wrench:
+  force:
+    x: -0.05535284678141278
+    y: 1.3002146383126578
+    z: 1.3872615893681843
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790646431
+  nanosec: 745063223
+force_stamp:
+  sec: 1790646431
+  nanosec: 745063223
+detect_stamp:
+  sec: 1790646431
+  nanosec: 745063223
+force_delta_n: 1.902134790351531
+z_drop_m: 0.0008113708496093608
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 5
+scan_id: 20260929-104144-6505
+motion_id: 15
+sample_id: 22139
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.42018020629882813
+    y: -0.20115228271484376
+    z: 0.17712615966796874
+  orientation:
+    x: 0.051560825944092885
+    y: 0.9986698552462834
+    z: 1.6376651796332555e-05
+    w: -3.438219991173322e-05
+wrench:
+  force:
+    x: -1.6415656805038452
+    y: 4.128832817077637
+    z: -1.0463876724243164
+  torque:
+    x: -1.6204519271850586
+    y: -0.9355581402778625
+    z: -0.314500629901886
+pose_stamp:
+  sec: 1790646547
+  nanosec: 897740434
+force_stamp:
+  sec: 1790646547
+  nanosec: 898916058
+detect_stamp:
+  sec: 1790646547
+  nanosec: 940160724
+force_delta_n: 5.7455660701097075
+z_drop_m: 0.0005449290234680881
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 6
+scan_id: 20260929-105344-8895
+motion_id: 2
+sample_id: 36821
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4203199768066406
+    y: -0.15669993591308592
+    z: 0.17785423278808593
+  orientation:
+    x: -0.0515520482821496
+    y: -0.9986702905582716
+    z: 5.989735586998906e-05
+    w: -0.0001829931118679745
+wrench:
+  force:
+    x: 2.2411694526672363
+    y: 2.630147695541382
+    z: 9.443137168884277
+  torque:
+    x: -0.7741239070892334
+    y: 1.4318101406097412
+    z: -0.35824599862098694
+pose_stamp:
+  sec: 1790646843
+  nanosec: 278566534
+force_stamp:
+  sec: 1790646843
+  nanosec: 281203070
+detect_stamp:
+  sec: 1790646843
+  nanosec: 318953271
+force_delta_n: 6.8060499919359145
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 7
+scan_id: 20260929-105344-8895
+motion_id: 3
+sample_id: 40271
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.46312750244140627
+    y: -0.156619873046875
+    z: 0.17882577514648437
+  orientation:
+    x: 0.05154486807667955
+    y: 0.998670676127838
+    z: 2.469729614604447e-05
+    w: -8.12857193901002e-05
+wrench:
+  force:
+    x: -4.325490474700928
+    y: 1.157622218132019
+    z: -2.273280382156372
+  torque:
+    x: -0.5078403949737549
+    y: -2.0853769779205322
+    z: 0.17655666172504425
+pose_stamp:
+  sec: 1790646914
+  nanosec: 798417112
+force_stamp:
+  sec: 1790646914
+  nanosec: 800305523
+detect_stamp:
+  sec: 1790646914
+  nanosec: 838275109
+force_delta_n: 8.088691317544399
+z_drop_m: 0.0005024351753300516
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967300
+scan_id: 20260929-105344-8895
+motion_id: 3
+sample_id: 40756
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.4626670532226563
+    y: -0.1566917724609375
+    z: 0.17765065002441405
+  orientation:
+    x: -0.05154619784724392
+    y: -0.9986706067190723
+    z: 2.7178292804932342e-05
+    w: -8.957786279267674e-05
+wrench:
+  force:
+    x: 1.6317729949951172
+    y: -0.55836620926857
+    z: 2.09390589594841
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790646924
+  nanosec: 964744286
+force_stamp:
+  sec: 1790646924
+  nanosec: 964744286
+detect_stamp:
+  sec: 1790646924
+  nanosec: 964744286
+force_delta_n: 2.7127288533754714
+z_drop_m: 0.0007653198242187353
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 8
+scan_id: 20260929-105344-8895
+motion_id: 7
+sample_id: 45751
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.3771537780761719
+    y: -0.15662542724609374
+    z: 0.17872200012207032
+  orientation:
+    x: 0.05154779353966322
+    y: 0.9986705228036469
+    z: 3.9709630503244695e-05
+    w: -0.00010142695891328229
+wrench:
+  force:
+    x: -0.893273115158081
+    y: 3.0655572414398193
+    z: -0.9560744166374207
+  torque:
+    x: -1.2952532768249512
+    y: -0.5501905083656311
+    z: -0.23342032730579376
+pose_stamp:
+  sec: 1790647027
+  nanosec: 838274331
+force_stamp:
+  sec: 1790647027
+  nanosec: 839343065
+detect_stamp:
+  sec: 1790647027
+  nanosec: 879620202
+force_delta_n: 4.556455551766757
+z_drop_m: 0.0005215000765661226
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967301
+scan_id: 20260929-105344-8895
+motion_id: 7
+sample_id: 46248
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.37752325439453127
+    y: -0.15667436218261718
+    z: 0.17775121307373049
+  orientation:
+    x: -0.051551783104042494
+    y: -0.998670319472852
+    z: 2.911899684207108e-05
+    w: -7.62552916440697e-05
+wrench:
+  force:
+    x: 0.15293897191683453
+    y: -0.4008986155192056
+    z: 2.335863411426544
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790647038
+  nanosec: 345198432
+force_stamp:
+  sec: 1790647038
+  nanosec: 345198432
+detect_stamp:
+  sec: 1790647038
+  nanosec: 345198432
+force_delta_n: 2.3749458743090224
+z_drop_m: 0.0007703018188476851
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 9
+scan_id: 20260929-105344-8895
+motion_id: 11
+sample_id: 51102
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.42020880126953125
+    y: -0.11565635681152343
+    z: 0.17951490783691407
+  orientation:
+    x: 0.0515480598040407
+    y: 0.9986705149328444
+    z: 3.1048659416093285e-06
+    w: -1.11609254647605e-05
+wrench:
+  force:
+    x: -2.238504409790039
+    y: 0.08574730157852173
+    z: -0.6649695634841919
+  torque:
+    x: -0.1440664678812027
+    y: -1.1160331964492798
+    z: 0.13471558690071106
+pose_stamp:
+  sec: 1790647138
+  nanosec: 238103100
+force_stamp:
+  sec: 1790647138
+  nanosec: 238934285
+detect_stamp:
+  sec: 1790647138
+  nanosec: 279397167
+force_delta_n: 5.915691807085025
+z_drop_m: 0.0005529540297715962
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967302
+scan_id: 20260929-105344-8895
+motion_id: 11
+sample_id: 51535
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.42025332641601565
+    y: -0.11635940551757812
+    z: 0.1784950714111328
+  orientation:
+    x: 0.05155643759220738
+    y: 0.9986700821831361
+    z: 6.495579725356175e-06
+    w: -2.5552616565311155e-05
+wrench:
+  force:
+    x: 0.6717994511127472
+    y: 1.3564000725746155
+    z: 2.0647157430648804
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790647147
+  nanosec: 424397506
+force_stamp:
+  sec: 1790647147
+  nanosec: 424397506
+detect_stamp:
+  sec: 1790647147
+  nanosec: 424397506
+force_delta_n: 2.560114598813063
+z_drop_m: 0.0007971801757812313
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 10
+scan_id: 20260929-105344-8895
+motion_id: 15
+sample_id: 53725
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4202635498046875
+    y: -0.16071528625488282
+    z: 0.1802367401123047
+  orientation:
+    x: 0.051582900803645144
+    y: 0.9986687160047243
+    z: 2.3362877589284894e-06
+    w: -3.5634775999631264e-06
+wrench:
+  force:
+    x: -1.8150429725646973
+    y: 4.018622398376465
+    z: -0.7664335370063782
+  torque:
+    x: -1.6186045408248901
+    y: -1.0442841053009033
+    z: -0.3483006954193115
+pose_stamp:
+  sec: 1790647192
+  nanosec: 19758692
+force_stamp:
+  sec: 1790647192
+  nanosec: 20864682
+detect_stamp:
+  sec: 1790647192
+  nanosec: 58647646
+force_delta_n: 5.217776411298688
+z_drop_m: 0.0005188070858843374
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 11
+scan_id: 20260929-110232-4715
+motion_id: 2
+sample_id: 62545
+type: 0
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4203571472167969
+    y: -0.1567136688232422
+    z: 0.17818521118164063
+  orientation:
+    x: -0.05155151641415986
+    y: -0.9986703191010576
+    z: 5.766333010637143e-05
+    w: -0.00017769899482212952
+wrench:
+  force:
+    x: 2.2531588077545166
+    y: 0.18006613850593567
+    z: 8.068299293518066
+  torque:
+    x: 0.19629378616809845
+    y: 1.5281091928482056
+    z: 0.11401429027318954
+pose_stamp:
+  sec: 1790647369
+  nanosec: 897851866
+force_stamp:
+  sec: 1790647369
+  nanosec: 898650588
+detect_stamp:
+  sec: 1790647369
+  nanosec: 941222694
+force_delta_n: 4.46895446789518
+z_drop_m: .nan
+z_drop_valid: false
+debounce_count: 3
+---
+event_id: 12
+scan_id: 20260929-110232-4715
+motion_id: 3
+sample_id: 66070
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.463122314453125
+    y: -0.15662237548828126
+    z: 0.17882780456542968
+  orientation:
+    x: 0.05154606503953684
+    y: 0.9986706169409751
+    z: 1.4547376624569483e-05
+    w: -4.2732257578494616e-05
+wrench:
+  force:
+    x: -3.5674397945404053
+    y: 1.0122119188308716
+    z: -2.1255311965942383
+  torque:
+    x: -0.4298166334629059
+    y: -1.8123364448547363
+    z: 0.1854335218667984
+pose_stamp:
+  sec: 1790647443
+  nanosec: 258392072
+force_stamp:
+  sec: 1790647443
+  nanosec: 259289647
+detect_stamp:
+  sec: 1790647443
+  nanosec: 298498085
+force_delta_n: 7.973445759880189
+z_drop_m: 0.0005788876081980754
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967303
+scan_id: 20260929-110232-4715
+motion_id: 3
+sample_id: 67037
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.46389376831054685
+    y: -0.15669073486328125
+    z: 0.1765556411743164
+  orientation:
+    x: -0.05157385809134733
+    y: -0.9986691827063403
+    z: 6.530765119637689e-06
+    w: -2.5131115130551733e-05
+wrench:
+  force:
+    x: 0.8789510726928711
+    y: -0.7695421874523163
+    z: 1.4960419734319053
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790647463
+  nanosec: 885640759
+force_stamp:
+  sec: 1790647463
+  nanosec: 885640759
+detect_stamp:
+  sec: 1790647463
+  nanosec: 885640759
+force_delta_n: 1.8981284868856676
+z_drop_m: 0.000808296203613279
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 13
+scan_id: 20260929-110232-4715
+motion_id: 7
+sample_id: 71978
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.3776148376464844
+    y: -0.15661932373046875
+    z: 0.17902117919921876
+  orientation:
+    x: 0.051560293422334154
+    y: 0.9986698711262357
+    z: 5.553400045115392e-05
+    w: -0.00014684306371561985
+wrench:
+  force:
+    x: -0.5385075807571411
+    y: 3.03999924659729
+    z: -0.7216982245445251
+  torque:
+    x: -1.3029800653457642
+    y: -0.4322126805782318
+    z: -0.23644205927848816
+pose_stamp:
+  sec: 1790647565
+  nanosec: 678263233
+force_stamp:
+  sec: 1790647565
+  nanosec: 680232545
+detect_stamp:
+  sec: 1790647565
+  nanosec: 721695175
+force_delta_n: 5.713122993049889
+z_drop_m: 0.0005206258247250906
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967304
+scan_id: 20260929-110232-4715
+motion_id: 7
+sample_id: 72507
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.37764190673828124
+    y: -0.1566674346923828
+    z: 0.17803762054443362
+  orientation:
+    x: 0.051559363116903886
+    y: 0.9986699300546173
+    z: 1.9865889097940216e-05
+    w: -4.98500891256034e-05
+wrench:
+  force:
+    x: 0.6063885241746902
+    y: -0.38880014419555664
+    z: 1.989860475063324
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790647576
+  nanosec: 983983002
+force_stamp:
+  sec: 1790647576
+  nanosec: 983983002
+detect_stamp:
+  sec: 1790647576
+  nanosec: 983983002
+force_delta_n: 2.116227139178704
+z_drop_m: 0.0007746353149414298
+z_drop_valid: true
+debounce_count: 1
+---
+event_id: 14
+scan_id: 20260929-110232-4715
+motion_id: 11
+sample_id: 77299
+type: 1
+source: robot_force
+frame_id: base_link
+pose:
+  position:
+    x: 0.4201616516113281
+    y: -0.11465281677246093
+    z: 0.17945680236816405
+  orientation:
+    x: 0.051555506652836154
+    y: 0.9986701288326264
+    z: 1.4306688549173193e-05
+    w: -5.750228948688518e-05
+wrench:
+  force:
+    x: -2.121804714202881
+    y: 0.3964637219905853
+    z: -1.0240474939346313
+  torque:
+    x: -0.2525702714920044
+    y: -1.0931459665298462
+    z: 0.1312243789434433
+pose_stamp:
+  sec: 1790647675
+  nanosec: 658480643
+force_stamp:
+  sec: 1790647675
+  nanosec: 659361859
+detect_stamp:
+  sec: 1790647675
+  nanosec: 699905105
+force_delta_n: 6.114500838607947
+z_drop_m: 0.0005332074513380303
+z_drop_valid: true
+debounce_count: 3
+---
+event_id: 4294967305
+scan_id: 20260929-110232-4715
+motion_id: 11
+sample_id: 77796
+type: 1
+source: robot_step
+frame_id: base_link
+pose:
+  position:
+    x: 0.4201650695800781
+    y: -0.11499589538574219
+    z: 0.17833453369140626
+  orientation:
+    x: 0.05154686297661171
+    y: 0.998670576743622
+    z: 1.959206390163934e-06
+    w: -7.745537634454032e-06
+wrench:
+  force:
+    x: 0.8898517489433289
+    y: 0.9962930778662363
+    z: 2.41850753625234
+  torque:
+    x: 0.0
+    y: 0.0
+    z: 0.0
+pose_stamp:
+  sec: 1790647686
+  nanosec: 145085726
+force_stamp:
+  sec: 1790647686
+  nanosec: 145085726
+detect_stamp:
+  sec: 1790647686
+  nanosec: 145085726
+force_delta_n: 2.7628996968784523
+z_drop_m: 0.0007711791992187633
+z_drop_valid: true
+debounce_count: 1
+---
