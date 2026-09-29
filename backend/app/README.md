@@ -355,3 +355,32 @@ T28에서는 실제 Mosquitto, FastAPI, PostgreSQL 컨테이너를 사용하고 
 - 필수 필드가 없는 MQTT 메시지는 수신되더라도 DB에 저장되지 않는지 확인
 
 이 검증은 실제 ROS2 노드에서 발생한 데이터가 아니라 Mock MQTT payload를 이용한 웹/DB 연동 검증이다.
+
+## 환경변수
+
+| 이름 | 출발값 | compose 값 | 근거 |
+|---|---|---|---|
+| `MQTT_HOST` | `mosquitto` | `mosquitto` (서비스 이름) | `docker-compose.yml`. 컨테이너끼리는 서비스 이름으로 찾는다 |
+| `MQTT_PORT` | `1883` | 1883 | `docker/.env`(`MQTT_PORT`) |
+| `DB_HOST` | — | `postgres` | 〃 |
+| `DB_PORT` | — | `5432` | 〃 |
+| `POSTGRES_DB` · `POSTGRES_USER` · `POSTGRES_PASSWORD` | — | `docker/.env` | **값을 레포에 두지 않는다.** `.env.example` 에는 키 이름만 있다 |
+
+DB 접속은 `connect_timeout=3` 이다. DB 가 죽어도 MQTT 수신과 WebSocket 중계는 계속 돈다.
+
+## 알려진 문제 · 열린 이슈
+
+| 번호 | 내용 | 상태 |
+|---|---|---|
+| — | **retain 스냅샷 캐시가 없다.** `robot/status` · `scan/state` · `safety/status` 는 retain 토픽인데, FastAPI 는 받은 즉시 흘려보내기만 한다. 브라우저가 새로 붙으면 다음 발행 때까지 아무것도 못 본다. 마지막 값을 들고 있다가 `/ws` 연결 직후 밀어 주면 된다 | 미착수. phase 2 `weld/state` 가 더해지면 retain 토픽 4개 |
+| [#150](../../issues/150) | 실기 없이 가능한 종단 — 중복 `request_id` → 106, 만료 → 101 | 열림. **화면에서 재현할 수 없다** — `request_id` 를 `main.py` 가 요청마다 `uuid4()` 로 새로 만든다(약 395행). `mosquitto_pub` 로 같은 id 를 두 번 보내야 한다 |
+| — | 명령 상태(`pending_commands`)가 **메모리에만 있다.** FastAPI 를 다시 띄우면 진행 중이던 명령의 이력이 사라진다 | 미착수 |
+| — | `cmd/scan/set_config` REST 는 있으나 **프런트 버튼이 없다** (BRD 4.4.2, TR-05 FAIL) | 이슈 미생성 |
+| [#90](../../issues/90) | 브리지가 모르는 코드에서 메시지를 버린다 → `/ws` 로 아무것도 안 온다 | PR #200 이 닫는다 |
+
+## 이 서비스가 지키는 계약 규칙
+
+- **구독 필터는 계약 2장 그대로다**: `robot/#` · `scan/#` · `contact/#` · `safety/#` · `cmd/ack` · `hb/ros` · `conn/ros`. 명령 토픽(`cmd/scan/+`)은 구독하지 않는다 — 발행만 한다
+- **`request_id` 는 FastAPI 가 발급한다**(UUID v4, 계약 1장). `command_id` · `job_id` 라는 이름은 쓰지 않는다
+- **미측정값은 `null` 로 저장한다.** `to_jsonb(None)` 은 SQL `NULL` 이 된다. 0 으로 채우지 않는다
+- 웹 → ROS 로 나가는 메시지에 발신 시각 `timestamp_ms` 를 붙인다
