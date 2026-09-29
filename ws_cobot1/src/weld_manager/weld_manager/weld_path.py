@@ -371,7 +371,8 @@ def plan_line(scan: ScanInput, index: int, params: WeldParams) -> Tuple[LinePlan
     start, end = seam(scan, index, params.bottom_margin_m)
     try:
         frame = tool_frame(spec.t, spec.n_out, params.tilt_rad, params.tool_roll_rad(index))
-        retreat_m = tip_retreat(frame, spec.t, params.standoff_m, params.tip_radius_m)
+        # D36: 선별 보정(standoff_line_offset_m)을 더한 스탠드오프. 9/29 실기에서 선마다 띄움이 0~8 mm 로 달랐다
+        retreat_m = tip_retreat(frame, spec.t, params.line_standoff_m(index), params.tip_radius_m)
     except PathRejected as error:
         raise PathRejected(f'{spec.name}: {error}') from None
     offset = _scale(frame.z, -retreat_m)
@@ -390,8 +391,11 @@ def plan_line(scan: ScanInput, index: int, params: WeldParams) -> Tuple[LinePlan
     p_app = _add(points[0], back)
     p_ret = _add(points[-1], back)
     z_safe = scan.z_top + params.travel_clearance_m
-    fixture_targets = (
-        (p_app[0], p_app[1], z_safe), p_app, *points, p_ret, (p_ret[0], p_ret[1], z_safe))
+    # D37: 스캔 결과에 대한 실제 부재 자리의 치우침 보정. 이음선(seam_fixture)은 그대로 두고 목표점만 옮긴다.
+    # 작업대 → Base 는 평행 이동뿐이라(9행) 작업대 좌표에서 더해도 Base 축 값과 같다
+    shift = params.target_shift_m
+    fixture_targets = tuple(_add(p, shift) for p in (
+        (p_app[0], p_app[1], z_safe), p_app, *points, p_ret, (p_ret[0], p_ret[1], z_safe)))
     base = [scan.to_base(p) for p in fixture_targets]
     plan = LinePlan(
         index=index, name=spec.name, seam_fixture=(start, end), orientation=frame.quaternion,
@@ -456,4 +460,4 @@ def plan_weld(scan: ScanInput, start_line: int, end_line: int, params: WeldParam
     return WeldPlan(
         scan_id=scan.scan_id, start_line=start_line, end_line=end_line, seams=seams, lines=lines,
         base_to_fixture=scan.base_to_fixture,
-        z_safe_base=scan.to_base((0.0, 0.0, scan.z_top + params.travel_clearance_m))[2])
+        z_safe_base=scan.to_base((0.0, 0.0, scan.z_top + params.travel_clearance_m + params.target_shift_m[2]))[2])

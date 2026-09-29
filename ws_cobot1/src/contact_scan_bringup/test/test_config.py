@@ -196,7 +196,8 @@ def test_sim_and_real_result_dirs_differ():
 # phase 2 weld_manager 절 (docs/phase2/weld-motion.md 6절). 이름은 계약에 속한다
 WELD_PARAMS = [
     'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
-    'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'approach_m',
+    'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'standoff_line_offset_m',
+    'target_shift_m', 'approach_m',
     'top_line_offset_dir', 'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
     'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'path_point_dwell_s',
     'tool_check_max_force_n', 'server_wait_timeout_s',
@@ -232,6 +233,16 @@ def test_weld_state_period_is_shorter_than_scan_timeout(file_name):
 def test_top_line_offset_dir_is_tool_or_vertical(file_name):
     """D34: 9/29 는 yaml 한 줄 전환. 값은 두 가지뿐이다."""
     assert _params(file_name)['weld_manager']['top_line_offset_dir'] in ('tool', 'vertical')
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_standoff_line_offsets_keep_every_line_off_the_seam(file_name):
+    """D36: 선별 보정을 더한 스탠드오프는 8 선 모두 0 보다 커야 한다(0 이하 = 접촉, weld_manager 가 102 로 거절)."""
+    weld = _params(file_name)['weld_manager']
+    offsets = weld['standoff_line_offset_m']
+    assert len(offsets) == 8
+    assert all(weld['standoff_m'] + off > 0.0 for off in offsets), offsets
+    assert len(weld['target_shift_m']) == 3
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
