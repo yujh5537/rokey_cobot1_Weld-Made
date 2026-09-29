@@ -16,6 +16,7 @@ export function updateWeldState(previous, message) {
     active: ACTIVE_PHASES.has(phase),
     arc: phase === 'WELDING',
     contact: null,
+    startedMotionId: changedRun ? null : previous?.startedMotionId ?? null,
     beads: changedRun ? [] : previous?.beads ?? [],
   }
 }
@@ -24,7 +25,8 @@ export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOrigin
   if (!state?.arc || !sample || !tipWorldM || !scanResult || !fixtureOriginMm ||
       state.scan_id !== scanResult.scan_id || sample.frameId !== 'base_link' ||
       sample.operation !== 'WELD_PATH' || !Number.isInteger(state.motion_id) ||
-      state.motion_id <= 0 || sample.motionId !== state.motion_id) return null
+      state.motion_id <= 0 || sample.motionId !== state.motion_id ||
+      !Number.isFinite(state.line_progress) || state.line_progress <= 0) return null
 
   const line = state.line
   if (!Number.isInteger(line) || line < 0 || line > 7) return null
@@ -38,6 +40,8 @@ export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOrigin
   if (![...start, ...end, ...origin, ...tip].every(Number.isFinite)) return null
   const a = start.map((value, i) => (value + origin[i]) / 1000)
   const b = end.map((value, i) => (value + origin[i]) / 1000)
+  // The first visible bead belongs to the seam start, not a clamped approach pose.
+  if (state.startedMotionId !== state.motion_id) return [...a, line]
   const direction = b.map((value, i) => value - a[i])
   const lengthSquared = direction.reduce((sum, value) => sum + value * value, 0)
   if (lengthSquared <= 0) return null
@@ -58,6 +62,7 @@ export function appendWeldSample(state, sample, tipWorldM, scanResult, fixtureOr
   return {
     ...state,
     contact,
+    startedMotionId: state.motion_id,
     beads: step < BEAD_STEP_M ? state.beads : [...state.beads.slice(-4999), contact],
   }
 }
