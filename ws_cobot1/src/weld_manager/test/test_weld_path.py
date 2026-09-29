@@ -461,11 +461,24 @@ def test_latest_success_skips_newer_failed_and_unfinished(store, tmp_path):
     assert load_scan(store, '', **FRAMES).scan_id == '20260923-100000-0001'
 
 
-def test_latest_success_skips_unreadable(store, tmp_path):
+def test_latest_unreadable_is_rejected_not_skipped(store, tmp_path):
+    # 독립 재검 🟠3: 최신 result.json 을 읽지 못하면 그것이 성공이었는지 모른다. 옛 성공 결과(큐브를 옮기기 전
+    # 좌표일 수 있다)로 조용히 넘어가지 않고 602. 예전에는 옛 결과를 골랐다
     write_result(tmp_path, '20260923-100000-0001')
     broken = write_result(tmp_path, '20260923-110000-0002')
     broken.write_text('{ 깨진 파일', encoding='utf-8')
-    assert load_scan(store, '', **FRAMES).scan_id == '20260923-100000-0001'
+    with pytest.raises(NoScanResult, match='20260923-110000-0002: 가장 최근 결과 후보를 읽지 못했다'):
+        load_scan(store, '', **FRAMES)
+    # scan_id 를 적으면 옛 결과를 쓸 수 있다(관제자가 고른 것)
+    assert load_scan(store, '20260923-100000-0001', **FRAMES).scan_id == '20260923-100000-0001'
+
+
+def test_older_unreadable_does_not_block_newer_success(store, tmp_path):
+    # 읽지 못하는 결과가 고른 성공 결과보다 옛 것이면 상관없다(거기까지 가지 않는다)
+    broken = write_result(tmp_path, '20260923-100000-0001')
+    broken.write_text('{ 깨진 파일', encoding='utf-8')
+    write_result(tmp_path, '20260923-110000-0002')
+    assert load_scan(store, '', **FRAMES).scan_id == '20260923-110000-0002'
 
 
 def test_newest_success_unusable_is_not_silently_replaced(store, tmp_path):
