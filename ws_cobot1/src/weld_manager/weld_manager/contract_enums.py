@@ -81,6 +81,7 @@ class Reason(IntEnum):
     OVER_FORCE = 400
     SAMPLE_STALE = 403
     ROBOT_STATUS_LOST = 404
+    STOP_UNCONFIRMED = 407   # 정지를 요청했지만 정지 완료를 확인하지 못했다(#161, 1차 scan_manager 와 같은 자리)
     SCAN_ACTIVE = 600
     WELD_ACTIVE = 601
     NO_SCAN_RESULT = 602

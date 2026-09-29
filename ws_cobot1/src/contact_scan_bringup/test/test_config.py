@@ -221,6 +221,14 @@ def test_continue_on_line_failure_is_a_bool(file_name):
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_state_period_is_shorter_than_scan_timeout(file_name):
+    """병후 #197(9/28): scan_manager 601 은 /weld/state 가 weld_state_timeout_s 보다 오래되면 "용접 없음" 으로 통과한다.
+    weld_manager 의 주기 발행이 그보다 짧아야 용접 중에 스캔이 접수되지 않는다."""
+    params = _params(file_name)
+    assert params['weld_manager']['state_publish_period_s'] < params['scan_manager']['weld_state_timeout_s']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
 def test_top_line_offset_dir_is_tool_or_vertical(file_name):
     """D34: 9/29 는 yaml 한 줄 전환. 값은 두 가지뿐이다."""
     assert _params(file_name)['weld_manager']['top_line_offset_dir'] in ('tool', 'vertical')

@@ -89,6 +89,19 @@ def test_speed_below_minimum_is_rejected(param_values, name):
     assert 'weld_speed_min_mps' in result.invalid[0]
 
 
+def test_home_needs_only_home_values(param_values):
+    """안전복귀는 tool_profile · 위빙 등 용접 전용 값이 없어도 된다(병후 #197). 복귀에 쓰는 값이 없으면 여전히 거절."""
+    from weld_manager.params import HOME_NAMES
+    for name in ('tool_profile_u_m', 'tool_profile_r_m', 'tilt_deg', 'weave_pitch_m'):
+        param_values[name] = None
+    assert not check(param_values).ok
+    home = check(param_values, only=HOME_NAMES)
+    assert home.ok and home.params.tool_profile_u_m is None and home.params.approach_m == 0.030
+    param_values['approach_m'] = None
+    result = check(param_values, only=HOME_NAMES)
+    assert not result.ok and 'approach_m' in result.missing
+
+
 def test_profile_arrays_must_have_same_length(param_values):
     param_values['tool_profile_r_m'] = [0.002, 0.006]
     result = check(param_values)

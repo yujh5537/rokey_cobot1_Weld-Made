@@ -315,6 +315,34 @@ def test_continue_off_stops_at_first_failure(make):
     assert h.phase().name == 'ERROR' and len(h.fake.goals) == 5
 
 
+def test_no_safety_status_rejects_start(make):
+    """병후 #197 ①: /safety/status 를 한 번도 못 받았으면 103. safety_monitor 없이 용접 이동이 나가지 않는다."""
+    h = make()
+    h.fake.publish_safety = False
+    h.weld._safety_status = None
+    result = h.run()
+    assert not result.success and result.reason_code == 103 and 'safety' in result.detail
+    assert h.fake.goals == [] and h.phase().name == 'IDLE'
+
+
+def test_home_works_without_weld_only_params(make):
+    """병후 #197: real.yaml 에 tool_profile 이 없어도 /weld/home 은 접수된다(용접 START 는 102)."""
+    h = make(params={'tool_profile_u_m': None, 'tool_profile_r_m': None})
+    assert h.run().reason_code == 102
+    home = h.home()
+    assert home.success, (home.reason_code, home.detail)
+
+
+def test_weld_state_stamp_is_filled(make):
+    """병후 #197(9/28): scan_manager 601 은 /weld/state.stamp 로 오래됨을 본다. 0 이면 조용히 통과되므로 채워져야 한다."""
+    h = make()
+    assert wait_for(lambda: len(h.states) > 0)
+    now = h.client.get_clock().now().nanoseconds
+    s = h.states[-1].stamp
+    stamp = s.sec * 1_000_000_000 + s.nanosec
+    assert stamp > 0 and abs(now - stamp) < 5_000_000_000
+
+
 def test_path_server_missing(make):
     h = make(with_path_server=False, params={'server_wait_timeout_s': 0.5})
     result = h.run()
