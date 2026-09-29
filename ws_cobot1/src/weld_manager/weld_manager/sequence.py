@@ -127,6 +127,10 @@ def classify(request: MotionRequest, result: MotionResult, *, stop_requested: bo
         server = '/robot/execute_path' if request.kind is MotionKind.PATH else '/robot/execute_motion'
         return _failed(Reason.ROBOT_DISCONNECTED, f'{label}: {server} 서버가 없거나 goal 응답이 오지 않았다')
     if not result.accepted:
+        if stop_requested:
+            # 이 노드가 보낸 /robot/stop 이 robot_manager 에 남아 있는 동안 도착한 goal 은 거절된다(계약 5.2
+            # "/robot/stop 이 걸려 있으면 거절"). 로봇은 이 goal 로 움직이지 않았다 — 중지다(독립 재검 🟠2)
+            return Verdict(VerdictKind.STOPPED, int(Reason.STOP_REQUESTED), f'{label}: 중지 접수 뒤 goal 이 거절됐다')
         return _failed(Reason.ROBOT_ERROR, f'{label}: goal 이 거절됐다')   # ROS 2 의 거절에는 사유가 없다
 
     reason = result.reason
