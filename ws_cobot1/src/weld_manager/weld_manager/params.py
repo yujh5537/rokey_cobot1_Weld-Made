@@ -118,6 +118,10 @@ SPECS: Tuple[ParamSpec, ...] = (
     ParamSpec('standoff_line_offset_m', DOUBLE_ARRAY, True,
               _array(lambda v: None if _number(v) else '유한한 수여야 한다', LINE_COUNT, ' (선 L0~L7 마다 하나)'),
               '선별 스탠드오프 보정 [m] (D36): 선 i 의 스탠드오프 = standoff_m + 이 값[i]. 합은 0 보다 커야 한다'),
+    ParamSpec('tilt_line_offset_deg', DOUBLE_ARRAY, True,
+              _array(lambda v: None if _number(v) else '유한한 수여야 한다', LINE_COUNT, ' (선 L0~L7 마다 하나)'),
+              '선별 기울임 보정 [deg] (D38): 선 i 의 기울임 = tilt_deg + 이 값[i]. 합은 0~80. '
+              '9/29 실기: L1 은 45° 손목 자리가 팔 길이(779 mm) 밖 → −30 으로 15°'),
     ParamSpec('target_shift_m', DOUBLE_ARRAY, True,
               _array(lambda v: None if _number(v) else '유한한 수여야 한다', 3, ' (x, y, z)'),
               '모든 목표점(접근 · 경유 · 후퇴 · z_safe 점)에 더하는 평행 이동 [m] (D37, 작업대 = Base 축). '
@@ -187,6 +191,7 @@ class WeldParams:
     tilt_deg: float
     tool_roll_deg: Tuple[float, ...]       # 8 개, 선 L0~L7
     standoff_line_offset_m: Tuple[float, ...]   # 8 개, 선 L0~L7 (D36)
+    tilt_line_offset_deg: Tuple[float, ...]     # 8 개, 선 L0~L7 (D38)
     target_shift_m: Tuple[float, ...]      # 3 개 (x, y, z), 작업대 = Base 축 (D37)
     tool_profile_u_m: Tuple[float, ...]
     tool_profile_r_m: Tuple[float, ...]
@@ -216,6 +221,13 @@ class WeldParams:
 
     def tool_roll_rad(self, line_index: int) -> float:
         return math.radians(self.tool_roll_deg[line_index])
+
+    def line_tilt_deg(self, line_index: int) -> float:
+        """선 i 의 기울임 = tilt_deg + tilt_line_offset_deg[i] (D38). check() 가 0~80 을 보장한다."""
+        return self.tilt_deg + self.tilt_line_offset_deg[line_index]
+
+    def line_tilt_rad(self, line_index: int) -> float:
+        return math.radians(self.line_tilt_deg(line_index))
 
     def line_standoff_m(self, line_index: int) -> float:
         """선 i 의 스탠드오프(구 표면 ↔ 이음선) = standoff_m + standoff_line_offset_m[i] (D36). check() 가 > 0 을 보장한다."""
@@ -311,6 +323,15 @@ def check(values: Mapping[str, object], override: Optional[Mapping[str, object]]
         for name in SPEED_NAMES:
             if name in clean and clean[name] < low:
                 invalid.append(f'{name} = {clean.pop(name)!r}: weld_speed_min_mps({low!r}) 보다 작다')
+    base_tilt = clean.get('tilt_deg')
+    tilt_offsets = clean.get('tilt_line_offset_deg')
+    if base_tilt is not None and tilt_offsets is not None and only is None:
+        # D38: 선별 합도 tilt_deg 와 같은 범위(0~80). 덮어쓰기(tilt_set)로 바뀐 tilt_deg 와 합쳐 본다
+        bad = [i for i, off in enumerate(tilt_offsets) if tilt(base_tilt + off)]
+        if bad:
+            invalid.append(f'tilt_line_offset_deg = {clean.pop("tilt_line_offset_deg")!r}: '
+                           f'tilt_deg({base_tilt!r}) 과 더한 값이 {TILT_RANGE_DEG[0]:g}~{TILT_RANGE_DEG[1]:g} 밖이다 '
+                           f'(선 {", ".join(f"L{i}" for i in bad)})')
     standoff = clean.get('standoff_m')
     offsets = clean.get('standoff_line_offset_m')
     if standoff is not None and offsets is not None and only is None:

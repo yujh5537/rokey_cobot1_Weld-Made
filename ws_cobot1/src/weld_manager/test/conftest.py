@@ -25,7 +25,7 @@ PARAM_VALUES = dict(
     weld_speed_mps=0.010, travel_speed_mps=0.050, approach_speed_mps=0.020,
     weld_speed_min_mps=0.002, standoff_m=0.003, tip_radius_m=0.002,
     weave_amplitude_m=0.002, weave_pitch_m=0.004, tilt_deg=45.0, tool_roll_deg=[0.0] * 8,
-    standoff_line_offset_m=[0.0] * 8, target_shift_m=[0.0] * 3,
+    standoff_line_offset_m=[0.0] * 8, tilt_line_offset_deg=[0.0] * 8, target_shift_m=[0.0] * 3,
     tool_profile_u_m=[0.0, 0.003, 0.012], tool_profile_r_m=[0.002, 0.006, 0.015],
     approach_m=0.030, top_line_offset_dir='tool', travel_clearance_m=0.050, bottom_margin_m=0.005, workspace_margin_m=0.100,
     path_tolerance_m=0.003, motion_timeout_s=120.0, path_point_dwell_s=0.5, tool_check_max_force_n=6.0,
