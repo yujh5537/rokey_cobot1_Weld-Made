@@ -45,6 +45,7 @@
 - `result_dir` · `tip_radius_m` 은 scan_manager 와 **같은 값**이어야 한다(`test_config` 가 검사).
 - `tool_profile_u_m` · `tool_profile_r_m` 은 M2(#186) 캘리퍼 실측값이다. **real.yaml 에는 실측 전이라 없고, 없으면 `/weld/run` 을 102 로 거절한다.** 세로선(L4~L7)의 툴 외형 검사에만 쓰인다. 9/29 학민 슬롯에서 재면 채운다(간섭 거리 D 12 mm 기준, `tool-tcp-register.md`).
 - `tool_roll_deg[8]`: sim 은 `[0, 0, 180, 180, 0, 0, 180, 180]`(모두 0 이면 L7 에서 J6 −360° 한계, 알람 9008). real 은 M1 확인 전 0 유지.
+- **`target_shift_m[x, y, z]`**(D37, #216) · **`standoff_line_offset_m[8]`**(D36): 9/29 실기 띄움 보정. 순서는 **평행 이동 먼저**(−y 쪽 선 멀고 +y 쪽 선 가까움 = 부재 자리 치우침, real +y 3.5 mm) → 그래도 선마다 남는 차이를 선별 보정으로. 선별 합 ≤ 0 은 102. 둘 다 `ros2 param set /weld_manager …` 로 실기 중 바꿔 볼 수 있다(yaml 은 뒤에).
 - `path_tolerance_m`: robot_manager 가 line 의 중간 점에도 쓴다(D32). ≤ 0 · NaN 은 604.
 - **`top_line_offset_dir`**(D34, `tool` 기본 / `vertical`): 윗면선(L0~L3)의 접근 · 후퇴점을 툴 축 뒤(−d)로 둘지 수직 위(+z)로 둘지. 세로선은 항상 `tool`. 9/29 맨 앞 2 자세(L0 후퇴점 · L6 접근 1)가 도달 불가면 real.yaml 한 줄을 `vertical` 로 바꾼다 — 코드 변경 없음.
 - **`path_point_dwell_s`**: `ExecutePath.timeout = motion_timeout_s + 경유점 수 × 이 값`. line 모드는 점마다 정지 확인(`arrival_grace_s`)이 붙어 100 점 · 120 s 고정이면 실기에서 초과한다(학민 #191). sim 0.5(Virtual 실측) · real 2.0(설계 출발값, 미실측).

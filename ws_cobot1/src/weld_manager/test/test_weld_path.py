@@ -186,6 +186,54 @@ def test_sphere_surface_to_seam_is_standoff_on_every_line(index):
         assert math.isclose(gap, params.standoff_m, abs_tol=1e-12), gap
 
 
+@pytest.mark.parametrize('index', range(8), ids=lambda i: LINES[i].name)
+def test_line_offset_changes_only_that_lines_standoff(index):
+    """D36: standoff_line_offset_m[i] 는 선 i 의 구 표면 ↔ 이음선 거리에만 더해진다(9/29 실기 0~8 mm 관찰 보정)."""
+    offsets = [0.0] * 8
+    offsets[index] = 0.0015                       # 3 mm → 4.5 mm (L2 · L6 처럼 가까웠던 선을 더 띄우는 쪽)
+    params = with_(weave_amplitude_m=0.0, standoff_line_offset_m=offsets)
+    scan = box_scan(M1_CUBE)
+    for other in range(8):
+        plan, _ = plan_line(scan, other, params)
+        d = rotate(plan.orientation, (0.0, 0.0, 1.0))
+        s, e = (scan.to_base(p) for p in plan.seam_fixture)
+        t = [b - a for a, b in zip(s, e)]
+        t = [c / math.hypot(*t) for c in t]
+        for tcp in (plan.path[0], plan.path[-2]):
+            center = [p - params.tip_radius_m * di for p, di in zip(tcp, d)]
+            rel = [c - a for c, a in zip(center, s)]
+            along = sum(r * ti for r, ti in zip(rel, t))
+            gap = math.dist(rel, [along * ti for ti in t]) - params.tip_radius_m
+            want = 0.0045 if other == index else 0.003
+            assert math.isclose(gap, want, abs_tol=1e-12), (other, gap)
+
+
+@pytest.mark.parametrize('index', range(8), ids=lambda i: LINES[i].name)
+def test_target_shift_moves_every_target_but_not_the_seam(index):
+    """D37: target_shift_m 은 접근 1 · 2 · 경유점 · 후퇴 · z_safe 점을 모두 같은 벡터만큼 옮기고 이음선 기록은 그대로다."""
+    shift = (0.001, 0.0035, -0.0005)
+    scan = box_scan(M1_CUBE)
+    base_plan, base_targets = plan_line(scan, index, with_())
+    plan, targets = plan_line(scan, index, with_(target_shift_m=list(shift)))
+    assert plan.seam_fixture == base_plan.seam_fixture and plan.orientation == base_plan.orientation
+    moved = [(a, b) for a, b in zip(
+        (base_plan.approach1, base_plan.approach2, *base_plan.path, base_plan.retreat),
+        (plan.approach1, plan.approach2, *plan.path, plan.retreat))]
+    assert len(moved) == len(base_plan.path) + 3
+    for before, after in moved:
+        assert close([v - w for v, w in zip(after, before)], shift, 1e-12)
+    for before, after in zip(base_targets, targets):
+        assert close([v - w for v, w in zip(after, before)], shift, 1e-12)
+
+
+def test_target_shift_z_moves_z_safe_too():
+    scan = box_scan(M1_CUBE)
+    weld = plan_weld(scan, 0, 0, with_(target_shift_m=[0.0, 0.0, 0.002]))
+    plain = plan_weld(scan, 0, 0, with_())
+    assert math.isclose(weld.z_safe_base - plain.z_safe_base, 0.002, abs_tol=1e-12)
+    assert math.isclose(weld.lines[0].approach1[2], weld.z_safe_base, abs_tol=1e-12)
+
+
 def test_tip_retreat_values():
     top = tool_frame(LINES[0].t, LINES[0].n_out, math.radians(45.0), 0.0)
     vertical = tool_frame(LINES[4].t, LINES[4].n_out, math.radians(45.0), 0.0)
