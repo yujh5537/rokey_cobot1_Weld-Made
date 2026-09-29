@@ -197,7 +197,7 @@ def test_sim_and_real_result_dirs_differ():
 WELD_PARAMS = [
     'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
     'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'standoff_line_offset_m',
-    'target_shift_m', 'approach_m',
+    'tilt_line_offset_deg', 'target_shift_m', 'approach_m',
     'top_line_offset_dir', 'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
     'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'path_point_dwell_s',
     'tool_check_max_force_n', 'server_wait_timeout_s',
@@ -243,6 +243,17 @@ def test_standoff_line_offsets_keep_every_line_off_the_seam(file_name):
     assert len(offsets) == 8
     assert all(weld['standoff_m'] + off > 0.0 for off in offsets), offsets
     assert len(weld['target_shift_m']) == 3
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_tilt_line_offsets_stay_in_range_and_vertical_lines_keep_tilt(file_name):
+    """D38: 선별 기울임 합은 0~80 이고, 세로선(L4~L7)은 0 이면 계획이 거절되므로 0 보다 커야 한다."""
+    weld = _params(file_name)['weld_manager']
+    offsets = weld['tilt_line_offset_deg']
+    assert len(offsets) == 8
+    tilts = [weld['tilt_deg'] + off for off in offsets]
+    assert all(0.0 <= t <= 80.0 for t in tilts), tilts
+    assert all(t > 0.0 for t in tilts[4:]), tilts
 
 
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)

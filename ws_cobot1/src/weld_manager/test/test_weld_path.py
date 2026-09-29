@@ -226,6 +226,42 @@ def test_target_shift_moves_every_target_but_not_the_seam(index):
         assert close([v - w for v, w in zip(after, before)], shift, 1e-12)
 
 
+@pytest.mark.parametrize('index', range(8), ids=lambda i: LINES[i].name)
+def test_tilt_line_offset_changes_only_that_lines_orientation(index):
+    """D38: tilt_line_offset_deg[i] 는 선 i 의 툴 축 기울임만 바꾼다. 스탠드오프(구 표면 ↔ 이음선)는 그대로 3 mm."""
+    offsets = [0.0] * 8
+    # 윗면선은 45° → 15°(9/29 L1). 세로선은 15° 면 핑거가 옆면에 닿아 거절되므로(아래 시험) 45° → 55° 로 올린다
+    offsets[index] = 10.0 if LINES[index].vertical else -30.0
+    want = 55.0 if LINES[index].vertical else 15.0
+    params = with_(weave_amplitude_m=0.0, tilt_line_offset_deg=offsets)
+    scan = box_scan(M1_CUBE)
+    for other in range(8):
+        plan, _ = plan_line(scan, other, params)
+        base_plan, _ = plan_line(scan, other, with_(weave_amplitude_m=0.0))
+        d = rotate(plan.orientation, (0.0, 0.0, 1.0))
+        tilt = math.degrees(math.acos(-d[2]))     # d 는 아래를 향한다. 연직에서 기운 각
+        assert math.isclose(tilt, want if other == index else 45.0, abs_tol=1e-9), (other, tilt)
+        if other != index:
+            assert plan.orientation == base_plan.orientation and plan.path == base_plan.path
+        s, e = (scan.to_base(p) for p in plan.seam_fixture)
+        t = [b - a for a, b in zip(s, e)]
+        t = [c / math.hypot(*t) for c in t]
+        for tcp in (plan.path[0], plan.path[-2]):
+            center = [p - params.tip_radius_m * di for p, di in zip(tcp, d)]
+            rel = [c - a for c, a in zip(center, s)]
+            along = sum(r * ti for r, ti in zip(rel, t))
+            gap = math.dist(rel, [along * ti for ti in t]) - params.tip_radius_m
+            assert math.isclose(gap, 0.003, abs_tol=1e-12), (other, gap)
+
+
+def test_tilt_line_offset_uses_that_lines_tilt_in_the_profile_check():
+    # 세로선의 옆면 검사 R < (s′ + u)·tan θ 는 선별 θ 로 본다: L5 를 15° 로 낮추면 닫힌 핑거가 옆면에 닿아 거절
+    scan = box_scan(M1_CUBE)
+    plan_line(scan, 5, with_())                                       # 45° 는 통과
+    with pytest.raises(PathRejected, match='tan 15'):
+        plan_line(scan, 5, with_(tilt_line_offset_deg=[0.0] * 5 + [-30.0, 0.0, 0.0]))
+
+
 def test_target_shift_z_moves_z_safe_too():
     scan = box_scan(M1_CUBE)
     weld = plan_weld(scan, 0, 0, with_(target_shift_m=[0.0, 0.0, 0.002]))
