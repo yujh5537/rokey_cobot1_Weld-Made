@@ -219,14 +219,18 @@ robot_manager:
                                      #   같은 날 이 값만 바꿔 다시 돌렸다: 1.5 실패 → 2.5 네 방향 성공. 공중 치우침은 [1.5, 2.5) N 이다
                                      #   ⚠️ 더 올릴 칸이 없다. release_n < follow_lo_n(3.0) 이라 남은 여유가 0.5 N 인데
                                      #      관측된 F0z 폭은 1.85 N 이다. 치우침이 조금만 더 벌어지면 다시 뚫린다 — 근본 수정은 #167
-    step_follow_lo_n: 3.0            # 누름 하한 [N]. 이보다 약하면 z 를 더 내린다
+    step_follow_lo_n: 2.6            # 누름 하한 [N]. 이보다 약하면 z 를 더 내린다. 2026-09-29 실기: 3.0 → 2.6 — NEG_Y 출발점에서 처음 누른
+                                     #   2.5 N 을 3.0 까지 못 올려(step_drop_m 0.5 mm 안에서) 'no_contact' 로 두 번 실패(scan …-5216 은 4 mm 가짜 EDGE,
+                                     #   …-1466 은 204). release_n(2.5) 바로 위(robot_manager 는 release_n < follow_lo_n 엄격 부등호를 검사 — 2.5 는 거절됐다)
     step_follow_hi_n: 7.0            # 누름 상한 [N]. 이보다 세면 z 를 올린다
     step_max_force_n: 12.0           # |ΔF| 가 이보다 크면 들고 중단 [N]. **전역 과대 외력과 다른 것이다** (계약 7.2, v0.1.21):
                                      #   12 N = 스텝 알고리즘이 스스로 들고 중단하는 보수적 **운용** 한계(robot_manager 안에서만 쓴다)
                                      #   30 N = contact_detector · safety_monitor 의 전역 **안전** 정지 · 래치 한계(over_force_n, 쌍 검사 대상)
                                      #   12 를 30 으로 올리지 않는다 — 올리면 스텝 모드의 자체 보호가 사라진다
     step_side_hit_n: 8.0             # 수평 |ΔF| 가 이보다 크면 물러나고 중단 [N]. 프로토타입 마찰 수평 힘 약 2.6 N
-    step_drop_m: 0.0005              # 힘이 빠졌을 때 최근 접촉 높이보다 이만큼 아래까지 내려가 본다 [m]. 이때도 안 닿아야 모서리
+    step_drop_m: 0.0008              # 힘이 빠졌을 때 최근 접촉 높이보다 이만큼 아래까지 내려가 본다 [m]. 이때도 안 닿아야 모서리.
+                                     #   2026-09-29 실기: 0.5 → 0.8 mm(위 NEG_Y 실패 대응). press_max 3 + 0.8 < drop_limit 5 유지.
+                                     #   모서리 판정 깊이 δ 가 커져 d = √(2rδ − δ²) 가 1.32 → 1.61 mm(r 2 mm): 폭이 한쪽당 약 0.3 mm 커질 수 있다
     step_z_tol_m: 0.001              # 긁는 동안 누르는 높이 변화 한계의 최솟값 [m]. 넘으면 탐침 밀림 · 물체 이동으로 보고 중단
     step_max_slope_deg: 5.0          # 높이 변화 한계 = max(step_z_tol_m, 긁은 거리 × tan(이 각도))
     step_settle_s: 0.15              # 멈춘 뒤 힘을 읽기 전 대기 [s]. 프로토타입 0.1
@@ -234,6 +238,17 @@ robot_manager:
     step_still_m: 0.00005            # 이 창 동안 위치 변화가 이 이하면 멈춤 [m]. posx 정지 잡음보다 커야 한다
     step_still_window_s: 0.15
     step_move_timeout_s: 2.0         # 한 스텝이 (거리/속도 + 이 값) 안에 멈추지 않으면 중단 [s]. 출발하지 않았으면 한 번 다시 보낸다(#153)
+    # --- ExecutePath (phase 2, docs/phase2/weld-ros-interfaces.md 5.2 · 6장, D31) ---------------------
+    # 없거나 못 쓰는 값이면 robot_manager 는 기동하고 ExecutePath 만 거절한다(코드에 기본값 없음)
+    path_mode: line                  # line = 점마다 amovel 뒤 멈춤 확인(1차에서 실기 확인된 API만). 점마다 선다(D8 허용).
+                                     #   spline = 첫 점까지 amovel 직선 뒤 나머지를 amovesx 한 번. 쓰지 않는다: Virtual(9/24)에서
+                                     #   amovesx 응답이 점당 약 30 ms 늦어(21 점 0.5~0.67 s) 그동안 샘플이 끊긴다 → SAMPLE_STALE
+    path_max_points: 100             # 경유점 상한. spline 은 드라이버 고정 배열 100 을 넘을 수 없다(컨트롤러가 개수를 검사하지 않는다)
+    path_max_speed_mps: 0.100        # 경로 속도 상한 [m/s]. 계약 출발값. weld_manager 는 상한을 보지 않는다(D29)
+    path_min_z_m: 0.100              # Base z 하한 [m]. 경유점이 잘못 와도 작업대에 박히지 않게 하는 마지막 울타리.
+                                     #   계약 출발값 = 작업대 표면 base_to_fixture.z 0.095 + 테이프 0.002 + 여유 0.003.
+                                     #   weld_manager 의 세로선 끝은 지지면 + 5 mm. base_to_fixture 를 다시 재면 같이 고친다
+    path_acc_ratio: 4.0              # 가속 = 이 값 × 속도 [1/s]. 1차 move_line 의 4 배 규칙과 같다
 
 scan_manager:
   ros__parameters:
@@ -334,6 +349,78 @@ scan_manager:
     # 넘으면 올리지도 HOME 하지도 않고 NOT_SUPPORTED 로 끝낸다 — 사람이 펜던트로 조그한다.
     # 모르는 좌표로 올림 목표를 만들면 엉뚱한 곳으로 직선 이동한다(규칙 4).
     pose_max_age_s: 1.0      # robot_manager 실측 약 43 Hz(23 ms) 의 40 배 이상. 정지 중 687 ms 공백 기록(#130)보다 크게 둔다
+    weld_state_timeout_s: 5.0        # weld_manager.state_publish_period_s(1.0) 의 5 배. 계약 phase 2 7.1.
+                                     #   /weld/state 의 마지막 stamp 가 이보다 오래되면 용접이 없다고 본다(START · 재시작 통과).
+                                     #   1차 safety_status_timeout_s 와 규칙은 같고 결과는 반대다(그쪽은 끊기면 거절)
+
+# --- phase 2 용접 (docs/phase2/weld-motion.md 6절, D1~D31) ------------------------------------------
+# 값은 계약 6절의 **설계 출발값**이다. 실측이 아니다. 실기에서 조정한다
+weld_manager:
+  ros__parameters:
+    weld_speed_mps: 0.010            # 용접선 위 TCP 속도 [m/s]
+    travel_speed_mps: 0.050          # 선 사이(z_safe) 이동 속도 [m/s]
+    approach_speed_mps: 0.020        # 접근 2(접근점 → 첫 경유점) 속도 [m/s]
+    weld_speed_min_mps: 0.002        # 속도 하한 [m/s]. robot_manager 이동 판정(0.2 mm / 0.3 s ≈ 0.67 mm/s)보다 커야 한다(#152)
+    standoff_m: 0.003                # 팁 구 표면 ↔ 이음선 최단거리 [m] (D22)
+    tip_radius_m: 0.002              # 팁 구 반지름 [m]. scan_manager 의 tip_radius_m 과 같은 값 [v0.1.18 잠정, 캘리퍼 확정 전]
+    weave_amplitude_m: 0.002         # 위빙 진폭 [m]. 0 = 직선
+    weave_pitch_m: 0.004             # 위빙 반주기 [m]. 0 = 직선
+    tilt_deg: 45.0                   # 툴 축이 연직에서 바깥으로 기우는 각 [deg]. 세로선은 0 이면 거절(PathRejected)
+    tool_roll_deg: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 180.0]     # 선 L0~L7 별 툴 축 둘레 회전 [deg] (D24).
+                                     #   **2026-09-29 14:25 확정(현지 · 학민)**: 선마다 홈에서 출발하는 방식(#220)에서 L6 은 180 이면 홈 → 접근 1
+                                     #   직선 이동 중 특이점(3205) 뒤 J5 137.5° > 135 한계(9008)로 정지. 0 으로 DONE. L7 은 180 으로 홈에서 DONE.
+                                     #   아래 오전 기록(180)은 L4 · L5 자리에서 이어 갈 때의 값이다 — 출발 자세가 다르면 손목 풀림이 달라진다
+                                     #   2026-09-29 실기(현지 · 학민): roll 0 으로 L7 top · bottom 에 도달했지만 J6 가 348.5 · 360.9° 로 한계(±360)
+                                     #   끝에 붙었다(bottom.csv). Virtual 9/24 의 L7 알람 9008 과 같은 현상 → L6 · L7 을 180 으로 손목을 반대로.
+                                     #   L6 는 roll 0 에서 접근 · 후퇴점이 NOT REACHABLE(알람 1206, d34.csv)이라 180 이 도달할지는 미확인
+                                     #   ⚠️ sim(9/24 Virtual)에서는 모두 0 이면 L7 접근에서 J6 가 −360° 를 넘었다(선마다 툴이 같은 쪽으로 돌아
+                                     #   누적). sim 은 [0, 0, 180, 180, 0, 0, 180, 180] 으로 8 선을 완주했다(J6 −244.9 ~ +84.9°).
+                                     #   실기 홈(J6 −15.14)에서 같은 값이 맞는지 M1 에서 확인하고 여기에 넣는다. 확인 전에는 L7 까지 가지 않는다(end_line)
+    standoff_line_offset_m: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # 선 L0~L7 별 스탠드오프 보정 [m] (D36, #216).
+                                     #   선 i 의 구 표면 ↔ 이음선 = standoff_m + 이 값. 합이 0 이하면 102 거절(접촉 금지).
+                                     #   target_shift_m 으로 치우침을 뺀 뒤에도 선마다 남는 차이를 여기서 맞춘다. 9/29 관찰(아래)만으로는 0.
+    target_shift_m: [0.0, 0.0035, 0.0] # 모든 목표점에 더하는 평행 이동 [m], 작업대 = Base 축 (D37, #216). 2026-09-29 실기(현지 · 학민, 눈):
+                                     #   6 선 완주 뒤 팁 ↔ 이음선이 L0 7~8 · L2 0~2 · L4 8 · L6 2 · L3 · L7 3 mm(목표 3). 바깥이 −y 인 선은 멀고
+                                     #   +y 인 선은 가까움 → 목표점이 실제 큐브보다 −y 로 치우침(입력이 9/23 스캔이라 놓은 자리 차이 가능).
+                                     #   기록된 치우침 3~4 mm 의 아래쪽 값으로 +y 3.5 mm. 축 방향 3 mm 는 sum > 0 이라 선별 보정만으로는
+                                     #   못 맞춘다(7.5 → 3 은 −4.5). z 는 관찰 없음 → 0.
+                                     #   **2026-09-29 오후 실기 확인(현지 · 학민, 눈): L0 · L2 한 선씩 → 둘 다 제대로 보정됨.** 값 확정.
+                                     #   L4 · L6 · L7 은 이 값으로 아직 안 봤다(계산 예상 5.5 · 4.5 · 5.5 mm, 모두 3 mm 보다 먼 쪽)
+    tilt_line_offset_deg: [0.0, -30.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # 선 L0~L7 별 기울임 보정 [deg] (D38, #218). 선 i = tilt_deg + 이 값.
+                                     #   2026-09-29 오후 실기(현지 · 학민): L1 접근점이 roll 180 · 90 · −90 모두 NOT REACHABLE(1206).
+                                     #   원인은 팔 길이 — 45° 자세의 손목 중심이 어깨에서 826 mm 인데 M0609 위팔 411 + 아래팔 368 = 779 mm.
+                                     #   15° 면 735 mm(오늘 도달한 L0 와 같은 값) → −30. 윗면선은 툴 외형 검사가 없고 스탠드오프 3 mm 는 유지.
+                                     #   L5(847 mm)는 35° 아래면 닫힌 핑거가 옆면에 닿아 거절, 위는 팔이 모자라 어떤 값도 안 됨 → 시연 제외
+    tool_profile_u_m: [0.0, 0.002, 0.012]    # 툴 외형 [m] (D23). 2026-09-29 M2 캘리퍼 실측(현지): 팁 구(r 2 mm) → 탐침 몸통 지름 13 mm(팁 뒤 2 mm 부터,
+    tool_profile_r_m: [0.002, 0.0065, 0.012] #   반폭 6.5) → 닫힌 핑거(팁 뒤 12 mm = 간섭 거리 D 재확인, 반폭 12). 세로선 검사 여유: 옆면 3.1 · 0.6 · 5.1 mm,
+                                     #   작업대 5.9 mm 이상(계약 z 104.13). 실측 간극: L4 bottom 25 · L7 bottom 15 mm(bottom.csv, 설계 17.6).
+                                     #   학민 9/27 합격선(R < 24.9 · 보수 22.1)은 작업대 조건이고, 옆면 조건 R < s′ + u 가 더 빠듯하다(u 12 에서 17.07)
+    approach_m: 0.030                # 접근 · 후퇴 거리 [m] (툴 축 뒤로)
+    top_line_offset_dir: vertical    # 윗면선(L0~L3) 접근 · 후퇴 오프셋 방향 (D34): tool = 툴 축 뒤(−d) / vertical = 수직 위(+z).
+                                     #   2026-09-29 실기 D34(d34.csv): tool 방향 L0 후퇴점(플랜지 718.9)은 도달, L6 접근점(727.7)은 NOT REACHABLE
+                                     #   → 계획서 합격선("하나라도 실패하면 vertical")대로 전환
+                                     #   세로선은 항상 tool. 9/29 맨 앞 2 자세(L0 후퇴점 · L6 접근 1, 플랜지 733 · 729 mm 계산값)가
+                                     #   도달 불가면 vertical 로 바꾼다(M1 이 실제로 도달한 자세, 플랜지 712 mm). 코드 변경 없음
+    travel_clearance_m: 0.0325       # z_safe = 윗면 z + 이 값 [m] (작업대 좌표). 2026-09-29: 50 → 32.5 mm. 계산값으로 L0 후퇴 높이의 플랜지가
+                                     #   722.0 → 712.3 mm(M1 도달 712.1), L6 접근 높이가 727.7 → 718.1 mm(오늘 도달 718.9)로 확인 범위 안에 들어온다
+    bottom_margin_m: 0.005           # 세로선 끝 = support_z + 이 값 [m]. robot_manager path_min_z_m 은 지지면 + 3 mm 라 이보다 낮다
+    workspace_margin_m: 0.100        # 부재 밖 허용 범위 x · y [m]
+    path_tolerance_m: 0.003          # ExecutePath 경유점 도착 허용치 [m] (D18 ±3 mm, D32: line 은 중간 점마다 · 마지막 점)
+    continue_on_line_failure: true   # 한 선의 goal 이 ROBOT_ERROR(204) 로 끝나면 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로(D33).
+                                     #   근거: 9/23 M1(#186) 에서 L1 · L5 가 45° 자세로 도달 불가 → 9/29 기대는 6 선. false 면 첫 실패에서 ERROR
+    orientation_tolerance_deg: 15.0  # 이동 뒤 자세 차이 허용 [deg]. 0 = 끔(병후 결정 Q9)
+    motion_timeout_s: 120.0          # 단위 goal 제한 [s]. 경로 goal 은 아래 path_point_dwell_s 만큼 경유점마다 늘어난다
+    path_point_dwell_s: 2.0         # ExecutePath 경유점 하나에 더하는 제한 시간 [s]. timeout = motion_timeout_s + 점 수 × 이 값.
+                                     #   설계 출발값 = arrival_grace_s 1.0 + 재전송 여유. 실측 없음(9/29 M4 line 에서 잰다). 100 점이면 +200 s (학민 #191 🔵)
+    tool_check_max_force_n: 6.0      # 시작 때 무접촉 |F| 가 이보다 크면 툴 미등록 의심(302). 9/23 미등록 치우침 약 12 N
+    server_wait_timeout_s: 2.0       # robot_manager 액션 서버 · goal 응답 대기 [s]. scan_manager 와 같은 뜻
+    stop_confirm_timeout_s: 5.0      # 정지 뒤 connected && !moving 확인 한도 [s]. scan_manager 와 같은 뜻
+    sample_timeout_s: 1.0            # 시작 · 안전복귀 때 /robot/sample 이 이보다 오래됐으면 없는 것(307)
+    state_publish_period_s: 1.0      # /weld/state 주기 [s]
+    scan_state_timeout_s: 5.0        # /scan/state 가 이보다 오래됐으면 시작 거절(600 계열 배타 판단 불가)
+    result_dir: ~/scan_results/real              # scan_manager 의 result_dir 과 **같은 값**이어야 한다(result_store 를 읽는다, #188)
+    result_frame_id: workpiece_fixture
+    motion_frame_id: base_link       # robot_manager 의 frame_id 와 같아야 한다(ExecutePath 는 다르면 604)
 
 mqtt_bridge:
   ros__parameters:

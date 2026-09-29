@@ -1,0 +1,25 @@
+// 04-③ 1 장: 판정 · 감시 · 정지가 메인 PC 안에서 끝나는 자료 흐름. 근거: docs/phase1/detection-safety-geometry.md 3 장, 계약 2 · 3 · 7.2
+digraph flow {
+  graph [rankdir=LR, fontname="NanumGothic", nodesep=0.5, ranksep=0.9, bgcolor="white"];
+  node  [fontname="NanumGothic", fontsize=15, shape=box, style="rounded,filled", fillcolor="#FFFFFF", color="#444444", margin="0.2,0.12"];
+  edge  [fontname="NanumGothic", fontsize=12, color="#444444"];
+
+  robot [label="M0609 컨트롤러\nget_tool_force = 모델 추정 외력\n(힘 센서 없음)", fillcolor="#EEEEEE"];
+  subgraph cluster_pc {
+    label="메인 PC (웹을 거치지 않는다)"; fontname="NanumGothic"; fontsize=14; style="rounded,dashed"; color="#3378C8";
+    rm [label="robot_manager\n샘플 50 Hz 설정 · 실기 42.8 Hz"];
+    cd [label="contact_detector\nCONTACT · EDGE · OVER_FORCE", fillcolor="#DDEBFA", color="#3378C8", penwidth=2];
+    sf [label="safety_monitor\n2 차 감시 · 래치", fillcolor="#DDEBFA", color="#3378C8", penwidth=2];
+    sm [label="scan_manager\n+ geometry_estimator"];
+  }
+  web [label="웹 관제\n(표시 · 버튼)", fillcolor="#EEEEEE"];
+
+  robot -> rm [label="TCP · 외력"];
+  rm -> cd [label="/robot/sample\n+ motion_id · operation"];
+  cd -> rm [label="/contact/event\n→ 즉시 정지", color="#3378C8", fontcolor="#3378C8", penwidth=2];
+  cd -> sm [label="판정 좌표"];
+  rm -> sf [label="sample · status"];
+  sf -> rm [label="/robot/stop", color="#C0392B", fontcolor="#C0392B", penwidth=2];
+  sm -> web [label="MQTT", style=dashed];
+  sf -> web [label="래치 · 사유", style=dashed];
+}

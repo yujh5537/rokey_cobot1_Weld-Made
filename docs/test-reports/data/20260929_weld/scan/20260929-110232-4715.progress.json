@@ -1,0 +1,511 @@
+{
+  "schema_version": 1,
+  "kind": "contact_scan.progress",
+  "units": {
+    "length": "m",
+    "angle": "rad",
+    "force": "N",
+    "torque": "N*m",
+    "time": "s"
+  },
+  "scan_id": "20260929-110232-4715",
+  "revision": 52,
+  "started_at": {
+    "sec": 1790647352,
+    "nanosec": 906590436
+  },
+  "updated_at": {
+    "sec": 1790648133,
+    "nanosec": 121361634
+  },
+  "state": {
+    "phase": "ERROR",
+    "direction": "NONE",
+    "progress": 3,
+    "progress_total": 4,
+    "motion_id": 0
+  },
+  "last_motion_id": 17,
+  "frames": {
+    "detection": "base_link",
+    "result": "workpiece_fixture"
+  },
+  "direction_order": [
+    "POS_X",
+    "NEG_X",
+    "POS_Y",
+    "NEG_Y"
+  ],
+  "config": {
+    "contact_threshold_n": 3.0,
+    "contact_threshold_set": true,
+    "edge_drop_m": 0.0005,
+    "edge_drop_set": true,
+    "debounce_n": 3,
+    "debounce_set": true,
+    "over_force_n": 30.0,
+    "over_force_set": true,
+    "descend_speed_mps": 0.003,
+    "descend_speed_set": true,
+    "slide_speed_mps": 0.005,
+    "slide_speed_set": true,
+    "max_descend_m": 0.05,
+    "max_descend_set": true,
+    "max_slide_m": 0.06,
+    "max_slide_set": true,
+    "motion_timeout_s": 120.0,
+    "motion_timeout_set": true,
+    "lift_height_m": 0.05,
+    "lift_height_set": true,
+    "target_force_n": 3.0,
+    "target_force_set": true,
+    "drop_limit_m": 0.005,
+    "drop_limit_set": true
+  },
+  "node_params": {
+    "move_speed_mps": 0.03,
+    "recontact_margin_m": 0.001,
+    "recontact_speed_mps": 0.002,
+    "search_origin_pose": [
+      0.420255,
+      -0.156675,
+      0.218,
+      0.05155162,
+      0.99867033,
+      0.0,
+      0.0
+    ],
+    "base_to_fixture": [
+      0.420255,
+      -0.156675,
+      0.095006
+    ],
+    "support_z_m": 0.002,
+    "tip_radius_m": 0.002,
+    "detect_latency_s": 0.0,
+    "edge_round_radius_m": 0.0,
+    "edge_bias_offset_m": 0.0,
+    "result_dir": "~/scan_results/real",
+    "event_wait_timeout_s": 1.0,
+    "stop_confirm_timeout_s": 5.0,
+    "server_wait_timeout_s": 2.0,
+    "safety_status_timeout_s": 5.0,
+    "robot_status_timeout_s": 2.0,
+    "pose_max_age_s": 1.0,
+    "weld_state_timeout_s": 5.0,
+    "result_frame_id": "workpiece_fixture",
+    "motion_frame_id": "base_link"
+  },
+  "measurements": {
+    "top": {
+      "status": "CONFIRMED",
+      "valid": true,
+      "detection": {
+        "event_type": "CONTACT",
+        "event_id": 11,
+        "sample_id": 62545,
+        "motion_id": 2,
+        "source": "robot_force",
+        "pose": {
+          "position_m": [
+            0.4203571472167969,
+            -0.1567136688232422,
+            0.17818521118164063
+          ],
+          "orientation_xyzw": [
+            -0.05155151641415986,
+            -0.9986703191010576,
+            5.766333010637143e-05,
+            -0.00017769899482212952
+          ],
+          "frame_id": "base_link",
+          "stamp": {
+            "sec": 1790647369,
+            "nanosec": 897851866
+          }
+        },
+        "force_stamp": {
+          "sec": 1790647369,
+          "nanosec": 898650588
+        },
+        "detect_stamp": {
+          "sec": 1790647369,
+          "nanosec": 941222694
+        },
+        "force_delta_n": 4.46895446789518,
+        "z_drop_m": null,
+        "z_drop_valid": false,
+        "debounce_count": 3,
+        "wrench": {
+          "force_n": [
+            2.2531588077545166,
+            0.18006613850593567,
+            8.068299293518066
+          ],
+          "torque_nm": [
+            0.19629378616809845,
+            1.5281091928482056,
+            0.11401429027318954
+          ]
+        }
+      },
+      "stop_pose": {
+        "position_m": [
+          0.42027630615234374,
+          -0.15668278503417968,
+          0.1779486846923828
+        ],
+        "orientation_xyzw": [
+          -0.051552846535992805,
+          -0.9986702564974407,
+          4.559106051326312e-05,
+          -0.0001439542553708808
+        ],
+        "frame_id": "base_link",
+        "stamp": {
+          "sec": 1790647370,
+          "nanosec": 218764228
+        }
+      },
+      "stop_pose_valid": true,
+      "reason_code": null,
+      "detail": "",
+      "recorded_at": {
+        "sec": 1790647370,
+        "nanosec": 266055611
+      }
+    },
+    "edges": {
+      "POS_X": {
+        "status": "CONFIRMED",
+        "valid": true,
+        "detection": {
+          "event_type": "EDGE",
+          "event_id": 4294967303,
+          "sample_id": 67037,
+          "motion_id": 3,
+          "source": "robot_step",
+          "pose": {
+            "position_m": [
+              0.46389376831054685,
+              -0.15669073486328125,
+              0.1765556411743164
+            ],
+            "orientation_xyzw": [
+              -0.05157385809134733,
+              -0.9986691827063403,
+              6.530765119637689e-06,
+              -2.5131115130551733e-05
+            ],
+            "frame_id": "base_link",
+            "stamp": {
+              "sec": 1790647463,
+              "nanosec": 885640759
+            }
+          },
+          "force_stamp": {
+            "sec": 1790647463,
+            "nanosec": 885640759
+          },
+          "detect_stamp": {
+            "sec": 1790647463,
+            "nanosec": 885640759
+          },
+          "force_delta_n": 1.8981284868856676,
+          "z_drop_m": 0.000808296203613279,
+          "z_drop_valid": true,
+          "debounce_count": 1,
+          "wrench": {
+            "force_n": [
+              0.8789510726928711,
+              -0.7695421874523163,
+              1.4960419734319053
+            ],
+            "torque_nm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "stop_pose": {
+          "position_m": [
+            0.4639898376464844,
+            -0.15672157287597657,
+            0.17689747619628907
+          ],
+          "orientation_xyzw": [
+            -0.05157385809134733,
+            -0.9986691827063403,
+            6.530765119637689e-06,
+            -2.5131115130551733e-05
+          ],
+          "frame_id": "base_link",
+          "stamp": {
+            "sec": 1790647463,
+            "nanosec": 878856007
+          }
+        },
+        "stop_pose_valid": true,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": {
+          "sec": 1790647463,
+          "nanosec": 895522780
+        }
+      },
+      "NEG_X": {
+        "status": "CONFIRMED",
+        "valid": true,
+        "detection": {
+          "event_type": "EDGE",
+          "event_id": 4294967304,
+          "sample_id": 72507,
+          "motion_id": 7,
+          "source": "robot_step",
+          "pose": {
+            "position_m": [
+              0.37764190673828124,
+              -0.1566674346923828,
+              0.17803762054443362
+            ],
+            "orientation_xyzw": [
+              0.051559363116903886,
+              0.9986699300546173,
+              1.9865889097940216e-05,
+              -4.98500891256034e-05
+            ],
+            "frame_id": "base_link",
+            "stamp": {
+              "sec": 1790647576,
+              "nanosec": 983983002
+            }
+          },
+          "force_stamp": {
+            "sec": 1790647576,
+            "nanosec": 983983002
+          },
+          "detect_stamp": {
+            "sec": 1790647576,
+            "nanosec": 983983002
+          },
+          "force_delta_n": 2.116227139178704,
+          "z_drop_m": 0.0007746353149414298,
+          "z_drop_valid": true,
+          "debounce_count": 1,
+          "wrench": {
+            "force_n": [
+              0.6063885241746902,
+              -0.38880014419555664,
+              1.989860475063324
+            ],
+            "torque_nm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "stop_pose": {
+          "position_m": [
+            0.37762469482421873,
+            -0.15665777587890625,
+            0.17827763366699217
+          ],
+          "orientation_xyzw": [
+            0.051559363116903886,
+            0.9986699300546173,
+            1.9865889097940216e-05,
+            -4.98500891256034e-05
+          ],
+          "frame_id": "base_link",
+          "stamp": {
+            "sec": 1790647576,
+            "nanosec": 978888838
+          }
+        },
+        "stop_pose_valid": true,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": {
+          "sec": 1790647577,
+          "nanosec": 111889854
+        }
+      },
+      "POS_Y": {
+        "status": "CONFIRMED",
+        "valid": true,
+        "detection": {
+          "event_type": "EDGE",
+          "event_id": 4294967305,
+          "sample_id": 77796,
+          "motion_id": 11,
+          "source": "robot_step",
+          "pose": {
+            "position_m": [
+              0.4201650695800781,
+              -0.11499589538574219,
+              0.17833453369140626
+            ],
+            "orientation_xyzw": [
+              0.05154686297661171,
+              0.998670576743622,
+              1.959206390163934e-06,
+              -7.745537634454032e-06
+            ],
+            "frame_id": "base_link",
+            "stamp": {
+              "sec": 1790647686,
+              "nanosec": 145085726
+            }
+          },
+          "force_stamp": {
+            "sec": 1790647686,
+            "nanosec": 145085726
+          },
+          "detect_stamp": {
+            "sec": 1790647686,
+            "nanosec": 145085726
+          },
+          "force_delta_n": 2.7628996968784523,
+          "z_drop_m": 0.0007711791992187633,
+          "z_drop_valid": true,
+          "debounce_count": 1,
+          "wrench": {
+            "force_n": [
+              0.8898517489433289,
+              0.9962930778662363,
+              2.41850753625234
+            ],
+            "torque_nm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "stop_pose": {
+          "position_m": [
+            0.4201455078125,
+            -0.11499461364746094,
+            0.17858885192871093
+          ],
+          "orientation_xyzw": [
+            0.05154686297661171,
+            0.998670576743622,
+            1.959206390163934e-06,
+            -7.745537634454032e-06
+          ],
+          "frame_id": "base_link",
+          "stamp": {
+            "sec": 1790647686,
+            "nanosec": 138430954
+          }
+        },
+        "stop_pose_valid": true,
+        "reason_code": null,
+        "detail": "",
+        "recorded_at": {
+          "sec": 1790647686,
+          "nanosec": 154738905
+        }
+      },
+      "NEG_Y": {
+        "status": "FAILED",
+        "valid": false,
+        "detection": null,
+        "stop_pose": {
+          "position_m": [
+            0.4202911071777344,
+            -0.16167874145507813,
+            0.17955900573730468
+          ],
+          "orientation_xyzw": [
+            -0.05154885749934432,
+            -0.9986704700515403,
+            2.808669985634196e-05,
+            -8.215038029109281e-05
+          ],
+          "frame_id": "base_link",
+          "stamp": {
+            "sec": 1790647736,
+            "nanosec": 38353828
+          }
+        },
+        "stop_pose_valid": true,
+        "reason_code": 204,
+        "detail": "slide_NEG_Y: 스텝 긁기 z_drift: 5.0 mm 긁는 동안 누르는 높이가 -1.10 mm 바뀜 (한계 ±1.00 mm). 탐침 밀림 · 물체 이동 · 윗면 기울기 확인",
+        "recorded_at": {
+          "sec": 1790647736,
+          "nanosec": 50575989
+        }
+      }
+    }
+  },
+  "interruptions": [],
+  "home_return": {
+    "requested": true,
+    "request_count": 1,
+    "requested_at": {
+      "sec": 1790648129,
+      "nanosec": 356811110
+    },
+    "interruptions_at_request": 0,
+    "origin_phase": "ERROR",
+    "completed": true,
+    "completed_at": {
+      "sec": 1790648133,
+      "nanosec": 121361634
+    },
+    "final_pose": {
+      "position_m": [
+        0.42119369506835935,
+        -0.1560277862548828,
+        0.2945217590332031
+      ],
+      "orientation_xyzw": [
+        -0.052148857819832556,
+        -0.9986393056124265,
+        0.00010043652585873329,
+        -0.00015435841932298262
+      ],
+      "frame_id": "base_link",
+      "stamp": {
+        "sec": 1790648133,
+        "nanosec": 98702380
+      }
+    },
+    "final_pose_valid": true
+  },
+  "failure": {
+    "reason_code": 204,
+    "detail": "slide_NEG_Y: 스텝 긁기 z_drift: 5.0 mm 긁는 동안 누르는 높이가 -1.10 mm 바뀜 (한계 ±1.00 mm). 탐침 밀림 · 물체 이동 · 윗면 기울기 확인",
+    "phase": "EDGE_SEARCH",
+    "pose": {
+      "position_m": [
+        0.4202911071777344,
+        -0.16167874145507813,
+        0.17955900573730468
+      ],
+      "orientation_xyzw": [
+        -0.05154885749934432,
+        -0.9986704700515403,
+        2.808669985634196e-05,
+        -8.215038029109281e-05
+      ],
+      "frame_id": "base_link",
+      "stamp": {
+        "sec": 1790647736,
+        "nanosec": 38353828
+      }
+    },
+    "pose_valid": true,
+    "recorded_at": {
+      "sec": 1790647736,
+      "nanosec": 57562234
+    },
+    "resumed_at": null
+  },
+  "result_saved": false,
+  "result_success": null
+}

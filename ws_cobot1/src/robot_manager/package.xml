@@ -10,6 +10,7 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   <exec_depend>contact_scan_interfaces</exec_depend>
   <!-- 두산 드라이버(dsr_msgs2)는 ws_dsr 에만 있고 CI 에는 없다. 그래서 의존으로 선언하지 않고
        노드에서만 import 한다. 순수 계산(conversions)과 그 테스트는 dsr_msgs2 없이 돈다. -->

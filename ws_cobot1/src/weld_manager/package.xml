@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>weld_manager</name>
+  <version>0.2.0</version>
+  <description>phase 2 용접 모션: 스캔 결과의 모서리 8 개를 기울인 자세 · 스탠드오프 · 위빙 경유점으로 따라가는 순서를 조정하는 노드. 경로 계산은 rclpy 없이 도는 순수 Python 모듈이다.</description>
+  <maintainer email="rokeycollab12@gmail.com">HyeonJi Nam</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>contact_scan_interfaces</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>geometry_msgs</depend>
+  <!-- result_store(순수 Python)로 스캔 결과를 읽는다 (P2 지시서: import 허용) -->
+  <exec_depend>scan_manager</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

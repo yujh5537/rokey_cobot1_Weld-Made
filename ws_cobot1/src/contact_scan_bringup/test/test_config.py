@@ -159,6 +159,19 @@ def test_home_return_params_exist(file_name):
         assert scan[name] > 0 and math.isfinite(scan[name]), f'{file_name}: {name} = {scan[name]}'
 
 
+def test_weld_state_timeout_is_positive_and_the_same_in_sim_and_real():
+    """scan_manager 가 /weld/state 를 끊긴 것으로 보는 한도 (phase 2 계약 7.1, 출발값 5.0).
+
+    필수 파라미터라 없으면 START 가 거절된다. 끊기면 용접이 없다고 보고 통과시키는 값이라
+    sim 과 real 이 다르면 Virtual 에서 본 배타 동작이 실기에서 달라진다.
+    """
+    values = {f: _params(f)['scan_manager'].get('weld_state_timeout_s') for f in SOURCE_BY_FILE}
+    for file_name, value in values.items():
+        assert value is not None, f'{file_name}: scan_manager.weld_state_timeout_s 이 없다'
+        assert value > 0 and math.isfinite(value), f'{file_name}: weld_state_timeout_s = {value}'
+    assert len(set(values.values())) == 1, f'sim 과 real 의 weld_state_timeout_s 가 다르다 {values}'
+
+
 @pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
 def test_result_dir_is_absolute(file_name):
     """result_dir 은 절대경로여야 한다 (#187).
@@ -178,3 +191,113 @@ def test_sim_and_real_result_dirs_differ():
     """
     dirs = {f: _params(f)['scan_manager']['result_dir'] for f in SOURCE_BY_FILE}
     assert len(set(dirs.values())) == len(dirs), f'sim 과 real 의 result_dir 이 같다 {dirs}'
+
+
+# phase 2 weld_manager 절 (docs/phase2/weld-motion.md 6절). 이름은 계약에 속한다
+WELD_PARAMS = [
+    'weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps', 'weld_speed_min_mps', 'standoff_m',
+    'tip_radius_m', 'weave_amplitude_m', 'weave_pitch_m', 'tilt_deg', 'tool_roll_deg', 'standoff_line_offset_m',
+    'tilt_line_offset_deg', 'target_shift_m', 'approach_m',
+    'top_line_offset_dir', 'travel_clearance_m', 'bottom_margin_m', 'workspace_margin_m', 'path_tolerance_m',
+    'continue_on_line_failure', 'orientation_tolerance_deg', 'motion_timeout_s', 'path_point_dwell_s',
+    'tool_check_max_force_n', 'server_wait_timeout_s',
+    'stop_confirm_timeout_s', 'sample_timeout_s', 'state_publish_period_s', 'scan_state_timeout_s',
+    'result_dir', 'result_frame_id', 'motion_frame_id',
+]
+# M2(#186 툴 치수)를 재기 전이라 real.yaml 에는 두지 않는다(미측정값을 채우지 않는다, 규칙 4)
+TOOL_PROFILE = ['tool_profile_u_m', 'tool_profile_r_m']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_manager_has_contract_params(file_name):
+    weld = _params(file_name)['weld_manager']
+    missing = [name for name in WELD_PARAMS if name not in weld]
+    assert not missing, f'{file_name}: weld_manager 에 {missing} 가 없다'
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_continue_on_line_failure_is_a_bool(file_name):
+    """D33 스위치는 bool 만 받는다(weld_manager 는 1 · 'true' 를 거절한다)."""
+    assert isinstance(_params(file_name)['weld_manager']['continue_on_line_failure'], bool)
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_state_period_is_shorter_than_scan_timeout(file_name):
+    """병후 #197(9/28): scan_manager 601 은 /weld/state 가 weld_state_timeout_s 보다 오래되면 "용접 없음" 으로 통과한다.
+    weld_manager 의 주기 발행이 그보다 짧아야 용접 중에 스캔이 접수되지 않는다."""
+    params = _params(file_name)
+    assert params['weld_manager']['state_publish_period_s'] < params['scan_manager']['weld_state_timeout_s']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_top_line_offset_dir_is_tool_or_vertical(file_name):
+    """D34: 9/29 는 yaml 한 줄 전환. 값은 두 가지뿐이다."""
+    assert _params(file_name)['weld_manager']['top_line_offset_dir'] in ('tool', 'vertical')
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_standoff_line_offsets_keep_every_line_off_the_seam(file_name):
+    """D36: 선별 보정을 더한 스탠드오프는 8 선 모두 0 보다 커야 한다(0 이하 = 접촉, weld_manager 가 102 로 거절)."""
+    weld = _params(file_name)['weld_manager']
+    offsets = weld['standoff_line_offset_m']
+    assert len(offsets) == 8
+    assert all(weld['standoff_m'] + off > 0.0 for off in offsets), offsets
+    assert len(weld['target_shift_m']) == 3
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_tilt_line_offsets_stay_in_range_and_vertical_lines_keep_tilt(file_name):
+    """D38: 선별 기울임 합은 0~80 이고, 세로선(L4~L7)은 0 이면 계획이 거절되므로 0 보다 커야 한다."""
+    weld = _params(file_name)['weld_manager']
+    offsets = weld['tilt_line_offset_deg']
+    assert len(offsets) == 8
+    tilts = [weld['tilt_deg'] + off for off in offsets]
+    assert all(0.0 <= t <= 80.0 for t in tilts), tilts
+    assert all(t > 0.0 for t in tilts[4:]), tilts
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_path_timeout_covers_max_points(file_name):
+    """학민 #191 🔵: robot_manager 의 최대 경유점(path_max_points)을 실어도 제한 시간이 이동 시간을 덮어야 한다.
+    100 점 · 위빙 경로(선 길이 약 100 mm + 진폭 왕복) / weld_speed + 점 수 × dwell 을 계산값으로 본다."""
+    params = _params(file_name)
+    weld, robot = params['weld_manager'], params['robot_manager']
+    n = robot['path_max_points']
+    travel_s = (0.100 + n * 2 * weld['weave_amplitude_m']) / weld['weld_speed_mps']
+    assert weld['motion_timeout_s'] + n * weld['path_point_dwell_s'] > travel_s + n * robot['arrival_grace_s']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_tool_profile_is_both_or_neither(file_name):
+    """외형 두 배열은 같이 있거나 같이 없다. 있으면 길이가 같고 u 는 오름차순이다."""
+    weld = _params(file_name)['weld_manager']
+    present = [name for name in TOOL_PROFILE if name in weld]
+    assert len(present) in (0, 2), f'{file_name}: {present} 만 있다'
+    if present:
+        u, r = weld['tool_profile_u_m'], weld['tool_profile_r_m']
+        assert len(u) == len(r) and u == sorted(set(u)) and all(v > 0 for v in r)
+
+
+@pytest.mark.parametrize('file_name, node, name', [
+    (f, 'scan_manager', 'result_dir') for f in SOURCE_BY_FILE] + [
+    (f, 'scan_manager', 'tip_radius_m') for f in SOURCE_BY_FILE])
+def test_weld_manager_shares_values_with_scan_manager(file_name, node, name):
+    """result_dir 이 다르면 weld_manager 가 스캔 결과를 못 찾고, tip_radius_m 이 다르면 스탠드오프 정의가 어긋난다(계약 6절)."""
+    params = _params(file_name)
+    assert params['weld_manager'][name] == params[node][name]
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_frame_matches_robot_manager(file_name):
+    """ExecutePath 는 frame_id 가 robot_manager.frame_id 와 다르면 604 로 거절한다."""
+    params = _params(file_name)
+    assert params['weld_manager']['motion_frame_id'] == params['robot_manager']['frame_id']
+
+
+@pytest.mark.parametrize('file_name', SOURCE_BY_FILE)
+def test_weld_speeds_fit_robot_limits(file_name):
+    """용접 속도는 robot_manager 상한 이하, 하한은 이동 판정 최저 속도(eps / 창)보다 커야 한다(#152)."""
+    params = _params(file_name)
+    weld, robot = params['weld_manager'], params['robot_manager']
+    assert weld['weld_speed_mps'] <= robot['path_max_speed_mps']
+    assert weld['weld_speed_min_mps'] > robot['moving_eps_m'] / robot['moving_window_s']

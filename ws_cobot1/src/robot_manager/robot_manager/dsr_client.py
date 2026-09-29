@@ -7,14 +7,20 @@
 
 이 모듈만 `dsr_msgs2`를 import한다. CI에는 두산 드라이버가 없으므로 순수 계산 모듈과 분리한다.
 """
+import math
+
 from dsr_msgs2.srv import (GetCurrentPosx, GetRobotState, GetToolForce, MoveJoint, MoveLine,
-                           MoveStop, ReleaseComplianceCtrl, ReleaseForce, SetDesiredForce,
-                           TaskComplianceCtrl)
+                           MoveSplineTask, MoveStop, ReleaseComplianceCtrl, ReleaseForce,
+                           SetDesiredForce, TaskComplianceCtrl)
+from std_msgs.msg import Float64MultiArray
+
+from robot_manager.paths import SPLINE_MAX_POINTS
 
 DR_BASE = 0
 DR_MV_MOD_ABS, DR_MV_MOD_REL = 0, 1
 DR_FC_MOD_REL = 1
 SYNC, ASYNC = 0, 1
+SPLINE_VEL_CONST = 1  # MoveSplineTask.opt: DEFAULT 0 · CONST 1 (경유점 사이에서 속도를 일정하게)
 DR_QSTOP = 1          # DR_common2.py: QSTOP_STO 0 · QSTOP 1 · SSTOP 2 · HOLD 3
 MM_PER_M = 1000.0
 
@@ -27,6 +33,7 @@ SERVICES = {
     'state': (GetRobotState, 'system/get_robot_state'),
     'move_line': (MoveLine, 'motion/move_line'),
     'move_joint': (MoveJoint, 'motion/move_joint'),
+    'move_spline': (MoveSplineTask, 'motion/move_spline_task'),   # phase 2 ExecutePath (spline)
     'move_stop': (MoveStop, 'motion/move_stop'),
     'compliance_on': (TaskComplianceCtrl, 'force/task_compliance_ctrl'),
     'compliance_off': (ReleaseComplianceCtrl, 'force/release_compliance_ctrl'),
@@ -89,6 +96,54 @@ def move_line_request(posx_mm_deg, speed_mps, relative):
         pos=list(posx_mm_deg), vel=[speed_mm_s, speed_mm_s], acc=[4 * speed_mm_s, 4 * speed_mm_s],
         time=0.0, radius=0.0, ref=DR_BASE,
         mode=DR_MV_MOD_REL if relative else DR_MV_MOD_ABS, blend_type=0, sync_type=ASYNC)
+
+
+def _posx_problem(posx):
+    return len(posx) != 6 or not all(math.isfinite(v) for v in posx)
+
+
+def _path_vel_acc(speed_mps, acc_ratio):
+    """(vel, acc) [mm/s, mm/s²]. 0 이하 · NaN 은 ValueError (0 속도 이동을 보내지 않는다)."""
+    if not (math.isfinite(speed_mps) and speed_mps > 0.0 and math.isfinite(acc_ratio) and acc_ratio > 0.0):
+        raise ValueError(f'속도 {speed_mps!r} m/s · 가속 비 {acc_ratio!r} 는 양수여야 한다')
+    speed_mm_s = speed_mps * MM_PER_M
+    return speed_mm_s, acc_ratio * speed_mm_s
+
+
+def path_line_request(posx_mm_deg, speed_mps, acc_ratio):
+    """ExecutePath line 모드의 한 점: 비동기 절대 직선 이동(amovel).
+
+    `move_line_request` 와 같지만 가속이 `path_acc_ratio` 파라미터를 따른다(계약 6장, 단위 1/s).
+    radius 는 0 이다. ASYNC 에서는 드라이버가 radius 를 버리므로 블렌딩을 기대하지 않는다(D31).
+    """
+    if _posx_problem(posx_mm_deg):
+        raise ValueError(f'posx 가 올바르지 않다: {list(posx_mm_deg)!r}')
+    speed_mm_s, acc_mm_s2 = _path_vel_acc(speed_mps, acc_ratio)
+    return MoveLine.Request(
+        pos=list(posx_mm_deg), vel=[speed_mm_s, speed_mm_s], acc=[acc_mm_s2, acc_mm_s2],
+        time=0.0, radius=0.0, ref=DR_BASE, mode=DR_MV_MOD_ABS, blend_type=0, sync_type=ASYNC)
+
+
+def move_spline_request(posx_list, speed_mps, acc_ratio):
+    """ExecutePath spline 모드: 경유점 전체를 비동기 spline 한 번으로(amovesx).
+
+    드라이버는 요청을 검사하지 않는다(dsr_controller2.cpp 557~583행, 현지 소스 확인 2026-09-24).
+    - `pos_cnt` 가 100 을 넘으면 고정 배열 밖에 쓴다 → 여기서 막는다
+    - `pos.at(i)` 로 `pos_cnt` 개를 읽으므로 둘이 다르면 드라이버에서 예외가 난다 → 항상 같게 채운다
+    - 각 점의 `data[0..5]` 를 범위 검사 없이 읽는다 → 6 개가 아닌 점을 막는다
+    vel · acc 의 두 번째 값(deg/s)은 `move_line_request` 와 같은 규칙으로 같은 숫자를 쓴다.
+    """
+    points = [list(p) for p in posx_list]
+    if not 1 <= len(points) <= SPLINE_MAX_POINTS:
+        raise ValueError(f'spline 경유점 {len(points)} 개 (1~{SPLINE_MAX_POINTS})')
+    for i, p in enumerate(points):
+        if _posx_problem(p):
+            raise ValueError(f'spline 경유점 {i} 의 posx 가 올바르지 않다: {p!r}')
+    speed_mm_s, acc_mm_s2 = _path_vel_acc(speed_mps, acc_ratio)
+    return MoveSplineTask.Request(
+        pos=[Float64MultiArray(data=p) for p in points], pos_cnt=len(points),
+        vel=[speed_mm_s, speed_mm_s], acc=[acc_mm_s2, acc_mm_s2], time=0.0, ref=DR_BASE,
+        mode=DR_MV_MOD_ABS, opt=SPLINE_VEL_CONST, sync_type=ASYNC)
 
 
 def move_joint_request(joint_deg, vel_deg_s):
