@@ -1,0 +1,36 @@
+[WARN] [1790616769.676239618] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled. Use ROS_AUTOMATIC_DISCOVERY_RANGE and ROS_STATIC_PEERS instead.
+[WARN] [1790616769.676270509] [rcl]: 'localhost_only' is disabled, 'automatic_discovery_range' and 'static_peers' will be used.
+WELD_STATE (0, 255, 0)
+/robot/execute_path success/code None 0 
+P1_PASS points= 21 OP_WELD_PATH samples= 1001
+WELD_STATE (1, 255, 0)
+WELD_STATE (2, 0, 0)
+WELD_STATE (3, 0, 0)
+WELD_STATE (4, 0, 0)
+WELD_STATE (2, 1, 1)
+WELD_STATE (3, 1, 1)
+WELD_STATE (4, 1, 1)
+WELD_STATE (2, 2, 2)
+WELD_STATE (3, 2, 2)
+WELD_STATE (4, 2, 2)
+WELD_STATE (2, 3, 3)
+WELD_STATE (3, 3, 3)
+WELD_STATE (4, 3, 3)
+WELD_STATE (2, 4, 4)
+WELD_STATE (3, 4, 4)
+WELD_STATE (4, 4, 4)
+WELD_STATE (4, 4, 5)
+WELD_STATE (2, 5, 5)
+WELD_STATE (3, 5, 5)
+WELD_STATE (4, 5, 5)
+WELD_STATE (2, 6, 6)
+WELD_STATE (3, 6, 6)
+WELD_STATE (4, 6, 6)
+WELD_STATE (2, 7, 7)
+WELD_STATE (3, 7, 7)
+WELD_STATE (4, 7, 7)
+WELD_STATE (4, 7, 8)
+WELD_STATE (9, 255, 8)
+WELD_STATE (5, 255, 8)
+/weld/run success/code True 0 
+{"weld_id": "20260929-023312-1710", "success": true, "reason_code": 0, "detail": "", "lines": [{"index": 0, "status": 1, "reason_code": 0, "detail": ""}, {"index": 1, "status": 1, "reason_code": 0, "detail": ""}, {"index": 2, "status": 1, "reason_code": 0, "detail": ""}, {"index": 3, "status": 1, "reason_code": 0, "detail": ""}, {"index": 4, "status": 1, "reason_code": 0, "detail": ""}, {"index": 5, "status": 1, "reason_code": 0, "detail": ""}, {"index": 6, "status": 1, "reason_code": 0, "detail": ""}, {"index": 7, "status": 1, "reason_code": 0, "detail": ""}], "operation5_samples": 10076, "weld_states": [[0, 255, 0], [1, 255, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0], [2, 1, 1], [3, 1, 1], [4, 1, 1], [2, 2, 2], [3, 2, 2], [4, 2, 2], [2, 3, 3], [3, 3, 3], [4, 3, 3], [2, 4, 4], [3, 4, 4], [4, 4, 4], [4, 4, 5], [2, 5, 5], [3, 5, 5], [4, 5, 5], [2, 6, 6], [3, 6, 6], [4, 6, 6], [2, 7, 7], [3, 7, 7], [4, 7, 7], [4, 7, 8], [9, 255, 8], [5, 255, 8]]}

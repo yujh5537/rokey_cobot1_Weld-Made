@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "kind": "weld.result",
+  "units": {
+    "length": "m",
+    "angle": "rad",
+    "time": "s"
+  },
+  "weld_id": "20260929-023312-1710",
+  "scan_id": "20260921-131938-1493",
+  "success": true,
+  "reason_code": 0,
+  "detail": "",
+  "frame_id": "workpiece_fixture",
+  "base_to_fixture": [
+    0.425,
+    -0.184,
+    0.4
+  ],
+  "start_line": 0,
+  "end_line": 7,
+  "lines": [
+    {
+      "index": 0,
+      "seam": {
+        "start": [
+          -0.04980501098632812,
+          -0.029854998779296878,
+          0.03986501464843746
+        ],
+        "end": [
+          0.04997499389648436,
+          -0.029854998779296878,
+          0.03986501464843746
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616792,
+        "nanosec": 544581875
+      },
+      "finished_at": {
+        "sec": 1790616832,
+        "nanosec": 785438140
+      }
+    },
+    {
+      "index": 1,
+      "seam": {
+        "start": [
+          0.04997499389648436,
+          -0.029854998779296878,
+          0.03986501464843746
+        ],
+        "end": [
+          0.04997499389648436,
+          0.029884997558593758,
+          0.03986501464843746
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616832,
+        "nanosec": 785841398
+      },
+      "finished_at": {
+        "sec": 1790616861,
+        "nanosec": 677627997
+      }
+    },
+    {
+      "index": 2,
+      "seam": {
+        "start": [
+          0.04997499389648436,
+          0.029884997558593758,
+          0.03986501464843746
+        ],
+        "end": [
+          -0.04980501098632812,
+          0.029884997558593758,
+          0.03986501464843746
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616861,
+        "nanosec": 677838280
+      },
+      "finished_at": {
+        "sec": 1790616902,
+        "nanosec": 33067944
+      }
+    },
+    {
+      "index": 3,
+      "seam": {
+        "start": [
+          -0.04980501098632812,
+          0.029884997558593758,
+          0.03986501464843746
+        ],
+        "end": [
+          -0.04980501098632812,
+          -0.029854998779296878,
+          0.03986501464843746
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616902,
+        "nanosec": 33466526
+      },
+      "finished_at": {
+        "sec": 1790616930,
+        "nanosec": 682976215
+      }
+    },
+    {
+      "index": 4,
+      "seam": {
+        "start": [
+          -0.04980501098632812,
+          -0.029854998779296878,
+          0.03986501464843746
+        ],
+        "end": [
+          -0.04980501098632812,
+          -0.029854998779296878,
+          0.005
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616930,
+        "nanosec": 683278581
+      },
+      "finished_at": {
+        "sec": 1790616954,
+        "nanosec": 330128414
+      }
+    },
+    {
+      "index": 5,
+      "seam": {
+        "start": [
+          0.04997499389648436,
+          -0.029854998779296878,
+          0.03986501464843746
+        ],
+        "end": [
+          0.04997499389648436,
+          -0.029854998779296878,
+          0.005
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616954,
+        "nanosec": 330343731
+      },
+      "finished_at": {
+        "sec": 1790616978,
+        "nanosec": 94817399
+      }
+    },
+    {
+      "index": 6,
+      "seam": {
+        "start": [
+          0.04997499389648436,
+          0.029884997558593758,
+          0.03986501464843746
+        ],
+        "end": [
+          0.04997499389648436,
+          0.029884997558593758,
+          0.005
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790616978,
+        "nanosec": 95165471
+      },
+      "finished_at": {
+        "sec": 1790617001,
+        "nanosec": 421326937
+      }
+    },
+    {
+      "index": 7,
+      "seam": {
+        "start": [
+          -0.04980501098632812,
+          0.029884997558593758,
+          0.03986501464843746
+        ],
+        "end": [
+          -0.04980501098632812,
+          0.029884997558593758,
+          0.005
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790617001,
+        "nanosec": 421516424
+      },
+      "finished_at": {
+        "sec": 1790617025,
+        "nanosec": 321093477
+      }
+    }
+  ],
+  "config": {
+    "weld_speed_mps": 0.01,
+    "travel_speed_mps": 0.05,
+    "standoff_m": 0.003,
+    "weave_amplitude_m": 0.002,
+    "weave_pitch_m": 0.004,
+    "tilt_deg": 45.0
+  },
+  "started_at": {
+    "sec": 1790616792,
+    "nanosec": 544404398
+  },
+  "finished_at": {
+    "sec": 1790617025,
+    "nanosec": 321213718
+  }
+}

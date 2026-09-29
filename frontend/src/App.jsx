@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { buildM0609Model, disposeObject3D } from './robotModel.js'
 import { parseRobotJoints } from './robotJoints.js'
+import { createWeldEffect } from './weldEffect.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -232,6 +233,43 @@ function formatScanLogMessage(payload) {
 }
 
 function App() {
+  const weldRef = useRef(null)
+  const renderedScanRef = useRef(null)
+  const autoWeldScan = useRef(null)
+  const [weld, setWeld] = useState(null)
+  const [weldError, setWeldError] = useState('')
+  const [weldPending, setWeldPending] = useState(false)
+  useEffect(() => {
+    let disposed = false
+    let timer
+    const controller = new AbortController()
+    async function poll() {
+      try {
+        const response = await fetch('/sim-weld/state', { signal: controller.signal })
+        if (!response.ok) throw new Error('offline')
+        const state = await response.json()
+        if (!disposed) { weldRef.current = state; setWeld(state) }
+      } catch {
+        if (!disposed) { weldRef.current = null; setWeld(null) }
+      }
+      if (!disposed) timer = setTimeout(poll, 100)
+    }
+    poll()
+    return () => { disposed = true; controller.abort(); clearTimeout(timer) }
+  }, [])
+  async function commandWeld(command) {
+    setWeldPending(true)
+    setWeldError('')
+    try {
+      const response = await fetch(`/sim-weld/${command}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scan_id: scanResult?.scan_id }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.detail)
+    } catch (error) { setWeldError(error.message) }
+    finally { setWeldPending(false) }
+  }
   // Three.js canvas
   const canvasRef = useRef(null)
 
@@ -517,6 +555,7 @@ function App() {
 
     const websocket = new WebSocket(wsUrl)
     let jointTimeout
+    let displayedScanId = null
 
 
     // WebSocket 연결 성공
@@ -545,6 +584,16 @@ function App() {
 
           const nextScanId =
             payload.scan_id ?? null
+
+          if (['PREPARING', 'TOP_SEARCH', 'EDGE_SEARCH', 'GEOMETRY'].includes(nextPhase)) autoWeldScan.current = nextScanId
+          if (['ERROR', 'STOPPED', 'STOPPING'].includes(nextPhase)) autoWeldScan.current = null
+
+          if (nextScanId && nextScanId !== displayedScanId) {
+            displayedScanId = nextScanId
+            setContactPoints([])
+            setTipTrajectory([])
+            setScanResult(null)
+          }
 
           setScanResult((previousResult) => {
             const scanIdChanged =
@@ -627,7 +676,8 @@ function App() {
         // contact/event
         if (
           topic === 'contact/event' &&
-          payload.pose
+          payload.pose &&
+          (!payload.scan_id || !displayedScanId || payload.scan_id === displayedScanId)
         ) {
           // contact/event pose는 판정 순간의 탐침 TCP 좌표(base_link)다.
           // scan/result도 이 접촉점들로 계산되므로 노란 접촉점은 이 원본 좌표를 쓴다.
@@ -766,7 +816,24 @@ function App() {
       antialias: true,
     })
 
-    renderer.setSize(900, 500)
+    const resizeRenderer = () => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      const width = Math.max(canvas.clientWidth, 320)
+      const height = Math.max(canvas.clientHeight, 360)
+      const pixelRatio = Math.min(window.devicePixelRatio, 2)
+
+      renderer.setPixelRatio(pixelRatio)
+      renderer.setSize(width, height, false)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+    }
+
+    resizeRenderer()
+
+    const resizeObserver = new ResizeObserver(resizeRenderer)
+    resizeObserver.observe(canvasRef.current)
 
 
     // 4. 조명
@@ -1146,7 +1213,7 @@ function App() {
     // 8. 현재 TCP 팁 표시
     const tipGeometry =
       new THREE.SphereGeometry(
-        0.12,
+        0.04 / 3,
         24,
         24
       )
@@ -1211,6 +1278,8 @@ function App() {
 
     pathCandidateGroupRef.current = pathCandidateGroup
 
+    const weldEffect = createWeldEffect(scene)
+
     // 13. 실시간 렌더링
     let animationFrameId
 
@@ -1218,6 +1287,7 @@ function App() {
       animationFrameId =
         requestAnimationFrame(animate)
 
+      weldEffect.tick(weldRef.current?.scan_id === renderedScanRef.current ? weldRef.current : null)
       controls.update()
 
       renderer.render(
@@ -1233,9 +1303,12 @@ function App() {
     return () => {
       cancelAnimationFrame(animationFrameId)
 
+      resizeObserver.disconnect()
+
       controls.dispose()
 
       disposed = true
+      weldEffect.dispose()
       robotModel.dispose()
       disposeObject3D(scene)
 
@@ -1354,7 +1427,7 @@ function App() {
     contactPoints.forEach((point) => {
       const geometry =
         new THREE.SphereGeometry(
-          0.08,
+          0.08 / 9,
           20,
           20
         )
@@ -1712,369 +1785,259 @@ function App() {
     )
   }, [scanResult])
 
+  useEffect(() => {
+    renderedScanRef.current = scanResult?.success === true && scanResult?.box_valid === true
+      ? scanResult.scan_id : null
+  }, [scanResult])
+
+  const weldAvailable = Boolean(weld && !weld.active)
+  useEffect(() => {
+    if (phase !== 'DONE' || !weldAvailable || safetyLatched ||
+        scanResult?.success !== true || scanResult?.box_valid !== true ||
+        !scanResult.path_candidates?.every((edge) => edge.valid) ||
+        scanResult.path_candidates.length !== 4 ||
+        autoWeldScan.current !== scanResult.scan_id) return
+    // Let the completed geometry render before approaching its top edges.
+    const timer = setTimeout(async () => {
+      autoWeldScan.current = null
+      try {
+        const response = await fetch('/sim-weld/start', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scan_id: scanResult.scan_id }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.detail)
+      } catch (error) { setWeldError(error.message) }
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [phase, weldAvailable, safetyLatched, scanResult])
+
+  const progressPercent = progressTotal > 0
+    ? Math.min(100, Math.max(0, (progress / progressTotal) * 100))
+    : 0
+  const phaseTone = ['ERROR', 'STOPPED'].includes(phase)
+    ? 'danger'
+    : phase === 'DONE'
+      ? 'success'
+      : phase === 'IDLE'
+        ? 'neutral'
+        : 'active'
+
   return (
-    <main>
+    <main className="app-shell">
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">WELD-MADE · M0609</p>
+          <h1>접촉 탐색 시스템</h1>
+          <p className="subtitle">외곽 엣지·경로 후보 생성 시스템</p>
+        </div>
+        <div className="system-badges" aria-label="시스템 연결 상태">
+          <span className={`status-badge ${wsConnected ? 'is-ok' : 'is-error'}`}>
+            <i /> WebSocket {wsConnected ? '연결됨' : '연결 안 됨'}
+          </span>
+          <span className={`status-badge ${robotModelStatus === 'READY' ? 'is-ok' : 'is-warn'}`}>
+            <i /> M0609 {robotModelStatus}
+          </span>
+          <span className={`status-badge ${safetyLatched ? 'is-error' : 'is-ok'}`}>
+            <i /> 안전 {safetyLatched ? '래치됨' : safetyStatusSeen ? '정상' : '확인 중'}
+          </span>
+        </div>
+      </header>
 
-      <h1>접촉 탐색 시스템</h1>
+      <div className="workspace-grid">
+        <section className="panel viewer-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">LIVE VIEW</p>
+              <h2>3D 화면</h2>
+            </div>
+            <span className={`phase-chip ${phaseTone}`}>
+              {getPhaseLabel(phase, progress, progressTotal)}
+            </span>
+          </div>
 
-      <p>
-        외곽 엣지·경로 후보 생성 시스템
-      </p>
+          <div className="canvas-wrap">
+            <canvas ref={canvasRef} />
+            <div className="view-legend" aria-label="3D 표시 범례">
+              <span><i className="legend-tip" />탐침 끝</span>
+              <span><i className="legend-contact" />접촉점</span>
+              <span><i className="legend-path" />경로 후보</span>
+            </div>
+            {robotModelStatus === 'LOADING' && (
+              <div className="canvas-notice">로봇 모델을 불러오는 중입니다.</div>
+            )}
+            {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
+              <div className="canvas-notice is-error" role="alert">
+                일부 로봇 모델을 불러오지 못했습니다.
+              </div>
+            )}
+          </div>
+          <div className="weld-controls">
+            <strong>형상 생성 후 자동 용접 · 윗면 4변</strong>
+            <button disabled={!weld || weld.active || weldPending || safetyLatched || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
+              onClick={() => commandWeld('start')}>용접 시작</button>
+            <button disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button>
+            <span role="status">{!weld ? '가상 용접 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · ${weld.line + 1}/4변`}</span>
+            {(weldError || weld?.detail) && <p role="alert">{weldError || weld.detail}</p>}
+          </div>
+          <p className="view-help">좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
+        </section>
 
+        <aside className="side-column">
+          <section className="panel action-panel">
+            <div className="panel-heading compact">
+              <div><p className="section-kicker">CONTROL</p><h2>작업 제어</h2></div>
+            </div>
+            <div className="control-panel">
+              <button className="primary" disabled={weld?.active} onClick={handleStart}>시작</button>
+              <button className="danger" onClick={() => weld?.active ? commandWeld('stop') : handleStop()}>중지</button>
+              <button disabled={weld?.active} onClick={handleHome}>안전복귀</button>
+              <button disabled={weld?.active} onClick={handleResume}>재시작</button>
+              <button
+                className="wide"
+                onClick={handleSafetyReset}
+                disabled={safetyStatusSeen && !safetyLatched}
+                title={
+                  !safetyStatusSeen
+                    ? '안전 상태 미수신: 안전 해제 명령을 시도할 수 있습니다.'
+                    : safetyLatched
+                      ? '안전 래치를 해제합니다.'
+                      : '안전 래치가 걸려 있지 않습니다.'
+                }
+              >안전 해제</button>
+            </div>
+          </section>
 
-      {/* 제어 버튼 */}
-      <section className="control-panel">
+          <section className="panel status-panel">
+            <div className="panel-heading compact">
+              <div><p className="section-kicker">PROGRESS</p><h2>현재 상태</h2></div>
+              <strong>{progress} / {progressTotal}</strong>
+            </div>
+            <div className="progress-track" aria-label={`진행도 ${progress} / ${progressTotal}`}>
+              <span style={{ width: `${progressPercent}%` }} />
+            </div>
+            <dl className="status-list">
+              <div><dt>현재 단계</dt><dd>{getPhaseLabel(phase, progress, progressTotal)}</dd></div>
+              <div><dt>진행 방향</dt><dd>{direction}</dd></div>
+              <div><dt>최근 명령</dt><dd>{commandStatus}</dd></div>
+              <div><dt>관절 수신</dt><dd>{Object.keys(jointPositions).length} / 6</dd></div>
+            </dl>
+            <p className="scan-id">Scan ID <code>{scanId ?? '-'}</code></p>
+          </section>
 
-        <button onClick={handleStart}>
-          시작
-        </button>
+          <section className="panel tcp-panel">
+            <div className="panel-heading compact">
+              <div><p className="section-kicker">TCP POSITION</p><h2>탐침 위치</h2></div>
+            </div>
+            {tipPose ? (
+              <div className="coordinate-grid">
+                <div><span>X</span><strong>{formatNumber(tipPose.x)}</strong><small>mm</small></div>
+                <div><span>Y</span><strong>{formatNumber(tipPose.y)}</strong><small>mm</small></div>
+                <div><span>Z</span><strong>{formatNumber(tipPose.z)}</strong><small>mm</small></div>
+              </div>
+            ) : <p className="empty-state">팁 위치를 기다리는 중입니다.</p>}
+            <p className="mini-status">{jointStatus}</p>
+          </section>
+        </aside>
+      </div>
 
-        <button onClick={handleStop}>
-          중지
-        </button>
-
-        <button onClick={handleHome}>
-          안전복귀
-        </button>
-
-        <button onClick={handleResume}>
-          재시작
-        </button>
-
-        <button
-          onClick={handleSafetyReset}
-          disabled={safetyStatusSeen && !safetyLatched}
-          title={
-            !safetyStatusSeen
-              ? '안전 상태 미수신: 안전 해제 명령을 시도할 수 있습니다.'
-              : safetyLatched
-                ? '안전 래치를 해제합니다.'
-                : '안전 래치가 걸려 있지 않습니다.'
-          }
-        >
-          안전 해제
-        </button>
-
-      </section>
-
-
-      {/* 현재 상태 */}
-      <section className="status-panel">
-
-        <h2>현재 상태</h2>
-
-        <p>
-          FastAPI WebSocket:{' '}
-          {wsConnected ? '연결됨' : '연결 안 됨'}
-        </p>
-
-        <p>
-          현재 단계:{' '}
-          {getPhaseLabel(
-            phase,
-            progress,
-            progressTotal
-          )}
-        </p>
-
-        <p>
-          Phase 코드: {phase}
-        </p>
-
-        <p>
-          진행 방향: {direction}
-        </p>
-
-        <p>
-          진행도: {progress} / {progressTotal}
-        </p>
-
-        <p>
-          Scan ID: {scanId ?? '-'}
-        </p>
-
-        <p>
-          최근 명령 상태: {commandStatus}
-        </p>
-
-        <p>
-          Request ID: {lastRequestId ?? '-'}
-        </p>
-
-        <p>
-          M0609 3D 모델: {robotModelStatus}
-        </p>
-
-        <p>
-          M0609 관절 수신:{' '}
-          {Object.keys(jointPositions).length} / 6 — {jointStatus}
-        </p>
-
-        <p>
-          RG2 자세: 실기 탐침 파지 고정 · 0.721396 rad · 탐침 돌출 13 mm
-        </p>
-
-        {tipPose ? (
-          <>
-            <p>
-              팁 기준 프레임: {tipPose.frameId}
-            </p>
-
-            <p>
-              팁 위치:
-              {' '}
-              X {formatNumber(tipPose.x)} mm /
-              {' '}
-              Y {formatNumber(tipPose.y)} mm /
-              {' '}
-              Z {formatNumber(tipPose.z)} mm
-            </p>
-          </>
-        ) : (
-          <p>
-            팁 위치: 아직 수신되지 않음
-          </p>
-        )}
-
-      </section>
-
-      {/* 외곽 엣지·경로 후보 */}
-      <section>
-
-        <h2>외곽 엣지·경로 후보</h2>
-
-        {scanResult && (
-          <p>
-            결과 좌표 프레임:{' '}
-            {scanResult.frame_id ?? '-'}
-          </p>
-        )}
-
-        {scanResult?.success === true &&
-        !BASE_TO_FIXTURE_MM && (
-          <p>
-            작업대 원점 미설정:
-            VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.
-          </p>
-        )}
+      <section className="panel result-panel">
+        <div className="panel-heading">
+          <div><p className="section-kicker">SCAN RESULT</p><h2>외곽 엣지·경로 후보</h2></div>
+          {scanResult?.success === true && <span className="result-ready">결과 생성 완료</span>}
+        </div>
 
         {scanResult?.success === true && (
-          <p>
-            3D 좌표: contact/event · robot/sample은 base_link,
-            scan/result는 base_to_fixture로 base_link에 정렬
-          </p>
-        )}
-
-        {scanResult &&
-          scanResult.success !== true && (
-            <p>
-              경로 후보를 생성하지 못했습니다.
-              {' '}
-              {scanResult.reason ?? 'UNKNOWN'}
-            </p>
-          )}
-
-        {scanResult?.success === true &&
-          !scanResult.path_candidates && (
-            <p>
-              경로 후보 데이터가 없습니다.
-            </p>
-          )}
-
-        {scanResult?.success === true &&
-          Array.isArray(
-            scanResult.path_candidates
-          ) && (
-            <table>
-
-              <thead>
-                <tr>
-                  <th>번호</th>
-                  <th>시작 X</th>
-                  <th>시작 Y</th>
-                  <th>시작 Z</th>
-                  <th>끝 X</th>
-                  <th>끝 Y</th>
-                  <th>끝 Z</th>
-                  <th>길이</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {scanResult.path_candidates.map(
-                  (candidate, index) => (
-                    <tr key={index}>
-                      <td>
-                        {index + 1}
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.start?.x_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.start?.y_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.start?.z_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.end?.x_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.end?.y_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.end?.z_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.length_mm
-                        )} mm
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-
-            </table>
-          )}
-
-      </section>
-
-      {/* 명령 상태 이력 */}
-      <section>
-
-        <h2>명령 상태 이력</h2>
-
-        {commandHistory.length === 0 && (
-          <p>아직 전송한 명령이 없습니다.</p>
-        )}
-
-        {commandHistory.map((command) => (
-          <div key={command.requestId}>
-
-            <p>
-              명령:{' '}
-              {getCommandLabel(
-                command.commandTopic
-              )}
-            </p>
-
-            <p>
-              접수 결과:{' '}
-              {command.status === 'REJECTED'
-                ? '거절'
-                : command.ack?.accepted === true
-                  ? '접수'
-                  : '대기'}
-            </p>
-
-            <p>
-              실행 결과:{' '}
-              {command.status === 'SUCCEEDED'
-                ? '완료'
-                : command.status === 'FAILED'
-                  ? '실패'
-                  : command.status === 'REJECTED'
-                    ? '-'
-                    : '대기'}
-            </p>
-
-            <p>
-              상태 코드: {command.status}
-            </p>
-
-            {command.ack?.accepted === false &&
-              command.ack?.reason && (
-                <p>
-                  거절 사유: {command.ack.reason}
-                  {command.ack.reason_code != null &&
-                    ` (${command.ack.reason_code})`}
-                  {command.ack.detail &&
-                    ` — ${command.ack.detail}`}
-                </p>
-              )}
-
-            {command.status === 'FAILED' &&
-              command.result?.reason && (
-                <p>
-                  실패 사유: {command.result.reason}
-                  {command.result.reason_code != null &&
-                    ` (${command.result.reason_code})`}
-                  {command.result.detail &&
-                    ` — ${command.result.detail}`}
-                </p>
-              )}
-
-            <p>
-              Request ID: {command.requestId}
-            </p>
-
-            <p>
-              갱신 시각:{' '}
-              {formatLogTime(command.updatedAtMs)}
-            </p>
-
+          <div className="measurement-grid">
+            <div><span>폭</span><strong>{formatNumber(scanResult.width_mm)}</strong><small>mm</small></div>
+            <div><span>길이</span><strong>{formatNumber(scanResult.length_mm)}</strong><small>mm</small></div>
+            <div><span>높이</span><strong>{formatNumber(scanResult.height_mm)}</strong><small>mm</small></div>
+            <div><span>경로 후보</span><strong>{scanResult.path_candidates?.length ?? 0}</strong><small>개</small></div>
           </div>
-        ))}
-
-      </section>
-
-      {/* Three.js */}
-      <section>
-
-        <h2>3D 화면</h2>
-
-        <p>좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
-        <p>RG2는 실기에서 읽은 탐침 파지 자세(±0.721396 rad)로 고정 표시하며, 그리퍼 끝에서 탐침 끝까지 13 mm로 렌더링합니다.</p>
-        {robotModelStatus === 'LOADING' && <p>로봇 모델을 불러오는 중입니다.</p>}
-        {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
-          <p role="alert">일부 로봇 모델을 불러오지 못했습니다. GitHub 모델 파일 접근을 확인한 뒤 새로고침하세요.</p>
         )}
-        <canvas ref={canvasRef} />
-
-      </section>
-
-
-      {/* 로그 */}
-      <section className="log-panel">
-
-        <h2>시간순 로그</h2>
-
-        {logs.length === 0 && (
-          <p>아직 로그가 없습니다.</p>
+        {!scanResult && <p className="empty-state large">스캔을 시작하면 측정 결과와 경로 후보가 여기에 표시됩니다.</p>}
+        {scanResult?.success === true && !BASE_TO_FIXTURE_MM && (
+          <p className="alert-message">작업대 원점 미설정: VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.</p>
+        )}
+        {scanResult && scanResult.success !== true && (
+          <p className="alert-message">경로 후보를 생성하지 못했습니다. {scanResult.reason ?? 'UNKNOWN'}</p>
+        )}
+        {scanResult?.success === true && !scanResult.path_candidates && (
+          <p className="empty-state">경로 후보 데이터가 없습니다.</p>
         )}
 
-        {logs.map((log, index) => (
-          <p
-            key={`${log.timestampMs}-${index}`}
-          >
-            {formatLogTime(log.timestampMs)}
-            {' - '}
-            {log.message}
-          </p>
-        ))}
-
+        {scanResult?.success === true && Array.isArray(scanResult.path_candidates) && (
+          <div className="table-wrap">
+            <table>
+              <thead><tr>
+                <th>번호</th><th>시작 X</th><th>시작 Y</th><th>시작 Z</th>
+                <th>끝 X</th><th>끝 Y</th><th>끝 Z</th><th>길이</th>
+              </tr></thead>
+              <tbody>
+                {scanResult.path_candidates.map((candidate, index) => (
+                  <tr key={index}>
+                    <td><span className="path-number">{index + 1}</span></td>
+                    <td>{formatNumber(candidate.start?.x_mm)} mm</td>
+                    <td>{formatNumber(candidate.start?.y_mm)} mm</td>
+                    <td>{formatNumber(candidate.start?.z_mm)} mm</td>
+                    <td>{formatNumber(candidate.end?.x_mm)} mm</td>
+                    <td>{formatNumber(candidate.end?.y_mm)} mm</td>
+                    <td>{formatNumber(candidate.end?.z_mm)} mm</td>
+                    <td><strong>{formatNumber(candidate.length_mm)} mm</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {scanResult?.success === true && (
+          <p className="result-meta">결과 좌표 프레임: {scanResult.frame_id ?? '-'} · base_to_fixture 기준으로 3D 화면에 정렬</p>
+        )}
       </section>
 
+      <div className="details-grid">
+        <section className="panel history-panel">
+          <div className="panel-heading compact">
+            <div><p className="section-kicker">COMMANDS</p><h2>명령 상태 이력</h2></div>
+            <span className="count-badge">{commandHistory.length}</span>
+          </div>
+          <div className="scroll-area">
+            {commandHistory.length === 0 && <p className="empty-state">아직 전송한 명령이 없습니다.</p>}
+            {[...commandHistory].reverse().map((command) => (
+              <article className="command-item" key={command.requestId}>
+                <div><strong>{getCommandLabel(command.commandTopic)}</strong><span>{formatLogTime(command.updatedAtMs)}</span></div>
+                <span className={`command-state ${command.status.toLowerCase()}`}>{command.status}</span>
+                {(command.ack?.accepted === false || command.status === 'FAILED') && (
+                  <p>{command.ack?.reason ?? command.result?.reason ?? '명령 처리 실패'}</p>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel log-panel">
+          <div className="panel-heading compact">
+            <div><p className="section-kicker">SYSTEM LOG</p><h2>시간순 로그</h2></div>
+            <span className="count-badge">{logs.length}</span>
+          </div>
+          <div className="scroll-area log-list">
+            {logs.length === 0 && <p className="empty-state">아직 로그가 없습니다.</p>}
+            {[...logs].reverse().map((log, index) => (
+              <p key={`${log.timestampMs}-${index}`}><time>{formatLogTime(log.timestampMs)}</time><span>{log.message}</span></p>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <details className="diagnostics panel">
+        <summary>상세 시스템 정보</summary>
+        <div className="diagnostic-grid">
+          <p><span>Phase 코드</span>{phase}</p>
+          <p><span>Request ID</span>{lastRequestId ?? '-'}</p>
+          <p><span>팁 기준 프레임</span>{tipPose?.frameId ?? '-'}</p>
+          <p><span>RG2 자세</span>0.721396 rad · 탐침 돌출 13 mm</p>
+        </div>
+      </details>
     </main>
   )
 }
