@@ -33,6 +33,7 @@ MQTT_SUBSCRIPTIONS = [
     "scan/#",
     "contact/#",
     "safety/#",
+    "weld/#",
     "cmd/ack",
     "hb/ros",
     "conn/ros",
@@ -48,6 +49,9 @@ mqtt_client = mqtt.Client(
 # =========================================================
 
 websocket_clients: set[WebSocket] = set()
+STATE_TOPICS = {"robot/status", "scan/state", "safety/status", "weld/state"}
+latest_states: dict[str, dict[str, Any]] = {}
+state_lock = Lock()
 main_event_loop = None
 
 
@@ -223,6 +227,10 @@ def on_message(client, userdata, message):
         f"topic={message.topic} payload={payload}"
     )
 
+    if message.topic in STATE_TOPICS:
+        with state_lock:
+            latest_states[message.topic] = payload
+
     # 1. MQTT 원본 메시지를 WebSocket으로 전달
     schedule_websocket_broadcast(
         message.topic,
@@ -280,7 +288,7 @@ def on_message(client, userdata, message):
             )
 
     # 4. 명령 완료/실패 처리
-    elif message.topic == "scan/command_result":
+    elif message.topic in ("scan/command_result", "weld/command_result"):
         command_state = update_command_from_result(payload)
 
         if command_state is not None:
@@ -355,6 +363,10 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
     websocket_clients.add(websocket)
+    with state_lock:
+        snapshots = list(latest_states.items())
+    for topic, payload in snapshots:
+        await websocket.send_json({"topic": topic, "payload": payload})
 
     print(
         f"[WS] connected "
@@ -396,7 +408,7 @@ def publish_command(
     timestamp_ms = int(time.time() * 1000)
 
     message = {
-        "schema_version": "0.1",
+        "schema_version": "0.2" if topic.startswith("cmd/weld/") else "0.1",
         "request_id": request_id,
         "timestamp_ms": timestamp_ms,
         "payload": request.payload,
@@ -577,3 +589,18 @@ def database_test():
         "database": result[0],
         "user": result[1],
     }
+
+
+@app.post("/commands/weld/start")
+def command_weld_start(request: CommandRequest | None = None):
+    return publish_command("cmd/weld/start", request or CommandRequest())
+
+
+@app.post("/commands/weld/stop")
+def command_weld_stop(request: CommandRequest | None = None):
+    return publish_command("cmd/weld/stop", request or CommandRequest())
+
+
+@app.post("/commands/weld/home")
+def command_weld_home(request: CommandRequest | None = None):
+    return publish_command("cmd/weld/home", request or CommandRequest())
