@@ -64,8 +64,12 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
 브라우저 `http://127.0.0.1:5173`에서 WebSocket 연결과 표준 부재 형상을 확인한다.
-Virtual 표준 fixture의 상판·부재 밑면은 Base Z=400 mm이고 바닥 격자·로봇 베이스는
-Base Z=0이다. 웹 작업대 다리 높이는 상판 원점 Z에서 계산한다.
+Virtual 표준 fixture의 상판·부재 밑면은 Base Z=400 mm이고, 웹 작업대 높이는
+94 mm 그대로다. 로봇 모델 베이스만 화면의 작업대 바닥 Z=306 mm에 놓는다.
+ROS의 `base_link`와 TCP 텔레메트리는 그대로 Base Z=0을 사용한다.
+따라서 이 베이스 이동은 **화면 모델만** 306 mm 올린다. 모델 탐침 끝과
+`robot/sample` TCP 표시·용접 좌표 사이에는 같은 오프셋이 남는다. 실제 TCP 정렬까지
+맞추려면 fixture와 로봇 베이스의 공통 좌표계를 별도로 보정해야 한다.
 초기 관절 홈 성공과 `/safety/status.latched=false`를 확인한 뒤 **용접 시작**을 누른다.
 웹은 화면에 표시된 scan ID로 `/commands/weld/start`에 `start_line=0, end_line=7`을 보낸다.
 불꽃과 자국은 `weld/state.phase=WELDING` 동안 들어온 `robot/sample` TCP 위치를

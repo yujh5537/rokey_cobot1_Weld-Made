@@ -131,7 +131,7 @@ function getBaseToFixtureMm() {
 const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
 
 // 작업대 상판의 Base 좌표. Virtual 표준 fixture는 z=400 mm이고
-// DB/실기 배치는 z≈95 mm다. 바닥과 로봇 베이스는 z=0에 둔다.
+// DB/실기 배치는 z≈95 mm다.
 const DEFAULT_TABLE_ORIGIN_MM = {
   x: 420.255,
   y: -156.675,
@@ -875,18 +875,18 @@ function App() {
     // 5. 작업대
     // 웹 3D 기준:
     // - 작업대 상판 = workpiece_fixture Z = 0
-    // - 바닥/로봇 베이스 = Base Z=0
+    // - 작업대 바닥 = 상판보다 94 mm 아래
     // - 화면 축척 = 100 mm -> Three.js 1 unit
     const worktable = new THREE.Group()
 
     const tableWidth = 4.0
     const tableDepth = 3.0
-    const tableHeight = TABLE_ORIGIN_MM.z * DISPLAY_SCALE
+    const tableHeight = 94 * DISPLAY_SCALE
     const topThickness = 0.12
     const floorY = -tableHeight
 
-    // 장면은 base_link 기준이다. table origin은 상판 좌표이며,
-    // 바닥 격자와 로봇 베이스가 Base Z=0에서 만나도록 다리 높이를 정한다.
+    // 장면은 base_link 기준이다. table origin은 상판 좌표다.
+    // 작업대 형상과 부재 위치는 표준 fixture 값을 유지한다.
     const tableOriginThree =
       toThreePosition(
         TABLE_ORIGIN_MM.x,
@@ -1107,7 +1107,7 @@ function App() {
 
     scene.add(worktable)
 
-    // 바닥 격자는 로봇 베이스와 같은 Base Z=0이다.
+    // 바닥 격자는 상판보다 94 mm 아래에 있다.
     const floorGrid =
       new THREE.GridHelper(
         8,
@@ -1135,6 +1135,10 @@ function App() {
     // Doosan 공식 M0609 visual mesh와 RG2 공개 visual mesh를 사용한다.
     const robotModel =
       buildM0609Model()
+
+    // Virtual 표준 fixture 화면에서 베이스 모델만 작업대 바닥에 맞춘다.
+    // 작업대 상판과 scan/result 형상 좌표는 변경하지 않는다.
+    robotModel.root.position.y = tableOriginThree.y + floorY
 
     robotModelRef.current =
       robotModel.root
