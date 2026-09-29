@@ -17,12 +17,12 @@
 
 | 산출물 | 담당 | 이미 있는 것 (origin/main) | 할 일 | 결과물 위치 |
 |---|---|---|---|---|
-| 시스템 아키텍처 | 병후 | `docs/architecture.md`, `docs/design/contact-scan-system-architecture-v1.6.drawio` | phase 2(weld_manager · ExecutePath · weld/*) 추가해 v1.7, png 내보내기 | `docs/deliverables/01-system-architecture.md` + png |
+| 시스템 아키텍처 | 병후 | `docs/architecture.md`, `docs/design/contact-scan-system-architecture-v1.6.drawio` | phase 2(weld_manager · ExecutePath · weld/*) 추가해 v1.7, png 내보내기 | `docs/deliverables/01-system-architecture.md` + drawio · png (9/28 v1.6 카드 형식으로 다시 만듦) |
 | 네트워크 구성도 | 의석 초안 → 현지 | 루트 README runbook(두 PC · 브로커 · 실기 192.168.1.100 · 포트), `docker/docker-compose.yml`, `docs/env/setup-record-20260916.md`, `docs/decisions/0002-web-stack-mqtt.md` | 새 그림 1 장: 웹 PC(**Docker 4 서비스: mosquitto · postgres · FastAPI · Spring Boot 8080**, React/Vite 5173 은 Docker 밖 `npm run dev`) ↔ 메인 PC(ROS 2 노드 5 + weld_manager 는 "예정" 표시) ↔ 로봇 컨트롤러 · RG2. IP · 포트 · 프로토콜(MQTT 1883 · ROS DDS 도메인 30 · DRFL). 의석이 웹 PC 쪽 초안(9/25), 현지가 메인 PC · 로봇 쪽을 같은 파일에 덧붙임(9/26) | `02-network.md` + drawio · png |
 | 동작 순서도 | 현지 | `scan_manager/README.md` 시퀀스 표, `docs/design/contact-scan-node-diagram-v1.1.md` 시나리오, phase 2 `weld-motion.md` 5절 | 플로우차트 2 장: 스캔(PREPARING → TOP → EDGE ×4 → GEOMETRY → HOMING, 중지 · 안전복귀 · 재시작 분기) · 용접(접근 → 경로 → 후퇴 × 8 → 홈). 예외 분기(래치 · 미접촉 · 정지)를 같은 그림에 | `03-flowchart.md` + drawio · png |
 | 하드웨어 구성 | 학민 | `docs/contracts/units-frames.md`(TCP · 홈 · 작업대 원점 · 큐브 · 배치 원칙), `docs/env/tool-tcp-register.md`, 실기 사진 | 장비 목록 표(M0609 · RG2 · 인공눈물 탐침 · 홀더 · 작업대 · 81 mm 큐브 · 테이프 · 메인 PC · 웹 PC · 스위치) + 배치 사진(치수 표기) + TCP · 홈 · 좌표 기준 요약 | `04-hardware.md` + 사진 |
-| 인터페이스 정의서 | 병후 | `docs/contracts/ros-interfaces.md` · `mqtt-schema.md` · `docs/phase2/weld-*` | 요약본 1 편: 토픽 · 서비스 · 액션 표(이름 · 타입 · 발행/구독 · 뜻) + MQTT 표 + 대표 msg 3 개 전문. 원본은 링크 | `05-interfaces.md` |
-| ROS2 Node 구조도 | 병후 | `docs/design/contact-scan-node-diagram-v1.1.md/.drawio`(연결 40 선) | weld_manager · ExecutePath · /weld/* 추가해 v1.2, png | `06-node-graph.md` + drawio · png |
+| 인터페이스 정의서 | 병후 | `docs/contracts/ros-interfaces.md` · `mqtt-schema.md` · `docs/phase2/weld-*` | 요약본 1 편: 토픽 · 서비스 · 액션 표(이름 · 타입 · 발행/구독 · 뜻) + MQTT 표 + 대표 msg 3 개 전문. 원본은 링크 | `05-interfaces.md` + drawio · png (9/28 설계 정의서 v1.2 형식의 v1.3 으로 다시 씀 — 시나리오 · 타입 전문 27 개 · 계약과 구현 차이) |
+| ROS2 Node 구조도 | 병후 | `docs/design/contact-scan-node-diagram-v1.1.md/.drawio`(연결 40 선) | weld_manager · ExecutePath · /weld/* 추가해 v1.2, png | `06-node-graph.md` + drawio · png (9/28 v1.1 drawio 형식으로 다시 만듦, 첫 판은 `archive/`) |
 | HMI 화면 구성 | 의석 | 프런트(React + Three.js 3D 관제), `docs/test-reports/t41-robot-visualization.md`, TR-05 보고 | 화면 캡처(스캔 · 용접)에 요소 번호 → 표시 정보 · 버튼 · 데이터 출처 표. 화면 흐름 1 장 | `07-hmi.md` + 캡처 |
 | 예외 · 오류 리스트와 처리 | 학민 | `ros-interfaces.md` 6.1 ReasonCode 표(1xx~5xx, 6xx 는 phase 2 `docs/phase2/weld-ros-interfaces.md`) · 7.1 세 정지 경로, `docs/test-reports/daily/20260923.md` §7 SAMPLE_STALE 대응표, safety 감사 보고 | 표 1 개: 상황 → 감지하는 노드 → 코드 → 로봇 동작 → 화면 표시 → 관제자 조치(재시작 · 안전복귀 · 래치 해제). 실기에서 실제로 겪은 것에 ✔ | `08-exceptions.md` |
 | 위험요소 · 안전대책 | 학민 | BRD 4.5 · 위험 목록, safety_monitor README, units-frames "탐침 상태 전제조건", 실기 세션 보고(46 N 밀림 · 툴 미등록 12 N · TCP 휘발) | 표: 위험 → 원인 → 대책(설계 · 절차 · 파라미터) → 검증(TR-07 · 실기 사례). 세션 시작 점검표 포함 | `09-safety.md` |
@@ -51,7 +51,7 @@
 |---|---|
 | 기능 구현 완전성 | BRD MoSCoW Must 목록 ↔ 구현 · 이슈 · PR 표. 스캔 5 점 → 형상 → 웹 3D, 용접 8 선 |
 | 기능 구현 정확성 | TR-01(검출 하중 · 산포), 치수 오차(9/23 실기 폭 +1.5 mm), TR-05(반영 지연 · 중지 1 s), TR-10 |
-| 동작 · 운용 안정성 | 실기 통합 3 회 연속 성공(#179), SAMPLE_STALE 대응표, 래치 · 정지 경로 |
+| 동작 · 운용 안정성 | 실기 통합 3 회 연속 성공(9/23 시연, 1 회 약 7 분 · 팀원 전원 입회 · 동영상. 튜닝은 #179), SAMPLE_STALE 대응표, 래치 · 정지 경로 |
 | 입출력 데이터 이해도 | 계약 문서(ROS · MQTT · JSON), result.json 저장 · 조회, 단위 · 프레임 규칙, 무효값 규칙 |
 | 기능 동작 지속성 | 중지 · 안전복귀 · 재시작 독립, 안전 래치 해제 절차, 예외 · 오류 표(08), 위험 · 안전 대책(09) |
 

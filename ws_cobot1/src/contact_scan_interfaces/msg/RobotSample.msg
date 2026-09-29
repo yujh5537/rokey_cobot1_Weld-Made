@@ -5,6 +5,7 @@ uint8 OP_MOVE_TO=1
 uint8 OP_DESCEND=2
 uint8 OP_SLIDE=3
 uint8 OP_HOME=4
+uint8 OP_WELD_PATH=5                # ExecutePath 실행 중 (phase 2). ExecuteMotion goal 에는 쓰지 않는다
 
 uint64 sample_id                    # robot_manager 발급, 발행마다 +1
 string frame_id                     # pose · wrench 의 기준 프레임 ('base_link' 가칭)

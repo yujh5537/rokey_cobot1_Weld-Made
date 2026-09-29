@@ -2,6 +2,51 @@
 
 형식: `버전 (날짜, PR) - 무엇을 왜. 영향받는 모듈`
 
+## v0.1.21 (2026-09-23, T06 감사 후 팀 결정 10건 + 2차 하강 제한 재결정)
+**타입 변경 있음**(번호 · 필드 **추가**만. 기존 번호 · 필드는 그대로다): `ReasonCode` 에 `STOP_UNCONFIRMED(407)`, `RobotStatus` 에 SLIDE 누름 목표 6개(`slide_mode` · `slide_force_setpoint_n` · `slide_force_baseline_n` · `slide_force_estimate_n` · `step_press_lo_n` · `step_press_hi_n`). 영향: scan_manager(재시작 허용 목록 · 안전복귀 경로) · safety_monitor(2차 하강 제한 여유 · 최신성 500 ms) · robot_manager(1차 하강 제한 기준 z · 상태의 누름 세 값) · mqtt_bridge(`robot/status` JSON 6개) · contact_detector(문서만).
+
+입력: `docs/test-reports/safety-audit-review_20260922.md`(§7 "팀 결정이 필요한 항목" 10건)과 그 입력이 된 감사 보고서(PR #144, 아직 병합되지 않았다). 결정 전문과 근거는 `docs/decisions/0004-safety-audit-decisions.md` 에 있다.
+
+- **결정 1 · ERROR 재시작(9장 TBD 해소).** `ERROR` 로 끝난 작업은 **허용 목록**(`SAMPLE_STALE 403` · `ROBOT_STATUS_LOST 404` · `STOP_UNCONFIRMED 407`)일 때만 `/safety/reset` 뒤 `/scan/resume` 을 받는다. `OVER_FORCE` · `DROP_LIMIT` · 알 수 없는 오류 · **목록에 없는 새 사유**는 `NOT_SUPPORTED` 로 거절하고 새 START 만 가능하다. 자동 재개는 없다. 기존 관문(래치 · 상태 최신성 · 연결)은 그대로 본다. "정지 미확인"이 `ROBOT_STATUS_LOST(404)` 에 섞여 있던 것을 새 코드 **407** 로 갈랐다 — 허용 목록을 사유로 판단하려면 사유가 갈려 있어야 한다
+- **결정 2 재결정 (2026-09-23) · 2차 한계 9 → 10 mm.** 간섭 거리 **D = 그리퍼 밖 탐침 길이 12 mm**(자로 실측, 현지 · 학민 · 병후)를 새로 재어, `drop_limit_margin_m` 을 0.004 → **0.005**(2차 = 10 mm)로 바꿨다. 옛 9 mm 와 "탐침 길이를 손으로 재어 정했다"는 근거 문구는 사실이 아니었다(정정). 남는 조건 둘 다 **미측정**이다: 상한 `L2 + O2 < D`(O2 < 2 mm) · 하한 `5 + O1 < L2`(O1 < 5 mm). O 를 지배하는 것은 관성이 아니라 힘 제어이고(9/22 실기 1123: 정지 뒤 z 가 2.8 mm 내려감, #152 · PR #156 이 고쳤다), **이 값은 힘 제어가 없는 step 모드 기준이다.** 되돌릴 조건과 D 재측정 규칙은 `ros-interfaces.md` 7.2 · ADR 0004 결정 2 에 적었다.
+- **결정 2 · 하강 제한 여유(7.2, #53).** `drop_limit_m` 은 두 노드가 **같은 값**(쌍 검사 유지). safety_monitor 에만 `drop_limit_margin_m`(계약 이름 아님, `ScanConfig` 에 없음)을 두어 2차 한계를 `drop_limit_m + margin` 으로 한다. real · sim 모두 1차 5 mm · 2차 **10 mm**(9/22 결정은 9 mm 였고 9/23 에 재결정했다 — 아래 항목). `SetConfig` 가 두 노드의 `drop_limit_m` 을 같은 값으로 덮어도 여유는 남는다. `confirm_n` 으로 늦추지 않는다
+  - **선행 조건이었던 기준 z 통일을 같이 했다(C-9).** robot_manager 의 1차 기준 z 를 "실행 직전의 마지막 위치"에서 **"자기가 `OP_SLIDE` 로 발행한 첫 유효 샘플의 z"** 로 바꿨다. safety_monitor 가 잡는 것과 **같은 메시지의 같은 값**이다. 순응을 켜면 z 가 약 0.7 mm 올라와 두 기준이 어긋나 있었다
+- **결정 3 · 최신성(6.3 예외).** **이 항목만 시연 전에 v0.1.16(#168)로 먼저 나갔다.** real 의 `sample_stale_ms` 300 → **500**. #130 에서 316~365 ms 공백이 반복돼 goal 의 약 40 %가 `SAMPLE_STALE` 로 멈췄다. 500 이면 기록된 공백 14개 중 687 ms 하나만 걸린다. **700 은 지금 올리지 않는다**(데이터가 쌓이면 검토만). #130 원인이 풀리면 300 으로 되돌린다. "한계보다 원인이 먼저"라는 지침의 예외임을 6.3 에 적었다
+- **결정 4 · force/REL 표시.** `force` 모드의 누름은 설정 증분(`slide_target_force_n`, `DR_FC_MOD_REL`) · SLIDE 시작 기준 Fz · 추정 최종 힘(둘의 합) **세 값이 다른 것**이다. 자유 문자열에 섞지 않고 `RobotStatus` 필드로 갈라 싣는다. 추정값은 이름으로 추정임을 밝힌다(`slide_force_estimate_n`). **`step` 모드에서는 세 값이 NaN** 이고 목표 누름 띠(`step_press_lo_n` · `step_press_hi_n`)를 싣는다. 실기 기본은 `step`, sim 은 `force`
+- **결정 5 · EDGE.** PR #160(v0.1.15)의 스텝 모드 방식을 승인한다. 이 버전에서 로직을 바꾸지 않았다
+- **결정 6 · 중지 KPI(7.1).** **물리 정지 1 s 이내**(BRD 9장 그대로)와 **STOPPED 표시 3 s 이내**(신설)를 나눴다. 물리 정지에 3 s 를 허용하는 표현은 두지 않는다. 물리 정지 시간은 bag · 실기로만 판정한다
+- **결정 7 · 안전복귀(7.5 신설, 9장 TBD 해소).** 위치 확인 → 손상 의심 확인 → 수직 올림 → **도착 확인** → `OP_HOME`. 위치 불명 · 올림 실패 · 손상 의심(`OVER_FORCE` · `DROP_LIMIT` · `OUT_OF_WORKSPACE`)이면 HOME 을 보내지 않고 사람이 펜던트로 조그한다. #130 에서 올림이 실패했는데 HOME 이 나간 사례가 2회 있었다. 올림도 래치를 보지 않는다
+- **결정 8 · 과대 외력.** 전역 `over_force_n` **30 N 유지**. 스텝 모드의 `step_max_force_n` 12 N 은 **다른 것**(알고리즘이 스스로 들고 중단하는 로컬 보호)이며 그대로 둔다. 7.2 에 둘의 차이를 적고, real.yaml 의 "over_force_n(15)" 주석을 30 으로 바로잡았다
+- **결정 9 · 디바운스(3.3).** `debounce_n = 3` **현행 유지**. 다만 `get_tool_force` 가 약 10 Hz 로만 갱신되므로 "연속 샘플 3회"가 독립 측정 3회가 아니라는 사실을 적었다. "값 변화 3회"로 바꾸지 않는다(오프라인 계산에서 판정 순간 참 힘 중앙 34.8 N). 스텝 모드의 "멈춘 뒤 새 샘플만 평균 · `debounce_count = 1`" 은 별개라고 명시했다
+- **결정 10 · #141 기준점.** 작업환경 물리 재구성으로 해결. **수치는 바꾸지 않았다** — 확정된 새 실측값이 레포 · 이슈 · PR 어디에도 없어 추측하지 않는다
+
+> phase 2(용접) 계약은 **v0.2.x** 로 번호를 매기고 1차 v0.1.x 와 병행한다. 최신이 위.
+
+## v0.2.0 (2026-09-23, phase 2 용접 인터페이스, docs/phase2)
+**타입 추가**(`WeldConfig` · `WeldState` · `WeldLine` · `WeldResult` · `StopWeld` · `RunWeld` · `ExecutePath`)와 **기존 타입의 상수 추가**(`RobotSample` · `ExecuteMotion` 에 `OP_WELD_PATH=5`, ReasonCode 6xx 5 개). 기존 필드는 바꾸지 않았다. 전문과 동작 규칙은 `docs/phase2/weld-ros-interfaces.md`, MQTT 는 `docs/phase2/weld-mqtt-schema.md`, 모션 정의는 `docs/phase2/weld-motion.md`.
+- **왜**: 1차(스캔) 완료 뒤 2차 프로젝트 "스캔 결과로 용접 모션"을 같은 레포 · 같은 인터페이스 패키지에서 진행한다(병후, 2026-09-23). phase 2 는 기존 계약 · BRD 의 구속을 받지 않지만, 타입 동기화 검사(`test_contract_sync`)와 ReasonCode 번호 규칙(추가만, 변경 없음)은 그대로 쓴다
+- 영향: robot_manager(`/robot/execute_path` 서버 추가, `RobotSample.operation=5` 발행) · scan_manager(`/weld/state` 활성이면 START · RESUME 을 601 로 거절) · mqtt_bridge(`weld/*` · `cmd/weld/*` · 6xx 이름 · `WELD_PATH` 이름, 의석) · 새 노드 weld_manager · 웹
+- `ExecuteMotion` 서버는 `OP_WELD_PATH` goal 을 계속 거절한다(`op > OP_HOME`). 용접 이동은 `ExecutePath` 로만 한다
+- 리뷰 반영(2026-09-23 저녁): 학민 — robot_manager `path_min_z_m` · 순응 검사 근거 · `path_acc_ratio` 단위. 의석 — 토픽별 `schema_version` · null 단독 규칙 · 브리지 표 PR 을 P1 앞에. 현지 — 스탠드오프 정의(구 표면 ↔ 이음선) · 세로선 툴 외형 검사 · 미요청 정지 = ERROR · 오래된 `/weld/state` 무시 · roll 선별 배열 · `/robot/sample` 구독 · 속도 하한. 자체 노드 6 개(1장 · `.claude/rules/ros2-nodes.md` 예외)
+- 현지 2차(2026-09-23 밤): `RunWeld.end_line` · `WeldResult.end_line` 추가("L0 만" 시험을 계약상 가능하게) · 툴 외형 파라미터 이름 `tool_profile_u_m` · `tool_profile_r_m` · weld_manager 는 속도 상한을 검사하지 않는다(D29, 3.1)
+- 현지 3차(2026-09-24): 후퇴점은 ExecutePath 안(weld_speed) · 대기 한도 3 개 · `orientation_tolerance_deg` · z_safe 아래면 수직 상승(D30) · 휴지 중 `/weld/stop` 은 `/robot/stop` 을 부르지 않음 · `ExecuteMotion.scan_id` 자리에 `weld_id`
+- 현지 4차(2026-09-24, 드라이버 소스 확인): `ExecutePath` 실행 방식을 `path_mode` line(기본) / spline 으로, `move_line`+radius 는 ASYNC 에서 radius 가 버려져 제외 · `path_max_points` 200 → 100(`MAX_SPLINE_POINT`, 컨트롤러가 `pos_cnt` 를 검사하지 않음). 호출 확인은 #186 M4(D31)
+- 2026-09-25(병후 결정): **D12 갱신** — P1 robot_manager `ExecutePath` 구현은 현지(PR #191), 리뷰 학민. **D32** — `path_tolerance_m` 은 line 모드의 중간 점 도착 판정에도 쓰고 `≤ 0` · NaN 은 604(현지 해석 채택). **D31 결과** — spline 은 Virtual 응답 지연으로 사용 불가(현지 9/24), line 만. 5.2 에 명령 실패 뒤 정지 확인 규칙(#191 · #193). `weld-motion.md` 5절에 선 사이 이동은 z_safe 두 점 사이에서만(학민 M1 충돌 사례). **D33** — 한 선의 204 실패는 그 선만 FAILED 로 기록하고 복구 이동 뒤 다음 선으로 계속(`continue_on_line_failure`, 5.1 · 3.2 · weld-motion 5 · 6절. M1: L1 · L5 도달 불가 → D27 기대는 6 선). 타입 변경 없음(`ExecutePath.action` 주석만)
+- 2026-09-26(병후 결정, 현지 #184 리뷰): **D33 좁힘** — 다음 선으로 계속하는 것은 z_safe 위에서 난 204(도달 불가 · 출발 안 함)뿐. z_safe 아래의 204 는 복구 이동(−d 물러남 → z_safe) 뒤 ERROR. **D30 갱신** — 시작 때 z_safe 아래면 −d 물러남 → 상승(복구 · 7.2 안전복귀와 같은 순서). 타입 변경 없음
+- 2026-09-26(#198, 문서만): 1차 `ros-interfaces.md` 5.1 · 5.3 에 `WELD_ACTIVE(601)` 와 검사 순서(BUSY → 601 → 래치 → 로봇) · phase 2 7.1 에 같은 순서 한 줄(600 과 대칭) · `weld-motion.md` 6절에 scan_manager 파라미터 `weld_state_timeout_s`(5.0) 줄. 새 버전 번호 없음
+- 2026-09-26 밤(#198): D33 "z_safe 위" 판정 = `z ≥ z_safe − path_tolerance_m`(학민 ③ · 현지 제안 1, 코드와 일치) · 3.2 복구 이동 중 stop → STOPPED · **D34** 접근 · 후퇴점 도달성 — 9/29 2 자세 선확인, 윗면선 오프셋 방향 파라미터 `top_line_offset_dir`(`tool`/`vertical`) 추가(weld_manager, 타입 변경 없음)
+- 2026-09-27(D35, 문서만): `ExecutePath` 거절 사유에 **출발점 z < `path_min_z_m`** 추가(수락 시점, 604). **출발점을 모르면(유효한 위치 샘플 없음) 604 로 거절**(학민 #199, 1차 SLIDE 의 같은 검사). 학민 #191 리뷰 🟡. robot_manager 코드는 #191 에서 반영(현지). 타입 변경 없음
+- 2026-09-27(문서만): `weld-motion.md` 6절에 weld_manager 파라미터 **`path_point_dwell_s`** 한 줄 — `ExecutePath` 제한 시간 = `motion_timeout_s` + 경유점 수 × 이 값(현지 #191 🔵 답, 구현 #195~#197). 타입 변경 없음
+
+## v0.1.22 (2026-09-27, 브리지 이름 표 · phase 2 대비)
+**타입 변경 없음.** 필드 · 번호를 더하거나 빼지 않았다. `mqtt-schema.md` 1장 enum 규칙에 한 줄을 더했다: **mqtt_bridge 의 이름 표에 없는 값은 메시지를 버리지 않고 `"UNKNOWN_<값>"` 으로 보낸다**(#90). 영향: mqtt_bridge(`encoders.py`) · 웹(모르는 이름을 받아도 나머지 필드를 그대로 쓴다).
+
+- **왜.** 예전에는 표에 없는 값에서 `encode_*` 가 `ValueError` 를 냈고, 구독 보호막이 그 메시지를 통째로 버렸다. **정작 알려야 할 코드일수록 웹이 못 받았다**(#90).
+- **`ROBOT_OPERATION_NAMES[5] = "WELD_PATH"`** 를 같이 넣었다. phase 2 에서 robot_manager 가 `ExecutePath` 실행 중 `OP_WELD_PATH=5` 를 싣는다(계약 v0.2.0 · #184, 발행은 #191). 표에 5 가 없으면 용접 중 `robot/sample` 이 통째로 버려져 웹의 TCP 위치 · 궤적이 멈춘다.
+- 표가 계약과 어긋난 채 조용히 굴러가지 않게 막는 것은 이 규칙이 아니라 `mqtt_bridge/test/test_enum_tables.py` 의 표 대조 시험이다(#161). **`UNKNOWN_<값>` 은 계약에 상수를 더한 뒤 표를 안 고쳐도 된다는 뜻이 아니다** — 이름 표는 계약과 같게 유지한다.
+- 웹 → ROS 방향은 바꾸지 않았다. 웹이 보낸 모르는 이름은 그대로 `INVALID_VALUE` 로 거절한다(모르는 명령을 짐작해 실행하지 않는다).
+- **머리 버전 표기(3행)는 이 PR 에서 건드리지 않았다.** #161 이 `b83cae6` 으로 같은 줄에 v0.1.21 을 넣어서, 양쪽이 같은 줄을 고치면 머지할 때 충돌한다. v0.1.22 한 줄은 두 PR 이 다 들어간 뒤에 따로 더한다.
+- 시험은 `test_encoders.py` 가 아니라 새 파일 `mqtt_bridge/test/test_enum_names.py` 에 두었다. 같은 이유다 — #161 이 `test_encoders.py` 의 import 블록과 파일 끝을 고친다.
 
 ## v0.1.20 (2026-09-23, T41 · #179)
 `mqtt-schema.md`의 M0609/RG2 표시용 관절 스트림을 발행원 기준으로 분리했다. 영향: mqtt_bridge · frontend · mock_publisher.
@@ -28,7 +73,7 @@
 - `support_z_m` 0 → 0.002(테이프 두께 잠정). real `detect_latency_s` 0.020 → 0.0(스텝 모드는 멈춘 뒤 EDGE 확정, v0.1.15 7.2 후속)
 - 세션 시작 점검 2 에 **START 전 툴 · TCP 등록 확인 두 줄**을 넣었다(2026-09-23 등록 누락 비상정지 2 회)
 - 배치 원칙 1 · 2 · 6 은 바뀌었다는 표시만 하고 #147 에서 다시 쓴다
-영향: robot_manager(`home_joint_deg`) · scan_manager(좌표 · 편향 보정, real 값만). 번호: #161 이 v0.1.17 을 쓴다.
+영향: robot_manager(`home_joint_deg`) · scan_manager(좌표 · 편향 보정, real 값만). 번호: #161 은 v0.1.21 이다(#179 가 v0.1.19 · v0.1.20 을 쓴다).
 
 ## v0.1.16 (2026-09-23, #130 최신성 한계)
 **타입 변경 없음.** real 의 `sample_stale_ms` 를 300 → 500 으로 올렸다(6.3절). 6.3 의 "한계를 올리기 전에 원인을 없앤다"는 원칙의 **예외**이며, 이유 · 남는 위험(687 ms 공백) · 되돌릴 조건을 6.3 과 real.yaml 주석에 같이 남겼다. 코드 기본값과 sim 값은 바꾸지 않았다(sim 은 이미 500). 영향: safety_monitor(실기 값만).

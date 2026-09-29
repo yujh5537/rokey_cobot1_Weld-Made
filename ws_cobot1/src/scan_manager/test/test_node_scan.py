@@ -28,6 +28,7 @@ from contact_scan_interfaces.msg import ScanConfig  # noqa: E402
 from contact_scan_interfaces.msg import ScanLog  # noqa: E402
 from contact_scan_interfaces.msg import ScanResult  # noqa: E402
 from contact_scan_interfaces.msg import ScanState  # noqa: E402
+from contact_scan_interfaces.msg import WeldState  # noqa: E402
 from contact_scan_interfaces.srv import SetConfig  # noqa: E402
 from contact_scan_interfaces.srv import StopScan  # noqa: E402
 from contact_scan_qos import QOS_LOG  # noqa: E402
@@ -250,11 +251,12 @@ def test_start_is_refused_by_conditions(make_rig, setup, code):
 
 
 def test_missing_required_parameters_refuse_start_and_name_them(make_rig):
-    rig = make_rig(tip_radius_m=None, search_origin_pose=None)
+    rig = make_rig(tip_radius_m=None, search_origin_pose=None, weld_state_timeout_s=None)
     rig.wait_ready()
     result = rig.run()
     assert not result.success and result.reason_code == Reason.INVALID_VALUE
     assert 'tip_radius_m' in result.detail and 'search_origin_pose' in result.detail
+    assert 'weld_state_timeout_s' in result.detail    # 601 판정의 한도(phase 2 계약 7.1)도 필수다
     assert rig.node.state_machine.phase is Phase.IDLE
     assert rig.peers.goals == []
 
@@ -319,7 +321,7 @@ def test_home_is_accepted_while_the_safety_monitor_is_quiet(make_rig):
 
     result = rig.home()
     assert result.success, result.detail
-    assert [Operation(g.operation) for g in rig.peers.goals] == [Operation.HOME]
+    assert [Operation(g.operation) for g in rig.peers.goals] == HOME_MOTIONS
 
 
 def test_a_stale_robot_status_refuses_start_and_home(make_rig):
@@ -361,6 +363,103 @@ def test_a_topic_never_received_is_not_reported_as_a_gap(make_rig):
     # 주기 점검이 실제로 여러 번 돌았는지 먼저 확인한다. 이것이 없으면 타이머가 죽어도 통과한다
     assert rig.wait(lambda: len(rig.states) >= 3), '주기 발행이 돌지 않았다'
     assert [log for log in rig.logs if log.level == ScanLog.LEVEL_WARN] == []
+
+
+# ---- 용접과의 배타: WELD_ACTIVE(601) (phase 2 계약 7.1, 1차 5.1 · 5.3) ----
+# weld_manager 자리는 FakePeers.weld_phase 다. None 이면 발행하지 않고, stamp 는 발행 시각이다.
+
+def weld(rig, phase):
+    """가짜 weld_manager 가 phase 를 발행하고, scan_manager 가 그것을 받을 때까지."""
+    rig.peers.weld_phase = phase
+    assert rig.wait(lambda: rig.node.conditions().weld_phase == phase)
+
+
+def refusals(rig, code):
+    return [log for log in rig.logs
+            if log.level == ScanLog.LEVEL_WARN and log.code == code and '명령 거절' in log.message]
+
+
+def test_start_is_refused_with_601_while_welding(rig):
+    weld(rig, WeldState.PHASE_WELDING)
+    result = rig.run()
+    assert not result.success and result.reason_code == Reason.WELD_ACTIVE
+    assert result.detail == 'weld phase=WELDING(3)' and result.scan_id == ''
+    assert math.isnan(result.result.z_top) and not result.result.z_top_valid   # 거절에도 0 을 남기지 않는다
+    assert rig.node.state_machine.phase is Phase.IDLE and rig.peers.goals == []
+    assert not rig.result_dir.exists()                    # 거절된 작업의 기록은 없다
+    # 거절은 /scan/log 에 WARN 한 줄로 남는다(웹 로그 창). 별도 로그를 만들지 않는다
+    assert rig.wait(lambda: refusals(rig, Reason.WELD_ACTIVE))
+    assert refusals(rig, Reason.WELD_ACTIVE)[0].message == '명령 거절: weld phase=WELDING(3)'
+
+
+def test_resume_is_refused_with_601_while_welding_and_keeps_the_resume_point(rig):
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    sent = len(rig.peers.goals)
+    weld(rig, WeldState.PHASE_WELDING)
+
+    result = resume(rig)
+    assert not result.success and result.reason_code == Reason.WELD_ACTIVE
+    assert Phase.RESUMING not in phases(rig) and rig.node.state_machine.phase is Phase.STOPPED
+    assert len(rig.peers.goals) == sent
+
+    weld(rig, WeldState.PHASE_DONE)                       # 용접이 끝났다. 같은 재개 지점에서 잇는다
+    result = resume(rig)
+    assert result.success and result.scan_id == stopped.scan_id, result.detail
+
+
+def test_home_is_accepted_while_welding(rig):
+    """안전복귀는 막지 않는다(규칙 3, 계약 7.1)."""
+    weld(rig, WeldState.PHASE_WELDING)
+    result = rig.home()
+    assert result.success, result.detail
+    assert rig.operations() == HOME_MOTIONS
+
+
+def test_start_is_accepted_when_the_weld_is_at_rest(rig):
+    weld(rig, WeldState.PHASE_IDLE)
+    result = rig.run()
+    assert result.success, result.detail
+
+
+def test_start_passes_once_the_weld_state_goes_stale(make_rig):
+    """weld_manager 가 WELDING 중에 죽으면 마지막 값이 남는다(TRANSIENT_LOCAL). 한도가 지나면 용접이 없다고 본다."""
+    rig = make_rig(weld_state_timeout_s=0.3)
+    rig.wait_ready()
+    weld(rig, WeldState.PHASE_WELDING)
+    assert rig.run().reason_code == Reason.WELD_ACTIVE
+
+    rig.peers.weld_phase = None                           # 발행이 멈췄다
+    wait_stale(rig, lambda c: c.weld_state_age_s, 0.3)
+    assert rig.node.conditions().weld_phase == WeldState.PHASE_WELDING   # 마지막 값은 그대로 남아 있다
+    result = rig.run()
+    assert result.success, result.detail
+    # 용접 상태가 없는 것은 정상이다. 안전 · 로봇 상태처럼 끊김을 알리지 않는다
+    assert not [log for log in rig.logs if '/weld/state' in log.message]
+
+
+@pytest.mark.parametrize('value, text', [
+    (None, '없는 필수 파라미터: weld_state_timeout_s'),
+    (0.0, '범위 밖: weld_state_timeout_s = 0.0'),
+])
+def test_resume_needs_the_weld_limit_of_this_node(make_rig, rig, value, text):
+    """재시작은 기록의 설정으로 돈다. 지금 노드에 한도가 없으면 601 판정이 통과로 떨어지므로 접수하지 않는다."""
+    stopped = stop_at_goal(rig, SLIDE_POS_X)
+    position = rig.peers.position
+    rig.close()                                           # 한도가 빠진(잘못된) yaml 로 다시 띄웠다
+    broken = make_rig(result_dir=rig.result_dir, weld_state_timeout_s=value)
+    broken.peers.position = position
+    broken.wait_ready()
+    weld(broken, WeldState.PHASE_WELDING)
+
+    result = resume(broken)
+    assert not result.success and result.reason_code == Reason.INVALID_VALUE
+    assert text in result.detail
+    assert broken.peers.goals == [] and broken.node.state_machine.phase is Phase.IDLE
+    assert broken.run().reason_code == Reason.INVALID_VALUE   # START 도 같은 이유로 거절된다
+
+    fixed = restart(make_rig, broken)                     # 한도를 넣고 다시 띄우면 기록에서 잇는다
+    result = resume(fixed)
+    assert result.success and result.scan_id == stopped.scan_id, result.detail
 
 
 # ---- 정상 경로 ----
@@ -758,7 +857,8 @@ def test_stop_is_not_confirmed_by_a_status_older_than_the_request(make_rig):
     rig.stop()
     result = rig._result_of(result_future).result
 
-    assert result.reason_code == Reason.ROBOT_STATUS_LOST
+    # 404(상태가 안 온다)가 아니라 407(정지를 요청했는데 완료를 확인하지 못했다)이다 (계약 6.1)
+    assert result.reason_code == Reason.STOP_UNCONFIRMED
     assert rig.node.state_machine.phase is Phase.ERROR
     assert rig.store().load(result.scan_id).interruptions == []
 
@@ -801,7 +901,7 @@ def test_home_is_not_blocked_by_missing_measurement_parameters(make_rig):
 
     result = rig.home()                                    # 안전복귀는 된다
 
-    assert result.success and rig.operations() == [Operation.HOME]
+    assert result.success and rig.operations() == HOME_MOTIONS
     assert rig.node.state_machine.phase is Phase.IDLE
     assert not rig.result_dir.exists()                     # 작업이 없으니 기록도 없다
 
@@ -847,7 +947,8 @@ def test_operator_session_set_config_stop_home_then_full_scan(rig):
 
     assert rig.home().success
     assert rig.node.state_machine.phase is Phase.STOPPED
-    assert rig.peers.goals[-1].motion_id == first_goals + 1      # 같은 작업의 motion_id 를 잇는다
+    # 안전복귀는 올림 + HOME 두 모션이다(계약 7.5). 같은 작업의 motion_id 를 잇는다
+    assert [g.motion_id for g in rig.peers.goals[-2:]] == [first_goals + 1, first_goals + 2]
 
     rig.peers.behavior.clear()
     done = rig.run(RunScan.Goal(request_id='run-2'))
@@ -925,6 +1026,8 @@ def test_each_scan_gets_a_fresh_result_stamp(rig):
 # ---- 재시작 (T26) ----
 # 정상 경로의 goal 순번: 1 기준점, 2 하강, 3 +x 밀기, 4~6 방향 전환, 7 -x 밀기, 8~10, 11 +y 밀기, 12~14, 15 -y 밀기, 16 들어 올림, 17 홈
 SLIDE_POS_X, TO_ORIGIN_XY, SLIDE_POS_Y, FINAL_LIFT = 3, 5, 11, 16
+# 안전복귀(/scan/home)가 보내는 모션. 계약 7.5: 수직 올림 → 도착 확인 → HOME
+HOME_MOTIONS = [Operation.MOVE_TO, Operation.HOME]
 
 
 def stop_at_goal(rig, n, start=None):
@@ -1318,7 +1421,8 @@ def test_a_safe_return_after_a_restart_still_blocks_the_resume(make_rig, rig):
     assert fresh.peers.goals[-1].motion_id == record.last_motion_id
 
     result = resume(fresh)
-    assert result.reason_code == Reason.NOT_SUPPORTED and len(fresh.peers.goals) == 1
+    # 안전복귀의 두 모션만 나갔고 재시작은 하나도 보내지 않았다
+    assert result.reason_code == Reason.NOT_SUPPORTED and len(fresh.peers.goals) == 2
 
 
 def test_a_restarted_node_refuses_like_the_one_that_never_died(make_rig, rig):
@@ -1383,7 +1487,7 @@ def test_a_safe_return_that_could_not_be_recorded_blocks_the_resume_until_a_new_
 
     assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
     assert fresh.node.state_machine.phase is Phase.IDLE
-    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+    assert [Operation(g.operation) for g in fresh.peers.goals] == HOME_MOTIONS
     assert fresh.run().success                                    # 새 작업은 된다
     assert fresh.node._unrecorded_home is False
 
@@ -1400,7 +1504,8 @@ def test_motion_id_is_remembered_as_soon_as_it_is_issued(rig):
     assert rig.stop().accepted
     rig._result_of(running)
     assert rig.home().success
-    assert rig.peers.goals[-1].motion_id == SLIDE_POS_X + 1
+    # 안전복귀는 올림 + HOME 두 모션이다(계약 7.5). 번호는 중지 시점에서 이어진다
+    assert [g.motion_id for g in rig.peers.goals[-2:]] == [SLIDE_POS_X + 1, SLIDE_POS_X + 2]
 
 
 def test_the_unrecorded_safe_return_is_remembered_even_after_a_later_home_adopts_the_scan(make_rig, rig):
@@ -1432,7 +1537,7 @@ def test_the_unrecorded_safe_return_is_remembered_even_after_a_later_home_adopts
     result = resume(fresh)
 
     assert result.reason_code == Reason.NOT_SUPPORTED and '안전복귀' in result.detail
-    assert [Operation(g.operation) for g in fresh.peers.goals] == [Operation.HOME]
+    assert [Operation(g.operation) for g in fresh.peers.goals] == HOME_MOTIONS
 
 
 def test_a_safe_return_with_nothing_to_record_does_not_change_the_refusal_code(rig):

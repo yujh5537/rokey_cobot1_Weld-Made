@@ -1,6 +1,7 @@
 """scan_manager 상태 기계 (순수 Python, rclpy 없음).
 
-기준: docs/contracts/ros-interfaces.md v0.1.1 의 3.4 · 4.1 · 4.3 · 5.1~5.3 · 7.1 · 7.4절.
+기준: docs/contracts/ros-interfaces.md v0.1.1 의 3.4 · 4.1 · 4.3 · 5.1~5.3 · 7.1 · 7.4절,
+용접과의 배타(WELD_ACTIVE 601)는 docs/phase2/weld-ros-interfaces.md 7.1절.
 전이도와 전이표는 이 패키지의 README.md 에 있다.
 
 입력은 두 종류다.
@@ -12,7 +13,8 @@
 
 작업 중지 · 안전복귀 · 재시작은 서로 독립된 명령이다. STOP 은 STOPPING 으로만 가고,
 STOPPING 에서는 STOP_CONFIRMED(→ STOPPED) 와 FAILED(→ ERROR) 만 받는다.
-홈 복귀나 재시작으로 이어지는 전이는 표에 없다.
+홈 복귀나 재시작으로 이어지는 전이는 표에 없다. **자동 재개는 없다** — ERROR 에서 다시 시작하려면
+사람이 /safety/reset 을 하고 /scan/resume 을 보내야 한다(계약 9장, RESUMABLE_FAILURE_CODES).
 
 restore() 는 입력이 아니다. 프로세스가 재시작된 뒤 기록의 휴지 상태를 되돌리는 입구이며 전이표를 거치지 않는다.
 """
@@ -25,6 +27,8 @@ from typing import Callable, Optional
 from .contract_enums import Direction
 from .contract_enums import Phase
 from .contract_enums import Reason
+from .contract_enums import WELD_REST_PHASES
+from .contract_enums import WeldPhase
 
 
 class Command(Enum):
@@ -61,6 +65,29 @@ ACTIVE_PHASES = frozenset({
 RESUMABLE_PHASES = frozenset({
     Phase.PREPARING, Phase.TOP_SEARCH, Phase.EDGE_SEARCH, Phase.GEOMETRY,
 })
+# ERROR 로 끝난 작업에서 /safety/reset 뒤 RESUME 을 허용하는 실패 사유 (계약 5.3 · 9장, v0.1.21).
+#
+# **허용 목록이다.** 여기 없는 사유는 전부 불허다 — 새 사유가 생겼을 때 저절로 허용되지 않는다.
+# 셋의 공통점은 **측정값이 오염되지 않는다**는 것이다: 샘플이 끊겼거나(403) 로봇 상태가 끊겼거나(404)
+# 정지 완료를 확인하지 못했을 뿐(407), 탐침이 무언가에 세게 닿지 않았다.
+#
+# OVER_FORCE(400) · DROP_LIMIT(205) 는 탐침 · 부재가 상했을 수 있다. 사람이 눈으로 보고 새 START 를
+# 해야 한다. 알 수 없는 오류(ROBOT_ERROR 204)도 무엇에 닿았는지 모르므로 불허다.
+RESUMABLE_FAILURE_CODES = frozenset({
+    int(Reason.SAMPLE_STALE),        # 403
+    int(Reason.ROBOT_STATUS_LOST),   # 404
+    int(Reason.STOP_UNCONFIRMED),    # 407
+})
+
+
+def failure_is_resumable(failure) -> bool:
+    """이 실패 뒤에 RESET + RESUME 을 받아도 되는가 (계약 9장 허용 목록).
+
+    failure 가 없으면 False 다 — "실패가 없다"는 ERROR 재시작의 근거가 되지 않는다.
+    """
+    return failure is not None and int(failure.reason_code) in RESUMABLE_FAILURE_CODES
+
+
 # 모서리 탐색 순서 (정의서 1.3). 계약에는 순서가 없어서 생성자 인자로 바꿀 수 있게 했다.
 DEFAULT_DIRECTION_ORDER = (
     Direction.POS_X, Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y,
@@ -87,7 +114,9 @@ COMMAND_TRANSITIONS = {
         **_same(REST_PHASES | {Phase.STOPPING}),
     },
     Command.HOME: _to(REST_PHASES, Phase.HOMING),
-    Command.RESUME: _to({Phase.STOPPED}, Phase.RESUMING),
+    # ERROR 는 _check 가 실패 사유로 한 번 더 거른다(허용 목록). 여기서 막으면 거절 사유가
+    # NO_RESUMABLE_SCAN 이 되어 "왜 안 되는지"가 사라진다
+    Command.RESUME: _to({Phase.STOPPED, Phase.ERROR}, Phase.RESUMING),
 }
 SIGNAL_TRANSITIONS = {
     Signal.PREPARE_DONE: _to({Phase.PREPARING}, Phase.TOP_SEARCH),
@@ -143,7 +172,7 @@ def status_stale(topic: str, limit_name: str, age_s, timeout_s) -> Optional[str]
 
 @dataclass(frozen=True)
 class Conditions:
-    """명령 시점의 보호 조건. None 은 "아직 수신하지 못함"이며 거절 사유가 된다.
+    """명령 시점의 보호 조건. None 은 "아직 수신하지 못함"이며 거절 사유가 된다(/weld/state 만 예외).
 
     ``*_age_s`` 는 마지막으로 받은 상태 메시지의 stamp 가 지난 시간이다. 노드가 재고(잴 수 없으면 None),
     한계 시간과 비교해 "끊김"을 판정하는 것은 여기다(``status_stale``). 끊김을 False 나 0 으로 적지 않는다.
@@ -155,6 +184,39 @@ class Conditions:
     safety_status_age_s: Optional[float] = None   # /safety/status.stamp 의 나이(s)
     robot_status_timeout_s: Optional[float] = None   # 끊김으로 보는 한도. None = 파라미터 없음
     safety_status_timeout_s: Optional[float] = None
+    # /weld/state (phase 2, 계약 7.1). 위와 달리 **None 은 거절 사유가 아니다** — 못 받았으면 용접이 없다고 본다
+    weld_phase: Optional[int] = None               # /weld/state.phase. None = 한 번도 못 받음
+    weld_state_age_s: Optional[float] = None       # /weld/state.stamp 의 나이(s). None = 잴 수 없음
+    weld_state_timeout_s: Optional[float] = None   # None = 파라미터 없음
+
+
+def weld_phase_name(phase: int) -> str:
+    """거절 detail 에 싣는 이름. 표에 없는 값은 브리지와 같은 UNKNOWN_<n> 이다(#200)."""
+    try:
+        return f'{WeldPhase(phase).name}({int(phase)})'
+    except ValueError:
+        return f'UNKNOWN_{int(phase)}({int(phase)})'
+
+
+def weld_active(conditions: 'Conditions') -> Optional[str]:
+    """용접이 로봇을 잡고 있는가. 잡고 있으면 거절 detail, 아니면 None (weld-ros-interfaces.md 7.1).
+
+    **판정할 수 없으면 통과다(fail-open).** 한 번도 못 받음 · 마지막 stamp 가 weld_state_timeout_s 보다
+    오래됨 · ROS 시계 0 · 한도 파라미터 없음은 전부 "용접이 없다"로 본다. /weld/state 는 TRANSIENT_LOCAL 이라
+    weld_manager 가 WELDING 중에 죽으면 마지막 값이 남아, 끊김을 거절로 보면 스캔이 영영 601 로 막힌다.
+    같은 status_stale 을 쓰지만 결과는 /safety/status · /robot/status 와 **반대다**(그쪽은 판정 불가 = 거절).
+    weld_manager 쪽은 반대로 /scan/state 가 없거나 오래되면 INVALID_REQUEST(101)로 거절한다(fail-closed).
+    이 비대칭은 의도된 것이다 — weld_manager 가 없는 1차 동작을 그대로 두기 위해서다.
+    """
+    if conditions.weld_phase is None:
+        return None
+    if status_stale(
+            '/weld/state', 'weld_state_timeout_s',
+            conditions.weld_state_age_s, conditions.weld_state_timeout_s):
+        return None
+    if conditions.weld_phase in WELD_REST_PHASES:
+        return None
+    return f'weld phase={weld_phase_name(conditions.weld_phase)}'
 
 
 @dataclass(frozen=True)
@@ -327,7 +389,9 @@ class ScanStateMachine:
                 raise ValueError(f'progress 가 0~{self.progress_total} 이 아니다({progress!r})')
             if resume_phase is not None:
                 resume_phase = Phase(resume_phase)
-                if phase is not Phase.STOPPED or resume_phase not in RESUMABLE_PHASES:
+                allowed = (phase is Phase.STOPPED
+                           or (phase is Phase.ERROR and failure_is_resumable(failure)))
+                if not allowed or resume_phase not in RESUMABLE_PHASES:
                     raise ValueError(
                         f'재개 지점 {resume_phase.name} 은 phase={phase.name} 에 둘 수 없다')
             self._scan_id = scan_id
@@ -343,13 +407,16 @@ class ScanStateMachine:
         phase = self._phase
         if phase not in COMMAND_TRANSITIONS[command]:
             if command is Command.RESUME and phase in REST_PHASES:
-                if phase is Phase.ERROR:
-                    # 이상 상태별 재시작 허용 조건은 TBD(9장)
-                    return Reason.NOT_SUPPORTED, '오류로 끝난 작업의 재시작 절차는 TBD'
                 return Reason.NO_RESUMABLE_SCAN, f'phase={phase.name}'
             return Reason.BUSY, f'phase={phase.name}'
 
         if command is Command.RESUME:
+            if phase is Phase.ERROR and not failure_is_resumable(self._failure):
+                # 허용 목록 밖이다. 안전 점검 · 복귀 뒤 새 START 만 가능하다 (계약 9장, v0.1.21)
+                code = None if self._failure is None else self._failure.reason_code
+                return Reason.NOT_SUPPORTED, (
+                    f'오류 사유 {code} 는 재시작 허용 목록에 없다. 안전 점검 뒤 새 START 로 시작한다'
+                    if code else '오류로 끝났는데 사유 기록이 없다. 새 START 로 시작한다')
             if self._resume_phase is None:
                 return Reason.NO_RESUMABLE_SCAN, '재개할 단계가 없다'
             if scan_id and scan_id != self._scan_id:
@@ -358,6 +425,12 @@ class ScanStateMachine:
                 return Reason.NOT_SUPPORTED, '홈 안전복귀 뒤의 재접근 절차는 TBD'
 
         if command in (Command.START, Command.RESUME):
+            # 용접 중이면 WELD_ACTIVE(601). 순서는 BUSY → 601 → 래치 → 로봇이다(계약 1차 5.1 · 5.3,
+            # phase 2 7.1, 9/26 결정): weld_manager 의 600 이 래치 앞에 있는 것과 대칭이다.
+            # ERROR 재시작(허용 목록)도 이 블록을 지나므로 같이 막힌다. 안전복귀(HOME)는 여기 들어오지 않는다.
+            weld = weld_active(conditions)
+            if weld:
+                return Reason.WELD_ACTIVE, weld
             if conditions.safety_latched is None:
                 return Reason.SAFETY_LATCHED, '/safety/status 미수신'
             # 끊김을 래치보다 먼저 본다: 끊긴 뒤의 latched 는 죽은 감시자가 남긴 옛 값이라 믿을 수 없다.
@@ -427,8 +500,14 @@ class ScanStateMachine:
             if signal is Signal.FAILED:
                 if not reason_code:
                     raise ValueError('FAILED 에는 0 이 아닌 reason_code 가 필요하다')
-                self._failure = Failure(int(reason_code), detail, phase)
-                self._resume_phase = None
+                failure = Failure(int(reason_code), detail, phase)
+                self._failure = failure
+                # 재개 지점은 **허용 목록에 있는 사유일 때만** 남긴다 (계약 9장, v0.1.21).
+                # 그 밖에는 지운다 — 남겨 두면 허용 판정이 한 겹만 틀려도 오염된 기준으로 재개한다.
+                # 실패한 그 단계가 곧 재개 지점이다(중지와 달리 FAILED 는 _resume_phase 를 세우는
+                # 경로를 거치지 않는다). 마무리 HOMING 은 RESUMABLE_PHASES 에 없어 저절로 빠진다.
+                self._resume_phase = (
+                    phase if failure_is_resumable(failure) and phase in RESUMABLE_PHASES else None)
                 target = Phase.ERROR
             elif signal is Signal.EDGE_FOUND:
                 self._progress += 1

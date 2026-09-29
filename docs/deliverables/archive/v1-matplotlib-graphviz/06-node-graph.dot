@@ -1,0 +1,98 @@
+// 06 ROS2 노드 구조도 v1.2 — 원본 텍스트. png 는 figures.py 가 dot 으로 만든다(phase 2 를 뺀 판도).
+// 출발: docs/design/contact-scan-node-diagram-v1.1.md · .drawio (40 선, 고치지 않음)
+// 근거: docs/contracts/ros-interfaces.md 2장(v0.1.15 스텝 모드 EDGE · v0.1.19~20 /dsr01/joint_states) · mqtt-schema.md 2장
+//       docs/phase2/weld-ros-interfaces.md 2장 · weld-mqtt-schema.md 1장 (계약 v0.2.0)
+// 선 라벨의 [L..] [P..] [X..] [C..] [W..] 는 06-node-graph.md 연결 표의 번호다. 같은 두 노드 사이의 같은 방향 선은 한 화살표에 모았다.
+// 규칙: 줄 끝에 "// P2" 가 붙은 줄은 phase 2(용접)다. 한 줄 = 한 문장.
+digraph nodes {
+  graph [rankdir=TB, fontname="Noto Sans CJK KR", fontsize=22, nodesep=0.55, ranksep=0.75, newrank=true, compound=true, pad=0.3, splines=true,
+         label="ROS2 노드 구조도 v1.2 — 자체 노드 5 + weld_manager (phase 2, 구현 PR 진행 중)\n선 = 이름 · 종류(T Topic / S Service / A Action) · 타입   ·   굵은 테두리 = 자체 노드   ·   회색 점선 = 외부(제공) 또는 계약 · 미구현   ·   주황 = phase 2   ·   점선 = 검토안(MVP 밖)", labelloc=t];
+  node  [fontname="Noto Sans CJK KR", fontsize=15, shape=box, style="rounded,filled", fillcolor="#D3DCF5", color="#22357F", penwidth=2.4];
+  edge  [fontname="Noto Sans CJK KR", fontsize=11, color="#444444", arrowsize=0.8];
+
+  subgraph cluster_web {
+    label="웹 PC"; style="rounded,filled"; fillcolor="#FAEFF7"; color="#A05195"; fontsize=15;
+    webstack [label="[외부] 웹 스택\nFastAPI · Spring Boot · PostgreSQL · React\n(ROS 2 아님)", fillcolor="#E9EDF1", color="#8A96A3", style="rounded,filled,dashed", penwidth=1.4];
+    broker   [label="[외부] MQTT 브로커\nMosquitto", fillcolor="#E9EDF1", color="#8A96A3", style="rounded,filled,dashed", penwidth=1.4];
+  }
+
+  subgraph cluster_main {
+    label="메인 PC — ROS 2 Jazzy · 네임스페이스 없음 · 실행 파일명 = 노드명"; style="rounded,filled"; fillcolor="#EFF1FB"; color="#5566B5"; fontsize=15;
+    bridge [label="mqtt_bridge\nROS 2 ↔ MQTT · m → mm · NaN → null"];
+    subgraph cluster_sm {
+      label="scan_manager 패키지"; style="rounded,filled"; fillcolor="#E2E8F8"; color="#22357F"; fontsize=13;
+      sm    [label="scan_manager\n스캔 순서 · 중지 · 안전복귀 · 재시작\n(+ geometry_estimator 모듈: 5 점 → 직육면체)"];
+      store [label="result_store (모듈)\nprogress.json · result.json", shape=folder, fillcolor="#FFFFFF", penwidth=1, fontsize=12];
+    }
+    saf  [label="safety_monitor\n2차 감시 · 래치"];
+    cd   [label="contact_detector\nCONTACT · EDGE · OVER_FORCE"];
+    rm   [label="robot_manager\n모션 · 힘/순응 · 샘플 · 드라이버 단일 창구"];
+    weld [label="weld_manager  [phase 2]\n8 선 용접 모션 · 구현 PR 진행 중", fillcolor="#FFF1E0", color="#D2691E", fontcolor="#8B3A00", style="rounded,filled,dashed"]; // P2
+    dsr  [label="[외부] 두산 드라이버\ndsr_controller2 · /dsr01\njoint_state_broadcaster", fillcolor="#E9EDF1", color="#8A96A3", style="rounded,filled,dashed", penwidth=1.4];
+    rg2d [label="[외부] OnRobot RG2 드라이버", fillcolor="#E9EDF1", color="#8A96A3", style="rounded,filled,dashed", penwidth=1.4];
+  }
+
+  subgraph cluster_robot {
+    label="로봇 컨트롤러"; style="rounded,filled"; fillcolor="#EEF7F5"; color="#2E8B7A"; fontsize=15;
+    ctrl [label="[외부] M0609 컨트롤러 (DRCF) · RG2 · 무센서 탐침", fillcolor="#FFFFFF", color="#2E8B7A", penwidth=1.4];
+  }
+
+  // ── 외부 · MQTT ──
+  webstack -> broker [label="[X03] MQTT 발행 · 구독", dir=both, color="#8A96A3", style=dashed];
+  broker -> bridge   [label="[X01] MQTT cmd/scan/+ · cmd/safety/reset\nhb/web · conn/web", color="#8A96A3"];
+  bridge -> broker   [label="[X02] MQTT robot/* · scan/* · contact/event\nsafety/status · cmd/ack · scan/command_result\nhb/ros · conn/ros", color="#8A96A3"];
+  broker -> bridge   [label="[W16] MQTT cmd/weld/+", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+  bridge -> broker   [label="[W17] MQTT weld/state · result · log · command_result", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+
+  // ── 명령 · 표시 (mqtt_bridge ↔ scan_manager) ──
+  bridge -> sm [label="[L01] /scan/run · A · RunScan\n[L02] /scan/home · A · ReturnHome\n[L03] /scan/resume · A · Resume\n[L04] /scan/stop · S · StopScan\n[L05] /scan/set_config · S · SetConfig", penwidth=1.6];
+  sm -> bridge [label="[L06] /scan/state · T · ScanState\n[L07] /scan/result · T · ScanResult\n[L08] /scan/log · T · ScanLog"];
+  bridge -> sm [label="[C01] /scan/calibrate · A (검토안)", style=dotted, color="#999999", fontcolor="#777777"];
+  sm -> bridge [label="[C02] /calibration/result · T (검토안)", style=dotted, color="#999999", fontcolor="#777777"];
+
+  // ── scan_manager → 다른 노드 ──
+  sm -> rm  [label="[L11] /robot/execute_motion · A · ExecuteMotion\n[L22] /robot/stop · S · StopRobot\n[P01] /robot_manager/set_parameters · S", penwidth=1.6];
+  sm -> cd  [label="[L09] /scan/state · T · ScanState\n[L12] /contact/tare · S · TareForce\n[P02] /contact_detector/set_parameters · S"];
+  sm -> saf [label="[P03] /safety_monitor/set_parameters · S"];
+  sm -> saf [label="[L10] /scan/state · T\n(계약 · 9/27 main 미구현)", style=dashed, color="#999999", fontcolor="#777777"];
+  sm -> store [label="기록 (파일)", style=dotted, arrowhead=none];
+
+  // ── robot_manager → ──
+  rm -> cd     [label="[L13] /robot/sample · T · RobotSample"];
+  rm -> saf    [label="[L14] /robot/sample · T · RobotSample\n[L17] /robot/status · T · RobotStatus"];
+  rm -> sm     [label="[L16] /robot/status · T · RobotStatus\n[L28] /contact/event · T · ContactEvent (스텝 EDGE)\n[L30] /robot/sample · T (마지막 유효 pose, v0.1.21)"];
+  rm -> bridge [label="[L15] /robot/sample · T\n[L18] /robot/status · T\n[L29] /contact/event · T (스텝 EDGE)"];
+
+  // ── contact_detector → ──
+  cd -> rm     [label="[L19] /contact/event · T · ContactEvent\n→ motion_id 대조 뒤 자체 정지"];
+  cd -> sm     [label="[L20] /contact/event · T\n판정 좌표 기록"];
+  cd -> bridge [label="[L21] /contact/event · T"];
+
+  // ── safety_monitor ──
+  saf -> rm     [label="[L23] /robot/stop · S · StopRobot\n웹 경유 없음", color="#B00020", fontcolor="#B00020", penwidth=2];
+  saf -> sm     [label="[L24] /safety/status · T · SafetyStatus"];
+  saf -> bridge [label="[L25] /safety/status · T"];
+  bridge -> saf [label="[L27] /safety/reset · S · ResetSafety"];
+  bridge -> saf [label="[L26] /web/heartbeat · T · WebHeartbeat\n(발행만 · 감시는 9/27 main 미구현)", style=dashed, color="#999999", fontcolor="#777777"];
+
+  // ── 드라이버 · 컨트롤러 ──
+  rm -> dsr     [label="[X04] dsr_msgs2 서비스\n[X05] 상태 · TCP/힘 응답", dir=both, color="#8A96A3"];
+  rm -> rg2d    [label="[X06] 탐침 파지", color="#8A96A3"];
+  dsr -> bridge [label="[P04] /dsr01/joint_states · T\nsensor_msgs/JointState (표시 전용)", color="#8A96A3", style=dashed];
+  dsr -> ctrl   [label="[X07] DRCF TCP/IP", dir=both, color="#2E8B7A", penwidth=1.8];
+  rg2d -> ctrl  [label="[X08] RG2 명령 · 상태", dir=both, color="#2E8B7A"];
+
+  // ── phase 2 ──
+  bridge -> weld [label="[W01] /weld/run · A · RunWeld\n[W02] /weld/home · A · ReturnHome\n[W03] /weld/stop · S · StopWeld", color="#D2691E", fontcolor="#8B3A00", style=dashed, penwidth=1.6]; // P2
+  weld -> bridge [label="[W04] /weld/state · T · WeldState\n[W05] /weld/result · T · WeldResult\n[W06] /weld/log · T · ScanLog", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+  weld -> sm     [label="[W07] /weld/state · T\n(스캔 시작 · 재시작 거절 601)", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+  sm -> weld     [label="[W08] /scan/state · T\n(용접 시작 거절 600)", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+  rm -> weld     [label="[W09] /robot/status · T\n[W11] /robot/sample · T (시작 때만)", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+  saf -> weld    [label="[W10] /safety/status · T", color="#D2691E", fontcolor="#8B3A00", style=dashed]; // P2
+  weld -> rm     [label="[W12] /robot/execute_path · A · ExecutePath\n[W13] /robot/execute_motion · A · ExecuteMotion\n[W14] /robot/stop · S · StopRobot", color="#D2691E", fontcolor="#8B3A00", style=dashed, penwidth=1.6]; // P2
+  store -> weld  [label="[W15] result.json 읽기 (파일, ROS 아님)", color="#D2691E", fontcolor="#8B3A00", style=dotted]; // P2
+
+  {rank=same; webstack; broker;}
+  {rank=same; cd; rm;}
+  {rank=same; dsr; rg2d;}
+}

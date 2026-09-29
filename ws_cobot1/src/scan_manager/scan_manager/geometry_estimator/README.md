@@ -25,7 +25,7 @@ if box.success: ...          # 예외를 던지지 않는다. 실패는 box.erro
 | `TopObservation.z_m` | CONTACT `ContactEvent.pose.position.z` (판정 좌표. 정지 완료 좌표가 아니다) | |
 | `TopObservation.descend_speed_mps` | 그 DESCEND goal 의 `speed` | |
 | `EdgeObservation.coordinate_m` | EDGE `ContactEvent.pose.position` 에서 **진행 축의 값** (±X 는 x, ±Y 는 y) | 다른 축 값은 쓰지 않는다(축 평행 전제, BRD 6장) |
-| `EdgeObservation.z_drop_m` | `ContactEvent.z_drop_m` (`z_drop_valid=false` 면 `None`) | 임계값이 아니라 실제 하강량 δ |
+| `EdgeObservation.z_drop_m` | `ContactEvent.z_drop_m` (`z_drop_valid=false` 면 `None`) | 임계값이 아니라 실제 하강량 δ. **`None` 이면 d = 0 으로 보정한다**(아래, #146) |
 | `EdgeObservation.slide_speed_mps` | 그 SLIDE goal 의 `speed` | |
 | `support_z_m` | 지지면 높이. 작업대 좌표면 0 (units-frames.md: z=0 = 작업대 표면) | |
 | `BiasParams` | scan_manager 파라미터 (아래) | 코드에 기본값이 없다 |
@@ -45,7 +45,7 @@ if box.success: ...          # 예외를 던지지 않는다. 실패는 box.erro
 | `error` | 뜻 | ReasonCode |
 |---|---|---|
 | `''` | 성공 | `OK` |
-| `GEOM_MISSING_POINT` | 5점 · 지지면 중 없는 값이 있다. **하강량 · 속도를 몰라 보정할 수 없는 경우도 포함한다**(보정 없이 통과시키지 않는다). `detail` 에 어느 값인지 적는다 | `INSUFFICIENT_POINTS(501)` |
+| `GEOM_MISSING_POINT` | 5점 · 지지면 중 없는 값이 있다. **속도를 몰라 보정할 수 없는 경우도 포함한다**(보정 없이 통과시키지 않는다). 하강량 δ 만 모르는 것은 실패가 아니다(d = 0, 아래). 음수 · inf 인 δ 는 여기다. `detail` 에 어느 값인지 적는다 | `INSUFFICIENT_POINTS(501)` |
 | `GEOM_NONPOSITIVE_WIDTH` | 가로 또는 세로가 0 이하 | `INVALID_SHAPE(500)` |
 | `GEOM_NEGATIVE_HEIGHT` | 높이가 0 이하 (0 도 포함한다) | `INVALID_SHAPE(500)` |
 
@@ -54,13 +54,15 @@ if box.success: ...          # 예외를 던지지 않는다. 실패는 box.erro
 모서리:  corrected = raw − (진행 방향 부호) x [ d − R + v·t + offset ]
            d = √(2(R + r)δ − δ²)      δ < R + r
            d = R + r                  δ ≥ R + r   (팁이 모서리를 완전히 벗어남)
+           d = 0                      δ 모름      (z_drop_valid=false. 힘 꺾임 EDGE, #146)
 윗면:    z_top = raw + v_descend·t
 ```
 - r `tip_radius_m`, t `detect_latency_s`, R `edge_round_radius_m`, offset `edge_bias_offset_m`, δ `z_drop_m`, v 밀기 속도
 - R = 0 이면 BRD 1.4 의 식 √(2rδ − δ²) + v·t 다. BRD 예시(r 3 mm, δ 0.5 mm, 10 mm/s, 40 ms → 약 2.1 mm)는 테스트에 있다
 - **δ ≥ R + r 에서 고정하는 이유**: 구 중심이 모서리를 (R + r) 만큼 지나면 접촉 법선이 수평이 되어 팁이 더는 모서리에 얹혀 있지 않다.
   식을 그대로 쓰면 그 뒤로는 d 가 도로 작아지고(덜 보정), δ > 2(R + r) 에서는 제곱근 안이 음수다.
-  실측 r = 0.225 mm 에서 `edge_drop_m` 출발값 0.5 mm 가 이 구간이다. BRD 1.4 에는 이 경우가 없다(ADR 후보)
+  옛 탐침(r = 0.225 mm, 2026-09-19 실측)에서는 `edge_drop_m` 출발값 0.5 mm 가 이 구간이었다. 지금 탐침(r 2.0 mm,
+  units-frames v0.1.18 잠정 · 캘리퍼 확정 전)에서는 δ 0.5 mm 가 R + r 보다 작아 이 구간이 아니다. BRD 1.4 에는 이 경우가 없다(ADR 후보)
 - 팁이 벗어난 뒤 δ 에 닿을 때까지 수평으로 더 간 거리는 식으로 알 수 없다. `edge_bias_offset_m`(기준 블록 실측, T30)에 들어간다
   - **`edge_bias_offset_m` 은 방향당 값이다. 폭 차이가 아니다.** offset 을 0 으로 두고 잰 뒤
     `edge_bias_offset_m = (추정 폭 − 캘리퍼스 폭) ÷ 2` (세로도 같다). 2 로 나누지 않으면 그만큼 과보정한다
@@ -71,6 +73,14 @@ if box.success: ...          # 예외를 던지지 않는다. 실패는 box.erro
     `2 x (d − R + v·t)` 에서 v·t 는 밀기 속도를 둘로 바꿔 재면 기울기로 분리되고, 나머지가 R 이다.
     예리한 모서리(R = 0)와 R = 1.7 mm 는 δ = 0.2 mm 에서 폭으로 약 2.1 mm 차이가 난다(계산값).
     그만큼 작은 하강량을 실기에서 안정적으로 판정할 수 있는지는 확인하지 않았다(T25)
+- **δ 를 모를 때 d = 0 으로 두는 이유 (#146)**: 힘 꺾임 EDGE(#128)는 z 추세선 없이도 확정되고, 그때 `z_drop_valid = false` 다.
+  예전처럼 실패로 두면 한 방향 때문에 네 방향을 다 잰 스캔 전체가 501 로 끝난다.
+  - d 는 0 ~ (R + r) 이므로 d = 0 가정의 오차는 **방향당 최대 R + r** 이다(이 상한은 시험으로 고정했다).
+    지금 탐침(R = 0, r 2.0 mm, units-frames v0.1.18 잠정)이면 **방향당 최대 2 mm, 폭으로 최대 4 mm** 다. 옛 탐침 r 0.225 mm 에서는 0.225 mm 였다
+  - 힘 꺾임은 구가 모서리를 막 넘기 시작할 때 나므로 d ≈ 0 이 실제에 가깝다(2026-09-21 힘 경로 재생 4 회 · 실기 1 회: δ 0 ~ 0.10 mm → d 0 ~ 0.19 mm, #132 학민).
+    이 d 는 r 0.225 mm 로 계산한 값이다. r 2.0 mm(v0.1.18 잠정)로 다시 계산하면 약 0 ~ 0.62 mm 다(계산값, 실측 아님)
+  - **δ 를 0 으로 저장하지 않는다**(규칙 4). `inputs['z_drop_m']` 은 `None` 그대로 남는다. 0 은 보정식의 기하 항이다
+  - 남는 계통 몫은 offset 이 가져간다. 그래서 힘 꺾임을 쓰면 **offset 도 힘 꺾임을 켠 상태로** 잰다(T25)
 - **R(모서리 둥글림)**: 둥근 부분은 공칭 모서리보다 R 안쪽에서 시작하므로 보정량이 음수가 될 수 있다(R 1.7 mm · δ 0.5 mm → −0.41 mm).
   블록의 R 은 아직 재지 않았다. **모따기(C)는 다루지 않는다**
 - 판정 지연 t 에 디바운스 몫이 들어가는지는 `ContactEvent` 의 "판정 샘플" 정의(이슈 #69)에 달려 있다

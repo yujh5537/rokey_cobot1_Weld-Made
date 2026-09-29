@@ -2,8 +2,10 @@
 
 감시하는 것 (BRD 4.5.3 · 4.5.4 · 4.6, 계약 7.2):
   - 과대 외력  : 원시 |F| > over_force_n. 2차 감시 (1차는 contact_detector → robot_manager)
-  - 하강 제한  : SLIDE 중 z 가 기준보다 drop_limit_m 넘게 내려감. 2차 감시 (1차는 robot_manager)
-                 기준 z = operation 이 OP_SLIDE 로 바뀐 첫 샘플의 z (계약 7.2. 1차와 값도 기준도 같다)
+  - 하강 제한  : SLIDE 중 z 가 기준보다 drop_limit_m + drop_limit_margin_m 넘게 내려감. 2차 감시 (1차는 robot_manager)
+                 기준 z = operation 이 OP_SLIDE 로 바뀐 첫 샘플의 z (계약 7.2. 1차와 **기준 z 는 같다**)
+                 한계만 여유(margin)만큼 뒤에 둔다: 값까지 같으면 잡음 한 샘플로도 2차가 먼저 걸려
+                 1차가 정상 동작인데 래치부터 걸린다 (#53, 계약 v0.1.21 결정 2)
   - 데이터 최신성: /robot/sample · /robot/status 가 한계 시간 넘게 안 들어옴 (위험 10)
 
 이 노드가 할 수 있는 것과 없는 것 (BRD 4.5 각주, 규칙 9):
@@ -59,21 +61,35 @@ class Sample:
 @dataclass(frozen=True)
 class SafetyLimits:
     over_force_n: float          # 계약 이름. contact_detector 와 같은 값
-    drop_limit_m: float          # 계약 이름. robot_manager 와 같은 값
+    drop_limit_m: float          # 계약 이름. robot_manager 와 같은 값 (쌍 검사 대상)
     sample_stale_ms: int
     robot_status_timeout_ms: int
     confirm_n: int               # 조건을 확정하는 연속 샘플 수
     startup_grace_s: float       # 기동 후 이 시간 동안은 최신성으로 정지 · 래치를 걸지 않는다
+    drop_limit_margin_m: float   # 계약 이름이 **아니다**. 2차 감시만의 여유 (계약 7.2)
 
     def __post_init__(self):
         if not (self.over_force_n > 0 and self.drop_limit_m > 0):
             raise ValueError('over_force_n, drop_limit_m 은 0 보다 커야 한다')
+        if not self.drop_limit_margin_m > 0:
+            # 0 을 허용하면 "여유를 뒀다"고 적힌 설정이 조용히 1차와 같아진다. 여유가 필요 없다는
+            # 결정이 나면 이 검사와 계약 7.2 를 같이 고친다 (CLAUDE.md 규칙 4 · 7)
+            raise ValueError('drop_limit_margin_m 은 0 보다 커야 한다 (계약 7.2 의 2차 여유)')
         if self.sample_stale_ms <= 0 or self.robot_status_timeout_ms <= 0:
             raise ValueError('sample_stale_ms, robot_status_timeout_ms 는 0 보다 커야 한다')
         if self.startup_grace_s < 0:
             raise ValueError('startup_grace_s 는 0 이상이어야 한다')
         if self.confirm_n < 1:
             raise ValueError('confirm_n 은 1 이상이어야 한다')
+
+    @property
+    def effective_drop_limit_m(self) -> float:
+        """2차 감시가 실제로 쓰는 한계. 1차(robot_manager)의 drop_limit_m 보다 여유만큼 뒤다.
+
+        SetConfig(계약 2.4 P03)가 두 노드의 drop_limit_m 을 같은 값으로 덮어써도 여유는 남는다 —
+        drop_limit_margin_m 은 계약 이름이 아니고 ScanConfig 에도 없어서 전파 대상이 아니다.
+        """
+        return self.drop_limit_m + self.drop_limit_margin_m
 
 
 @dataclass(frozen=True)
@@ -138,10 +154,13 @@ class ConditionWatch:
                        f'force {magnitude:.1f} N > {self.limits.over_force_n:.1f} N') is not None:
             found.append(self.active[OVER_FORCE])
 
+        # 경계는 초과다: 정확히 한계면 걸리지 않는다 (계약 7.2, 1차 robot_manager 와 같은 규칙)
+        limit = self.limits.effective_drop_limit_m
         drop = None if self.slide_start_z is None else self.slide_start_z - sample.position[2]
-        if self._check(DROP_LIMIT, drop is not None and drop > self.limits.drop_limit_m, sample,
-                       f'drop {1000 * (drop or 0.0):.1f} mm > {1000 * self.limits.drop_limit_m:.1f} mm '
-                       f'(기준 z = SLIDE 첫 샘플)') is not None:
+        if self._check(DROP_LIMIT, drop is not None and drop > limit, sample,
+                       f'drop {1000 * (drop or 0.0):.1f} mm > {1000 * limit:.1f} mm '
+                       f'(2차 = 1차 {1000 * self.limits.drop_limit_m:.1f} + 여유 '
+                       f'{1000 * self.limits.drop_limit_margin_m:.1f} mm, 기준 z = SLIDE 첫 샘플)') is not None:
             found.append(self.active[DROP_LIMIT])
         return found
 

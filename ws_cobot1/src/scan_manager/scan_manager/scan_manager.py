@@ -27,17 +27,20 @@ from contact_scan_interfaces.action import Resume
 from contact_scan_interfaces.action import ReturnHome
 from contact_scan_interfaces.action import RunScan
 from contact_scan_interfaces.msg import ContactEvent
+from contact_scan_interfaces.msg import RobotSample
 from contact_scan_interfaces.msg import RobotStatus
 from contact_scan_interfaces.msg import SafetyStatus
 from contact_scan_interfaces.msg import ScanLog
 from contact_scan_interfaces.msg import ScanResult
 from contact_scan_interfaces.msg import ScanState
+from contact_scan_interfaces.msg import WeldState
 from contact_scan_interfaces.srv import SetConfig
 from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.srv import StopScan
 from contact_scan_interfaces.srv import TareForce
 from contact_scan_qos import QOS_EVENT
 from contact_scan_qos import QOS_LOG
+from contact_scan_qos import QOS_SENSOR
 from contact_scan_qos import QOS_STATE
 from rcl_interfaces.msg import Parameter as ParameterMsg
 from rcl_interfaces.msg import ParameterType
@@ -77,6 +80,7 @@ from .result_store import ResultStore
 from .result_store import ResultStoreError
 from .result_store import Stamp
 from .result_store.records import CONFIG_FIELDS
+from .sequence import damage_suspect_reason as _damage_suspect_reason
 from .sequence import MatchedEvent
 from .sequence import MotionPlanner
 from .sequence import MotionResult
@@ -207,7 +211,11 @@ class ScanManager(Node):
         self._unrecorded_home = False
         self._status_cond = threading.Condition()
         self._robot_status = None
+        # /robot/sample 의 마지막 유효 pose (위치, 자세, pose_stamp). 안전복귀의 올림에 쓴다(계약 7.5)
+        self._robot_pose = None
         self._safety_status = None
+        # /weld/state 의 마지막 메시지(phase 2, 계약 7.1). None = 한 번도 못 받음 = 용접이 없다고 본다
+        self._weld_state = None
         self._store = None
         self._store_dir = None
         self._begun = None
@@ -231,10 +239,17 @@ class ScanManager(Node):
         clients = ReentrantCallbackGroup()
         self.create_subscription(
             RobotStatus, '/robot/status', self._on_robot_status, QOS_STATE, callback_group=subs)
+        # 안전복귀(계약 7.5)가 "지금 위치를 아는가"를 묻는다. 측정에는 쓰지 않는다 —
+        # 측정값의 출처는 판정 좌표(ContactEvent)다
+        self.create_subscription(
+            RobotSample, '/robot/sample', self._on_robot_sample, QOS_SENSOR, callback_group=subs)
         self.create_subscription(
             SafetyStatus, '/safety/status', self._on_safety_status, QOS_STATE, callback_group=subs)
         self.create_subscription(
             ContactEvent, '/contact/event', self._matcher.offer, QOS_EVENT, callback_group=subs)
+        # 용접 중이면 START · RESUME 을 WELD_ACTIVE(601)로 거절한다(phase 2 계약 7.1). 안전복귀는 보지 않는다
+        self.create_subscription(
+            WeldState, '/weld/state', self._on_weld_state, QOS_STATE, callback_group=subs)
         self._motion_client = ActionClient(
             self, ExecuteMotion, '/robot/execute_motion', callback_group=clients)
         self._tare_client = self.create_client(TareForce, '/contact/tare', callback_group=clients)
@@ -426,9 +441,48 @@ class ScanManager(Node):
             self._robot_status = msg
             self._status_cond.notify_all()
 
+    def _on_robot_sample(self, msg):
+        """마지막 유효 pose 만 들고 있는다(계약 7.5). 무효 샘플은 버린다 — pose 가 NaN 이다."""
+        if not msg.valid:
+            return
+        with self._status_cond:
+            self._robot_pose = (
+                conversions.position_of(msg.pose),
+                (msg.pose.orientation.x, msg.pose.orientation.y,
+                 msg.pose.orientation.z, msg.pose.orientation.w),
+                msg.pose_stamp)
+
+    def current_pose(self, max_age_s):
+        """안전복귀가 쓸 (위치, 자세). 모르면 None (계약 7.5 ①).
+
+        나이는 수신 시각이 아니라 pose_stamp 로 잰다. /robot/sample 은 SENSOR QoS 라 늦게 붙은
+        구독자에게 옛 샘플이 다시 오지는 않지만, robot_manager 가 살아 있으면서 조회만 막힌 동안
+        마지막 샘플이 그대로 남는다. 시계가 0 이면(use_sim_time 인데 /clock 없음) 잴 수 없으니
+        모르는 것으로 본다 — wait_still() 과 같은 관례다.
+        """
+        with self._status_cond:
+            latest = self._robot_pose
+        if latest is None:
+            return None
+        position, orientation, stamp = latest
+        now_ns = self.get_clock().now().nanoseconds
+        if now_ns <= 0 or not (stamp.sec or stamp.nanosec):
+            return None
+        age_s = (now_ns - (stamp.sec * 1_000_000_000 + stamp.nanosec)) / 1e9
+        if age_s > max_age_s:
+            self.get_logger().warn(
+                f'마지막 유효 TCP pose 가 {age_s:.2f} s 전이다(한도 {max_age_s:.2f} s). '
+                f'지금 위치를 모르는 것으로 본다')
+            return None
+        return position, orientation
+
     def _on_safety_status(self, msg):
         with self._status_cond:
             self._safety_status = msg
+
+    def _on_weld_state(self, msg):
+        with self._status_cond:
+            self._weld_state = msg
 
     def _status_age_s(self, msg, now_ns):
         """상태 메시지의 stamp 가 지난 시간(s). 잴 수 없으면 None.
@@ -448,20 +502,24 @@ class ScanManager(Node):
         return None if value is None or scan_params.positive(value) else float(value)
 
     def conditions(self) -> Conditions:
-        """명령 시점의 보호 조건. 아직 받지 못한 것은 None 이고 거절 사유가 된다.
+        """명령 시점의 보호 조건. 아직 받지 못한 것은 None 이고 거절 사유가 된다(/weld/state 는 예외).
 
         최신성은 **재기만** 한다. 한계 시간과 비교해 거절하는 규칙은 상태 기계(status_stale)에 있다.
         """
         now_ns = self.get_clock().now().nanoseconds
         with self._status_cond:
-            robot, safety = self._robot_status, self._safety_status
+            robot, safety, weld = self._robot_status, self._safety_status, self._weld_state
         return Conditions(
             robot_connected=None if robot is None else bool(robot.connected),
             safety_latched=None if safety is None else bool(safety.latched),
             robot_status_age_s=None if robot is None else self._status_age_s(robot, now_ns),
             safety_status_age_s=None if safety is None else self._status_age_s(safety, now_ns),
             robot_status_timeout_s=self._timeout_param('robot_status_timeout_s'),
-            safety_status_timeout_s=self._timeout_param('safety_status_timeout_s'))
+            safety_status_timeout_s=self._timeout_param('safety_status_timeout_s'),
+            # 용접 상태는 못 받았거나 끊겼으면 "용접 없음"이다(상태 기계의 weld_active). 0 으로 채우지 않는다
+            weld_phase=None if weld is None else int(weld.phase),
+            weld_state_age_s=None if weld is None else self._status_age_s(weld, now_ns),
+            weld_state_timeout_s=self._timeout_param('weld_state_timeout_s'))
 
     def _watch_status_freshness(self):
         """끊김 · 회복을 각각 한 번씩 알린다. 막지는 않는다(이슈 #120).
@@ -954,8 +1012,12 @@ class ScanManager(Node):
         first = max(self._last_motion_id.get(job.scan_id, 0), resumption.last_motion_id) + 1
 
         def run():
-            # 재시작의 사실을 남기지 못하면(디스크 오류 등) 로봇을 움직이기 전에 끝낸다
-            self._write(self._store.record_resume, job.scan_id)
+            # 재시작의 사실을 남기지 못하면(디스크 오류 등) 로봇을 움직이기 전에 끝낸다.
+            # ERROR 를 잇는 재시작은 남길 곳이 다르다: 실패 기록에 찍는다(FAILED 는 Interruption 을
+            # 남기지 않는다. 계약 9장 허용 목록, v0.1.21)
+            self._write(
+                self._store.record_failure_resume if resumption.from_failure
+                else self._store.record_resume, job.scan_id)
             return ResumeRunner(
                 MotionPlanner(job.params), ports, job.params.direction_order, resumption.plan,
                 first_motion_id=first).run()
@@ -998,6 +1060,15 @@ class ScanManager(Node):
                 return scan_resume.Refusal(
                     Reason.NOT_SUPPORTED,
                     '기록에 남기지 못한 안전복귀가 있었다. 홈 안전복귀 뒤의 재접근 절차는 TBD')
+            # 용접 배타(601)의 한도는 **지금 노드의** 값이다. 재시작은 기록의 설정으로 돌기 때문에 START 처럼
+            # 필수 파라미터 누락에 먼저 걸리지 않는다 — 한도가 없으면 상태 기계가 "판정 불가 = 용접 없음"으로
+            # 통과시켜 용접 중에도 접수된다(fail-open, 계약 phase 2 7.1). 그래서 여기서 START 와 같은 코드로 막는다
+            if self._timeout_param('weld_state_timeout_s') is None:
+                value = self.get_parameter_or('weld_state_timeout_s').value
+                return scan_resume.Refusal(
+                    Reason.INVALID_VALUE,
+                    '없는 필수 파라미터: weld_state_timeout_s' if value is None
+                    else f'범위 밖: weld_state_timeout_s = {value!r}: {scan_params.positive(value)}')
             not_adopted = ''
             if machine.phase is Phase.IDLE:
                 if not self.get_parameter_or('result_dir').value:
@@ -1025,6 +1096,15 @@ class ScanManager(Node):
                 direction_order=[Direction[name] for name in self._direction_order])
             if isinstance(planned, scan_resume.Refusal):
                 return planned
+
+            # 재시작의 첫 모션도 지금 어디 있는지를 알아야 보낼 수 있다(계약 7.6). **접수 때** 막는다 —
+            # 실행 중에 실패하면 실패 기록에 resumed_at 이 찍혀 다시 이을 기회가 사라진다.
+            # 여기서 거절하면 기록이 그대로 남아, 샘플이 돌아온 뒤 다시 RESUME 할 수 있다
+            if self.current_pose(planned.params.pose_max_age_s) is None:
+                return scan_resume.Refusal(
+                    Reason.NOT_SUPPORTED,
+                    '지금 TCP 위치를 모른다(/robot/sample 의 유효 pose 가 없거나 오래됐다). '
+                    '재시작의 첫 모션 목표를 만들 수 없다 — 샘플이 돌아온 뒤 다시 RESUME 한다')
 
             job = _Job(
                 scan_id, planned.params, conversions.config_to_msg(planned.config),
@@ -1364,6 +1444,18 @@ class _NodePorts(Ports):
 
     def wait_still(self):
         return self._node.wait_still(self._params.stop_confirm_timeout_s)
+
+    def current_pose(self):
+        return self._node.current_pose(self._params.pose_max_age_s)
+
+    def damage_suspect_reason(self):
+        """직전 실패가 손상 의심 사유였는가 (계약 7.5 ②).
+
+        상태 기계의 failure 는 다음 START 까지 남는다. 안전복귀는 그 실패 뒤에 오는 명령이므로
+        여기서 보는 것이 맞다. 정상 중지(STOPPED)에는 failure 가 없어 "" 다 — 평소 경로는 그대로다.
+        """
+        return _damage_suspect_reason(
+            self._node.state_machine.failure, self._node.safety_reason_code())
 
     def tare(self):
         node, p = self._node, self._params

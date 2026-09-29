@@ -1,4 +1,5 @@
-"""계약 상수의 순수 Python 사본 (docs/contracts/ros-interfaces.md 3.4절 · 5.4절 · 6.1절).
+"""계약 상수의 순수 Python 사본 (docs/contracts/ros-interfaces.md 3.4절 · 5.4절 · 6.1절,
+docs/phase2/weld-ros-interfaces.md 3.2절 · 7.1절).
 
 rclpy · contact_scan_interfaces 를 import 하지 않는다. ROS 를 source 하지 않은 셸에서도
 상태 기계와 그 테스트가 돌아야 하기 때문이다. 값이 msg 상수와 같은지는
@@ -26,6 +27,26 @@ class Phase(IntEnum):
     RESUMING = 10
 
 
+class WeldPhase(IntEnum):
+    """WeldState.PHASE_* (phase 2, weld-ros-interfaces.md 3.2절). scan_manager 는 /weld/state 로 읽기만 한다."""
+
+    IDLE = 0
+    PREPARING = 1
+    APPROACH = 2
+    WELDING = 3
+    RETREAT = 4
+    DONE = 5
+    ERROR = 6
+    STOPPING = 7
+    STOPPED = 8
+    HOMING = 9
+
+
+# 용접이 로봇을 잡고 있지 않은 phase (weld-ros-interfaces.md 7.1절). **허용 목록이다** — 여기 없는 값
+# (HOMING 포함, 표에 없는 새 값 포함)이면 scan_manager 는 START · RESUME 을 WELD_ACTIVE(601)로 거절한다.
+WELD_REST_PHASES = frozenset({WeldPhase.IDLE, WeldPhase.DONE, WeldPhase.ERROR, WeldPhase.STOPPED})
+
+
 class Direction(IntEnum):
     """ScanState.DIR_* (3.4절). ExecuteMotion.DIR_* 와 같은 값."""
 
@@ -44,6 +65,7 @@ class Operation(IntEnum):
     DESCEND = 2
     SLIDE = 3
     HOME = 4
+    WELD_PATH = 5     # phase 2 (v0.2.0). ExecutePath 실행 중 표시용. scan_manager 는 goal 에 쓰지 않는다
 
 
 class MotionReason(IntEnum):
@@ -99,6 +121,13 @@ class Reason(IntEnum):
     ROBOT_STATUS_LOST = 404
     HB_EXPIRED = 405
     CONDITION_ACTIVE = 406
+    STOP_UNCONFIRMED = 407
     # 5xx 형상
     INVALID_SHAPE = 500
     INSUFFICIENT_POINTS = 501
+    # 6xx 용접 (phase 2, v0.2.0)
+    SCAN_ACTIVE = 600
+    WELD_ACTIVE = 601
+    NO_SCAN_RESULT = 602
+    LINE_OUT_OF_RANGE = 603
+    PATH_REJECTED = 604

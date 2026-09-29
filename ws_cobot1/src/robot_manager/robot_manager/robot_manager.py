@@ -6,6 +6,8 @@
 - `/robot/status` (QOS_STATE): 기동 직후 1회 + 바뀔 때 + 주기.
 - `/robot/execute_motion` (Action): 하강 · 슬라이딩 · 이동 · 홈. 동시에 1개만 받는다.
 - `/contact/event` 구독: 현재 goal과 `motion_id`가 같고 동작이 맞을 때만 정지에 쓴다.
+- `/robot/execute_path` (Action, phase 2): 경유점 경로. ExecuteMotion 과 같은 goal 자리를 쓴다
+  (`docs/phase2/weld-ros-interfaces.md` 5.2). 실행은 `path_executor.py`.
 
 **두산 호출은 한 줄로 줄을 세운다**(`call_queue.CallQueue`). 조회와 모션을 동시에 부르면
 `dsr_controller2`가 모든 서비스 응답을 멈췄다(2026-09-20 Virtual, `docs/env/api-check-log.md`).
@@ -21,7 +23,7 @@ import time
 from collections import deque
 
 import rclpy
-from contact_scan_interfaces.action import ExecuteMotion
+from contact_scan_interfaces.action import ExecuteMotion, ExecutePath
 from contact_scan_interfaces.srv import StopRobot
 from contact_scan_interfaces.msg import ContactEvent, ReasonCode, RobotSample, RobotStatus
 from contact_scan_qos import QOS_EVENT, QOS_SENSOR, QOS_STATE
@@ -32,7 +34,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
-from robot_manager import dsr_client, motion_state, motions, step_slide
+from robot_manager import dsr_client, motion_state, motions, path_executor, paths, step_slide
 from robot_manager.call_queue import CallQueue
 from robot_manager.conversions import posx_to_pose_fields, tool_force_to_wrench_fields
 
@@ -237,6 +239,70 @@ class Motion:
         self.event = None               # 정지 사유가 된 ContactEvent
         self.stop_at_accept = None      # 수락 시점에 남아 있던 /robot/stop 요청 (OP_HOME 전용, #115)
         self.step_mode = False          # SLIDE 를 스텝 모드로 실행 중 (EDGE 는 robot_manager 가 확정한다)
+        # 첫 OP_SLIDE 샘플로 start_z 를 다시 잡았는가. 한 모션에서 한 번만 잡는다 (계약 7.2)
+        self.slide_start_latched = False
+        # force 모드에서 set_desired_force 를 부른 시점의 Fz. REL 기준이다. 모르면 None (계약 3.2)
+        self.slide_force_baseline = None
+
+
+class PathGoal:
+    """ExecutePath goal 을 `Motion` 자리에 넣는 어댑터.
+
+    goal 자리(`self.motion`)를 ExecuteMotion 과 같이 써야 BUSY 가 양쪽으로 걸린다(계약 5.2). 그런데
+    `on_event` 는 `motion.goal.operation` 을 읽고 ExecutePath goal 에는 그 필드가 없다. 기존 코드를
+    고치지 않고 `operation = OP_WELD_PATH` 를 가진 이 객체를 넣는다. `on_event` 는 이 동작에 맞는
+    이벤트가 없다고 보고 무시하며, 과대 외력만 그보다 먼저 `motion.event` 에 걸린다.
+    """
+    operation = RobotSample.OP_WELD_PATH
+
+    def __init__(self, request):
+        self.request = request
+        self.motion_id = request.motion_id
+
+
+class PathGoal:
+    """ExecutePath goal 을 `Motion` 자리에 넣는 어댑터.
+
+    goal 자리(`self.motion`)를 ExecuteMotion 과 같이 써야 BUSY 가 양쪽으로 걸린다(계약 5.2). 그런데
+    `on_event` 는 `motion.goal.operation` 을 읽고 ExecutePath goal 에는 그 필드가 없다. 기존 코드를
+    고치지 않고 `operation = OP_WELD_PATH` 를 가진 이 객체를 넣는다. `on_event` 는 이 동작에 맞는
+    이벤트가 없다고 보고 무시하며, 과대 외력만 그보다 먼저 `motion.event` 에 걸린다.
+    """
+    operation = RobotSample.OP_WELD_PATH
+
+    def __init__(self, request):
+        self.request = request
+        self.motion_id = request.motion_id
+
+
+class PathGoal:
+    """ExecutePath goal 을 `Motion` 자리에 넣는 어댑터.
+
+    goal 자리(`self.motion`)를 ExecuteMotion 과 같이 써야 BUSY 가 양쪽으로 걸린다(계약 5.2). 그런데
+    `on_event` 는 `motion.goal.operation` 을 읽고 ExecutePath goal 에는 그 필드가 없다. 기존 코드를
+    고치지 않고 `operation = OP_WELD_PATH` 를 가진 이 객체를 넣는다. `on_event` 는 이 동작에 맞는
+    이벤트가 없다고 보고 무시하며, 과대 외력만 그보다 먼저 `motion.event` 에 걸린다.
+    """
+    operation = RobotSample.OP_WELD_PATH
+
+    def __init__(self, request):
+        self.request = request
+        self.motion_id = request.motion_id
+
+
+class PathGoal:
+    """ExecutePath goal 을 `Motion` 자리에 넣는 어댑터.
+
+    goal 자리(`self.motion`)를 ExecuteMotion 과 같이 써야 BUSY 가 양쪽으로 걸린다(계약 5.2). 그런데
+    `on_event` 는 `motion.goal.operation` 을 읽고 ExecutePath goal 에는 그 필드가 없다. 기존 코드를
+    고치지 않고 `operation = OP_WELD_PATH` 를 가진 이 객체를 넣는다. `on_event` 는 이 동작에 맞는
+    이벤트가 없다고 보고 무시하며, 과대 외력만 그보다 먼저 `motion.event` 에 걸린다.
+    """
+    operation = RobotSample.OP_WELD_PATH
+
+    def __init__(self, request):
+        self.request = request
+        self.motion_id = request.motion_id
 
 
 class RobotManager(Node):
@@ -285,6 +351,12 @@ class RobotManager(Node):
         for name in STEP_DOUBLE_PARAMS:
             self.declare_parameter(name, Parameter.Type.DOUBLE)
         self.declare_parameter('step_force_samples', 3)
+        # ExecutePath (phase 2, 계약 weld-ros-interfaces.md 6장). 기본값을 두지 않는다(규칙 7).
+        # 없거나 못 쓰는 값이면 기동은 하고 ExecutePath 만 거절한다 — 1차 스캔은 이 값 없이 돈다
+        self.declare_parameter('path_mode', Parameter.Type.STRING)
+        self.declare_parameter('path_max_points', Parameter.Type.INTEGER)
+        for name in ('path_max_speed_mps', 'path_min_z_m', 'path_acc_ratio'):
+            self.declare_parameter(name, Parameter.Type.DOUBLE)
 
         self.frame_id = self.get_parameter('frame_id').value
         self.service_timeout_s = float(self.get_parameter('service_timeout_s').value)
@@ -353,6 +425,15 @@ class RobotManager(Node):
             cancel_callback=lambda goal_handle: CancelResponse.ACCEPT,
             execute_callback=self.execute_motion,
             callback_group=group)
+        self.path_server = ActionServer(
+            self, ExecutePath, '/robot/execute_path',
+            goal_callback=self.on_path_goal_request,
+            cancel_callback=lambda goal_handle: CancelResponse.ACCEPT,
+            execute_callback=self.execute_path,
+            callback_group=group)
+        _, path_problem = self.path_limits()
+        if path_problem:
+            self.get_logger().warning(f'ExecutePath 를 받지 않는다: {path_problem}')
         self.get_logger().info(
             f'robot_manager 시작. 샘플 {sample_hz} Hz, 상태 {status_hz} Hz, '
             f'서비스 {dsr_client.prefix(self.get_parameter("dsr_namespace").value)}')
@@ -393,6 +474,18 @@ class RobotManager(Node):
             return list(self.param('home_joint_deg') or [])
         except ParameterUninitializedException:
             return []
+
+    def path_limits(self):
+        """(PathLimits, '') 또는 (None, 쓸 수 없는 이유)."""
+        try:
+            limits = paths.PathLimits(
+                mode=self.param('path_mode'), max_points=self.param('path_max_points'),
+                max_speed_mps=self.param('path_max_speed_mps'), min_z_m=self.param('path_min_z_m'),
+                acc_ratio=self.param('path_acc_ratio'), frame_id=self.frame_id)
+        except ParameterUninitializedException as exc:
+            return None, f'path_* 파라미터가 없다({exc}). contact_scan_bringup/config/*.yaml'
+        problem = paths.limits_problem(limits)
+        return (None, problem) if problem else (limits, '')
 
     # ---- 샘플 -------------------------------------------------------------
     def on_sample_timer(self):
@@ -486,7 +579,38 @@ class RobotManager(Node):
             msg.wrench.torque.x = msg.wrench.torque.y = msg.wrench.torque.z = NAN
 
         msg.valid = pose_ok and force_ok
+        self.latch_slide_start_z(msg, (x, y, z) if pose_ok else None)
         self.sample_pub.publish(msg)
+
+    def latch_slide_start_z(self, msg, position):
+        """1차 하강 제한의 기준 z 를 **이 샘플**로 잡는다 (계약 7.2, v0.1.21).
+
+        safety_monitor(2차)는 `operation` 이 OP_SLIDE 로 바뀐 첫 유효 샘플의 z 를 기준으로 쓴다.
+        1차가 "실행 직전의 마지막 위치"를 쓰면 둘이 어긋난다 — 순응 제어를 켜면 z 가 약 0.7 mm
+        올라오고(2026-09-21 실기), 그 사이에 샘플이 한 번 나가느냐에 따라 값이 달라진다. 기준이
+        어긋나면 2차의 여유(drop_limit_margin_m)가 의미를 잃는다. 그래서 **같은 메시지의 같은 값**을
+        쓴다: 여기서 잡은 값이 곧 safety_monitor 가 잡을 값이다.
+
+        실행 직전에 잡아 둔 값은 지우지 않고 덮어쓴다. 첫 OP_SLIDE 샘플이 나가기 전까지는 그 값으로
+        감시한다 — 기준이 없다고 감시를 끄지 않는다(감시 없이 도는 것이 가장 나쁘다).
+        """
+        if not msg.valid or position is None or msg.operation != RobotSample.OP_SLIDE:
+            return
+        with self.motion_lock:
+            motion = self.motion
+            if motion is None or motion.slide_start_latched:
+                return
+            motion.slide_start_latched = True
+            before, motion.start_z = motion.start_z, position[2]
+        if before is None:
+            self.get_logger().info(
+                f'SLIDE 하강 제한 기준 z = {position[2]:.5f} m (sample_id={msg.sample_id}. '
+                f'2차 감시도 같은 샘플로 잡는다)')
+        elif abs(before - position[2]) > 1e-9:
+            self.get_logger().info(
+                f'SLIDE 하강 제한 기준 z 를 첫 OP_SLIDE 샘플로 맞췄다: {before:.5f} → '
+                f'{position[2]:.5f} m (차이 {1000 * (position[2] - before):+.2f} mm, '
+                f'sample_id={msg.sample_id})')
 
     # ---- 상태 -------------------------------------------------------------
     def on_status_timer(self):
@@ -511,7 +635,53 @@ class RobotManager(Node):
 
     def status_key(self):
         return (self.connected, self.moving, self.compliance_active, self.force_ctrl_active,
-                self.motion_id, self.operation, self.detail)
+                self.motion_id, self.operation, self.detail, self.slide_press_key())
+
+    def slide_press_key(self):
+        press = self.slide_press()
+        # NaN != NaN 이라 값으로 비교하면 매번 "바뀌었다"가 된다. 비교용으로만 문자열로 바꾼다
+        return (press['mode'],) + tuple(f'{press[k]!r}' for k in (
+            'setpoint_n', 'baseline_n', 'estimate_n', 'press_lo_n', 'press_hi_n'))
+
+    def slide_press(self):
+        """SLIDE 의 누름 목표 (계약 3.2, v0.1.21). 모르는 값은 0 이 아니라 NaN 이다 (규칙 4).
+
+        **세 값은 서로 다른 것이다.** `slide_target_force_n` 은 DR_FC_MOD_REL 이라 "설정한 증분"이고,
+        실제 누름은 SLIDE 가 어디서 시작하느냐에 따라 달라진다(9/22 실기 방향별 1.5~8.6 N). 그래서
+        설정 · 시작 기준 · 추정 합을 한 자리에 섞지 않고 각각 싣는다. 합은 **추정**이며 실측이 아니다 —
+        힘 제어 중의 조회 Fz 는 1 N 안팎이 나와 "실측 누름"으로 쓰면 오히려 오해를 부른다.
+
+        **step 모드에서는 세 값이 전부 NaN 이다.** 스텝 모드는 순응 · 힘 제어를 켜지 않으므로 REL 값이
+        제어 목표가 아니다. 대신 목표 누름 띠(step_follow_lo_n ~ step_follow_hi_n)를 싣는다.
+        """
+        blank = {'mode': '', 'setpoint_n': NAN, 'baseline_n': NAN, 'estimate_n': NAN,
+                 'press_lo_n': NAN, 'press_hi_n': NAN}
+        try:
+            mode = str(self.param('slide_mode'))
+        except (ParameterUninitializedException, KeyError, TypeError):
+            return blank
+        out = dict(blank, mode=mode)
+        motion = self.motion
+        sliding = (motion is not None and motion.goal.operation == RobotSample.OP_SLIDE)
+        if mode == 'step':
+            for key, name in (('press_lo_n', 'step_follow_lo_n'), ('press_hi_n', 'step_follow_hi_n')):
+                try:
+                    out[key] = float(self.param(name))
+                except (ParameterUninitializedException, KeyError, TypeError, ValueError):
+                    pass                                  # 값이 없으면 NaN 그대로 둔다
+            return out
+        if mode != 'force':
+            return out
+        try:
+            out['setpoint_n'] = float(self.param('slide_target_force_n'))
+        except (ParameterUninitializedException, KeyError, TypeError, ValueError):
+            return out
+        baseline = motion.slide_force_baseline if sliding else None
+        if baseline is None:
+            return out                                    # 기준을 모르면 합도 내지 않는다
+        out['baseline_n'] = baseline
+        out['estimate_n'] = baseline + out['setpoint_n']
+        return out
 
     def publish_status(self):
         msg = RobotStatus()
@@ -524,6 +694,13 @@ class RobotManager(Node):
         msg.force_ctrl_active = self.force_ctrl_active
         msg.motion_id = self.motion_id
         msg.operation = self.operation
+        press = self.slide_press()
+        msg.slide_mode = press['mode']
+        msg.slide_force_setpoint_n = press['setpoint_n']
+        msg.slide_force_baseline_n = press['baseline_n']
+        msg.slide_force_estimate_n = press['estimate_n']
+        msg.step_press_lo_n = press['press_lo_n']
+        msg.step_press_hi_n = press['press_hi_n']
         msg.detail = self.detail
         self.status_pub.publish(msg)
         self.last_status_key = self.status_key()
@@ -650,6 +827,82 @@ class RobotManager(Node):
         self.get_logger().info(f'goal 종료: reason={reason} code={code} {detail}')
         return result
 
+    # ---- ExecutePath (phase 2) ----------------------------------------------
+    def on_path_goal_request(self, goal_request):
+        """계약 5.2. ExecuteMotion 과 같은 자리 · 같은 거절 규칙. 경로 자체의 문제는 수락 뒤 604 로 돌려준다."""
+        who = f'motion_id={goal_request.motion_id}'
+        with self.motion_lock:
+            if self.motion is not None:
+                problem = 'BUSY'
+            elif not self.connected:
+                problem = 'ROBOT_DISCONNECTED'
+            elif self.stop_requested is not None:
+                problem = 'STOP_REQUESTED: 처리되지 않은 정지 요청이 있다'
+            elif self.compliance_active or self.force_ctrl_active:
+                # 켜는 경로는 없지만 1차 SLIDE 해제 실패 뒤 남은 상태를 잡는 안전망(계약 1장)
+                problem = 'BUSY: 순응 · 힘 제어가 켜져 있다'
+            else:
+                problem = self.path_limits()[1]
+            if problem:
+                self.get_logger().warn(f'경로 goal 거절 ({problem}): {who}')
+                return GoalResponse.REJECT
+            self.motion = Motion(PathGoal(goal_request), self.now_s())
+        return GoalResponse.ACCEPT
+
+    def execute_path(self, goal_handle):
+        goal = goal_handle.request
+        motion = self.motion
+        motion.start_position = self.last_pose[2] if self.last_pose else None
+        waypoints = [paths.Waypoint((p.position.x, p.position.y, p.position.z),
+                                    (p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w))
+                     for p in goal.waypoints]
+        runner = None
+        try:
+            limits, problem = self.path_limits()
+            # D35(#199): 출발점(현재 위치) z 도 같은 울타리로 본다. 모르면 거절
+            problem = problem or paths.path_problem(waypoints, goal.frame_id, goal.speed,
+                                                    goal.path_tolerance_m, limits,
+                                                    start=motion.start_position)
+            if problem:     # 로봇은 움직이지 않았다. 샘플의 operation 도 바꾸지 않는다
+                reason, code, detail = ExecutePath.Result.REASON_REJECTED, ReasonCode.PATH_REJECTED, problem
+            else:
+                # 샘플에 OP_WELD_PATH 를 싣는다. 웹 비드 궤적의 근거다(계약 2.1)
+                self.motion_id, self.operation = goal.motion_id, RobotSample.OP_WELD_PATH
+                self.set_state(self.connected, self.moving, f'path {goal.motion_id} 실행 중')
+                self.get_logger().info(
+                    f'경로 goal 수락: weld={goal.weld_id} motion_id={goal.motion_id} line={goal.line_index} '
+                    f'점 {len(waypoints)} 개 speed={goal.speed} mode={limits.mode}')
+                runner = path_executor.PathRunner(self, goal_handle, motion, limits, waypoints)
+                reason, code, detail = runner.run()
+        except Exception as exc:                       # 예상 못 한 오류도 아래 정리를 거친다
+            self.get_logger().error(f'경로 실행 중 오류: {exc}')
+            reason, code, detail = ExecutePath.Result.REASON_ROBOT_ERROR, ReasonCode.ROBOT_ERROR, str(exc)
+        finally:
+            # 켜는 것은 없지만 1차와 같은 정리를 거친다(켜진 것이 없으면 아무것도 부르지 않는다)
+            if not self.release_all(motion):
+                self.get_logger().error('경로 종료 정리에서 해제에 실패했다')
+            self.settle_leftover_stop_request()
+            self.motion_id, self.operation = 0, RobotSample.OP_NONE
+            self.set_state(self.connected, self.moving, '')
+            with self.motion_lock:
+                self.motion = None
+        result = ExecutePath.Result()
+        if self.last_pose:       # 정지 시점 pose
+            result.pose, result.pose_stamp = self.last_pose[0], self.last_pose[1]
+        result.frame_id = self.frame_id
+        result.reason, result.reason_code, result.detail = reason, code, detail
+        result.distance_travelled = runner.distance_m if runner else 0.0
+        result.waypoints_done = runner.waypoints_done if runner else 0
+        if reason == ExecutePath.Result.REASON_CANCELED:
+            goal_handle.canceled()
+        elif code == ReasonCode.OK:
+            goal_handle.succeed()
+        else:
+            goal_handle.abort()
+        self.get_logger().info(f'경로 goal 종료: reason={reason} code={code} '
+                               f'점 {result.waypoints_done}/{len(waypoints)} {detail}')
+        return result
+
     def run_motion(self, goal_handle, motion):
         """명령을 보내고 끝날 때까지 지켜본다. (reason, reason_code, detail)."""
         goal = motion.goal
@@ -717,15 +970,22 @@ class RobotManager(Node):
         "접촉할 대상물에 근접하여 DR_FC_MOD_REL 로 힘제어를 시작"하라고 권한다(REL 유지 여부는 TBD).
         """
         baseline = self.last_force
+        setpoint = float(self.param('slide_target_force_n'))
         if baseline is None:
+            # 모르는 기준선을 0 으로 채우지 않는다. 그러면 '추정 최종 힘'이 설정값과 같아져
+            # "3 N 으로 눌렀다"는 거짓 숫자가 된다 (CLAUDE.md 규칙 4, 계약 3.2)
+            motion.slide_force_baseline = None
             self.get_logger().warning(
                 'SLIDE 시작: 직전 힘을 모른다. DR_FC_MOD_REL 기준선을 확인할 수 없다')
         else:
             fz = baseline[2]
+            motion.slide_force_baseline = fz
             self.get_logger().info(
                 f'SLIDE 시작: DR_FC_MOD_REL 기준선 Fz={fz:.2f} N '
                 f'(|F|={math.dist(baseline, (0.0, 0.0, 0.0)):.2f} N). '
-                f'목표 {float(self.param("slide_target_force_n")):.2f} N 은 여기에 더해진다')
+                f'설정 증분 {setpoint:.2f} N 은 여기에 더해진다 → '
+                f'추정 최종 누름 {fz + setpoint:.2f} N (**추정이며 실측이 아니다**)')
+        self.publish_status()                 # 세 값이 바뀌었다. 웹이 곧바로 받는다 (계약 3.2)
         # 켜는 호출을 보내기 **전에** 해제 대상으로 표시한다. call_sync 는 응답 시간 초과도 False 로
         # 돌려주는데, 그때 컨트롤러는 이미 켰을 수 있다. 성공 응답을 받은 뒤에만 표시하면 release_all 이
         # 해제를 부르지 않아 순응 · 힘 제어가 켜진 채 남는다(CLAUDE.md 규칙 2, T14). 켜지지 않았는데
@@ -740,7 +1000,7 @@ class RobotManager(Node):
             return False
         motion.force_on = self.force_ctrl_active = True
         if not self.call_sync(self.srv_clients['force_on'],
-                              dsr_client.force_on_request(float(self.param('slide_target_force_n'))),
+                              dsr_client.force_on_request(setpoint),
                               'set_desired_force'):
             self.get_logger().error('set_desired_force 응답 없음 또는 거절. 켜졌을 수 있어 해제를 부른다'
                                     '(켜기 시간 초과 뒤 해제 — 해제 실패면 compliance_released=false)')
