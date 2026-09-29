@@ -469,6 +469,12 @@ class WeldRunner(_Runner):
             stop_pose=self._stop_pose_fixture(), finished_at=self._ports.now())
         self._current = None
 
+    def publish_internal_failure(self, detail: str) -> None:
+        """러너 밖으로 예외가 새어 나갔을 때 노드가 부른다. 그때까지의 선 기록으로 결과를 한 번 낸다(계약 2.1 · 3.4:
+        실패 · 중단 포함 종료 때 1 회). 진행 중이던 선은 FAILED(204 · detail). 이미 냈으면 아무것도 하지 않는다."""
+        self._end_current_line(LineStatus.FAILED, Reason.ROBOT_ERROR, detail)
+        self._publish(False, Reason.ROBOT_ERROR, detail)
+
     def _publish(self, success: bool, reason_code: int, detail: str) -> None:
         if self._published is not None:
             return    # 마무리 복귀 중의 중지 · 실패: 결과는 이미 냈다(한 번만)
@@ -484,7 +490,7 @@ class WeldRunner(_Runner):
     def _finish_stop(self) -> RunOutcome:
         if not self._ports.wait_still():
             return self._finish_fail(_Fail(
-                Reason.ROBOT_STATUS_LOST, '정지 완료(connected && !moving)를 확인하지 못했다'))
+                Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
         self._end_current_line(LineStatus.STOPPED, Reason.STOP_REQUESTED, '작업 중지')
         self._publish(False, Reason.STOP_REQUESTED, '작업 중지')
         self._ports.notify(Signal.STOP_CONFIRMED)
@@ -530,7 +536,7 @@ class HomeRunner(_Runner):
             return RunOutcome(OutcomeKind.DONE, 0, '', None, self.last_motion_id)
         except _Stop:
             if not self._ports.wait_still():
-                return self._fail(_Fail(Reason.ROBOT_STATUS_LOST, '정지 완료(connected && !moving)를 확인하지 못했다'))
+                return self._fail(_Fail(Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
             self._ports.notify(Signal.STOP_CONFIRMED)
             return RunOutcome(OutcomeKind.STOPPED, int(Reason.STOP_REQUESTED), 'stopped', None,
                               self.last_motion_id)

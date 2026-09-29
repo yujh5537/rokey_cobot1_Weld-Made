@@ -382,6 +382,11 @@ class WeldManager(Node):
             return Reason.INVALID_REQUEST, f'/scan/state 가 {age:.1f} s 전 것이다(> {p.scan_state_timeout_s} s)'
         if scan.phase not in _SCAN_REST:
             return Reason.SCAN_ACTIVE, f'스캔 진행 중(scan phase={scan.phase})'
+        with self._status_cond:
+            safety_seen = self._safety_status is not None
+        if not safety_seen:
+            # safety_monitor 가 떠 있지 않은 채 용접 이동을 시작하지 않는다(1차 scan_manager 와 같은 막음, 병후 #197 ①)
+            return Reason.SAFETY_LATCHED, '/safety/status 를 받지 못했다(safety_monitor 가 떠 있는가)'
         latched = self.safety_reason_code()
         if latched:
             return Reason.SAFETY_LATCHED, f'안전 래치 중(reason_code={latched})'
@@ -441,12 +446,18 @@ class WeldManager(Node):
                  f'용접 시작 request_id={request.request_id} scan_id={plan.scan_id} '
                  f'선 L{plan.start_line}~L{plan.end_line}')
         ports = _NodePorts(self, job)
+        runner = WeldRunner(ports, plan, params, weld_id, params.result_frame_id,
+                            params.orientation_tolerance_rad, start_pose)
         try:
-            outcome = WeldRunner(ports, plan, params, weld_id, params.result_frame_id,
-                                 params.orientation_tolerance_rad, start_pose).run()
+            outcome = runner.run()
         except _Closing:
             outcome = None
         except Exception as exc:
+            # 그때까지의 선 기록으로 결과를 한 번 낸다(계약 2.1 · 3.4, 병후 #197 ③). 발행 자체가 실패해도 상태는 ERROR 로
+            try:
+                runner.publish_internal_failure(f'internal: {exc!r}')
+            except Exception as publish_exc:
+                self.get_logger().error(f'내부 예외 뒤 결과 발행 실패: {publish_exc!r}')
             outcome = self._internal_failure(exc)
         finally:
             self._last_motion_id = ports.last_motion_id
@@ -499,7 +510,8 @@ class WeldManager(Node):
 
     def _execute_home(self, goal_handle):
         result = ReturnHome.Result()
-        checked = weld_params.check(self._parameter_values())
+        # 안전복귀는 용접 전용 값(tool_profile …)이 비어 있어도 막지 않는다(병후 #197)
+        checked = weld_params.check(self._parameter_values(), only=weld_params.HOME_NAMES)
         if not checked.ok:
             return self._reject(goal_handle, result, Reason.INVALID_VALUE, checked.describe())
         p = checked.params

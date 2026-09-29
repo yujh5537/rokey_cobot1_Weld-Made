@@ -51,6 +51,7 @@ class FakePeers(Node):
         self.scan_phase = ScanState.PHASE_DONE
         self.publish_scan_state = True
         self.publish_sample = True
+        self.publish_safety = True
         self.force = (0.0, 0.0, 1.5)
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -80,8 +81,9 @@ class FakePeers(Node):
     def _publish(self):
         now = self._now()
         self._status_pub.publish(RobotStatus(stamp=now, connected=self.connected, moving=False))
-        self._safety_pub.publish(SafetyStatus(stamp=now, latched=self.latched, reason_code=self.latch_code,
-                                              level=SafetyStatus.LEVEL_STOP if self.latched else 0))
+        if self.publish_safety:
+            self._safety_pub.publish(SafetyStatus(stamp=now, latched=self.latched, reason_code=self.latch_code,
+                                                  level=SafetyStatus.LEVEL_STOP if self.latched else 0))
         if self.publish_scan_state:
             self._scan_pub.publish(ScanState(stamp=now, phase=self.scan_phase))
         if self.publish_sample:

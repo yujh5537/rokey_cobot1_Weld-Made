@@ -320,7 +320,7 @@ def test_stop_not_confirmed_is_failure(scan):
         return stop_during(3)[3](ports, request)
     outcome, ports, _ = run(scan, {3: action})
     assert outcome.kind is OutcomeKind.FAILED and ports.sm.phase is P.ERROR
-    assert outcome.reason_code == Reason.ROBOT_STATUS_LOST
+    assert outcome.reason_code == Reason.STOP_UNCONFIRMED       # 407 (#161, 1차와 같은 자리)
 
 
 def test_stop_during_final_homing_publishes_once(scan):
@@ -551,6 +551,29 @@ def test_failed_line_keeps_stop_pose_from_result(scan):
     b = plan.base_to_fixture
     pose = outcome.record.lines[1].stop_pose
     assert all(math.isclose(a, e - o) for a, e, o in zip(pose.position, (0.43, -0.2, 0.44), b))
+
+
+# ---- 내부 예외 (병후 #197 ③) ----
+
+def test_internal_failure_still_publishes_the_record_once(scan):
+    p = params()
+    plan = plan_weld(scan, 0, 7, p)
+    sm = WeldStateMachine()
+    assert sm.request(Command.START, weld_id=WELD_ID, scan_id=scan.scan_id).accepted
+
+    def boom(ports, request):
+        raise RuntimeError('시험: 예상 못 한 예외')
+    ports = FakePorts(sm, {6: boom})                       # L1 접근 2
+    runner = WeldRunner(ports, plan, p, WELD_ID, 'workpiece_fixture')
+    with pytest.raises(RuntimeError):
+        runner.run()
+    runner.publish_internal_failure('internal: RuntimeError')
+    runner.publish_internal_failure('두 번째는 무시')          # 한 번만
+    assert len(ports.saved) == 1
+    record = ports.saved[0]
+    assert not record.success and record.reason_code == Reason.ROBOT_ERROR
+    assert statuses(record)[:3] == [LineStatus.DONE, LineStatus.FAILED, LineStatus.NOT_ATTEMPTED]
+    assert record.lines[1].detail == 'internal: RuntimeError'
 
 
 # ---- classify 단독 ----

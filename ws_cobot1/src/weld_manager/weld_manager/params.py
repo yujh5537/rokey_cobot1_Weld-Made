@@ -157,6 +157,12 @@ SPECS: Tuple[ParamSpec, ...] = (
               'ExecuteMotion · ExecutePath goal 의 프레임(가칭)', default='base_link'),
 )
 SPEC_BY_NAME: Dict[str, ParamSpec] = {spec.name: spec for spec in SPECS}
+# 안전복귀(/weld/home)가 쓰는 값. 용접 전용 값(tool_profile · 위빙 · tilt …)이 비어 있어도 복귀는 막지 않는다
+# (병후 #197 리뷰: real.yaml 에 tool_profile 이 없으면 /weld/home 도 102 였다)
+HOME_NAMES = (
+    'approach_m', 'approach_speed_mps', 'travel_speed_mps', 'motion_timeout_s', 'server_wait_timeout_s',
+    'stop_confirm_timeout_s', 'sample_timeout_s', 'result_frame_id', 'motion_frame_id',
+)
 
 
 @dataclass(frozen=True)
@@ -254,16 +260,21 @@ def check_override(override: Mapping[str, object]) -> Tuple[str, ...]:
     return tuple(problems)
 
 
-def check(values: Mapping[str, object], override: Optional[Mapping[str, object]] = None) -> ParamCheck:
+def check(values: Mapping[str, object], override: Optional[Mapping[str, object]] = None,
+          only: Optional[Tuple[str, ...]] = None) -> ParamCheck:
     """파라미터 값(+ 이번 작업의 덮어쓰기)을 검사한다. values · override 는 바꾸지 않는다.
 
     values 에서 None 은 "yaml 에 없음"이다. override 는 WeldConfig 의 *_set=true 항목만 담는다.
+    only: 주면 그 이름들만 필수 · 범위를 본다(안전복귀용 HOME_NAMES). 나머지는 있으면 그대로, 없으면 None 으로 둔다.
     """
     merged = dict(values)
     merged.update(override or {})
     missing, invalid, clean = [], [], {}
     for spec in SPECS:
         value = merged.get(spec.name)
+        if only is not None and spec.name not in only:
+            clean[spec.name] = (tuple(value) if spec.kind == DOUBLE_ARRAY and value is not None else value)
+            continue
         if value is None:
             if spec.required:
                 missing.append(spec.name)
@@ -283,12 +294,12 @@ def check(values: Mapping[str, object], override: Optional[Mapping[str, object]]
             clean[spec.name] = value
 
     low = clean.get('weld_speed_min_mps')
-    if low is not None:
+    if low is not None and only is None:
         for name in SPEED_NAMES:
             if name in clean and clean[name] < low:
                 invalid.append(f'{name} = {clean.pop(name)!r}: weld_speed_min_mps({low!r}) 보다 작다')
     u, r = clean.get('tool_profile_u_m'), clean.get('tool_profile_r_m')
-    if u is not None and r is not None and len(u) != len(r):
+    if only is None and u is not None and r is not None and len(u) != len(r):
         invalid.append(f'tool_profile_u_m({len(u)} 개) · tool_profile_r_m({len(r)} 개): 길이가 같아야 한다')
 
     if missing or invalid:
