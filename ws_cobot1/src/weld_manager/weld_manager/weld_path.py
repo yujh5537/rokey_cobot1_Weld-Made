@@ -343,7 +343,7 @@ class LinePlan:
 
 
 def tool_profile_problem(spec: 'LineSpec', retreat_m: float, bottom_tcp_z: float,
-                         scan: 'ScanInput', params: WeldParams) -> Optional[str]:
+                         scan: 'ScanInput', params: WeldParams, tilt_rad: Optional[float] = None) -> Optional[str]:
     """weld-motion.md 5절 툴 외형 검사(D23). 세로선만 본다. 윗면선은 툴 전체가 이등분 축 뒤라 겹칠 수 없다.
 
     툴 외형 (u, R): 팁에서 축 방향 뒤로 u 부터 다음 u 전까지 축에서 가장 멀리 뻗은 반폭이 R 이하.
@@ -353,11 +353,11 @@ def tool_profile_problem(spec: 'LineSpec', retreat_m: float, bottom_tcp_z: float
     """
     if not spec.vertical:
         return None
-    theta = params.tilt_rad
+    theta = params.tilt_rad if tilt_rad is None else tilt_rad    # D38: 선별 기울임
     for u, r in params.tool_profile:
         if not r < (retreat_m + u) * math.tan(theta):
             return (f'툴 외형 (u {u * 1000:.1f} mm, R {r * 1000:.1f} mm) 이 옆면에 닿는다: '
-                    f'R < (s′ {retreat_m * 1000:.2f} + u) · tan {params.tilt_deg:g}° 이어야 한다')
+                    f'R < (s′ {retreat_m * 1000:.2f} + u) · tan {math.degrees(theta):g}° 이어야 한다')
         lowest = bottom_tcp_z + u * math.cos(theta) - r * math.sin(theta)
         if lowest < scan.support_z - _EPS:
             return (f'툴 외형 (u {u * 1000:.1f} mm, R {r * 1000:.1f} mm) 이 작업대에 닿는다: '
@@ -370,12 +370,15 @@ def plan_line(scan: ScanInput, index: int, params: WeldParams) -> Tuple[LinePlan
     spec = LINES[index]
     start, end = seam(scan, index, params.bottom_margin_m)
     try:
-        frame = tool_frame(spec.t, spec.n_out, params.tilt_rad, params.tool_roll_rad(index))
-        retreat_m = tip_retreat(frame, spec.t, params.standoff_m, params.tip_radius_m)
+        # D38: 선별 기울임(tilt_line_offset_deg). 9/29 실기: L1 은 45° 면 손목이 팔 길이 밖(826 > 779 mm) → 15°
+        tilt_rad = params.line_tilt_rad(index)
+        frame = tool_frame(spec.t, spec.n_out, tilt_rad, params.tool_roll_rad(index))
+        # D36: 선별 보정(standoff_line_offset_m)을 더한 스탠드오프. 9/29 실기에서 선마다 띄움이 0~8 mm 로 달랐다
+        retreat_m = tip_retreat(frame, spec.t, params.line_standoff_m(index), params.tip_radius_m)
     except PathRejected as error:
         raise PathRejected(f'{spec.name}: {error}') from None
     offset = _scale(frame.z, -retreat_m)
-    problem = tool_profile_problem(spec, retreat_m, end[2] + offset[2], scan, params)
+    problem = tool_profile_problem(spec, retreat_m, end[2] + offset[2], scan, params, tilt_rad)
     if problem:
         raise PathRejected(f'{spec.name}: {problem}')
     points = weave_points(start, end, offset, frame.weave,
@@ -390,8 +393,11 @@ def plan_line(scan: ScanInput, index: int, params: WeldParams) -> Tuple[LinePlan
     p_app = _add(points[0], back)
     p_ret = _add(points[-1], back)
     z_safe = scan.z_top + params.travel_clearance_m
-    fixture_targets = (
-        (p_app[0], p_app[1], z_safe), p_app, *points, p_ret, (p_ret[0], p_ret[1], z_safe))
+    # D37: 스캔 결과에 대한 실제 부재 자리의 치우침 보정. 이음선(seam_fixture)은 그대로 두고 목표점만 옮긴다.
+    # 작업대 → Base 는 평행 이동뿐이라(9행) 작업대 좌표에서 더해도 Base 축 값과 같다
+    shift = params.target_shift_m
+    fixture_targets = tuple(_add(p, shift) for p in (
+        (p_app[0], p_app[1], z_safe), p_app, *points, p_ret, (p_ret[0], p_ret[1], z_safe)))
     base = [scan.to_base(p) for p in fixture_targets]
     plan = LinePlan(
         index=index, name=spec.name, seam_fixture=(start, end), orientation=frame.quaternion,
@@ -456,4 +462,4 @@ def plan_weld(scan: ScanInput, start_line: int, end_line: int, params: WeldParam
     return WeldPlan(
         scan_id=scan.scan_id, start_line=start_line, end_line=end_line, seams=seams, lines=lines,
         base_to_fixture=scan.base_to_fixture,
-        z_safe_base=scan.to_base((0.0, 0.0, scan.z_top + params.travel_clearance_m))[2])
+        z_safe_base=scan.to_base((0.0, 0.0, scan.z_top + params.travel_clearance_m + params.target_shift_m[2]))[2])

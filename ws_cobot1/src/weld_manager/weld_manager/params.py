@@ -3,7 +3,7 @@
 - 이름은 계약이다(docs/phase2/weld-motion.md 6절 표, weld-ros-interfaces.md 6장). 값은
   contact_scan_bringup/config/*.yaml 의 `weld_manager:` 절에만 둔다. **모션 수치에는 코드 예비값이 없다**(CLAUDE.md 규칙 7).
   빠지면 START 를 거절한다(노드는 기동해 IDLE 로 있다).
-- "없음"은 None 이다. 0 은 값이다(weave_amplitude_m · weave_pitch_m 0 = 직선, tool_roll_deg 0 = 돌리지 않음).
+- "없음"은 None 이다. 0 은 값이다(weave_amplitude_m · weave_pitch_m 0 = 직선, tool_roll_deg · standoff_line_offset_m 0 = 그대로).
 - RunWeld.config_override(WeldConfig 의 *_set=true 항목)는 그 작업에만 덮어쓴다. 파라미터는 바꾸지 않는다(3.1절).
 - 속도는 하한(weld_speed_min_mps)만 본다. 상한은 robot_manager 의 path_max_speed_mps 가 거른다(D29).
 - 참 · 거짓 값(continue_on_line_failure, D33)은 bool 만 받는다. 0 · 1 · "true" 로 대신하지 않는다.
@@ -115,6 +115,17 @@ SPECS: Tuple[ParamSpec, ...] = (
     ParamSpec('tool_roll_deg', DOUBLE_ARRAY, True, _array(lambda v: None if _number(v) else '유한한 수여야 한다',
                                                           LINE_COUNT, ' (선 L0~L7 마다 하나)'),
               '선별 툴 축 둘레 회전 [deg] (D24, 도달성 · 핑거 방향 조정)'),
+    ParamSpec('standoff_line_offset_m', DOUBLE_ARRAY, True,
+              _array(lambda v: None if _number(v) else '유한한 수여야 한다', LINE_COUNT, ' (선 L0~L7 마다 하나)'),
+              '선별 스탠드오프 보정 [m] (D36): 선 i 의 스탠드오프 = standoff_m + 이 값[i]. 합은 0 보다 커야 한다'),
+    ParamSpec('tilt_line_offset_deg', DOUBLE_ARRAY, True,
+              _array(lambda v: None if _number(v) else '유한한 수여야 한다', LINE_COUNT, ' (선 L0~L7 마다 하나)'),
+              '선별 기울임 보정 [deg] (D38): 선 i 의 기울임 = tilt_deg + 이 값[i]. 합은 0~80. '
+              '9/29 실기: L1 은 45° 손목 자리가 팔 길이(779 mm) 밖 → −30 으로 15°'),
+    ParamSpec('target_shift_m', DOUBLE_ARRAY, True,
+              _array(lambda v: None if _number(v) else '유한한 수여야 한다', 3, ' (x, y, z)'),
+              '모든 목표점(접근 · 경유 · 후퇴 · z_safe 점)에 더하는 평행 이동 [m] (D37, 작업대 = Base 축). '
+              '9/29 실기: 팁이 큐브에 대해 Base −y 로 3~4 mm 치우쳐 −y 쪽 선은 멀고 +y 쪽 선은 가까웠다'),
     ParamSpec('tool_profile_u_m', DOUBLE_ARRAY, True, _increasing,
               '툴 외형: 팁에서 축 방향 뒤 거리 u [m] (D23 · D28). tool_profile_r_m 과 같은 길이'),
     ParamSpec('tool_profile_r_m', DOUBLE_ARRAY, True, _array(positive),
@@ -179,6 +190,9 @@ class WeldParams:
     weave_pitch_m: float
     tilt_deg: float
     tool_roll_deg: Tuple[float, ...]       # 8 개, 선 L0~L7
+    standoff_line_offset_m: Tuple[float, ...]   # 8 개, 선 L0~L7 (D36)
+    tilt_line_offset_deg: Tuple[float, ...]     # 8 개, 선 L0~L7 (D38)
+    target_shift_m: Tuple[float, ...]      # 3 개 (x, y, z), 작업대 = Base 축 (D37)
     tool_profile_u_m: Tuple[float, ...]
     tool_profile_r_m: Tuple[float, ...]
     approach_m: float
@@ -207,6 +221,17 @@ class WeldParams:
 
     def tool_roll_rad(self, line_index: int) -> float:
         return math.radians(self.tool_roll_deg[line_index])
+
+    def line_tilt_deg(self, line_index: int) -> float:
+        """선 i 의 기울임 = tilt_deg + tilt_line_offset_deg[i] (D38). check() 가 0~80 을 보장한다."""
+        return self.tilt_deg + self.tilt_line_offset_deg[line_index]
+
+    def line_tilt_rad(self, line_index: int) -> float:
+        return math.radians(self.line_tilt_deg(line_index))
+
+    def line_standoff_m(self, line_index: int) -> float:
+        """선 i 의 스탠드오프(구 표면 ↔ 이음선) = standoff_m + standoff_line_offset_m[i] (D36). check() 가 > 0 을 보장한다."""
+        return self.standoff_m + self.standoff_line_offset_m[line_index]
 
     @property
     def orientation_tolerance_rad(self) -> Optional[float]:
@@ -298,6 +323,23 @@ def check(values: Mapping[str, object], override: Optional[Mapping[str, object]]
         for name in SPEED_NAMES:
             if name in clean and clean[name] < low:
                 invalid.append(f'{name} = {clean.pop(name)!r}: weld_speed_min_mps({low!r}) 보다 작다')
+    base_tilt = clean.get('tilt_deg')
+    tilt_offsets = clean.get('tilt_line_offset_deg')
+    if base_tilt is not None and tilt_offsets is not None and only is None:
+        # D38: 선별 합도 tilt_deg 와 같은 범위(0~80). 덮어쓰기(tilt_set)로 바뀐 tilt_deg 와 합쳐 본다
+        bad = [i for i, off in enumerate(tilt_offsets) if tilt(base_tilt + off)]
+        if bad:
+            invalid.append(f'tilt_line_offset_deg = {clean.pop("tilt_line_offset_deg")!r}: '
+                           f'tilt_deg({base_tilt!r}) 과 더한 값이 {TILT_RANGE_DEG[0]:g}~{TILT_RANGE_DEG[1]:g} 밖이다 '
+                           f'(선 {", ".join(f"L{i}" for i in bad)})')
+    standoff = clean.get('standoff_m')
+    offsets = clean.get('standoff_line_offset_m')
+    if standoff is not None and offsets is not None and only is None:
+        # D36: 선별 합이 0 이하면 접촉이다. 덮어쓰기(standoff_set)로 standoff_m 이 줄어도 같이 본다
+        bad = [i for i, off in enumerate(offsets) if not standoff + off > 0.0]
+        if bad:
+            invalid.append(f'standoff_line_offset_m = {clean.pop("standoff_line_offset_m")!r}: '
+                           f'standoff_m({standoff!r}) 과 더한 값이 0 이하다 (선 {", ".join(f"L{i}" for i in bad)})')
     u, r = clean.get('tool_profile_u_m'), clean.get('tool_profile_r_m')
     if only is None and u is not None and r is not None and len(u) != len(r):
         invalid.append(f'tool_profile_u_m({len(u)} 개) · tool_profile_r_m({len(r)} 개): 길이가 같아야 한다')

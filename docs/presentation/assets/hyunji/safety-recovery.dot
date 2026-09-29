@@ -1,0 +1,16 @@
+// 04-③ 2 장: 장애 → 표시 → 관제자 조치 → 재개. 근거: safety_monitor README, docs/test-reports/daily/20260923.md §7(PR #173), 계약 7.1
+digraph recovery {
+  graph [rankdir=LR, fontname="NanumGothic", nodesep=0.35, ranksep=0.45, bgcolor="white"];
+  node  [fontname="NanumGothic", fontsize=15, shape=box, style="rounded,filled", fillcolor="#FFFFFF", color="#444444", margin="0.18,0.12", width=2.2];
+  edge  [fontname="NanumGothic", fontsize=12, color="#444444", penwidth=1.6];
+
+  a [label="① 이상 확정\n과대 외력 400\n샘플 끊김 403\n하강 제한 205", fillcolor="#FDE3E0", color="#C0392B"];
+  b [label="② 멈춤\nsafety_monitor →\n/robot/stop\n정지 완료 확인", fillcolor="#FDE3E0", color="#C0392B"];
+  c [label="③ 표시\n래치 · 사유 코드\n웹 경고 배너", fillcolor="#FFF5CC"];
+  d [label="④ 관제자 조치\n원인 확인 →\n/safety/reset →\n안전복귀", fillcolor="#DDEBFA", color="#3378C8"];
+  e [label="⑤ 재개\n새 START\n(중지였다면 재시작)", fillcolor="#D9F2D9"];
+  a -> b -> c -> d -> e;
+  note [shape=note, fontsize=12, style="filled", fillcolor="#F4F4F4", color="#888888",
+        label="래치는 조건이 사라져도 저절로 풀리지 않는다 — 사람이 보고 푼다\n멈춤을 확인하지 못하면 UNCONFIRMED 로 올리고 2 s 마다 다시 요청(물리 비상정지 안내)"];
+  b -> note [style=dotted, arrowhead=none];
+}

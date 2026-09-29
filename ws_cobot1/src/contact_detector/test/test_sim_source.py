@@ -124,7 +124,7 @@ def scan_one_direction(axis, sign, box=BOX, detector=None):
 def test_full_scan_recovers_the_virtual_box():
     """T07 합격 기준: sim → 판정 → 편향 보정이 가상 박스의 치수를 복원한다."""
     import sys
-    sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[3] / 'scan_manager'))
+    sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[2] / 'scan_manager'))
     from scan_manager.contract_enums import Direction
     from scan_manager.geometry_estimator import (
         BiasParams, EdgeObservation, TopObservation, estimate_box)

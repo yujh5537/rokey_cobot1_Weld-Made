@@ -62,6 +62,14 @@ def test_missing_values_are_listed_not_filled(param_values):
     ('tool_profile_u_m', [0.0, 0.003, 0.003]), ('tool_profile_u_m', [-0.001, 0.003, 0.012]),
     ('tool_profile_r_m', [0.002, 0.0, 0.015]), ('tool_check_max_force_n', 0.0),
     ('continue_on_line_failure', 1), ('continue_on_line_failure', 'true'),    # D33: bool 만
+    ('standoff_line_offset_m', [0.0] * 7), ('standoff_line_offset_m', 0.0),    # D36: 8 개 배열
+    ('standoff_line_offset_m', [0.0] * 7 + [float('nan')]),
+    ('standoff_line_offset_m', [0.0] * 7 + [-0.003]),                          # 합 0 = 접촉
+    ('standoff_line_offset_m', [-0.004] + [0.0] * 7),                          # 합 < 0
+    ('target_shift_m', [0.0, 0.0]), ('target_shift_m', [0.0, float('nan'), 0.0]), ('target_shift_m', 0.0),   # D37
+    ('tilt_line_offset_deg', [0.0] * 7), ('tilt_line_offset_deg', 0.0),                 # D38: 8 개 배열
+    ('tilt_line_offset_deg', [0.0, -45.1] + [0.0] * 6),                                 # 합 < 0
+    ('tilt_line_offset_deg', [0.0] * 7 + [35.1]),                                       # 합 > 80
 ])
 def test_out_of_range(param_values, name, value):
     param_values[name] = value
@@ -74,10 +82,37 @@ def test_out_of_range(param_values, name, value):
     ('weave_amplitude_m', 0.0), ('weave_pitch_m', 0.0), ('tilt_deg', 0.0), ('tilt_deg', 80.0),
     ('tool_roll_deg', [-30.0, 0, 0, 0, 0, 0, 0, 60.0]), ('bottom_margin_m', 0.0),
     ('continue_on_line_failure', False),
+    ('standoff_line_offset_m', [-0.001, 0, 0.002, 0, -0.001, 0, 0.001, 0]),   # D36 선별 보정(합 > 0)
+    ('standoff_line_offset_m', [-0.0029] + [0.0] * 7),
+    ('target_shift_m', [0.0, 0.0035, 0.0]), ('target_shift_m', [-0.01, 0.0, -0.002]),   # D37
+    ('tilt_line_offset_deg', [0.0, -30.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),               # D38 real 출발값(L1 15°)
+    ('tilt_line_offset_deg', [-45.0] + [0.0] * 6 + [35.0]),                             # 합 0 · 80 은 값
 ])
 def test_zero_and_bounds_are_values(param_values, name, value):
     param_values[name] = value
     assert check(param_values).ok
+
+
+def test_line_offset_is_checked_against_overridden_standoff(param_values):
+    # D36: WeldConfig 로 standoff_m 을 줄이면 선별 합이 0 이하가 될 수 있다. 그 작업은 102 로 거절
+    param_values['standoff_line_offset_m'] = [-0.002] + [0.0] * 7
+    assert check(param_values).ok
+    result = check(param_values, override={'standoff_m': 0.002})
+    assert not result.ok and 'L0' in result.invalid[0], result.invalid
+    assert check(param_values, override={'standoff_m': 0.0025}).ok
+    params = check(param_values, override={'standoff_m': 0.0025}).params
+    assert math.isclose(params.line_standoff_m(0), 0.0005) and params.line_standoff_m(1) == 0.0025
+
+
+def test_tilt_line_offset_is_checked_against_overridden_tilt(param_values):
+    # D38: WeldConfig 로 tilt_deg 를 바꾸면 선별 합이 범위를 벗어날 수 있다. 그 작업만 102
+    param_values['tilt_line_offset_deg'] = [0.0, -30.0] + [0.0] * 6
+    params = check(param_values).params
+    assert math.isclose(params.line_tilt_deg(1), 15.0) and params.line_tilt_deg(0) == 45.0
+    assert math.isclose(params.line_tilt_rad(1), math.radians(15.0))
+    result = check(param_values, override={'tilt_deg': 20.0})
+    assert not result.ok and 'L1' in result.invalid[0], result.invalid
+    assert check(param_values, override={'tilt_deg': 30.0}).ok
 
 
 @pytest.mark.parametrize('name', ['weld_speed_mps', 'travel_speed_mps', 'approach_speed_mps'])
