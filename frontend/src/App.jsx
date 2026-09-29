@@ -1337,6 +1337,10 @@ function App() {
           FIXTURE_ORIGIN_WORLD_MM
         )
       }
+      const showScanOverlays = !weldRef.current?.active
+      contactGroup.visible = showScanOverlays
+      trajectoryLine.visible = showScanOverlays
+      pathCandidateGroup.visible = showScanOverlays
       weldEffect.tick(weldRef.current?.scan_id === renderedScanRef.current ? weldRef.current : null)
       controls.update()
 

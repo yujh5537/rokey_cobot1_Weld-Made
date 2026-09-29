@@ -6,7 +6,7 @@ export function createWeldEffect(scene) {
   const group = new THREE.Group()
   scene.add(group)
   const beadGeometry = new THREE.SphereGeometry(0.007, 6, 4)
-  const beadMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  const beadMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 })
   const beads = new THREE.InstancedMesh(beadGeometry, beadMaterial, 5000)
   beads.frustumCulled = false
   beads.count = 0
@@ -27,11 +27,9 @@ export function createWeldEffect(scene) {
   group.add(glow)
   const particles = []
   const matrix = new THREE.Matrix4()
-  const color = new THREE.Color()
   let runId = ''
   let previous = performance.now()
   let count = 0
-  const born = []
   function tick(state) {
     const now = performance.now()
     const dt = Math.min((now - previous) / 1000, 0.05)
@@ -39,7 +37,6 @@ export function createWeldEffect(scene) {
     if (state?.run_id !== runId) {
       runId = state?.run_id
       count = 0
-      born.length = 0
       particles.length = 0
     }
     const points = state?.beads ?? []
@@ -47,16 +44,9 @@ export function createWeldEffect(scene) {
       const p = points[count]
       matrix.makeTranslation(p[0] * 10, p[2] * 10, -p[1] * 10)
       beads.setMatrixAt(count, matrix)
-      born[count] = now
     }
     beads.count = count
-    for (let i = 0; i < count; i++) {
-      const heat = Math.max(0, 1 - (now - born[i]) / 3000)
-      color.setRGB(0.28 + 0.72 * heat, 0.30 + 0.5 * heat ** 3, 0.32 * (1 - heat) + 0.2 * heat)
-      beads.setColorAt(i, color)
-    }
     beads.instanceMatrix.needsUpdate = true
-    if (beads.instanceColor) beads.instanceColor.needsUpdate = true
     glow.visible = Boolean(state?.arc && state?.contact)
     if (glow.visible) {
       const p = state.contact
