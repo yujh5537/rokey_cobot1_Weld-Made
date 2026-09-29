@@ -5,6 +5,7 @@ import { buildM0609Model, disposeObject3D } from './robotModel.js'
 import { parseRobotJoints } from './robotJoints.js'
 import { createWeldEffect } from './weldEffect.js'
 import { appendWeldSample, updateWeldState } from './weldLive.js'
+import { TABLE_HEIGHT_MM, basePointWorldMm, fixturePointWorldMm, fixtureRelativeToBaseMm, robotBaseWorldMm } from './sceneFrames.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -100,10 +101,10 @@ function toThreePosition(
   )
 }
 
-function getBaseToFixtureMm() {
+function getFixtureOriginWorldMm() {
   const raw =
     import.meta.env
-      .VITE_BASE_TO_FIXTURE_MM ?? ''
+      .VITE_FIXTURE_ORIGIN_WORLD_MM ?? import.meta.env.VITE_BASE_TO_FIXTURE_MM ?? ''
 
   const values = raw
     .split(',')
@@ -128,10 +129,9 @@ function getBaseToFixtureMm() {
   }
 }
 
-const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
+const FIXTURE_ORIGIN_WORLD_MM = getFixtureOriginWorldMm()
 
-// 작업대 상판의 Base 좌표. Virtual 표준 fixture는 z=400 mm이고
-// DB/실기 배치는 z≈95 mm다.
+// 작업대 상판의 화면/world 좌표. ROS base_link는 별도 원점이다.
 const DEFAULT_TABLE_ORIGIN_MM = {
   x: 420.255,
   y: -156.675,
@@ -171,6 +171,12 @@ function getTableOriginMm() {
 }
 
 const TABLE_ORIGIN_MM = getTableOriginMm()
+const ROBOT_BASE_WORLD_MM = robotBaseWorldMm(TABLE_ORIGIN_MM)
+
+function toThreeBasePosition(xMm, yMm, zMm) {
+  const world = basePointWorldMm({ x: xMm, y: yMm, z: zMm }, ROBOT_BASE_WORLD_MM)
+  return toThreePosition(world.x, world.y, world.z)
+}
 
 function formatScanLogMessage(payload) {
   const parts = []
@@ -247,6 +253,7 @@ function App() {
         ? { scan_id: scanResult?.scan_id, start_line: 0, end_line: 7 }
         : {}
       if (command === 'start' && !payload.scan_id) throw new Error('성공한 스캔 결과가 필요합니다')
+      if (command === 'start' && fixtureFrameMismatch) throw new Error('부재·로봇 좌표계가 다릅니다')
       const response = await fetch(`/commands/weld/${command}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payload }),
@@ -673,7 +680,7 @@ function App() {
           // 현재 TCP 위치와 P4 용접 자국은 같은 robot/sample을 사용한다.
           setTipPose(newTipPose)
           weldRef.current = appendWeldSample(
-            weldRef.current, newTipPose, scanResultRef.current, BASE_TO_FIXTURE_MM)
+            weldRef.current, newTipPose, scanResultRef.current, FIXTURE_ORIGIN_WORLD_MM)
 
           // TCP 이동 궤적
           setTipTrajectory((prevTrajectory) => {
@@ -881,11 +888,11 @@ function App() {
 
     const tableWidth = 4.0
     const tableDepth = 3.0
-    const tableHeight = 94 * DISPLAY_SCALE
+    const tableHeight = TABLE_HEIGHT_MM * DISPLAY_SCALE
     const topThickness = 0.12
     const floorY = -tableHeight
 
-    // 장면은 base_link 기준이다. table origin은 상판 좌표다.
+    // 장면은 화면/world 기준이다. table origin은 상판 좌표다.
     // 작업대 형상과 부재 위치는 표준 fixture 값을 유지한다.
     const tableOriginThree =
       toThreePosition(
@@ -1136,9 +1143,11 @@ function App() {
     const robotModel =
       buildM0609Model()
 
-    // Virtual 표준 fixture 화면에서 베이스 모델만 작업대 바닥에 맞춘다.
+    // 로봇과 모든 Base 좌표 표시가 같은 화면 원점을 사용한다.
     // 작업대 상판과 scan/result 형상 좌표는 변경하지 않는다.
-    robotModel.root.position.y = tableOriginThree.y + floorY
+    robotModel.root.position.copy(
+      toThreeBasePosition(0, 0, 0)
+    )
 
     robotModelRef.current =
       robotModel.root
@@ -1176,11 +1185,11 @@ function App() {
         )
       })
 
-    // M0609(base_link)와 실제 작업대가
-    // 한 화면에 들어오도록 두 원점의 중간을 바라본다.
+    // M0609 base_link와 작업대가 한 화면에 들어오게 한다.
     const viewCenter =
       tableOriginThree
         .clone()
+        .add(toThreeBasePosition(0, 0, 0))
         .multiplyScalar(0.5)
 
     // Include the fully extended arm while waiting for the first joint snapshot.
@@ -1227,6 +1236,9 @@ function App() {
     const axesHelper =
       new THREE.AxesHelper(2)
 
+    axesHelper.position.copy(toThreeBasePosition(0, 0, 0))
+    // ROS +Y -> Three -Z, ROS +Z -> Three +Y.
+    axesHelper.rotation.x = -Math.PI / 2
     scene.add(axesHelper)
 
     // 8. 현재 TCP 팁 표시
@@ -1386,7 +1398,7 @@ function App() {
     // MQTT/Web 좌표 단위는 mm.
     // 화면 표시를 위해 100 mm = Three.js 1 unit로 축소한다.
     tipMeshRef.current.position.copy(
-      toThreePosition(
+      toThreeBasePosition(
         tipPose.x,
         tipPose.y,
         tipPose.z
@@ -1410,7 +1422,7 @@ function App() {
     }
 
     const points = tipTrajectory.map((pose) =>
-      toThreePosition(
+      toThreeBasePosition(
         pose.x,
         pose.y,
         pose.z
@@ -1464,7 +1476,7 @@ function App() {
 
       // 판정 순간의 실제 탐침 TCP 좌표. scan/result를 만든 원본과 같은 좌표다.
       marker.position.copy(
-        toThreePosition(
+        toThreeBasePosition(
           point.x,
           point.y,
           point.z
@@ -1498,17 +1510,17 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
+    if (!FIXTURE_ORIGIN_WORLD_MM) {
       return
     }
 
     // scan/result는 workpiece_fixture 기준이고 접촉점/궤적은 base_link 기준이다.
-    // ROS와 같은 base_to_fixture 평행이동을 그대로 적용해 한 좌표계에 겹친다.
+    // fixture 로컬 좌표를 고정된 화면/world 원점에 표시한다.
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        FIXTURE_ORIGIN_WORLD_MM.x,
+        FIXTURE_ORIGIN_WORLD_MM.y,
+        FIXTURE_ORIGIN_WORLD_MM.z
       )
     )
 
@@ -1643,15 +1655,15 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
+    if (!FIXTURE_ORIGIN_WORLD_MM) {
       return
     }
 
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        FIXTURE_ORIGIN_WORLD_MM.x,
+        FIXTURE_ORIGIN_WORLD_MM.y,
+        FIXTURE_ORIGIN_WORLD_MM.z
       )
     )
 
@@ -1731,15 +1743,15 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
+    if (!FIXTURE_ORIGIN_WORLD_MM) {
       return
     }
 
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        FIXTURE_ORIGIN_WORLD_MM.x,
+        FIXTURE_ORIGIN_WORLD_MM.y,
+        FIXTURE_ORIGIN_WORLD_MM.z
       )
     )
 
@@ -1810,6 +1822,26 @@ function App() {
       ? scanResult.scan_id : null
   }, [scanResult])
 
+  const fixtureInRobotBase = FIXTURE_ORIGIN_WORLD_MM
+    ? fixtureRelativeToBaseMm(FIXTURE_ORIGIN_WORLD_MM, ROBOT_BASE_WORLD_MM)
+    : null
+  const recordedFixture = scanResult?.ros_base_to_fixture_mm
+  const fixtureFrameMismatch = Boolean(fixtureInRobotBase &&
+    Array.isArray(recordedFixture) && recordedFixture.length === 3 &&
+    Math.hypot(
+      fixtureInRobotBase.x - recordedFixture[0],
+      fixtureInRobotBase.y - recordedFixture[1],
+      fixtureInRobotBase.z - recordedFixture[2],
+    ) > 2)
+
+  const tipWorldPose = tipPose
+    ? basePointWorldMm(tipPose, ROBOT_BASE_WORLD_MM)
+    : null
+  const candidateWorldCoordinate = (point, axis) =>
+    point && FIXTURE_ORIGIN_WORLD_MM
+      ? formatNumber(fixturePointWorldMm(point, FIXTURE_ORIGIN_WORLD_MM)[axis])
+      : '-'
+
   const progressPercent = progressTotal > 0
     ? Math.min(100, Math.max(0, (progress / progressTotal) * 100))
     : 0
@@ -1872,10 +1904,11 @@ function App() {
           </div>
           <div className="weld-controls">
             <strong>형상 생성 후 용접 · 8선</strong>
-            <button disabled={!weld || weld.active || weldPending || safetyLatched || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
+            <button disabled={!weld || weld.active || weldPending || safetyLatched || fixtureFrameMismatch || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
               onClick={() => commandWeld('start')}>용접 시작</button>
             <button disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button>
             <span role="status">{!weld ? '용접 상태 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · ${weld.line + 1}/${weld.line_total || 8}선`}</span>
+            {fixtureFrameMismatch && <p role="alert">부재·로봇 좌표계 불일치: 저장된 ROS fixture 기준점은 재설정해야 합니다.</p>}
             {(weldError || weld?.detail) && <p role="alert">{weldError || weld.detail}</p>}
           </div>
           <p className="view-help">좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
@@ -1925,13 +1958,13 @@ function App() {
 
           <section className="panel tcp-panel">
             <div className="panel-heading compact">
-              <div><p className="section-kicker">TCP POSITION</p><h2>탐침 위치</h2></div>
+              <div><p className="section-kicker">TCP POSITION · WORLD</p><h2>탐침 위치</h2></div>
             </div>
-            {tipPose ? (
+            {tipWorldPose ? (
               <div className="coordinate-grid">
-                <div><span>X</span><strong>{formatNumber(tipPose.x)}</strong><small>mm</small></div>
-                <div><span>Y</span><strong>{formatNumber(tipPose.y)}</strong><small>mm</small></div>
-                <div><span>Z</span><strong>{formatNumber(tipPose.z)}</strong><small>mm</small></div>
+                <div><span>X</span><strong>{formatNumber(tipWorldPose.x)}</strong><small>mm</small></div>
+                <div><span>Y</span><strong>{formatNumber(tipWorldPose.y)}</strong><small>mm</small></div>
+                <div><span>Z</span><strong>{formatNumber(tipWorldPose.z)}</strong><small>mm</small></div>
               </div>
             ) : <p className="empty-state">팁 위치를 기다리는 중입니다.</p>}
             <p className="mini-status">{jointStatus}</p>
@@ -1954,8 +1987,8 @@ function App() {
           </div>
         )}
         {!scanResult && <p className="empty-state large">스캔을 시작하면 측정 결과와 경로 후보가 여기에 표시됩니다.</p>}
-        {scanResult?.success === true && !BASE_TO_FIXTURE_MM && (
-          <p className="alert-message">작업대 원점 미설정: VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.</p>
+        {scanResult?.success === true && !FIXTURE_ORIGIN_WORLD_MM && (
+          <p className="alert-message">부재 원점 미설정: VITE_FIXTURE_ORIGIN_WORLD_MM 값을 확인하세요.</p>
         )}
         {scanResult && scanResult.success !== true && (
           <p className="alert-message">경로 후보를 생성하지 못했습니다. {scanResult.reason ?? 'UNKNOWN'}</p>
@@ -1975,12 +2008,12 @@ function App() {
                 {scanResult.path_candidates.map((candidate, index) => (
                   <tr key={index}>
                     <td><span className="path-number">{index + 1}</span></td>
-                    <td>{formatNumber(candidate.start?.x_mm)} mm</td>
-                    <td>{formatNumber(candidate.start?.y_mm)} mm</td>
-                    <td>{formatNumber(candidate.start?.z_mm)} mm</td>
-                    <td>{formatNumber(candidate.end?.x_mm)} mm</td>
-                    <td>{formatNumber(candidate.end?.y_mm)} mm</td>
-                    <td>{formatNumber(candidate.end?.z_mm)} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.start, 'x')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.start, 'y')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.start, 'z')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.end, 'x')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.end, 'y')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.end, 'z')} mm</td>
                     <td><strong>{formatNumber(candidate.length_mm)} mm</strong></td>
                   </tr>
                 ))}
@@ -1989,7 +2022,7 @@ function App() {
           </div>
         )}
         {scanResult?.success === true && (
-          <p className="result-meta">결과 좌표 프레임: {scanResult.frame_id ?? '-'} · base_to_fixture 기준으로 3D 화면에 정렬</p>
+          <p className="result-meta">화면 좌표: World(mm) · 원본 결과: {scanResult.frame_id ?? '-'}</p>
         )}
       </section>
 
