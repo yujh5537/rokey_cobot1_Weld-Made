@@ -6,6 +6,8 @@
   script[n] = (reason, reason_code) → 그 사유로 곧바로 끝낸다
   없으면 목표에 도착한다(MOVE_TO = target, PATH = 마지막 경유점, HOME = HOME_POSE)
 - /robot/stop: 요청을 적어 두고 붙잡은 goal 을 풀어 준다.
+- reject_after_stop=n: n 번째 goal 요청(수락 전, 1 부터 두 서버 합쳐)을 /robot/stop 이 올 때까지 붙잡았다가 거절한다.
+  실제 robot_manager 는 처리되지 않은 정지 요청이 있으면 goal 을 거절한다(계약 5.2). 거절된 요청은 goals 에 없다.
 - /robot/status · /robot/sample · /safety/status · /scan/state: 주기 발행. 값은 속성으로 바꾼다.
 """
 
@@ -41,9 +43,12 @@ def _pose(position, orientation):
 
 class FakePeers(Node):
 
-    def __init__(self, script=None, with_path_server=True):
+    def __init__(self, script=None, with_path_server=True, reject_after_stop=None):
         super().__init__('fake_peers')
         self.script = dict(script or {})
+        self.reject_after_stop = reject_after_stop
+        self.requests = 0               # goal 요청 수(거절 포함)
+        self.pending_request = None     # reject_after_stop 요청을 붙잡고 있으면 그 번호
         self.goals = []                 # (kind, goal) 받은 순서대로. kind = 'MOVE_TO' | 'HOME' | 'PATH'
         self.stop_requests = []
         self.position, self.orientation = HOME_POSE
@@ -58,12 +63,12 @@ class FakePeers(Node):
         group = ReentrantCallbackGroup()
         self._servers = [ActionServer(
             self, ExecuteMotion, '/robot/execute_motion', execute_callback=self._execute_motion,
-            goal_callback=lambda _g: GoalResponse.ACCEPT, cancel_callback=lambda _h: CancelResponse.ACCEPT,
+            goal_callback=self._on_goal, cancel_callback=lambda _h: CancelResponse.ACCEPT,
             callback_group=group)]
         if with_path_server:
             self._servers.append(ActionServer(
                 self, ExecutePath, '/robot/execute_path', execute_callback=self._execute_path,
-                goal_callback=lambda _g: GoalResponse.ACCEPT, cancel_callback=lambda _h: CancelResponse.ACCEPT,
+                goal_callback=self._on_goal, cancel_callback=lambda _h: CancelResponse.ACCEPT,
                 callback_group=group))
         self.create_service(StopRobot, '/robot/stop', self._on_stop, callback_group=group)
         self._status_pub = self.create_publisher(RobotStatus, '/robot/status', QOS_STATE)
@@ -94,6 +99,19 @@ class FakePeers(Node):
             self._sample_pub.publish(sample)
 
     # ---- 모션 ----
+
+    def _on_goal(self, _goal):
+        with self._lock:
+            self.requests += 1
+            n = self.requests
+        if n != self.reject_after_stop:
+            return GoalResponse.ACCEPT
+        # 중지 접수 직후 도착한 goal: /robot/stop 이 걸려 있는 동안 받은 것으로 보고 거절한다(한도는 시험이 멈추지 않게)
+        self.pending_request = n
+        self._stop.wait(10.0)
+        self._stop.clear()
+        self.pending_request = None
+        return GoalResponse.REJECT
 
     def _take(self, kind, goal):
         with self._lock:

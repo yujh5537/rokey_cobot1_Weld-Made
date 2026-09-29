@@ -525,6 +525,10 @@ class WeldManager(Node):
             pose = Pose(conversions.position_of(sample.pose), conversions.orientation_of(sample.pose))
         with self._job_lock:
             snapshot = self.state_machine.snapshot()
+            if self.state_machine.is_busy:
+                # 실행 중 작업(self._job)을 건드리기 전에 거절한다. 덮어썼다가 지우면 그 작업의 /weld/stop 이
+                # stop_event 를 세우지 못해 STOPPED 가 아니라 요청하지 않은 정지(ERROR 204)로 끝난다(독립 재검 🟠1)
+                return self._reject(goal_handle, result, Reason.BUSY, f'phase={snapshot.phase.name}')
             job = _Job(snapshot.weld_id, snapshot.scan_id, p)
             self._job = job
             outcome = self.state_machine.request(Command.HOME)

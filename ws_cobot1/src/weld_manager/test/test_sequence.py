@@ -308,6 +308,22 @@ def test_stop_between_lines_keeps_finished_line_done(scan):
     assert outcome.record.lines[0].stop_pose is None      # 끝난 선에는 정지 좌표를 달지 않는다
 
 
+def test_stop_then_next_goal_rejected_ends_stopped(scan):
+    # 독립 재검 🟠2: 선 사이(L1 접근 1 = goal 5)에서 중지가 접수되고, 그 goal 은 robot_manager 에 남은 정지 요청 때문에
+    # 거절됐다(계약 5.2) → STOPPED. 예전에는 거절을 중지 접수보다 먼저 봐서 ERROR 204 였다
+    def rejected(ports, request):
+        ports.press_stop()
+        return MotionResult(accepted=False)
+    outcome, ports, plan = run(scan, {5: rejected})
+    assert outcome.kind is OutcomeKind.STOPPED and ports.sm.phase is P.STOPPED and len(ports.calls) == 5
+    record = outcome.record
+    assert statuses(record)[:3] == [LineStatus.DONE, LineStatus.STOPPED, LineStatus.NOT_ATTEMPTED]
+    assert record.reason_code == Reason.STOP_REQUESTED
+    # 거절된 goal 로는 움직이지 않았다 → 정지 자리는 L0 후퇴점(작업대 좌표)
+    expected = [a - b for a, b in zip(plan.lines[0].retreat, plan.base_to_fixture)]
+    assert all(math.isclose(a, e, abs_tol=1e-12) for a, e in zip(record.lines[1].stop_pose.position, expected))
+
+
 def test_stop_during_retreat_marks_line_stopped(scan):
     # 후퇴도 선 절차의 일부다(5절 표). 후퇴 도중 중지면 그 선은 STOPPED
     outcome, _, _ = run(scan, stop_during(4))
@@ -584,6 +600,13 @@ REQ = MotionRequest(MotionKind.MOVE_TO, 't', speed=0.01, target=(0, 0, 0), orien
 def test_reached_after_stop_is_stop():
     verdict = classify(REQ, reached(REQ), stop_requested=True)
     assert verdict.kind is VerdictKind.STOPPED
+
+
+def test_goal_rejected_after_stop_is_stop():
+    # 독립 재검 🟠2: 중지 접수 뒤의 거절은 중지다. 중지 없이 거절이면 실패(204)
+    assert classify(REQ, MotionResult(accepted=False), stop_requested=True).kind is VerdictKind.STOPPED
+    verdict = classify(REQ, MotionResult(accepted=False), stop_requested=False)
+    assert verdict.kind is VerdictKind.FAILED and verdict.reason_code == Reason.ROBOT_ERROR
 
 
 def test_failure_after_stop_is_still_failure():

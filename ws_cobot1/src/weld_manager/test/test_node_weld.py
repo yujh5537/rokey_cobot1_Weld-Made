@@ -63,11 +63,11 @@ def ros():
 
 
 class Harness:
-    def __init__(self, result_dir, script=None, with_path_server=True, params=None):
+    def __init__(self, result_dir, script=None, with_path_server=True, params=None, reject_after_stop=None):
         values = {**PARAM_VALUES, 'result_dir': str(result_dir), **(params or {})}
         overrides = [Parameter(name, value=value) for name, value in values.items()]
         self.weld = WeldManager(parameter_overrides=overrides)
-        self.fake = FakePeers(script, with_path_server)
+        self.fake = FakePeers(script, with_path_server, reject_after_stop)
         self.client = rclpy.create_node('weld_test_client')
         self.run_client = ActionClient(self.client, RunWeld, '/weld/run')
         self.home_client = ActionClient(self.client, ReturnHome, '/weld/home')
@@ -262,6 +262,39 @@ def test_weld_stop_during_path_then_home(make):
     assert h.fake.kinds()[3:] == ['MOVE_TO', 'MOVE_TO', 'HOME']   # 물러남 → z_safe → 홈
     assert [g.motion_id for _, g in h.fake.goals[3:]] == [4, 5, 6]  # 앞 작업의 번호를 잇는다
     assert h.phase().name == 'STOPPED'
+
+
+def test_home_during_run_is_rejected_and_stop_still_stops(make):
+    # 독립 재검 🟠1: 실행 중의 /weld/home 은 BUSY 로 거절하고 실행 중 작업을 건드리지 않는다.
+    # 예전에는 거절하면서 작업 참조를 지워 뒤이은 /weld/stop 이 ERROR 204 로 끝났다
+    h = make(script={3: 'hold'})
+    future = h.run(wait=False)
+    assert wait_for(lambda: len(h.fake.goals) == 3)
+    job = h.weld._job
+    home = h.home()
+    same_job, goals_after_home = h.weld._job is job, len(h.fake.goals)
+    stop = h.stop()                                             # 단언 전에 붙잡은 goal 을 푼다(실패해도 시험이 멈추지 않게)
+    result = wait_future(future, 30.0).result
+    assert not home.success and home.reason_code == 100
+    assert same_job and goals_after_home == 3                   # 작업 그대로, 로봇에 goal 을 더 보내지 않았다
+    assert stop.accepted
+    assert not result.success and result.reason_code == 200 and h.phase().name == 'STOPPED'
+    assert result.result.lines[0].status == WeldLine.STATUS_STOPPED
+
+
+def test_stop_then_goal_rejected_is_stopped(make):
+    # 독립 재검 🟠2: /weld/stop 이 L1 접근 1(요청 5)의 수락 전에 접수되고, robot_manager 가 남은 정지 요청 때문에
+    # 그 goal 을 거절한다(계약 5.2). 로봇은 움직이지 않았다 → STOPPED(예전에는 ERROR 204)
+    h = make(reject_after_stop=5, params={'server_wait_timeout_s': 5.0})
+    future = h.run(wait=False)
+    assert wait_for(lambda: h.fake.pending_request == 5)
+    stop = h.stop()
+    result = wait_future(future, 30.0).result
+    assert stop.accepted and [r.requester for r in h.fake.stop_requests] == ['weld_manager']
+    assert not result.success and result.reason_code == 200 and h.phase().name == 'STOPPED'
+    statuses = [line.status for line in result.result.lines]
+    assert statuses[:3] == [WeldLine.STATUS_DONE, WeldLine.STATUS_STOPPED, WeldLine.STATUS_NOT_ATTEMPTED]
+    assert h.fake.kinds() == ['MOVE_TO', 'MOVE_TO', 'PATH', 'MOVE_TO']     # 거절된 goal 은 로봇이 받지 않았다
 
 
 def test_unrequested_stop_is_error(make):
