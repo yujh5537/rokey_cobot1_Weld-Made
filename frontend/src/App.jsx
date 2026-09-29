@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { buildM0609Model, disposeObject3D } from './robotModel.js'
 import { parseRobotJoints } from './robotJoints.js'
 import { createWeldEffect } from './weldEffect.js'
+import { appendWeldSample, updateWeldState } from './weldLive.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -129,9 +130,8 @@ function getBaseToFixtureMm() {
 
 const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
 
-// 작업대는 실제 설비 배치용 시각 모델이다.
-// sim의 base_to_fixture.z=400 mm는 가상 박스 지지면이므로
-// 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
+// 작업대 상판의 Base 좌표. Virtual 표준 fixture는 z=400 mm이고
+// DB/실기 배치는 z≈95 mm다. 바닥과 로봇 베이스는 z=0에 둔다.
 const DEFAULT_TABLE_ORIGIN_MM = {
   x: 420.255,
   y: -156.675,
@@ -235,38 +235,25 @@ function formatScanLogMessage(payload) {
 function App() {
   const weldRef = useRef(null)
   const renderedScanRef = useRef(null)
-  const autoWeldScan = useRef(null)
+  const scanResultRef = useRef(null)
   const [weld, setWeld] = useState(null)
   const [weldError, setWeldError] = useState('')
   const [weldPending, setWeldPending] = useState(false)
-  useEffect(() => {
-    let disposed = false
-    let timer
-    const controller = new AbortController()
-    async function poll() {
-      try {
-        const response = await fetch('/sim-weld/state', { signal: controller.signal })
-        if (!response.ok) throw new Error('offline')
-        const state = await response.json()
-        if (!disposed) { weldRef.current = state; setWeld(state) }
-      } catch {
-        if (!disposed) { weldRef.current = null; setWeld(null) }
-      }
-      if (!disposed) timer = setTimeout(poll, 100)
-    }
-    poll()
-    return () => { disposed = true; controller.abort(); clearTimeout(timer) }
-  }, [])
   async function commandWeld(command) {
     setWeldPending(true)
     setWeldError('')
     try {
-      const response = await fetch(`/sim-weld/${command}`, {
+      const payload = command === 'start'
+        ? { scan_id: scanResult?.scan_id, start_line: 0, end_line: 7 }
+        : {}
+      if (command === 'start' && !payload.scan_id) throw new Error('성공한 스캔 결과가 필요합니다')
+      const response = await fetch(`/commands/weld/${command}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scan_id: scanResult?.scan_id }),
+        body: JSON.stringify({ payload }),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.detail)
+      if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`)
+      addLog(`용접 ${command} 요청: ${result.request_id}`)
     } catch (error) { setWeldError(error.message) }
     finally { setWeldPending(false) }
   }
@@ -337,6 +324,21 @@ function App() {
 
   // scan/result로 받은 최종 형상 결과
   const [scanResult, setScanResult] = useState(null)
+  useEffect(() => {
+    const url = import.meta.env.VITE_SIM_FIXTURE_URL
+    if (!url) return
+    const controller = new AbortController()
+    fetch(url, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`fixture HTTP ${response.status}`)
+        return response.json()
+      })
+      .then((fixture) => setScanResult(fixture))
+      .catch((error) => {
+        if (error.name !== 'AbortError') console.error('fixture load:', error)
+      })
+    return () => controller.abort()
+  }, [])
 
   // 시간순 로그
   const [logs, setLogs] = useState([])
@@ -497,7 +499,11 @@ function App() {
 
 
   function handleHome() {
-    sendScanCommand('home')
+    if (weldRef.current?.run_id && ['STOPPED', 'ERROR'].includes(weldRef.current.phase)) {
+      commandWeld('home')
+    } else {
+      sendScanCommand('home')
+    }
   }
 
 
@@ -576,6 +582,15 @@ function App() {
 
         const { topic, payload } = message
 
+        if (topic === 'weld/state') {
+          const next = updateWeldState(weldRef.current, payload)
+          weldRef.current = next
+          setWeld({ phase: next.phase, line: next.line,
+            line_total: next.line_total, active: next.active, scan_id: next.scan_id })
+        }
+        if (topic === 'weld/command_result' && payload.success === false) {
+          setWeldError(`${payload.reason ?? 'ERROR'}: ${payload.detail ?? ''}`)
+        }
 
         // scan/state
         if (topic === 'scan/state') {
@@ -585,8 +600,6 @@ function App() {
           const nextScanId =
             payload.scan_id ?? null
 
-          if (['PREPARING', 'TOP_SEARCH', 'EDGE_SEARCH', 'GEOMETRY'].includes(nextPhase)) autoWeldScan.current = nextScanId
-          if (['ERROR', 'STOPPED', 'STOPPING'].includes(nextPhase)) autoWeldScan.current = null
 
           if (nextScanId && nextScanId !== displayedScanId) {
             displayedScanId = nextScanId
@@ -657,8 +670,10 @@ function App() {
             z: payload.pose.z_mm,
           }
 
-          // 현재 TCP 위치
+          // 현재 TCP 위치와 P4 용접 자국은 같은 robot/sample을 사용한다.
           setTipPose(newTipPose)
+          weldRef.current = appendWeldSample(
+            weldRef.current, newTipPose, scanResultRef.current, BASE_TO_FIXTURE_MM)
 
           // TCP 이동 궤적
           setTipTrajectory((prevTrajectory) => {
@@ -719,6 +734,7 @@ function App() {
 
         // scan/result
         if (topic === 'scan/result') {
+          scanResultRef.current = payload
           setScanResult(payload)
 
           addLog(
@@ -859,19 +875,18 @@ function App() {
     // 5. 작업대
     // 웹 3D 기준:
     // - 작업대 상판 = workpiece_fixture Z = 0
-    // - 실제 바닥 = 작업대 상판보다 94 mm 아래
+    // - 바닥/로봇 베이스 = Base Z=0
     // - 화면 축척 = 100 mm -> Three.js 1 unit
     const worktable = new THREE.Group()
 
     const tableWidth = 4.0
     const tableDepth = 3.0
-    const tableHeight = 94 * DISPLAY_SCALE
+    const tableHeight = TABLE_ORIGIN_MM.z * DISPLAY_SCALE
     const topThickness = 0.12
     const floorY = -tableHeight
 
-    // Three.js 장면은 base_link 기준으로 유지한다.
-    // 작업대 시각 모델은 실제 설비 위치를 사용한다.
-    // sim base_to_fixture는 가상 박스의 지지면이므로 작업대 위치와 분리한다.
+    // 장면은 base_link 기준이다. table origin은 상판 좌표이며,
+    // 바닥 격자와 로봇 베이스가 Base Z=0에서 만나도록 다리 높이를 정한다.
     const tableOriginThree =
       toThreePosition(
         TABLE_ORIGIN_MM.x,
@@ -1092,7 +1107,7 @@ function App() {
 
     scene.add(worktable)
 
-    // 작업대 상판보다 실제 바닥이 94 mm 아래에 있다.
+    // 바닥 격자는 로봇 베이스와 같은 Base Z=0이다.
     const floorGrid =
       new THREE.GridHelper(
         8,
@@ -1786,31 +1801,10 @@ function App() {
   }, [scanResult])
 
   useEffect(() => {
+    scanResultRef.current = scanResult
     renderedScanRef.current = scanResult?.success === true && scanResult?.box_valid === true
       ? scanResult.scan_id : null
   }, [scanResult])
-
-  const weldAvailable = Boolean(weld && !weld.active)
-  useEffect(() => {
-    if (phase !== 'DONE' || !weldAvailable || safetyLatched ||
-        scanResult?.success !== true || scanResult?.box_valid !== true ||
-        !scanResult.path_candidates?.every((edge) => edge.valid) ||
-        scanResult.path_candidates.length !== 4 ||
-        autoWeldScan.current !== scanResult.scan_id) return
-    // Let the completed geometry render before approaching its top edges.
-    const timer = setTimeout(async () => {
-      autoWeldScan.current = null
-      try {
-        const response = await fetch('/sim-weld/start', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scan_id: scanResult.scan_id }),
-        })
-        const result = await response.json()
-        if (!response.ok) throw new Error(result.detail)
-      } catch (error) { setWeldError(error.message) }
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [phase, weldAvailable, safetyLatched, scanResult])
 
   const progressPercent = progressTotal > 0
     ? Math.min(100, Math.max(0, (progress / progressTotal) * 100))
@@ -1873,11 +1867,11 @@ function App() {
             )}
           </div>
           <div className="weld-controls">
-            <strong>형상 생성 후 자동 용접 · 윗면 4변</strong>
+            <strong>형상 생성 후 용접 · 8선</strong>
             <button disabled={!weld || weld.active || weldPending || safetyLatched || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
               onClick={() => commandWeld('start')}>용접 시작</button>
             <button disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button>
-            <span role="status">{!weld ? '가상 용접 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · ${weld.line + 1}/4변`}</span>
+            <span role="status">{!weld ? '용접 상태 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · ${weld.line + 1}/${weld.line_total || 8}선`}</span>
             {(weldError || weld?.detail) && <p role="alert">{weldError || weld.detail}</p>}
           </div>
           <p className="view-help">좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
