@@ -1,0 +1,262 @@
+{
+  "request_id": "85f23c39-213f-49ef-9f2f-b32e4797fb89",
+  "api": {
+    "status": "PUBLISHED",
+    "topic": "cmd/weld/start",
+    "request_id": "85f23c39-213f-49ef-9f2f-b32e4797fb89",
+    "mqtt_rc": 0,
+    "message": {
+      "schema_version": "0.2",
+      "request_id": "85f23c39-213f-49ef-9f2f-b32e4797fb89",
+      "timestamp_ms": 1790617622136,
+      "payload": {
+        "scan_id": "20260921-131938-1493",
+        "start_line": 0,
+        "end_line": 0
+      },
+      "session_id": "p4-e2e"
+    }
+  },
+  "ack": {
+    "schema_version": "0.1",
+    "request_id": "85f23c39-213f-49ef-9f2f-b32e4797fb89",
+    "accepted": true,
+    "reason_code": 0,
+    "reason": "OK",
+    "detail": "",
+    "published_at_ms": 1790617622150
+  },
+  "command_result": {
+    "schema_version": "0.2",
+    "request_id": "85f23c39-213f-49ef-9f2f-b32e4797fb89",
+    "weld_id": "20260929-024702-0837",
+    "success": true,
+    "reason_code": 0,
+    "reason": "OK",
+    "detail": "",
+    "published_at_ms": 1790617667384
+  },
+  "weld_result": {
+    "schema_version": "0.2",
+    "weld_id": "20260929-024702-0837",
+    "scan_id": "20260921-131938-1493",
+    "stamp_ms": 1790617662084,
+    "success": true,
+    "reason_code": 0,
+    "reason": "OK",
+    "detail": "",
+    "frame_id": "workpiece_fixture",
+    "base_to_fixture_mm": {
+      "x": 425.0,
+      "y": -184.0,
+      "z": 400.0
+    },
+    "start_line": 0,
+    "end_line": 0,
+    "lines": [
+      {
+        "index": 0,
+        "seam": {
+          "start": {
+            "x": -49.80501098632812,
+            "y": -29.854998779296878,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": 49.974993896484364,
+            "y": -29.854998779296878,
+            "z": 39.86501464843746
+          },
+          "length_mm": 99.78000488281248,
+          "valid": true
+        },
+        "status": "DONE",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 1790617622154,
+        "finished_at_ms": 1790617662068
+      },
+      {
+        "index": 1,
+        "seam": {
+          "start": {
+            "x": 49.974993896484364,
+            "y": -29.854998779296878,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": 49.974993896484364,
+            "y": 29.884997558593756,
+            "z": 39.86501464843746
+          },
+          "length_mm": 59.73999633789064,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      },
+      {
+        "index": 2,
+        "seam": {
+          "start": {
+            "x": 49.974993896484364,
+            "y": 29.884997558593756,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": -49.80501098632812,
+            "y": 29.884997558593756,
+            "z": 39.86501464843746
+          },
+          "length_mm": 99.78000488281248,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      },
+      {
+        "index": 3,
+        "seam": {
+          "start": {
+            "x": -49.80501098632812,
+            "y": 29.884997558593756,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": -49.80501098632812,
+            "y": -29.854998779296878,
+            "z": 39.86501464843746
+          },
+          "length_mm": 59.73999633789064,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      },
+      {
+        "index": 4,
+        "seam": {
+          "start": {
+            "x": -49.80501098632812,
+            "y": -29.854998779296878,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": -49.80501098632812,
+            "y": -29.854998779296878,
+            "z": 5.0
+          },
+          "length_mm": 34.865014648437466,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      },
+      {
+        "index": 5,
+        "seam": {
+          "start": {
+            "x": 49.974993896484364,
+            "y": -29.854998779296878,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": 49.974993896484364,
+            "y": -29.854998779296878,
+            "z": 5.0
+          },
+          "length_mm": 34.865014648437466,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      },
+      {
+        "index": 6,
+        "seam": {
+          "start": {
+            "x": 49.974993896484364,
+            "y": 29.884997558593756,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": 49.974993896484364,
+            "y": 29.884997558593756,
+            "z": 5.0
+          },
+          "length_mm": 34.865014648437466,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      },
+      {
+        "index": 7,
+        "seam": {
+          "start": {
+            "x": -49.80501098632812,
+            "y": 29.884997558593756,
+            "z": 39.86501464843746
+          },
+          "end": {
+            "x": -49.80501098632812,
+            "y": 29.884997558593756,
+            "z": 5.0
+          },
+          "length_mm": 34.865014648437466,
+          "valid": true
+        },
+        "status": "SKIPPED",
+        "reason_code": 0,
+        "reason": "OK",
+        "detail": "",
+        "stop_pose": null,
+        "started_at_ms": 0,
+        "finished_at_ms": 0
+      }
+    ],
+    "config": {
+      "weld_speed_mm_s": 10.0,
+      "travel_speed_mm_s": 50.0,
+      "standoff_mm": 3.0,
+      "weave_amplitude_mm": 2.0,
+      "weave_pitch_mm": 4.0,
+      "tilt_deg": 45.0
+    },
+    "started_at_ms": 1790617622154,
+    "finished_at_ms": 1790617662069,
+    "published_at_ms": 1790617662085
+  }
+}
