@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "kind": "weld.result",
+  "units": {
+    "length": "m",
+    "angle": "rad",
+    "time": "s"
+  },
+  "weld_id": "20260929-114108-5286",
+  "scan_id": "20260923-183211-3702",
+  "success": true,
+  "reason_code": 0,
+  "detail": "",
+  "frame_id": "workpiece_fixture",
+  "base_to_fixture": [
+    0.420255,
+    -0.156675,
+    0.095006
+  ],
+  "start_line": 3,
+  "end_line": 3,
+  "lines": [
+    {
+      "index": 0,
+      "seam": {
+        "start": [
+          -0.04238068577274862,
+          -0.042375107705299835,
+          0.08275947241210939
+        ],
+        "end": [
+          0.040621708419597106,
+          -0.042375107705299835,
+          0.08275947241210939
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "index": 1,
+      "seam": {
+        "start": [
+          0.040621708419597106,
+          -0.042375107705299835,
+          0.08275947241210939
+        ],
+        "end": [
+          0.040621708419597106,
+          0.03826889697384292,
+          0.08275947241210939
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "index": 2,
+      "seam": {
+        "start": [
+          0.040621708419597106,
+          0.03826889697384292,
+          0.08275947241210939
+        ],
+        "end": [
+          -0.04238068577274862,
+          0.03826889697384292,
+          0.08275947241210939
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "index": 3,
+      "seam": {
+        "start": [
+          -0.04238068577274862,
+          0.03826889697384292,
+          0.08275947241210939
+        ],
+        "end": [
+          -0.04238068577274862,
+          -0.042375107705299835,
+          0.08275947241210939
+        ]
+      },
+      "status": "DONE",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": {
+        "sec": 1790649668,
+        "nanosec": 837182012
+      },
+      "finished_at": {
+        "sec": 1790649706,
+        "nanosec": 320480649
+      }
+    },
+    {
+      "index": 4,
+      "seam": {
+        "start": [
+          -0.04238068577274862,
+          -0.042375107705299835,
+          0.08275947241210939
+        ],
+        "end": [
+          -0.04238068577274862,
+          -0.042375107705299835,
+          0.007
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "index": 5,
+      "seam": {
+        "start": [
+          0.040621708419597106,
+          -0.042375107705299835,
+          0.08275947241210939
+        ],
+        "end": [
+          0.040621708419597106,
+          -0.042375107705299835,
+          0.007
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "index": 6,
+      "seam": {
+        "start": [
+          0.040621708419597106,
+          0.03826889697384292,
+          0.08275947241210939
+        ],
+        "end": [
+          0.040621708419597106,
+          0.03826889697384292,
+          0.007
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    },
+    {
+      "index": 7,
+      "seam": {
+        "start": [
+          -0.04238068577274862,
+          0.03826889697384292,
+          0.08275947241210939
+        ],
+        "end": [
+          -0.04238068577274862,
+          0.03826889697384292,
+          0.007
+        ]
+      },
+      "status": "SKIPPED",
+      "reason_code": 0,
+      "detail": "",
+      "stop_pose": null,
+      "stop_pose_valid": false,
+      "started_at": null,
+      "finished_at": null
+    }
+  ],
+  "config": {
+    "weld_speed_mps": 0.01,
+    "travel_speed_mps": 0.05,
+    "standoff_m": 0.003,
+    "weave_amplitude_m": 0.002,
+    "weave_pitch_m": 0.004,
+    "tilt_deg": 45.0
+  },
+  "started_at": {
+    "sec": 1790649668,
+    "nanosec": 837068070
+  },
+  "finished_at": {
+    "sec": 1790649706,
+    "nanosec": 320662781
+  }
+}

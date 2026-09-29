@@ -78,7 +78,7 @@ ros2 topic echo /weld/state    # IDLE → PREPARING → (APPROACH → WELDING �
 |---|---|
 | 순수 시험 206 · 노드 시험(가짜 robot_manager) 14 | 통과 (2026-09-25, 현지 PC) |
 | Virtual 종단 8 선(45° · 위빙 · sim 픽스처 박스 100 × 60 × 40) | **통과** 2026-09-24 (P2-5, 242 s, 경로 점 27/17/27/17/11/11/11/11, 안전 이벤트 0). D33 반영 뒤 재검은 아래 기록 |
-| 실기 | **미실시**. 9/29 |
+| 실기 (2026-09-29, 명령 현지 · 입회 학민) | **6 선 DONE**(L0 · L2 · L3 · L4 · L6 · L7), L1 · L5 는 도달 불가로 FAILED 뒤 계속(D33). 위빙 L3 · L7 DONE. 점당 정지 0.50~0.58 s. 안전 이벤트 0. 입력은 9/23 스캔(오늘 스캔은 NEG_Y 실패). 스탠드오프 y 치우침 3~4 mm 관찰. `docs/test-reports/realrobot-session_20260929.md` |
 
 ## 9/29 실기 통합 순서 (README 가 아니라 `docs/phase2/README.md` "통합 순서" 가 원본. 여기는 weld_manager 쪽 보탬)
 
