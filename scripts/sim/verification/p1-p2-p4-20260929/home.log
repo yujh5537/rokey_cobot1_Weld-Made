@@ -1,0 +1,6 @@
+[weld_manager-5] [INFO] [1790642521.555695075] [weld_manager]: [HOMING code=0] 안전복귀 시작 request_id=6b48f7bd-8233-4499-bd65-b321c51c01a5
+[robot_manager-1] [INFO] [1790642521.559426341] [robot_manager]: goal 수락: scan= motion_id=1 op=1 dir=0 speed=0.02 max=0.0
+[robot_manager-1] [INFO] [1790642523.682096676] [robot_manager]: goal 종료: reason=0 code=0 
+[weld_manager-5] [WARN] [1790642523.686605987] [weld_manager]: [HOMING code=0] 안전복귀: z_safe 를 몰라 물러난 뒤 바로 OP_HOME 을 보낸다
+[robot_manager-1] [INFO] [1790642523.690367508] [robot_manager]: goal 수락: scan= motion_id=2 op=4 dir=0 speed=0.0 max=0.0
+[robot_manager-1] [INFO] [1790642524.766724869] [robot_manager]: goal 종료: reason=0 code=0 

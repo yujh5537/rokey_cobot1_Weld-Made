@@ -1,0 +1,8 @@
+API PUBLISHED 0.2 85f23c39-213f-49ef-9f2f-b32e4797fb89
+cmd/ack {'request_id': '85f23c39-213f-49ef-9f2f-b32e4797fb89', 'accepted': True, 'phase': None, 'line_index': None, 'success': None, 'reason_code': 0, 'weld_id': None}
+weld/state {'request_id': None, 'accepted': None, 'phase': 'PREPARING', 'line_index': None, 'success': None, 'reason_code': None, 'weld_id': '20260929-024702-0837'}
+weld/result {'request_id': None, 'accepted': None, 'phase': None, 'line_index': None, 'success': True, 'reason_code': 0, 'weld_id': '20260929-024702-0837'}
+weld/state {'request_id': None, 'accepted': None, 'phase': 'DONE', 'line_index': None, 'success': None, 'reason_code': None, 'weld_id': '20260929-024702-0837'}
+weld/command_result {'request_id': '85f23c39-213f-49ef-9f2f-b32e4797fb89', 'accepted': None, 'phase': None, 'line_index': None, 'success': True, 'reason_code': 0, 'weld_id': '20260929-024702-0837'}
+weld/state {'request_id': None, 'accepted': None, 'phase': 'DONE', 'line_index': None, 'success': None, 'reason_code': None, 'weld_id': '20260929-024702-0837'}
+P4_PASS

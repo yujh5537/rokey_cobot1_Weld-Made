@@ -1,0 +1,11 @@
+# Virtual-only top loop: docs/phase2/weld-motion.md, L0–L3.
+amplitude_m: 0.002
+pitch_m: 0.004
+tilt_deg: 0.0
+retreat_m: 0.03
+standoff_m: 0.003
+clearance_m: 0.03
+weld_speed_mps: 0.010
+approach_speed_mps: 0.020
+travel_speed_mps: 0.050
+position_tolerance_m: 0.003
