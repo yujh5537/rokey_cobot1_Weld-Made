@@ -90,8 +90,10 @@ Virtual ROS 설정의 `scan_manager.base_to_fixture`를 따로 확인한다.
 원본 Z=400 mm 배치에서의 8/8 성공 기록을 이 배치의 성공으로 간주하지 않는다.
 초기 관절 홈 성공과 `/safety/status.latched=false`를 확인한 뒤 **용접 시작**을 누른다.
 웹은 화면에 표시된 scan ID로 `/commands/weld/start`에 `start_line=0, end_line=7`을 보낸다.
-불꽃과 자국은 `weld/state.phase=WELDING` 동안 들어온 `robot/sample` TCP 위치를
-형상의 해당 모서리에 맞춰 그린다. **용접 중지**는 `/commands/weld/stop`이고,
+불꽃과 자국은 `weld/state.phase=WELDING`의 해당 `motion_id`가 움직이는 동안,
+화면에 보이는 탐침 끝 구체가 저장된 모서리 선분·꼭짓점에 닿을 때만 그린다.
+접촉점은 실제 선분의 가장 가까운 위치를 쓰므로 부재에 붙어 있다.
+기본 경로는 3 mm 스탠드오프가 있어 비접촉 구간에는 불꽃이 나오지 않는다. **용접 중지**는 `/commands/weld/stop`이고,
 중지 뒤 **안전복귀**는 `/commands/weld/home`이다. 중지가 자동 복귀를 실행하지 않는다.
 
 API에서 직접 실행하려면 기존 절차 7절과 같은 요청을 0~7선으로 보낸다.

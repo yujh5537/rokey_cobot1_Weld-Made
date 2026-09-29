@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+import { PROBE_TIP_RADIUS_M } from './sceneFrames.js'
 
 const ROS_METERS_TO_THREE = 10
 
@@ -350,7 +351,7 @@ function buildRg2Model(
   const probeTip =
     new THREE.Mesh(
       new THREE.SphereGeometry(
-        0.000225,
+        PROBE_TIP_RADIUS_M,
         16,
         16
       ),

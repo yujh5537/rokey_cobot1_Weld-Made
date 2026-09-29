@@ -5,7 +5,7 @@ import { buildM0609Model, disposeObject3D } from './robotModel.js'
 import { parseRobotJoints } from './robotJoints.js'
 import { createWeldEffect } from './weldEffect.js'
 import { appendWeldSample, updateWeldState } from './weldLive.js'
-import { TABLE_HEIGHT_MM, basePointWorldMm, fixturePointWorldMm, fixtureRelativeToBaseMm, robotBaseWorldMm } from './sceneFrames.js'
+import { TABLE_HEIGHT_MM, basePointWorldMm, fixturePointWorldMm, fixtureRelativeToBaseMm, robotBaseWorldMm, threePointWorldM } from './sceneFrames.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -240,6 +240,7 @@ function formatScanLogMessage(payload) {
 
 function App() {
   const weldRef = useRef(null)
+  const tipSampleRef = useRef(null)
   const renderedScanRef = useRef(null)
   const scanResultRef = useRef(null)
   const [weld, setWeld] = useState(null)
@@ -677,10 +678,14 @@ function App() {
             z: payload.pose.z_mm,
           }
 
-          // 현재 TCP 위치와 P4 용접 자국은 같은 robot/sample을 사용한다.
+          // 샘플의 motion ID와 실제 화면 탐침 위치를 렌더 시점에 함께 확인한다.
           setTipPose(newTipPose)
-          weldRef.current = appendWeldSample(
-            weldRef.current, newTipPose, scanResultRef.current, FIXTURE_ORIGIN_WORLD_MM)
+          tipSampleRef.current = {
+            ...newTipPose,
+            motionId: payload.motion_id,
+            operation: payload.operation,
+            receivedAt: performance.now(),
+          }
 
           // TCP 이동 궤적
           setTipTrajectory((prevTrajectory) => {
@@ -1244,7 +1249,7 @@ function App() {
     // 8. 현재 TCP 팁 표시
     const tipGeometry =
       new THREE.SphereGeometry(
-        0.04 / 3,
+        (0.04 / 3) * 2.5,
         24,
         24
       )
@@ -1318,6 +1323,20 @@ function App() {
       animationFrameId =
         requestAnimationFrame(animate)
 
+      const sample = tipSampleRef.current
+      const probeTip = robotModel.root.getObjectByName('probe_tip')
+      if (weldRef.current && probeTip) {
+        robotModel.root.updateMatrixWorld(true)
+        const tipThree = probeTip.getWorldPosition(new THREE.Vector3())
+        const tipWorldM = threePointWorldM(tipThree)
+        weldRef.current = appendWeldSample(
+          weldRef.current,
+          sample && performance.now() - sample.receivedAt < 500 ? sample : null,
+          tipWorldM,
+          scanResultRef.current,
+          FIXTURE_ORIGIN_WORLD_MM
+        )
+      }
       weldEffect.tick(weldRef.current?.scan_id === renderedScanRef.current ? weldRef.current : null)
       controls.update()
 
@@ -1458,7 +1477,7 @@ function App() {
     contactPoints.forEach((point) => {
       const geometry =
         new THREE.SphereGeometry(
-          0.08 / 9,
+          (0.08 / 9) * 2.5,
           20,
           20
         )

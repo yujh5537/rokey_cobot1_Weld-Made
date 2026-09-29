@@ -11,8 +11,8 @@ export function createWeldEffect(scene) {
   beads.frustumCulled = false
   beads.count = 0
   group.add(beads)
-  const positions = new Float32Array(240 * 6)
-  const colors = new Float32Array(240 * 6)
+  const positions = new Float32Array(360 * 6)
+  const colors = new Float32Array(360 * 6)
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
@@ -21,7 +21,7 @@ export function createWeldEffect(scene) {
   const sparks = new THREE.LineSegments(geometry, material)
   sparks.frustumCulled = false
   group.add(sparks)
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.015, 12, 8),
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.0225, 12, 8),
     new THREE.MeshBasicMaterial({ color: 0xe5f5ff, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false }))
   group.add(glow)
@@ -57,15 +57,15 @@ export function createWeldEffect(scene) {
     }
     beads.instanceMatrix.needsUpdate = true
     if (beads.instanceColor) beads.instanceColor.needsUpdate = true
-    glow.visible = Boolean(state?.arc && points.length)
+    glow.visible = Boolean(state?.arc && state?.contact)
     if (glow.visible) {
-      const p = points.at(-1)
+      const p = state.contact
       glow.position.set(p[0] * 10, p[2] * 10, -p[1] * 10)
-      glow.scale.setScalar(0.8 + Math.random() * 0.5)
-      for (let i = 0; i < Math.ceil(dt * 180) && particles.length < 240; i++) {
+      glow.scale.setScalar(1 + Math.random() * 0.7)
+      for (let i = 0; i < Math.ceil(dt * 300) && particles.length < 360; i++) {
         particles.push({ p: glow.position.clone(), v: new THREE.Vector3(
-          (Math.random() - 0.5) * 1.4, Math.random() * 1.5,
-          (Math.random() - 0.5) * 1.4), age: 0, life: 0.2 + Math.random() * 0.4 })
+          (Math.random() - 0.5) * 1.8, Math.random() * 2,
+          (Math.random() - 0.5) * 1.8), age: 0, life: 0.25 + Math.random() * 0.55 })
       }
     }
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -77,7 +77,7 @@ export function createWeldEffect(scene) {
       p.p.addScaledVector(p.v, dt)
     }
     particles.forEach((p, i) => {
-      const tail = p.p.clone().addScaledVector(p.v, -0.025)
+      const tail = p.p.clone().addScaledVector(p.v, -0.035)
       p.p.toArray(positions, i * 6)
       tail.toArray(positions, i * 6 + 3)
       const a = 1 - p.age / p.life

@@ -1,6 +1,8 @@
-// P4 weld/state and robot/sample are the only sources for the live effect.
-// Positions are Base millimetres at the MQTT boundary; weldEffect uses metres.
+// The live arc uses the visible probe tip and the saved seam in one world frame.
+import { PROBE_TIP_RADIUS_M } from './sceneFrames.js'
+
 const ACTIVE_PHASES = new Set(['PREPARING', 'APPROACH', 'WELDING', 'RETREAT', 'HOMING', 'STOPPING'])
+const BEAD_STEP_M = 0.00025
 
 export function updateWeldState(previous, message) {
   const runId = message.weld_id || ''
@@ -13,34 +15,50 @@ export function updateWeldState(previous, message) {
     line: message.line_index ?? previous?.line ?? 0,
     active: ACTIVE_PHASES.has(phase),
     arc: phase === 'WELDING',
+    contact: null,
     beads: changedRun ? [] : previous?.beads ?? [],
-    anchors: changedRun ? {} : previous?.anchors ?? {},
   }
 }
 
-export function appendWeldSample(state, sample, scanResult, fixtureOriginMm) {
-  if (!state?.arc || !sample || !scanResult || !fixtureOriginMm ||
-      state.scan_id !== scanResult.scan_id) return state
-  const line = state.line
-  const edge = scanResult.edges?.[line < 4 ? line : line + 4]
-  const start = edge?.start
-  if (!Number.isInteger(line) || line < 0 || line > 7 || !edge?.valid || !start ||
-      ![sample.x, sample.y, sample.z, start.x_mm, start.y_mm, start.z_mm]
-        .every(Number.isFinite)) return state
+export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm) {
+  if (!state?.arc || !sample || !tipWorldM || !scanResult || !fixtureOriginMm ||
+      state.scan_id !== scanResult.scan_id || sample.frameId !== 'base_link' ||
+      sample.operation !== 'WELD_PATH' || !Number.isInteger(state.motion_id) ||
+      state.motion_id <= 0 || sample.motionId !== state.motion_id) return null
 
-  const anchor = state.anchors[line] ?? sample
-  const x = fixtureOriginMm.x + start.x_mm + sample.x - anchor.x
-  const y = fixtureOriginMm.y + start.y_mm + sample.y - anchor.y
-  const z = line < 4
-    ? fixtureOriginMm.z + start.z_mm + 0.3
-    : fixtureOriginMm.z + start.z_mm + sample.z - anchor.z
-  const bead = [x / 1000, y / 1000, z / 1000, line]
+  const line = state.line
+  if (!Number.isInteger(line) || line < 0 || line > 7) return null
+  const edge = scanResult.edges?.[line < 4 ? line : line + 4]
+  if (!edge?.valid || !edge.start || !edge.end) return null
+
+  const start = [edge.start.x_mm, edge.start.y_mm, edge.start.z_mm]
+  const end = [edge.end.x_mm, edge.end.y_mm, edge.end.z_mm]
+  const origin = [fixtureOriginMm.x, fixtureOriginMm.y, fixtureOriginMm.z]
+  const tip = [tipWorldM.x, tipWorldM.y, tipWorldM.z]
+  if (![...start, ...end, ...origin, ...tip].every(Number.isFinite)) return null
+  const a = start.map((value, i) => (value + origin[i]) / 1000)
+  const b = end.map((value, i) => (value + origin[i]) / 1000)
+  const direction = b.map((value, i) => value - a[i])
+  const lengthSquared = direction.reduce((sum, value) => sum + value * value, 0)
+  if (lengthSquared <= 0) return null
+  const projection = tip.reduce((sum, value, i) => sum + (value - a[i]) * direction[i], 0)
+  const t = Math.max(0, Math.min(1, projection / lengthSquared))
+  const nearest = a.map((value, i) => value + t * direction[i])
+  if (Math.hypot(...tip.map((value, i) => value - nearest[i])) > PROBE_TIP_RADIUS_M) return null
+  return [...nearest, line]
+}
+
+export function appendWeldSample(state, sample, tipWorldM, scanResult, fixtureOriginMm) {
+  if (!state) return state
+  const contact = contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm)
+  if (!contact) return state.contact ? { ...state, contact: null } : state
   const last = state.beads.at(-1)
-  const step = last ? Math.hypot(bead[0] - last[0], bead[1] - last[1], bead[2] - last[2]) : Infinity
-  if (step < 0.0004) return state
+  const step = last && last[3] === contact[3]
+    ? Math.hypot(...contact.slice(0, 3).map((value, i) => value - last[i]))
+    : Infinity
   return {
     ...state,
-    anchors: { ...state.anchors, [line]: anchor },
-    beads: [...state.beads.slice(-4999), bead],
+    contact,
+    beads: step < BEAD_STEP_M ? state.beads : [...state.beads.slice(-4999), contact],
   }
 }
