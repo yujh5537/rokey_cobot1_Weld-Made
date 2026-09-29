@@ -264,6 +264,24 @@ def test_weld_stop_during_path_then_home(make):
     assert h.phase().name == 'STOPPED'
 
 
+def test_home_during_run_is_rejected_and_stop_still_stops(make):
+    # 독립 재검 🟠1: 실행 중의 /weld/home 은 BUSY 로 거절하고 실행 중 작업을 건드리지 않는다.
+    # 예전에는 거절하면서 작업 참조를 지워 뒤이은 /weld/stop 이 ERROR 204 로 끝났다
+    h = make(script={3: 'hold'})
+    future = h.run(wait=False)
+    assert wait_for(lambda: len(h.fake.goals) == 3)
+    job = h.weld._job
+    home = h.home()
+    same_job, goals_after_home = h.weld._job is job, len(h.fake.goals)
+    stop = h.stop()                                             # 단언 전에 붙잡은 goal 을 푼다(실패해도 시험이 멈추지 않게)
+    result = wait_future(future, 30.0).result
+    assert not home.success and home.reason_code == 100
+    assert same_job and goals_after_home == 3                   # 작업 그대로, 로봇에 goal 을 더 보내지 않았다
+    assert stop.accepted
+    assert not result.success and result.reason_code == 200 and h.phase().name == 'STOPPED'
+    assert result.result.lines[0].status == WeldLine.STATUS_STOPPED
+
+
 def test_unrequested_stop_is_error(make):
     h = make(script={3: (R.REASON_STOP_REQUESTED, 200)})   # 스캔 중지 버튼 같은 남의 /robot/stop
     result = h.run()
