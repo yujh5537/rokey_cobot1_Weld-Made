@@ -22,6 +22,8 @@
 
 ![시스템 아키텍처](./docs/deliverables/01-system-architecture.png)
 
+📐 **Editable source:** [Download 01-system-architecture.drawio](./docs/deliverables/01-system-architecture.drawio)
+
 두 PC와 로봇. PC 사이는 MQTT(1883) 하나이고, 접촉 판정 · 2차 감시 · 정지는 메인 PC 안에서 끝난다.
 
 | 위치 | 구성 | 역할 |
