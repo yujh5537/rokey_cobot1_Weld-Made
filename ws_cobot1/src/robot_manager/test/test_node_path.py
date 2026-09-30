@@ -513,6 +513,36 @@ def test_unexpected_exception_still_frees_the_slot(ros, monkeypatch):
         node.destroy_node()
 
 
+@pytest.mark.parametrize('stop_ok', [True, False])
+def test_exception_after_move_requests_stop_before_slot_release(ros, monkeypatch, stop_ok):
+    node, arm = make_node(monkeypatch)
+    observed = []
+    try:
+        def boom(runner):
+            assert runner._send_line(0)
+            raise RuntimeError('이동 수락 뒤 예외')
+        def stop(why, motion=None):
+            observed.append((why, node.motion is not None, node.operation))
+            return stop_ok, '' if stop_ok else '정지 응답 없음'
+        monkeypatch.setattr(path_executor.PathRunner, 'run', boom)
+        monkeypatch.setattr(node, 'stop_robot', stop)
+        result, handle = run(node, path_goal(n=2))
+        assert arm.labels() == ['move_line']
+        assert observed[0] == ('경로 실행 예외 뒤 정지 확인', True, RobotSample.OP_WELD_PATH)
+        assert len(observed) == (1 if stop_ok else 2)
+        if stop_ok:
+            assert node.stop_requested is None
+        else:
+            assert node.stop_requested[0] == ReasonCode.ROBOT_ERROR
+            assert node.on_path_goal_request(path_goal()) == GoalResponse.REJECT
+        assert result.reason_code == ReasonCode.ROBOT_ERROR
+        assert handle.state == 'aborted'
+        assert ('정지 확인 실패' in result.detail) == (not stop_ok)
+        assert_cleaned(node)
+    finally:
+        node.destroy_node()
+
+
 # ---- spline 모드 ----------------------------------------------------------------------------
 
 SPLINE = [Parameter('path_mode', Parameter.Type.STRING, 'spline')]

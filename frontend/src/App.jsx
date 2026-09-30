@@ -3,6 +3,9 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { buildM0609Model, disposeObject3D } from './robotModel.js'
 import { parseRobotJoints } from './robotJoints.js'
+import { createWeldEffect } from './weldEffect.js'
+import { appendWeldSample, applyWeldResult, updateWeldState } from './weldLive.js'
+import { TABLE_HEIGHT_MM, basePointWorldMm, fixturePointWorldMm, fixtureRelativeToBaseMm, robotBaseWorldMm, threePointWorldM } from './sceneFrames.js'
 import './App.css'
 
 function getPhaseLabel(
@@ -98,10 +101,10 @@ function toThreePosition(
   )
 }
 
-function getBaseToFixtureMm() {
+function getFixtureOriginWorldMm() {
   const raw =
     import.meta.env
-      .VITE_BASE_TO_FIXTURE_MM ?? ''
+      .VITE_FIXTURE_ORIGIN_WORLD_MM ?? import.meta.env.VITE_BASE_TO_FIXTURE_MM ?? ''
 
   const values = raw
     .split(',')
@@ -126,11 +129,27 @@ function getBaseToFixtureMm() {
   }
 }
 
-const BASE_TO_FIXTURE_MM = getBaseToFixtureMm()
+const FIXTURE_ORIGIN_WORLD_MM = getFixtureOriginWorldMm()
 
-// 작업대는 실제 설비 배치용 시각 모델이다.
-// sim의 base_to_fixture.z=400 mm는 가상 박스 지지면이므로
-// 실제 높이 94 mm 작업대의 위치로 사용하지 않는다.
+// 실물 부재는 작업대에서 약 4 mm 떠 있다. 측정된 윗면은 그대로 두고
+// 화면의 아랫면과 그에 연결된 모서리만 지지 높이에 맞춘다.
+const WORKPIECE_CLEARANCE_MM = 4
+
+function workpieceDisplayZ(point, result) {
+  if (!FIXTURE_ORIGIN_WORLD_MM || !Number.isFinite(point?.z_mm) ||
+      !Array.isArray(result?.vertices) || result.vertices.length !== 8) {
+    return point?.z_mm
+  }
+  const isBottom = result.vertices.slice(4).some((bottom) =>
+    bottom && Math.abs(bottom.x_mm - point.x_mm) < 1e-6 &&
+    Math.abs(bottom.y_mm - point.y_mm) < 1e-6 &&
+    Math.abs(bottom.z_mm - point.z_mm) < 1e-6)
+  return isBottom
+    ? TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM - FIXTURE_ORIGIN_WORLD_MM.z
+    : point.z_mm
+}
+
+// 작업대 상판의 화면/world 좌표. ROS base_link는 별도 원점이다.
 const DEFAULT_TABLE_ORIGIN_MM = {
   x: 420.255,
   y: -156.675,
@@ -170,6 +189,12 @@ function getTableOriginMm() {
 }
 
 const TABLE_ORIGIN_MM = getTableOriginMm()
+const ROBOT_BASE_WORLD_MM = robotBaseWorldMm(TABLE_ORIGIN_MM)
+
+function toThreeBasePosition(xMm, yMm, zMm) {
+  const world = basePointWorldMm({ x: xMm, y: yMm, z: zMm }, ROBOT_BASE_WORLD_MM)
+  return toThreePosition(world.x, world.y, world.z)
+}
 
 function formatScanLogMessage(payload) {
   const parts = []
@@ -232,6 +257,34 @@ function formatScanLogMessage(payload) {
 }
 
 function App() {
+  const weldRef = useRef(null)
+  const tipSampleRef = useRef(null)
+  const appliedJointsAtRef = useRef(null)
+  const renderedScanRef = useRef(null)
+  const scanResultRef = useRef(null)
+  const [weld, setWeld] = useState(null)
+  const [weldError, setWeldError] = useState('')
+  const [weldPending, setWeldPending] = useState(false)
+  async function commandWeld(command, line) {
+    setWeldPending(true)
+    setWeldError('')
+    try {
+      const payload = command === 'start'
+        ? { scan_id: scanResult?.scan_id, start_line: line, end_line: line }
+        : {}
+      if (command === 'start' && (!Number.isInteger(line) || line < 0 || line > 7)) throw new Error('L0~L7 중 용접할 선을 선택하세요')
+      if (command === 'start' && !payload.scan_id) throw new Error('성공한 스캔 결과가 필요합니다')
+      if (command === 'start' && fixtureFrameMismatch) throw new Error('부재·로봇 좌표계가 다릅니다')
+      const response = await fetch(`/commands/weld/${command}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`)
+      addLog(`용접 ${command === 'start' ? `L${line} 시작` : command} 요청: ${result.request_id}`)
+    } catch (error) { setWeldError(error.message) }
+    finally { setWeldPending(false) }
+  }
   // Three.js canvas
   const canvasRef = useRef(null)
 
@@ -299,6 +352,21 @@ function App() {
 
   // scan/result로 받은 최종 형상 결과
   const [scanResult, setScanResult] = useState(null)
+  useEffect(() => {
+    const url = import.meta.env.VITE_SIM_FIXTURE_URL
+    if (!url) return
+    const controller = new AbortController()
+    fetch(url, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`fixture HTTP ${response.status}`)
+        return response.json()
+      })
+      .then((fixture) => setScanResult(fixture))
+      .catch((error) => {
+        if (error.name !== 'AbortError') console.error('fixture load:', error)
+      })
+    return () => controller.abort()
+  }, [])
 
   // 시간순 로그
   const [logs, setLogs] = useState([])
@@ -459,7 +527,11 @@ function App() {
 
 
   function handleHome() {
-    sendScanCommand('home')
+    if (weldRef.current?.run_id && ['STOPPED', 'ERROR'].includes(weldRef.current.phase)) {
+      commandWeld('home')
+    } else {
+      sendScanCommand('home')
+    }
   }
 
 
@@ -517,6 +589,7 @@ function App() {
 
     const websocket = new WebSocket(wsUrl)
     let jointTimeout
+    let displayedScanId = null
 
 
     // WebSocket 연결 성공
@@ -537,6 +610,20 @@ function App() {
 
         const { topic, payload } = message
 
+        if (topic === 'weld/state') {
+          const next = updateWeldState(weldRef.current, payload, scanResultRef.current,
+            FIXTURE_ORIGIN_WORLD_MM, TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM)
+          weldRef.current = next
+          setWeld({ phase: next.phase, line: next.line,
+            line_total: next.line_total, active: next.active, scan_id: next.scan_id })
+        }
+        if (topic === 'weld/result') {
+          weldRef.current = applyWeldResult(weldRef.current, payload, scanResultRef.current,
+            FIXTURE_ORIGIN_WORLD_MM, TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM)
+        }
+        if (topic === 'weld/command_result' && payload.success === false) {
+          setWeldError(`${payload.reason ?? 'ERROR'}: ${payload.detail ?? ''}`)
+        }
 
         // scan/state
         if (topic === 'scan/state') {
@@ -545,6 +632,14 @@ function App() {
 
           const nextScanId =
             payload.scan_id ?? null
+
+
+          if (nextScanId && nextScanId !== displayedScanId) {
+            displayedScanId = nextScanId
+            setContactPoints([])
+            setTipTrajectory([])
+            setScanResult(null)
+          }
 
           setScanResult((previousResult) => {
             const scanIdChanged =
@@ -608,8 +703,14 @@ function App() {
             z: payload.pose.z_mm,
           }
 
-          // 현재 TCP 위치
+          // 샘플의 motion ID와 실제 화면 탐침 위치를 렌더 시점에 함께 확인한다.
           setTipPose(newTipPose)
+          tipSampleRef.current = {
+            ...newTipPose,
+            motionId: payload.motion_id,
+            operation: payload.operation,
+            receivedAt: performance.now(),
+          }
 
           // TCP 이동 궤적
           setTipTrajectory((prevTrajectory) => {
@@ -627,7 +728,8 @@ function App() {
         // contact/event
         if (
           topic === 'contact/event' &&
-          payload.pose
+          payload.pose &&
+          (!payload.scan_id || !displayedScanId || payload.scan_id === displayedScanId)
         ) {
           // contact/event pose는 판정 순간의 탐침 TCP 좌표(base_link)다.
           // scan/result도 이 접촉점들로 계산되므로 노란 접촉점은 이 원본 좌표를 쓴다.
@@ -669,6 +771,7 @@ function App() {
 
         // scan/result
         if (topic === 'scan/result') {
+          scanResultRef.current = payload
           setScanResult(payload)
 
           addLog(
@@ -766,7 +869,24 @@ function App() {
       antialias: true,
     })
 
-    renderer.setSize(900, 500)
+    const resizeRenderer = () => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+
+      const width = Math.max(canvas.clientWidth, 320)
+      const height = Math.max(canvas.clientHeight, 360)
+      const pixelRatio = Math.min(window.devicePixelRatio, 2)
+
+      renderer.setPixelRatio(pixelRatio)
+      renderer.setSize(width, height, false)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+    }
+
+    resizeRenderer()
+
+    const resizeObserver = new ResizeObserver(resizeRenderer)
+    resizeObserver.observe(canvasRef.current)
 
 
     // 4. 조명
@@ -792,19 +912,18 @@ function App() {
     // 5. 작업대
     // 웹 3D 기준:
     // - 작업대 상판 = workpiece_fixture Z = 0
-    // - 실제 바닥 = 작업대 상판보다 94 mm 아래
+    // - 작업대 바닥 = 상판보다 94 mm 아래
     // - 화면 축척 = 100 mm -> Three.js 1 unit
     const worktable = new THREE.Group()
 
     const tableWidth = 4.0
     const tableDepth = 3.0
-    const tableHeight = 94 * DISPLAY_SCALE
+    const tableHeight = TABLE_HEIGHT_MM * DISPLAY_SCALE
     const topThickness = 0.12
     const floorY = -tableHeight
 
-    // Three.js 장면은 base_link 기준으로 유지한다.
-    // 작업대 시각 모델은 실제 설비 위치를 사용한다.
-    // sim base_to_fixture는 가상 박스의 지지면이므로 작업대 위치와 분리한다.
+    // 장면은 화면/world 기준이다. table origin은 상판 좌표다.
+    // 작업대 형상과 부재 위치는 표준 fixture 값을 유지한다.
     const tableOriginThree =
       toThreePosition(
         TABLE_ORIGIN_MM.x,
@@ -1025,7 +1144,7 @@ function App() {
 
     scene.add(worktable)
 
-    // 작업대 상판보다 실제 바닥이 94 mm 아래에 있다.
+    // 바닥 격자는 상판보다 94 mm 아래에 있다.
     const floorGrid =
       new THREE.GridHelper(
         8,
@@ -1053,6 +1172,12 @@ function App() {
     // Doosan 공식 M0609 visual mesh와 RG2 공개 visual mesh를 사용한다.
     const robotModel =
       buildM0609Model()
+
+    // 로봇과 모든 Base 좌표 표시가 같은 화면 원점을 사용한다.
+    // 작업대 상판과 scan/result 형상 좌표는 변경하지 않는다.
+    robotModel.root.position.copy(
+      toThreeBasePosition(0, 0, 0)
+    )
 
     robotModelRef.current =
       robotModel.root
@@ -1090,11 +1215,11 @@ function App() {
         )
       })
 
-    // M0609(base_link)와 실제 작업대가
-    // 한 화면에 들어오도록 두 원점의 중간을 바라본다.
+    // M0609 base_link와 작업대가 한 화면에 들어오게 한다.
     const viewCenter =
       tableOriginThree
         .clone()
+        .add(toThreeBasePosition(0, 0, 0))
         .multiplyScalar(0.5)
 
     // Include the fully extended arm while waiting for the first joint snapshot.
@@ -1141,12 +1266,15 @@ function App() {
     const axesHelper =
       new THREE.AxesHelper(2)
 
+    axesHelper.position.copy(toThreeBasePosition(0, 0, 0))
+    // ROS +Y -> Three -Z, ROS +Z -> Three +Y.
+    axesHelper.rotation.x = -Math.PI / 2
     scene.add(axesHelper)
 
     // 8. 현재 TCP 팁 표시
     const tipGeometry =
       new THREE.SphereGeometry(
-        0.12,
+        (0.04 / 3) * 2.5,
         24,
         24
       )
@@ -1211,6 +1339,28 @@ function App() {
 
     pathCandidateGroupRef.current = pathCandidateGroup
 
+    const modelProbeTip = robotModel.root.getObjectByName('probe_tip')
+    const modelTipWorld = new THREE.Vector3()
+    const probeShaft = robotModel.root.getObjectByName('probe_shaft')
+    const shaftRestPosition = probeShaft?.position.clone()
+    const tipRestPosition = modelProbeTip?.position.clone()
+    const shaftCenterWorld = new THREE.Vector3()
+    const shiftedCenterLocal = new THREE.Vector3()
+    const probeShiftLocal = new THREE.Vector3()
+    let probeOffsetFixed = false
+    const shaftStartWorld = new THREE.Vector3()
+    const shaftEndWorld = new THREE.Vector3()
+    const shaftHalfLength = (probeShaft?.geometry.parameters.height ?? 0) / 2
+    // 작업대·부재·측정 표시는 고정 world 좌표를 유지한다.
+    // 관절 모델과 실측 TCP의 수신 시차를 장면 전체 이동으로 보정하지 않는다.
+    const measuredScene = new THREE.Group()
+    measuredScene.name = 'world_measurements'
+    scene.add(measuredScene)
+    measuredScene.add(tipMesh, trajectoryLine, contactGroup, workpieceGroup,
+      edgeGroup, pathCandidateGroup, worktable, floorGrid, axesHelper)
+    const measuredTipWorld = new THREE.Vector3()
+    const weldEffect = createWeldEffect(measuredScene)
+
     // 13. 실시간 렌더링
     let animationFrameId
 
@@ -1218,6 +1368,66 @@ function App() {
       animationFrameId =
         requestAnimationFrame(animate)
 
+      const sample = tipSampleRef.current
+      const probeTip = modelProbeTip
+      // 빨간 구·궤적·부재는 그대로 두고 봉만 ROS/world Y 방향으로 옮긴다.
+      // ROS Y는 Three.js -Z다. 용접 전 한 번 구한 그리퍼 로컬 오프셋을 유지한다.
+      const pathPositions = trajectoryLine.geometry.getAttribute('position')
+      if (pathPositions?.count > 0) {
+        measuredTipWorld.fromBufferAttribute(pathPositions, pathPositions.count - 1)
+        tipMesh.position.copy(measuredTipWorld)
+      }
+      let probeSegment = null
+      if (probeTip && probeShaft) {
+        probeShaft.position.copy(shaftRestPosition)
+        probeTip.position.copy(tipRestPosition)
+        robotModel.root.updateMatrixWorld(true)
+        if (!probeOffsetFixed && !weldRef.current?.active && pathPositions?.count > 0 &&
+            sample && performance.now() - sample.receivedAt < 500 &&
+            appliedJointsAtRef.current !== null && performance.now() - appliedJointsAtRef.current < 500) {
+          probeShaft.getWorldPosition(shaftCenterWorld)
+          shaftCenterWorld.z = measuredTipWorld.z
+          shiftedCenterLocal.copy(shaftCenterWorld)
+          probeShaft.parent.worldToLocal(shiftedCenterLocal)
+          probeShiftLocal.subVectors(shiftedCenterLocal, shaftRestPosition)
+          probeOffsetFixed = true
+        }
+        probeShaft.position.add(probeShiftLocal)
+        probeTip.position.add(probeShiftLocal)
+        robotModel.root.updateMatrixWorld(true)
+        probeTip.getWorldPosition(modelTipWorld)
+        // 기울어진 봉의 양 끝을 world 좌표로 보내 모서리와 가장 가까운 지점을 구한다.
+        shaftStartWorld.set(0, -shaftHalfLength, 0)
+        shaftEndWorld.set(0, shaftHalfLength, 0)
+        probeShaft.localToWorld(shaftStartWorld)
+        probeShaft.localToWorld(shaftEndWorld)
+        probeSegment = {
+          start: threePointWorldM(shaftStartWorld),
+          end: threePointWorldM(shaftEndWorld),
+        }
+      }
+      tipMesh.visible = !weldRef.current?.active && Boolean(
+        pathPositions?.count && sample && performance.now() - sample.receivedAt < 500
+      )
+      if (weldRef.current && probeTip) {
+        const tipThree = sample
+          ? toThreeBasePosition(sample.x, sample.y, sample.z) : modelTipWorld
+        const tipWorldM = threePointWorldM(tipThree)
+        weldRef.current = appendWeldSample(
+          weldRef.current,
+          sample && performance.now() - sample.receivedAt < 500 ? sample : null,
+          tipWorldM,
+          scanResultRef.current,
+          FIXTURE_ORIGIN_WORLD_MM,
+          TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM,
+          probeSegment
+        )
+      }
+      const showScanOverlays = !weldRef.current?.active
+      contactGroup.visible = showScanOverlays
+      trajectoryLine.visible = showScanOverlays
+      pathCandidateGroup.visible = showScanOverlays
+      weldEffect.tick(weldRef.current?.scan_id === renderedScanRef.current ? weldRef.current : null)
       controls.update()
 
       renderer.render(
@@ -1233,9 +1443,12 @@ function App() {
     return () => {
       cancelAnimationFrame(animationFrameId)
 
+      resizeObserver.disconnect()
+
       controls.dispose()
 
       disposed = true
+      weldEffect.dispose()
       robotModel.dispose()
       disposeObject3D(scene)
 
@@ -1274,35 +1487,16 @@ function App() {
           positionRad
       }
     )
+    if (Object.keys(jointPositions).length === 6) {
+      appliedJointsAtRef.current = performance.now()
+    }
   }, [jointPositions])
 
 
 
   // =========================
-  // TCP 팁 3D 위치 갱신
+  // 빨간 구는 파란 궤적의 마지막 실측 TCP와 동일한 world 좌표를 사용한다.
   // =========================
-
-  useEffect(() => {
-    if (!tipPose) {
-      return
-    }
-
-    if (!tipMeshRef.current) {
-      return
-    }
-
-    // MQTT/Web 좌표 단위는 mm.
-    // 화면 표시를 위해 100 mm = Three.js 1 unit로 축소한다.
-    tipMeshRef.current.position.copy(
-      toThreePosition(
-        tipPose.x,
-        tipPose.y,
-        tipPose.z
-      )
-    )
-
-    tipMeshRef.current.visible = true
-  }, [tipPose])
 
   // =========================
   // TCP 이동 궤적 3D 갱신
@@ -1313,12 +1507,12 @@ function App() {
       return
     }
 
-    if (tipTrajectory.length < 2) {
+    if (tipTrajectory.length < 1) {
       return
     }
 
     const points = tipTrajectory.map((pose) =>
-      toThreePosition(
+      toThreeBasePosition(
         pose.x,
         pose.y,
         pose.z
@@ -1354,7 +1548,7 @@ function App() {
     contactPoints.forEach((point) => {
       const geometry =
         new THREE.SphereGeometry(
-          0.08,
+          (0.08 / 9) * 2.5,
           20,
           20
         )
@@ -1372,7 +1566,7 @@ function App() {
 
       // 판정 순간의 실제 탐침 TCP 좌표. scan/result를 만든 원본과 같은 좌표다.
       marker.position.copy(
-        toThreePosition(
+        toThreeBasePosition(
           point.x,
           point.y,
           point.z
@@ -1406,17 +1600,17 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
+    if (!FIXTURE_ORIGIN_WORLD_MM) {
       return
     }
 
     // scan/result는 workpiece_fixture 기준이고 접촉점/궤적은 base_link 기준이다.
-    // ROS와 같은 base_to_fixture 평행이동을 그대로 적용해 한 좌표계에 겹친다.
+    // fixture 로컬 좌표를 고정된 화면/world 원점에 표시한다.
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        FIXTURE_ORIGIN_WORLD_MM.x,
+        FIXTURE_ORIGIN_WORLD_MM.y,
+        FIXTURE_ORIGIN_WORLD_MM.z
       )
     )
 
@@ -1433,7 +1627,7 @@ function App() {
       scanResult.vertices.map((point) => {
         const x = point?.x_mm
         const y = point?.y_mm
-        const z = point?.z_mm
+        const z = workpieceDisplayZ(point, scanResult)
 
         if (
           !Number.isFinite(x) ||
@@ -1551,15 +1745,15 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
+    if (!FIXTURE_ORIGIN_WORLD_MM) {
       return
     }
 
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        FIXTURE_ORIGIN_WORLD_MM.x,
+        FIXTURE_ORIGIN_WORLD_MM.y,
+        FIXTURE_ORIGIN_WORLD_MM.z
       )
     )
 
@@ -1584,14 +1778,14 @@ function App() {
       toThreePosition(
         edge.start.x_mm,
         edge.start.y_mm,
-        edge.start.z_mm
+        workpieceDisplayZ(edge.start, scanResult)
       )
 
       const end =
       toThreePosition(
         edge.end.x_mm,
         edge.end.y_mm,
-        edge.end.z_mm
+        workpieceDisplayZ(edge.end, scanResult)
       )
 
       const geometry =
@@ -1639,15 +1833,15 @@ function App() {
 
     group.clear()
 
-    if (!BASE_TO_FIXTURE_MM) {
+    if (!FIXTURE_ORIGIN_WORLD_MM) {
       return
     }
 
     group.position.copy(
       toThreePosition(
-        BASE_TO_FIXTURE_MM.x,
-        BASE_TO_FIXTURE_MM.y,
-        BASE_TO_FIXTURE_MM.z
+        FIXTURE_ORIGIN_WORLD_MM.x,
+        FIXTURE_ORIGIN_WORLD_MM.y,
+        FIXTURE_ORIGIN_WORLD_MM.z
       )
     )
 
@@ -1712,369 +1906,260 @@ function App() {
     )
   }, [scanResult])
 
+  useEffect(() => {
+    scanResultRef.current = scanResult
+    renderedScanRef.current = scanResult?.success === true && scanResult?.box_valid === true
+      ? scanResult.scan_id : null
+  }, [scanResult])
+
+  const fixtureInRobotBase = FIXTURE_ORIGIN_WORLD_MM
+    ? fixtureRelativeToBaseMm(FIXTURE_ORIGIN_WORLD_MM, ROBOT_BASE_WORLD_MM)
+    : null
+  const recordedFixture = scanResult?.ros_base_to_fixture_mm
+  const fixtureFrameMismatch = Boolean(fixtureInRobotBase &&
+    Array.isArray(recordedFixture) && recordedFixture.length === 3 &&
+    Math.hypot(
+      fixtureInRobotBase.x - recordedFixture[0],
+      fixtureInRobotBase.y - recordedFixture[1],
+      fixtureInRobotBase.z - recordedFixture[2],
+    ) > 2)
+
+  const tipWorldPose = tipPose
+    ? basePointWorldMm(tipPose, ROBOT_BASE_WORLD_MM)
+    : null
+  const candidateWorldCoordinate = (point, axis) =>
+    point && FIXTURE_ORIGIN_WORLD_MM
+      ? formatNumber(fixturePointWorldMm(point, FIXTURE_ORIGIN_WORLD_MM)[axis])
+      : '-'
+
+  const progressPercent = progressTotal > 0
+    ? Math.min(100, Math.max(0, (progress / progressTotal) * 100))
+    : 0
+  const phaseTone = ['ERROR', 'STOPPED'].includes(phase)
+    ? 'danger'
+    : phase === 'DONE'
+      ? 'success'
+      : phase === 'IDLE'
+        ? 'neutral'
+        : 'active'
+
   return (
-    <main>
+    <main className="app-shell">
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">WELD-MADE · M0609</p>
+          <h1>접촉 탐색 시스템</h1>
+          <p className="subtitle">외곽 엣지·경로 후보 생성 시스템</p>
+        </div>
+        <div className="system-badges" aria-label="시스템 연결 상태">
+          <span className={`status-badge ${wsConnected ? 'is-ok' : 'is-error'}`}>
+            <i /> WebSocket {wsConnected ? '연결됨' : '연결 안 됨'}
+          </span>
+          <span className={`status-badge ${robotModelStatus === 'READY' ? 'is-ok' : 'is-warn'}`}>
+            <i /> M0609 {robotModelStatus}
+          </span>
+          <span className={`status-badge ${safetyLatched ? 'is-error' : 'is-ok'}`}>
+            <i /> 안전 {safetyLatched ? '래치됨' : safetyStatusSeen ? '정상' : '확인 중'}
+          </span>
+        </div>
+      </header>
 
-      <h1>접촉 탐색 시스템</h1>
+      <div className="workspace-grid">
+        <section className="panel viewer-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="section-kicker">LIVE VIEW</p>
+              <h2>3D 화면</h2>
+            </div>
+            <span className={`phase-chip ${phaseTone}`}>
+              {getPhaseLabel(phase, progress, progressTotal)}
+            </span>
+          </div>
 
-      <p>
-        외곽 엣지·경로 후보 생성 시스템
-      </p>
+          <div className="canvas-wrap">
+            <canvas ref={canvasRef} />
+            <div className="view-legend" aria-label="3D 표시 범례">
+              <span><i className="legend-tip" />탐침 끝</span>
+              <span><i className="legend-contact" />접촉점</span>
+              <span><i className="legend-path" />경로 후보</span>
+            </div>
+            {robotModelStatus === 'LOADING' && (
+              <div className="canvas-notice">로봇 모델을 불러오는 중입니다.</div>
+            )}
+            {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
+              <div className="canvas-notice is-error" role="alert">
+                일부 로봇 모델을 불러오지 못했습니다.
+              </div>
+            )}
+          </div>
+          <div className="weld-controls">
+            {Array.from({ length: 8 }, (_, line) => (
+              <button key={line} disabled={!weld || weld.active || weldPending || safetyLatched || fixtureFrameMismatch || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
+                onClick={() => commandWeld('start', line)}>L{line} 용접 시작</button>
+            ))}
+            {/* <button className="danger" disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button> */}
+            <span role="status">{!weld ? '용접 상태 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · L${weld.line}`}</span>
+            {fixtureFrameMismatch && <p role="alert">부재·로봇 좌표계 불일치: 저장된 ROS fixture 기준점은 재설정해야 합니다.</p>}
+            {(weldError || weld?.detail) && <p role="alert">{weldError || weld.detail}</p>}
+          </div>
+          <p className="view-help">좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
+        </section>
 
+        <aside className="side-column">
+          <section className="panel action-panel">
+            <div className="panel-heading compact">
+              <div><p className="section-kicker">CONTROL</p><h2>작업 제어</h2></div>
+            </div>
+            <div className="control-panel">
+              <button className="primary" disabled={weld?.active} onClick={handleStart}>시작</button>
+              <button className="danger" onClick={() => weld?.active ? commandWeld('stop') : handleStop()}>중지</button>
+              <button disabled={weld?.active} onClick={handleHome}>안전복귀</button>
+              <button disabled={weld?.active} onClick={handleResume}>재시작</button>
+              <button
+                className="wide"
+                onClick={handleSafetyReset}
+                disabled={safetyStatusSeen && !safetyLatched}
+                title={
+                  !safetyStatusSeen
+                    ? '안전 상태 미수신: 안전 해제 명령을 시도할 수 있습니다.'
+                    : safetyLatched
+                      ? '안전 래치를 해제합니다.'
+                      : '안전 래치가 걸려 있지 않습니다.'
+                }
+              >안전 해제</button>
+            </div>
+          </section>
 
-      {/* 제어 버튼 */}
-      <section className="control-panel">
+          <section className="panel status-panel">
+            <div className="panel-heading compact">
+              <div><p className="section-kicker">PROGRESS</p><h2>현재 상태</h2></div>
+              <strong>{progress} / {progressTotal}</strong>
+            </div>
+            <div className="progress-track" aria-label={`진행도 ${progress} / ${progressTotal}`}>
+              <span style={{ width: `${progressPercent}%` }} />
+            </div>
+            <dl className="status-list">
+              <div><dt>현재 단계</dt><dd>{getPhaseLabel(phase, progress, progressTotal)}</dd></div>
+              <div><dt>진행 방향</dt><dd>{direction}</dd></div>
+              <div><dt>최근 명령</dt><dd>{commandStatus}</dd></div>
+              <div><dt>관절 수신</dt><dd>{Object.keys(jointPositions).length} / 6</dd></div>
+            </dl>
+            <p className="scan-id">Scan ID <code>{scanId ?? '-'}</code></p>
+          </section>
 
-        <button onClick={handleStart}>
-          시작
-        </button>
+          <section className="panel tcp-panel">
+            <div className="panel-heading compact">
+              <div><p className="section-kicker">TCP POSITION · WORLD</p><h2>탐침 위치</h2></div>
+            </div>
+            {tipWorldPose ? (
+              <div className="coordinate-grid">
+                <div><span>X</span><strong>{formatNumber(tipWorldPose.x)}</strong><small>mm</small></div>
+                <div><span>Y</span><strong>{formatNumber(tipWorldPose.y)}</strong><small>mm</small></div>
+                <div><span>Z</span><strong>{formatNumber(tipWorldPose.z)}</strong><small>mm</small></div>
+              </div>
+            ) : <p className="empty-state">팁 위치를 기다리는 중입니다.</p>}
+            <p className="mini-status">{jointStatus}</p>
+          </section>
+        </aside>
+      </div>
 
-        <button onClick={handleStop}>
-          중지
-        </button>
-
-        <button onClick={handleHome}>
-          안전복귀
-        </button>
-
-        <button onClick={handleResume}>
-          재시작
-        </button>
-
-        <button
-          onClick={handleSafetyReset}
-          disabled={safetyStatusSeen && !safetyLatched}
-          title={
-            !safetyStatusSeen
-              ? '안전 상태 미수신: 안전 해제 명령을 시도할 수 있습니다.'
-              : safetyLatched
-                ? '안전 래치를 해제합니다.'
-                : '안전 래치가 걸려 있지 않습니다.'
-          }
-        >
-          안전 해제
-        </button>
-
-      </section>
-
-
-      {/* 현재 상태 */}
-      <section className="status-panel">
-
-        <h2>현재 상태</h2>
-
-        <p>
-          FastAPI WebSocket:{' '}
-          {wsConnected ? '연결됨' : '연결 안 됨'}
-        </p>
-
-        <p>
-          현재 단계:{' '}
-          {getPhaseLabel(
-            phase,
-            progress,
-            progressTotal
-          )}
-        </p>
-
-        <p>
-          Phase 코드: {phase}
-        </p>
-
-        <p>
-          진행 방향: {direction}
-        </p>
-
-        <p>
-          진행도: {progress} / {progressTotal}
-        </p>
-
-        <p>
-          Scan ID: {scanId ?? '-'}
-        </p>
-
-        <p>
-          최근 명령 상태: {commandStatus}
-        </p>
-
-        <p>
-          Request ID: {lastRequestId ?? '-'}
-        </p>
-
-        <p>
-          M0609 3D 모델: {robotModelStatus}
-        </p>
-
-        <p>
-          M0609 관절 수신:{' '}
-          {Object.keys(jointPositions).length} / 6 — {jointStatus}
-        </p>
-
-        <p>
-          RG2 자세: 실기 탐침 파지 고정 · 0.721396 rad · 탐침 돌출 13 mm
-        </p>
-
-        {tipPose ? (
-          <>
-            <p>
-              팁 기준 프레임: {tipPose.frameId}
-            </p>
-
-            <p>
-              팁 위치:
-              {' '}
-              X {formatNumber(tipPose.x)} mm /
-              {' '}
-              Y {formatNumber(tipPose.y)} mm /
-              {' '}
-              Z {formatNumber(tipPose.z)} mm
-            </p>
-          </>
-        ) : (
-          <p>
-            팁 위치: 아직 수신되지 않음
-          </p>
-        )}
-
-      </section>
-
-      {/* 외곽 엣지·경로 후보 */}
-      <section>
-
-        <h2>외곽 엣지·경로 후보</h2>
-
-        {scanResult && (
-          <p>
-            결과 좌표 프레임:{' '}
-            {scanResult.frame_id ?? '-'}
-          </p>
-        )}
-
-        {scanResult?.success === true &&
-        !BASE_TO_FIXTURE_MM && (
-          <p>
-            작업대 원점 미설정:
-            VITE_BASE_TO_FIXTURE_MM 값을 확인하세요.
-          </p>
-        )}
+      <section className="panel result-panel">
+        <div className="panel-heading">
+          <div><p className="section-kicker">SCAN RESULT</p><h2>외곽 엣지·경로 후보</h2></div>
+          {scanResult?.success === true && <span className="result-ready">결과 생성 완료</span>}
+        </div>
 
         {scanResult?.success === true && (
-          <p>
-            3D 좌표: contact/event · robot/sample은 base_link,
-            scan/result는 base_to_fixture로 base_link에 정렬
-          </p>
-        )}
-
-        {scanResult &&
-          scanResult.success !== true && (
-            <p>
-              경로 후보를 생성하지 못했습니다.
-              {' '}
-              {scanResult.reason ?? 'UNKNOWN'}
-            </p>
-          )}
-
-        {scanResult?.success === true &&
-          !scanResult.path_candidates && (
-            <p>
-              경로 후보 데이터가 없습니다.
-            </p>
-          )}
-
-        {scanResult?.success === true &&
-          Array.isArray(
-            scanResult.path_candidates
-          ) && (
-            <table>
-
-              <thead>
-                <tr>
-                  <th>번호</th>
-                  <th>시작 X</th>
-                  <th>시작 Y</th>
-                  <th>시작 Z</th>
-                  <th>끝 X</th>
-                  <th>끝 Y</th>
-                  <th>끝 Z</th>
-                  <th>길이</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {scanResult.path_candidates.map(
-                  (candidate, index) => (
-                    <tr key={index}>
-                      <td>
-                        {index + 1}
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.start?.x_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.start?.y_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.start?.z_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.end?.x_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.end?.y_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.end?.z_mm
-                        )} mm
-                      </td>
-
-                      <td>
-                        {formatNumber(
-                          candidate.length_mm
-                        )} mm
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-
-            </table>
-          )}
-
-      </section>
-
-      {/* 명령 상태 이력 */}
-      <section>
-
-        <h2>명령 상태 이력</h2>
-
-        {commandHistory.length === 0 && (
-          <p>아직 전송한 명령이 없습니다.</p>
-        )}
-
-        {commandHistory.map((command) => (
-          <div key={command.requestId}>
-
-            <p>
-              명령:{' '}
-              {getCommandLabel(
-                command.commandTopic
-              )}
-            </p>
-
-            <p>
-              접수 결과:{' '}
-              {command.status === 'REJECTED'
-                ? '거절'
-                : command.ack?.accepted === true
-                  ? '접수'
-                  : '대기'}
-            </p>
-
-            <p>
-              실행 결과:{' '}
-              {command.status === 'SUCCEEDED'
-                ? '완료'
-                : command.status === 'FAILED'
-                  ? '실패'
-                  : command.status === 'REJECTED'
-                    ? '-'
-                    : '대기'}
-            </p>
-
-            <p>
-              상태 코드: {command.status}
-            </p>
-
-            {command.ack?.accepted === false &&
-              command.ack?.reason && (
-                <p>
-                  거절 사유: {command.ack.reason}
-                  {command.ack.reason_code != null &&
-                    ` (${command.ack.reason_code})`}
-                  {command.ack.detail &&
-                    ` — ${command.ack.detail}`}
-                </p>
-              )}
-
-            {command.status === 'FAILED' &&
-              command.result?.reason && (
-                <p>
-                  실패 사유: {command.result.reason}
-                  {command.result.reason_code != null &&
-                    ` (${command.result.reason_code})`}
-                  {command.result.detail &&
-                    ` — ${command.result.detail}`}
-                </p>
-              )}
-
-            <p>
-              Request ID: {command.requestId}
-            </p>
-
-            <p>
-              갱신 시각:{' '}
-              {formatLogTime(command.updatedAtMs)}
-            </p>
-
+          <div className="measurement-grid">
+            <div><span>폭</span><strong>{formatNumber(scanResult.width_mm)}</strong><small>mm</small></div>
+            <div><span>길이</span><strong>{formatNumber(scanResult.length_mm)}</strong><small>mm</small></div>
+            <div><span>높이</span><strong>{formatNumber(scanResult.height_mm)}</strong><small>mm</small></div>
+            <div><span>경로 후보</span><strong>{scanResult.path_candidates?.length ?? 0}</strong><small>개</small></div>
           </div>
-        ))}
-
-      </section>
-
-      {/* Three.js */}
-      <section>
-
-        <h2>3D 화면</h2>
-
-        <p>좌클릭 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</p>
-        <p>RG2는 실기에서 읽은 탐침 파지 자세(±0.721396 rad)로 고정 표시하며, 그리퍼 끝에서 탐침 끝까지 13 mm로 렌더링합니다.</p>
-        {robotModelStatus === 'LOADING' && <p>로봇 모델을 불러오는 중입니다.</p>}
-        {['PARTIAL', 'ERROR'].includes(robotModelStatus) && (
-          <p role="alert">일부 로봇 모델을 불러오지 못했습니다. GitHub 모델 파일 접근을 확인한 뒤 새로고침하세요.</p>
         )}
-        <canvas ref={canvasRef} />
-
-      </section>
-
-
-      {/* 로그 */}
-      <section className="log-panel">
-
-        <h2>시간순 로그</h2>
-
-        {logs.length === 0 && (
-          <p>아직 로그가 없습니다.</p>
+        {!scanResult && <p className="empty-state large">스캔을 시작하면 측정 결과와 경로 후보가 여기에 표시됩니다.</p>}
+        {scanResult?.success === true && !FIXTURE_ORIGIN_WORLD_MM && (
+          <p className="alert-message">부재 원점 미설정: VITE_FIXTURE_ORIGIN_WORLD_MM 값을 확인하세요.</p>
+        )}
+        {scanResult && scanResult.success !== true && (
+          <p className="alert-message">경로 후보를 생성하지 못했습니다. {scanResult.reason ?? 'UNKNOWN'}</p>
+        )}
+        {scanResult?.success === true && !scanResult.path_candidates && (
+          <p className="empty-state">경로 후보 데이터가 없습니다.</p>
         )}
 
-        {logs.map((log, index) => (
-          <p
-            key={`${log.timestampMs}-${index}`}
-          >
-            {formatLogTime(log.timestampMs)}
-            {' - '}
-            {log.message}
-          </p>
-        ))}
-
+        {scanResult?.success === true && Array.isArray(scanResult.path_candidates) && (
+          <div className="table-wrap">
+            <table>
+              <thead><tr>
+                <th>번호</th><th>시작 X</th><th>시작 Y</th><th>시작 Z</th>
+                <th>끝 X</th><th>끝 Y</th><th>끝 Z</th><th>길이</th>
+              </tr></thead>
+              <tbody>
+                {scanResult.path_candidates.map((candidate, index) => (
+                  <tr key={index}>
+                    <td><span className="path-number">{index + 1}</span></td>
+                    <td>{candidateWorldCoordinate(candidate.start, 'x')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.start, 'y')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.start, 'z')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.end, 'x')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.end, 'y')} mm</td>
+                    <td>{candidateWorldCoordinate(candidate.end, 'z')} mm</td>
+                    <td><strong>{formatNumber(candidate.length_mm)} mm</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {scanResult?.success === true && (
+          <p className="result-meta">화면 좌표: World(mm) · 원본 결과: {scanResult.frame_id ?? '-'}</p>
+        )}
       </section>
 
+      <div className="details-grid">
+        <section className="panel history-panel">
+          <div className="panel-heading compact">
+            <div><p className="section-kicker">COMMANDS</p><h2>명령 상태 이력</h2></div>
+            <span className="count-badge">{commandHistory.length}</span>
+          </div>
+          <div className="scroll-area">
+            {commandHistory.length === 0 && <p className="empty-state">아직 전송한 명령이 없습니다.</p>}
+            {[...commandHistory].reverse().map((command) => (
+              <article className="command-item" key={command.requestId}>
+                <div><strong>{getCommandLabel(command.commandTopic)}</strong><span>{formatLogTime(command.updatedAtMs)}</span></div>
+                <span className={`command-state ${command.status.toLowerCase()}`}>{command.status}</span>
+                {(command.ack?.accepted === false || command.status === 'FAILED') && (
+                  <p>{command.ack?.reason ?? command.result?.reason ?? '명령 처리 실패'}</p>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel log-panel">
+          <div className="panel-heading compact">
+            <div><p className="section-kicker">SYSTEM LOG</p><h2>시간순 로그</h2></div>
+            <span className="count-badge">{logs.length}</span>
+          </div>
+          <div className="scroll-area log-list">
+            {logs.length === 0 && <p className="empty-state">아직 로그가 없습니다.</p>}
+            {[...logs].reverse().map((log, index) => (
+              <p key={`${log.timestampMs}-${index}`}><time>{formatLogTime(log.timestampMs)}</time><span>{log.message}</span></p>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <details className="diagnostics panel">
+        <summary>상세 시스템 정보</summary>
+        <div className="diagnostic-grid">
+          <p><span>Phase 코드</span>{phase}</p>
+          <p><span>Request ID</span>{lastRequestId ?? '-'}</p>
+          <p><span>팁 기준 프레임</span>{tipPose?.frameId ?? '-'}</p>
+          <p><span>RG2 자세</span>0.721396 rad · 탐침 돌출 13 mm</p>
+        </div>
+      </details>
     </main>
   )
 }

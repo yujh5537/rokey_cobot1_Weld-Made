@@ -707,7 +707,14 @@ class _NodePorts(Ports):
 
         def on_feedback(message):
             if length > 0.0:
-                state_machine.set_progress(message.feedback.distance_travelled / length)
+                # Index 0 approaches the first seam point; the last index
+                # moves away from the final seam point to P_ret. Neither is
+                # welding. Use seam waypoint progress so 0 and 1 also mark
+                # the arc boundaries, independently of approach/retreat length.
+                last_index = len(request.waypoints) - 1
+                progress = (message.feedback.waypoint_index / last_index
+                            if last_index > 0 else 0.0)
+                state_machine.set_progress(progress)
         return on_feedback
 
     def _stop_untracked(self, detail):

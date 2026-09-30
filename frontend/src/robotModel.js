@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+import { PROBE_TIP_RADIUS_M } from './sceneFrames.js'
 
 const ROS_METERS_TO_THREE = 10
 
@@ -23,7 +24,9 @@ const RG2_PROBE_GRIP_JOINTS = {
   rg2_right_inner_finger_joint: RG2_PROBE_GRIP_MASTER_RAD,
 }
 
-const PROBE_EXTENSION_FROM_GRIPPER_M = 0.013
+// 등록된 실기 TCP: 플랜지에서 탐침 끝까지 252.12 mm.
+const PROBE_TCP_LENGTH_M = 0.25212
+const PROBE_VISUAL_TRIM_M = 0.0013 // 화면 탐침 끝을 1.3 mm 줄인다
 
 // pinned RG2 visual mesh를 실기 탐침 파지각(0.721396 rad)으로 놓았을 때
 // 두 inner_finger mesh의 최외곽 끝면 z. 탐침은 이 면 밖에서 시작해야 한다.
@@ -306,17 +309,15 @@ function buildRg2Model(
     }
   )
 
-  // 실제 보이는 jaw 끝면에서 바깥쪽(+Z)으로 13 mm만 노출한다.
-  // 즉 13 mm는 탐침 전체 길이가 아니라 RG2 밖으로 돌출된 길이다.
+  // 그리퍼 로컬 +Z축에 고정하고 등록 TCP 길이로 끝점을 정한다.
   const gripperEndZ =
     RG2_PROBE_GRIPPER_END_Z_M
 
   const probeLength =
-    PROBE_EXTENSION_FROM_GRIPPER_M
+    PROBE_TCP_LENGTH_M - PROBE_VISUAL_TRIM_M - gripperEndZ
 
   const probeTipZ =
-    gripperEndZ +
-    probeLength
+    PROBE_TCP_LENGTH_M - PROBE_VISUAL_TRIM_M
 
   const probeRadius = 0.0015
 
@@ -345,12 +346,13 @@ function buildRg2Model(
     probeTipZ -
     probeLength / 2
 
+  probe.name = 'probe_shaft'
   base.add(probe)
 
   const probeTip =
     new THREE.Mesh(
       new THREE.SphereGeometry(
-        0.000225,
+        PROBE_TIP_RADIUS_M,
         16,
         16
       ),

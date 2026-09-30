@@ -173,3 +173,33 @@ def test_two_published_commands_get_different_request_ids(monkeypatch):
     assert first["status"] == "PUBLISHED"
     assert second["status"] == "PUBLISHED"
     assert first["request_id"] != second["request_id"]
+
+
+def test_weld_command_uses_version_and_result_updates_status(monkeypatch):
+    sent = []
+    monkeypatch.setattr(main.mqtt_client, 'publish',
+                        lambda topic, body, qos, retain: (
+                            sent.append((topic, __import__('json').loads(body))) or
+                            type('Info', (), {'rc': main.mqtt.MQTT_ERR_SUCCESS})()))
+    result = main.command_weld_start(main.CommandRequest(payload={
+        'scan_id': 'scan-1', 'start_line': 0, 'end_line': 0}))
+    request_id = result['request_id']
+    assert sent[0][0] == 'cmd/weld/start'
+    assert sent[0][1]['schema_version'] == '0.2'
+    main.update_command_from_ack({'request_id': request_id, 'accepted': True})
+    state = main.update_command_from_result({'request_id': request_id, 'success': True,
+                                             'weld_id': 'weld-1'})
+    assert state['status'] == 'SUCCEEDED'
+    assert state['result']['weld_id'] == 'weld-1'
+
+
+def test_weld_state_is_cached_for_websocket(monkeypatch):
+    forwarded = []
+    monkeypatch.setattr(main, 'schedule_websocket_broadcast',
+                        lambda topic, payload: forwarded.append((topic, payload)))
+    import json
+    message = type('Message', (), {'topic': 'weld/state',
+                                  'payload': json.dumps({'phase': 'WELDING'}).encode()})()
+    main.on_message(None, None, message)
+    assert main.latest_states['weld/state']['phase'] == 'WELDING'
+    assert forwarded[-1] == ('weld/state', {'phase': 'WELDING'})

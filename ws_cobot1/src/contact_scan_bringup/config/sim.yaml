@@ -6,6 +6,14 @@
 # - over_force_n, drop_limit_m 은 여러 노드가 같은 값을 써야 한다(7.2). test/test_config.py 가 검사한다.
 # - 최상위 키는 노드 이름이다. 다른 노드의 파라미터는 각 담당자가 자기 절에 추가한다.
 
+# Virtual DRCF는 시작할 때 탐침 TCP가 비어 있다. scripts/sim/apply_virtual_tcp.py가
+# 이 값을 에뮬레이터에 등록한 뒤 스캔 노드를 실행한다.
+# 웹 M0609 모델의 보이는 probe_tip과 Virtual 플랜지 위치를 홈 자세에서 맞춘 값이다.
+# 실기 TCP(252.12 mm)와 별개이며, 모델·탐침 형상을 바꾸면 다시 맞춘다.
+virtual_tcp:
+  ros__parameters:
+    z_mm: 246.98
+
 contact_detector:
   ros__parameters:
     source: sim                      # 'sim' | 'robot_force' (BRD 4.1.6)

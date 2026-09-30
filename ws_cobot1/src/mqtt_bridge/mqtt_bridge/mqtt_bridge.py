@@ -10,18 +10,21 @@ from functools import partial
 import paho.mqtt.client as mqtt
 import rclpy
 from builtin_interfaces.msg import Time
-from contact_scan_interfaces.action import Resume, ReturnHome, RunScan
+from contact_scan_interfaces.action import Resume, ReturnHome, RunScan, RunWeld
 from contact_scan_interfaces.msg import (
     ContactEvent, ReasonCode, RobotSample, RobotStatus, SafetyStatus,
-    ScanConfig, ScanLog, ScanResult, ScanState, WebHeartbeat,
+    ScanConfig, ScanLog, ScanResult, ScanState, WebHeartbeat, WeldConfig, WeldResult, WeldState,
 )
-from contact_scan_interfaces.srv import ResetSafety, SetConfig, StopScan
+from contact_scan_interfaces.srv import ResetSafety, SetConfig, StopScan, StopWeld
 from contact_scan_qos import QOS_EVENT, QOS_HEARTBEAT, QOS_LOG, QOS_SENSOR, QOS_STATE
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
 from mqtt_bridge.command_guard import CommandGuard
+from mqtt_bridge.weld_codec import (decode_start as decode_weld_start,
+    encode_state as encode_weld_state, encode_result as encode_weld_result,
+    encode_log as encode_weld_log, encode_command_result as encode_weld_command_result)
 from mqtt_bridge.decoders import (
     decode_safety_reset, decode_scan_home, decode_scan_resume,
     decode_scan_set_config, decode_scan_start, decode_scan_stop,
@@ -220,6 +223,10 @@ class MqttBridge(Node):
         self._last_scan_id = ""
         self._scan_phase = ScanState.PHASE_IDLE
         self._pending_stop = []
+        self._pending_weld_stop = []
+        self._last_weld_id = ""
+        self._weld_phase = WeldState.PHASE_IDLE
+        self._weld_result_keys = []
 
         self._last_error_scan_id = ""
         self._last_error_code = ReasonCode.ROBOT_ERROR
@@ -272,6 +279,14 @@ class MqttBridge(Node):
             QOS_STATE,
         )
 
+        for msg_type, topic, callback, qos in (
+            (WeldState, '/weld/state', self._on_weld_state, QOS_STATE),
+            (WeldResult, '/weld/result', self._on_weld_result, QOS_STATE),
+            (ScanLog, '/weld/log', self._on_weld_log, QOS_LOG),
+        ):
+            self.create_subscription(msg_type, topic,
+                _safe_ros_callback(self.get_logger(), topic, callback), qos)
+
         self._heartbeat_pub = self.create_publisher(WebHeartbeat, "/web/heartbeat", QOS_HEARTBEAT)
         self._run_client = ActionClient(self, RunScan, "/scan/run")
         self._home_client = ActionClient(self, ReturnHome, "/scan/home")
@@ -279,6 +294,9 @@ class MqttBridge(Node):
         self._stop_client = self.create_client(StopScan, "/scan/stop")
         self._set_config_client = self.create_client(SetConfig, "/scan/set_config")
         self._reset_client = self.create_client(ResetSafety, "/safety/reset")
+        self._weld_run_client = ActionClient(self, RunWeld, '/weld/run')
+        self._weld_home_client = ActionClient(self, ReturnHome, '/weld/home')
+        self._weld_stop_client = self.create_client(StopWeld, '/weld/stop')
 
         self.create_timer(0.02, self._drain_queue)
         self.create_timer(1.0 / self._heartbeat_hz, self._publish_heartbeat)
@@ -316,6 +334,7 @@ class MqttBridge(Node):
         self._mqtt_connected = True
         client.subscribe([
             (self._topic("cmd/scan/+"), 1),
+            (self._topic("cmd/weld/+"), 1),
             (self._topic("cmd/safety/reset"), 1),
             (self._topic("hb/web"), 0),
             (self._topic("conn/web"), 1),
@@ -391,6 +410,23 @@ class MqttBridge(Node):
                 self._dispatch_set_config(body)
             elif topic == "cmd/safety/reset":
                 self._dispatch_reset(body)
+            elif topic == 'cmd/weld/start':
+                data = decode_weld_start(body)
+                goal = RunWeld.Goal()
+                goal.request_id, goal.scan_id = data['request_id'], data['scan_id']
+                goal.start_line, goal.end_line = data['start_line'], data['end_line']
+                goal.use_override = data['use_override']
+                for key, value in data['config'].items():
+                    setattr(goal.config_override, key, value)
+                self._send_weld_action('start', self._weld_run_client, goal, request_id)
+            elif topic == 'cmd/weld/home':
+                if body['payload']:
+                    raise ValueError('home payload must be empty')
+                goal = ReturnHome.Goal()
+                goal.request_id = request_id
+                self._send_weld_action('home', self._weld_home_client, goal, request_id)
+            elif topic == 'cmd/weld/stop':
+                self._dispatch_weld_stop(body)
             else:
                 self._ack(request_id, False, ReasonCode.NOT_SUPPORTED, "unsupported command")
         except Exception as exc:
@@ -436,6 +472,86 @@ class MqttBridge(Node):
             )
         except Exception as exc:
             self._command_result(request_id, "", False, ReasonCode.ROBOT_ERROR, str(exc))
+
+    def _send_weld_action(self, kind, client, goal, request_id):
+        if not client.server_is_ready():
+            self._ack(request_id, False, ReasonCode.NOT_SUPPORTED, f'weld {kind} unavailable')
+            return
+        client.send_goal_async(goal).add_done_callback(
+            partial(self._on_weld_goal_response, kind, request_id))
+
+    def _on_weld_goal_response(self, kind, request_id, future):
+        try:
+            handle = future.result()
+        except Exception as exc:
+            self._ack(request_id, False, ReasonCode.ROBOT_ERROR, str(exc))
+            return
+        if not handle.accepted:
+            self._ack(request_id, False, ReasonCode.BUSY, f'weld {kind} goal rejected')
+            return
+        self._ack(request_id, True, ReasonCode.OK, '')
+        handle.get_result_async().add_done_callback(
+            partial(self._on_weld_action_result, request_id))
+
+    def _on_weld_action_result(self, request_id, future):
+        try:
+            result = future.result().result
+            self._weld_command_result(request_id, getattr(result, 'weld_id', self._last_weld_id),
+                                      bool(result.success), int(result.reason_code), result.detail)
+        except Exception as exc:
+            self._weld_command_result(request_id, self._last_weld_id,
+                                      False, ReasonCode.ROBOT_ERROR, str(exc))
+
+    def _dispatch_weld_stop(self, body):
+        if not isinstance(body['payload'], dict):
+            raise ValueError('payload must be an object')
+        if set(body['payload']) - {'detail'}:
+            raise ValueError('unknown stop field')
+        detail = body['payload'].get('detail', '')
+        if not isinstance(detail, str):
+            raise ValueError('detail must be a string')
+        if not self._weld_stop_client.service_is_ready():
+            self._ack(body['request_id'], False, ReasonCode.NOT_SUPPORTED, 'weld stop unavailable')
+            return
+        req = StopWeld.Request()
+        req.request_id = body['request_id']
+        req.requester = 'mqtt_bridge'
+        req.reason = ReasonCode.STOP_REQUESTED
+        req.detail = detail
+        phase, weld_id = self._weld_phase, self._last_weld_id
+        self._weld_stop_client.call_async(req).add_done_callback(
+            partial(self._on_weld_stop_response, req.request_id, phase, weld_id))
+
+    def _on_weld_stop_response(self, request_id, phase, weld_id, future):
+        try:
+            response = future.result()
+        except Exception as exc:
+            self._ack(request_id, False, ReasonCode.ROBOT_ERROR, str(exc))
+            return
+        self._ack(request_id, response.accepted, response.reason_code, response.detail)
+        if not response.accepted:
+            return
+        if phase in (WeldState.PHASE_IDLE, WeldState.PHASE_DONE,
+                     WeldState.PHASE_ERROR, WeldState.PHASE_STOPPED):
+            self._weld_command_result(request_id, weld_id, True,
+                                      ReasonCode.STOP_REQUESTED, response.detail)
+        else:
+            self._pending_weld_stop.append((request_id, weld_id))
+            self._finish_weld_stops()
+
+    def _finish_weld_stops(self):
+        if self._weld_phase not in (WeldState.PHASE_STOPPED, WeldState.PHASE_ERROR):
+            return
+        remaining = []
+        for request_id, weld_id in self._pending_weld_stop:
+            if weld_id != self._last_weld_id:
+                remaining.append((request_id, weld_id))
+                continue
+            stopped = self._weld_phase == WeldState.PHASE_STOPPED
+            self._weld_command_result(request_id, weld_id, stopped,
+                ReasonCode.STOP_REQUESTED if stopped else ReasonCode.ROBOT_ERROR,
+                '' if stopped else 'weld entered ERROR before stop completed')
+        self._pending_weld_stop = remaining
 
     def _dispatch_stop(self, body):
         data = decode_scan_stop(body)
@@ -770,6 +886,27 @@ class MqttBridge(Node):
             1,
             False,
         )
+
+    def _on_weld_state(self, msg):
+        self._weld_phase, self._last_weld_id = msg.phase, msg.weld_id
+        self._publish('weld/state', encode_weld_state(msg, now_ms()), 1, True)
+        self._finish_weld_stops()
+
+    def _on_weld_result(self, msg):
+        key = (msg.weld_id, msg.stamp.sec, msg.stamp.nanosec)
+        if key in self._weld_result_keys:
+            return
+        self._weld_result_keys.append(key)
+        self._weld_result_keys = self._weld_result_keys[-self._dedup_cache_size:]
+        self._publish('weld/result', encode_weld_result(msg, now_ms()), 1, False)
+
+    def _on_weld_log(self, msg):
+        self._publish('weld/log', encode_weld_log(msg, now_ms()), 1, False)
+
+    def _weld_command_result(self, request_id, weld_id, success, code, detail):
+        self._publish('weld/command_result',
+                      encode_weld_command_result(request_id, weld_id, success, code,
+                                                 detail, now_ms()), 1, False)
 
     def _on_contact_event(self, msg):
         data = {

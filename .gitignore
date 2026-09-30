@@ -41,3 +41,8 @@ CLAUDE.local.md
 
 # 강의안 파생 자료 (공개 레포 제외, 로컬 보관)
 /docs/_local/
+ws_cobot1/build*/
+ws_cobot1/install*/
+ws_cobot1/log*/
+backup-bashrc/
+*.bundle

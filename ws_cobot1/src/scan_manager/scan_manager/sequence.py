@@ -94,24 +94,23 @@ class MotionPlanner:
             target_orientation=tuple(orientation), timeout_s=self._p.motion_timeout_s)
 
     def change_direction(self, stop_position: Position, first_contact_z: float):
-        """7.3절: ① 올림 ② 기준 원점의 x · y 로 수평 이동 ③ 첫 접촉 z + margin 까지 저속 내림.
-
-        재하강(OP_DESCEND)은 하지 않는다. 남은 틈은 다음 SLIDE 의 −z 목표 힘이 메운다.
-        """
+        """올림 → 원점 상공 복귀 → 힘 감지로 윗면 재접촉."""
         lifted_z = stop_position[2] + self._p.lift_height_m
         return (self.lift(stop_position),) + self.reapproach(lifted_z, first_contact_z)
 
     def reapproach(self, lifted_z: float, first_contact_z: float):
-        """방향 전환의 ② · ③. 이미 올라가 있는 높이(lifted_z)에서 시작한다.
+        """첫 접촉 높이까지 위치 이동하지 않고, 원점 상공에서 접촉을 새로 찾는다.
 
-        재시작은 ① 올림 뒤에 tare 를 하고 여기로 온다(무접촉에서 F₀ 를 다시 잡는다).
+        DESCEND 직전 정지 확인과 tare, 접촉 이벤트 수신은 Runner가 수행한다.
         """
-        origin_x, origin_y, _ = self._p.origin_position
+        origin_x, origin_y, origin_z = self._p.origin_position
+        approach_z = min(lifted_z, max(origin_z, first_contact_z + self._p.recontact_margin_m))
         return (
             self._move_to('to_origin_xy', (origin_x, origin_y, lifted_z), self._p.move_speed_mps),
-            self._move_to(
-                'recontact', (origin_x, origin_y, first_contact_z + self._p.recontact_margin_m),
-                self._p.recontact_speed_mps),
+            self._move_to('recontact_approach', (origin_x, origin_y, approach_z),
+                          self._p.recontact_speed_mps),
+            MotionRequest(Operation.DESCEND, 'recontact', speed=self._p.recontact_speed_mps,
+                          max_distance=self._p.max_descend_m, timeout_s=self._p.motion_timeout_s),
         )
 
     def home(self) -> MotionRequest:
@@ -520,8 +519,19 @@ class ScanRunner(_Runner):
     def _change_direction(self, first_contact_z: float):
         if self._position is None:
             raise _Fail(Reason.ROBOT_ERROR, '방향 전환: 직전 모션의 정지 좌표를 모른다')
-        for request in self._plan.change_direction(self._position, first_contact_z):
-            self._execute(request)
+        self._recontact(self._plan.change_direction(self._position, first_contact_z))
+
+    def _recontact(self, requests):
+        for request in requests:
+            if request.operation is Operation.DESCEND:
+                self._settle_and_tare()
+                event, _ = self._measure(request, None)
+                # 방향별 재접촉은 동작 확인용이다. 원래 윗면 측정과 progress는 유지한다.
+                self._ports.log_info(
+                    f'윗면 재접촉 확인: z={event.position[2]:.5f} m (판정 좌표)',
+                    event.position)
+            else:
+                self._execute(request)
 
     def _shape(self) -> StepOutcome:
         return self._ports.compute_geometry()
@@ -622,8 +632,7 @@ class ResumeRunner(ScanRunner):
         self._catch_up()
         if remaining:
             # 올린 높이는 Result 가 아니라 보낸 목표에서 읽는다(방향 전환과 같다)
-            for request in self._plan.reapproach(lift.target_position[2], plan.first_contact_z):
-                self._execute(request)
+            self._recontact(self._plan.reapproach(lift.target_position[2], plan.first_contact_z))
             self._find_edges(remaining, plan.first_contact_z)
 
     def _resume_before_top(self, position, orientation):

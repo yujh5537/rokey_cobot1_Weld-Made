@@ -69,7 +69,8 @@ class CommandGuard:
                 "missing required field(s): " + ", ".join(missing),
             )
 
-        if message["schema_version"] != SCHEMA_VERSION:
+        expected_version = "0.2" if topic.startswith("cmd/weld/") else SCHEMA_VERSION
+        if message["schema_version"] != expected_version:
             return GuardResult(False, REASON_INVALID_REQUEST, "INVALID_REQUEST",
                                "unsupported schema_version")
 
@@ -93,7 +94,7 @@ class CommandGuard:
 
         self._recent_request_ids.append(request_id)
 
-        if topic == "cmd/scan/stop":
+        if topic in ("cmd/scan/stop", "cmd/weld/stop"):
             return GuardResult(True, REASON_OK, "OK")
 
         if now_ms - timestamp_ms > self._cmd_expiry_ms:

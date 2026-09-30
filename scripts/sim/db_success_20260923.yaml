@@ -1,0 +1,18 @@
+# 성공 스캔 20260923-171647-5890으로 만든 Virtual 장면.
+# ROS 좌표는 Base 기준 m, 웹 좌표는 mm이다.
+source_scan_id: 20260923-171647-5890
+web:
+  VITE_BASE_TO_FIXTURE_MM: 420.255,-156.675,95.006
+  VITE_TABLE_ORIGIN_MM: 420.255,-156.675,95.006
+ros:
+  contact_detector:
+    sim_box_origin_m: [0.420255, -0.156675, 0.095006]
+    sim_box_size_m: [0.08286017844990068, 0.08060034022120022, 0.08086082128906251]
+  scan_manager:
+    base_to_fixture: [0.420255, -0.156675, 0.095006]
+    descend_speed_mps: 0.003
+    slide_speed_mps: 0.005
+    max_descend_m: 0.05
+    max_slide_m: 0.06
+    motion_timeout_s: 120.0
+    search_origin_pose: [0.420255, -0.156675, 0.2058668212890625, 0.9999832196, 0.0055369752, -0.0014006997, 0.0009697282]

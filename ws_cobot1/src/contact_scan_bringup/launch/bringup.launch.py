@@ -45,12 +45,17 @@ def _is_installed(package):
 def _launch_nodes(context):
     source = LaunchConfiguration('source').perform(context)
     broker_host = LaunchConfiguration('broker_host').perform(context)
+    config_override = LaunchConfiguration('config_file').perform(context)
     if source not in CONFIG_BY_SOURCE:
         raise RuntimeError(
             f"source:={source} 는 지원하지 않는다. {' | '.join(CONFIG_BY_SOURCE)} 중에서 고른다")
 
-    config = os.path.join(
+    if config_override and source != 'sim':
+        raise RuntimeError('config_file 은 source:=sim 에서만 사용할 수 있다')
+    config = config_override or os.path.join(
         get_package_share_directory('contact_scan_bringup'), 'config', CONFIG_BY_SOURCE[source])
+    if not os.path.isfile(config):
+        raise RuntimeError(f'파라미터 파일이 없다: {config}')
 
     actions = [LogInfo(msg=f'[bringup] source={source}, 파라미터 파일={config}')]
     for name in NODES:
@@ -82,5 +87,9 @@ def generate_launch_description():
             'broker_host',
             default_value='127.0.0.1',
             description='MQTT broker host. 환경별 주소는 실행 인자로 전달한다'),
+        DeclareLaunchArgument(
+            'config_file',
+            default_value='',
+            description='sim 전용 파라미터 파일 경로. 비우면 설치된 sim.yaml을 사용한다'),
         OpaqueFunction(function=_launch_nodes),
     ])

@@ -47,7 +47,7 @@ NEWER_SCAN_ID = '20260920-130000-0002'
 # 정상 경로의 n 번째 모션: to_origin, descend, slide_POS_X, (lift, to_origin_xy, recontact, slide) x3, final_lift, home
 SLIDE_POS_X = 3
 LAST_MEASURING = 15
-FINAL_LIFT = 16
+FINAL_LIFT = 19
 
 
 class RecordingPorts(FakePorts):
