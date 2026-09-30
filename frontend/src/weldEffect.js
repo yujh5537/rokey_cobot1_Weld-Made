@@ -21,7 +21,7 @@ export function createWeldEffect(scene) {
   const sparks = new THREE.LineSegments(geometry, material)
   sparks.frustumCulled = false
   group.add(sparks)
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8),
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.03 * 1.13, 12, 8),
     new THREE.MeshBasicMaterial({ color: 0xe5f5ff, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false }))
   group.add(glow)

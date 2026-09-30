@@ -131,6 +131,24 @@ function getFixtureOriginWorldMm() {
 
 const FIXTURE_ORIGIN_WORLD_MM = getFixtureOriginWorldMm()
 
+// 실물 부재는 작업대에서 약 4 mm 떠 있다. 측정된 윗면은 그대로 두고
+// 화면의 아랫면과 그에 연결된 모서리만 지지 높이에 맞춘다.
+const WORKPIECE_CLEARANCE_MM = 4
+
+function workpieceDisplayZ(point, result) {
+  if (!FIXTURE_ORIGIN_WORLD_MM || !Number.isFinite(point?.z_mm) ||
+      !Array.isArray(result?.vertices) || result.vertices.length !== 8) {
+    return point?.z_mm
+  }
+  const isBottom = result.vertices.slice(4).some((bottom) =>
+    bottom && Math.abs(bottom.x_mm - point.x_mm) < 1e-6 &&
+    Math.abs(bottom.y_mm - point.y_mm) < 1e-6 &&
+    Math.abs(bottom.z_mm - point.z_mm) < 1e-6)
+  return isBottom
+    ? TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM - FIXTURE_ORIGIN_WORLD_MM.z
+    : point.z_mm
+}
+
 // 작업대 상판의 화면/world 좌표. ROS base_link는 별도 원점이다.
 const DEFAULT_TABLE_ORIGIN_MM = {
   x: 420.255,
@@ -592,7 +610,8 @@ function App() {
         const { topic, payload } = message
 
         if (topic === 'weld/state') {
-          const next = updateWeldState(weldRef.current, payload)
+          const next = updateWeldState(weldRef.current, payload, scanResultRef.current,
+            FIXTURE_ORIGIN_WORLD_MM, TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM)
           weldRef.current = next
           setWeld({ phase: next.phase, line: next.line,
             line_total: next.line_total, active: next.active, scan_id: next.scan_id })
@@ -1315,7 +1334,17 @@ function App() {
 
     pathCandidateGroupRef.current = pathCandidateGroup
 
-    const weldEffect = createWeldEffect(scene)
+    const modelProbeTip = robotModel.root.getObjectByName('probe_tip')
+    const modelTipWorld = new THREE.Vector3()
+    // 모델 탐침은 고정된 그리퍼 축을 유지한다. 측정 데이터는 하나의
+    // 표시 그룹에서 함께 정렬해 접촉점·궤적·부재 사이의 상대 좌표를 보존한다.
+    const measuredScene = new THREE.Group()
+    measuredScene.name = 'probe_aligned_measurements'
+    scene.add(measuredScene)
+    measuredScene.add(tipMesh, trajectoryLine, contactGroup, workpieceGroup,
+      edgeGroup, pathCandidateGroup, worktable, floorGrid, axesHelper)
+    const measuredTipWorld = new THREE.Vector3()
+    const weldEffect = createWeldEffect(measuredScene)
 
     // 13. 실시간 렌더링
     let animationFrameId
@@ -1325,17 +1354,33 @@ function App() {
         requestAnimationFrame(animate)
 
       const sample = tipSampleRef.current
-      const probeTip = robotModel.root.getObjectByName('probe_tip')
-      if (weldRef.current && probeTip) {
+      const probeTip = modelProbeTip
+      if (probeTip) {
         robotModel.root.updateMatrixWorld(true)
-        const tipThree = probeTip.getWorldPosition(new THREE.Vector3())
+        probeTip.getWorldPosition(modelTipWorld)
+      }
+      // 궤적 마지막 점과 모델 끝의 차이를 모든 측정 표시에 동일하게 적용한다.
+      // 저장된 좌표나 로봇 모델의 봉 길이·각도는 변경하지 않는다.
+      const pathPositions = trajectoryLine.geometry.getAttribute('position')
+      if (pathPositions?.count > 0) {
+        measuredTipWorld.fromBufferAttribute(pathPositions, pathPositions.count - 1)
+        tipMesh.position.copy(measuredTipWorld)
+        if (probeTip && sample && performance.now() - sample.receivedAt < 500) {
+          measuredScene.position.subVectors(modelTipWorld, measuredTipWorld)
+        }
+      }
+      tipMesh.visible = Boolean(pathPositions?.count && sample && performance.now() - sample.receivedAt < 500)
+      if (weldRef.current && probeTip) {
+        const tipThree = sample
+          ? toThreeBasePosition(sample.x, sample.y, sample.z) : modelTipWorld
         const tipWorldM = threePointWorldM(tipThree)
         weldRef.current = appendWeldSample(
           weldRef.current,
           sample && performance.now() - sample.receivedAt < 500 ? sample : null,
           tipWorldM,
           scanResultRef.current,
-          FIXTURE_ORIGIN_WORLD_MM
+          FIXTURE_ORIGIN_WORLD_MM,
+          TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM
         )
       }
       const showScanOverlays = !weldRef.current?.active
@@ -1407,30 +1452,8 @@ function App() {
 
 
   // =========================
-  // TCP 팁 3D 위치 갱신
+  // 빨간 구는 파란 궤적의 마지막 실측 TCP와 동일한 world 좌표를 사용한다.
   // =========================
-
-  useEffect(() => {
-    if (!tipPose) {
-      return
-    }
-
-    if (!tipMeshRef.current) {
-      return
-    }
-
-    // MQTT/Web 좌표 단위는 mm.
-    // 화면 표시를 위해 100 mm = Three.js 1 unit로 축소한다.
-    tipMeshRef.current.position.copy(
-      toThreeBasePosition(
-        tipPose.x,
-        tipPose.y,
-        tipPose.z
-      )
-    )
-
-    tipMeshRef.current.visible = true
-  }, [tipPose])
 
   // =========================
   // TCP 이동 궤적 3D 갱신
@@ -1441,7 +1464,7 @@ function App() {
       return
     }
 
-    if (tipTrajectory.length < 2) {
+    if (tipTrajectory.length < 1) {
       return
     }
 
@@ -1561,7 +1584,7 @@ function App() {
       scanResult.vertices.map((point) => {
         const x = point?.x_mm
         const y = point?.y_mm
-        const z = point?.z_mm
+        const z = workpieceDisplayZ(point, scanResult)
 
         if (
           !Number.isFinite(x) ||
@@ -1712,14 +1735,14 @@ function App() {
       toThreePosition(
         edge.start.x_mm,
         edge.start.y_mm,
-        edge.start.z_mm
+        workpieceDisplayZ(edge.start, scanResult)
       )
 
       const end =
       toThreePosition(
         edge.end.x_mm,
         edge.end.y_mm,
-        edge.end.z_mm
+        workpieceDisplayZ(edge.end, scanResult)
       )
 
       const geometry =
@@ -1927,7 +1950,6 @@ function App() {
             )}
           </div>
           <div className="weld-controls">
-            <strong>형상 생성 후 용접 · 8선</strong>
             {Array.from({ length: 8 }, (_, line) => (
               <button key={line} disabled={!weld || weld.active || weldPending || safetyLatched || fixtureFrameMismatch || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
                 onClick={() => commandWeld('start', line)}>L{line} 용접 시작</button>
