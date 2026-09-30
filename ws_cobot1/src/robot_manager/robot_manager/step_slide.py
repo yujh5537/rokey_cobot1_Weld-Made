@@ -178,19 +178,20 @@ def run(io, direction, p: StepParams):
     slide_start = io.position()
     travelled = 0.0
     while True:
-        if travelled >= p.max_slide_m - 1e-9:
-            lift_and_fail(NO_EDGE, f'{p.max_slide_m * 1000:.0f} mm 긁어도 접촉 소실이 없었다')
-        io.move_rel(_add((0.0, 0.0, 0.0), u, p.coarse_m))
-        travelled += p.coarse_m
-        if not keep_contact():
-            break
-        dz = io.position()[2] - ref_z
-        z_lim = max(p.z_tol_m, travelled * math.tan(math.radians(p.max_slope_deg)))
-        if abs(dz) > z_lim:
-            lift_and_fail(Z_DRIFT, f'{travelled * 1000:.1f} mm 긁는 동안 누르는 높이가 {dz * 1000:+.2f} mm '
-                                   f'바뀜 (한계 ±{z_lim * 1000:.2f} mm). 탐침 밀림 · 물체 이동 · 윗면 기울기 확인',
-                          back=True)
-    io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 후보 → 가는 스텝으로 다시')
+        while True:
+            if travelled >= p.max_slide_m - 1e-9:
+                lift_and_fail(NO_EDGE, f'{p.max_slide_m * 1000:.0f} mm 긁어도 접촉 소실이 없었다')
+            io.move_rel(_add((0.0, 0.0, 0.0), u, p.coarse_m))
+            travelled += p.coarse_m
+            if not keep_contact():
+                break
+            dz = io.position()[2] - ref_z
+            z_lim = max(p.z_tol_m, travelled * math.tan(math.radians(p.max_slope_deg)))
+            if abs(dz) > z_lim:
+                lift_and_fail(Z_DRIFT, f'{travelled * 1000:.1f} mm 긁는 동안 누르는 높이가 {dz * 1000:+.2f} mm '
+                                       f'바뀜 (한계 ±{z_lim * 1000:.2f} mm). 탐침 밀림 · 물체 이동 · 윗면 기울기 확인',
+                              back=True)
+        io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 후보 → 가는 스텝으로 다시')
 
         # 3. 다듬기 (못 누르면 coarse 씩 더 뒤에서 다시, 최대 7 번 = 4.5 mm)
         #   a. 접촉 높이 + lift 로 든다. drop_m 만 들면 모서리 아래로 내려간 팁이 윗면보다 낮아
