@@ -17,7 +17,8 @@
      2 mm 팁이 모서리 각에 걸려 1~2 N 이 남는데(9/22 18:0x 위치 기록), 이 값은 F0 치우침(±0.6 N)만큼
      release_n 을 넘나든다. 그래서 소실 기준은 follow_lo 이고, 최근 접촉 높이는 follow_lo 이상으로 누른
      자리만 쌓는다(약한 걸침이 기준 높이를 끌어내리면 모서리를 타고 흘러내린다)
-  3. 소실을 확인한 위치를 모서리로 확정한다. 복귀 · F0 재측정 · 미세 재탐색은 하지 않는다.
+  3. 다듬기: 접촉 높이 + lift 로 들고, 마지막으로 제대로 누른 자리 뒤에서 긁는 방향으로 nudge 만큼 들어와
+     공중에서 F0 를 다시 잰 뒤 다시 누르고 fine 씩 전진해 소실 지점을 다시 찾는다 → 모서리
   4. 끝나면 lift 만큼 든다 (팁을 모서리에 걸쳐 두지 않는다)
 
 실패하면 가능한 한 면에서 떨어진 뒤 StepFailure 를 낸다. 단위: m · N.
@@ -115,7 +116,7 @@ def run(io, direction, p: StepParams):
         io.move_rel(_add((0.0, 0.0, 0.0), u, p.nudge_m))
     base = io.force()
     io.log(f'스텝 긁기: 기준 힘 F0 = ({base[0]:.2f}, {base[1]:.2f}, {base[2]:.2f}) N')
-    cur = {'base': base}      # 이 방향 탐색의 기준 힘
+    cur = {'base': base}      # 다듬기 직전에 다시 잰다
 
     def lift_and_fail(kind, message, back=False):
         if back:
@@ -146,7 +147,7 @@ def run(io, direction, p: StepParams):
         df = read()
     ref_z = io.position()[2]
     hist = [ref_z]
-    state = {'df': df}
+    state = {'df': df, 'good': io.position()}
 
     def keep_contact():
         """ΔFz 를 [follow_lo, follow_hi] 로 맞춘다. 닿아 있으면 True,
@@ -160,6 +161,7 @@ def run(io, direction, p: StepParams):
             elif f[2] >= p.follow_lo_n:
                 hist.append(io.position()[2])
                 state['df'] = f
+                state['good'] = io.position()
                 return True
             elif can_go_down:
                 io.move_rel((0.0, 0.0, -p.z_step_m))
@@ -173,6 +175,7 @@ def run(io, direction, p: StepParams):
         lift_and_fail(NO_CONTACT, '누른 직후 접촉을 유지하지 못했다')
 
     # 2. 긁기
+    slide_start = io.position()
     travelled = 0.0
     while True:
         if travelled >= p.max_slide_m - 1e-9:
@@ -187,13 +190,60 @@ def run(io, direction, p: StepParams):
             lift_and_fail(Z_DRIFT, f'{travelled * 1000:.1f} mm 긁는 동안 누르는 높이가 {dz * 1000:+.2f} mm '
                                    f'바뀜 (한계 ±{z_lim * 1000:.2f} mm). 탐침 밀림 · 물체 이동 · 윗면 기울기 확인',
                           back=True)
-    # drop_m 아래까지 내려가도 누름 하한 미만이면 현재 위치를 모서리로 확정한다.
-    # 확정한 모서리를 다시 누르거나 미세 스텝으로 재탐색하지 않는다.
-    q = io.position()
-    z_ref = median(hist[-10:])
-    edge = StepEdge(position=(q[0], q[1], z_ref), lost_z=q[2],
-                    z_drop_m=max(0.0, z_ref - q[2]),
-                    force_delta=tuple(state['df']), travelled_m=travelled)
-    io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 확인 → 모서리 확정 (재탐색 생략)')
-    io.move_rel((0.0, 0.0, p.lift_m))
-    return edge
+    io.log(f'스텝 긁기: {travelled * 1000:.1f} mm 에서 접촉 소실 후보 → 가는 스텝으로 다시')
+
+        # 3. 다듬기 (못 누르면 coarse 씩 더 뒤에서 다시, 최대 7 번 = 4.5 mm)
+        #   a. 접촉 높이 + lift 로 든다. drop_m 만 들면 모서리 아래로 내려간 팁이 윗면보다 낮아
+        #      돌아가는 길에 옆면에 걸린다 (9/22 motion 3104: Fx −3 N, 세 번 다 못 누름)
+        #   b. 마지막으로 follow_lo 이상 누른 자리(윗면이 확실한 곳)보다 nudge 만큼 뒤로 갔다가 nudge 만큼 전진한다.
+        #      마지막 수평 이동을 긁는 방향과 같게 둬야 Fz 읽기 조건이 F0 · 긁기와 같다 (9/21: 방향만으로 1.9 N 차이)
+        #   c. 공중에서 F0 를 다시 잰다. 1 분 가까이 긁는 동안 외력 추정값이 흘러 실행마다 ±0.6 N 달랐다
+        #   d. 접촉 높이까지 내려가 누름을 맞춘다. 못 누르면(돌아온 자리도 모서리 밖) coarse 만큼 더 뒤에서 다시
+        lost = io.position()
+        good = state['good']
+        ref = median(hist[-10:])
+        # 마지막 누른 자리는 모서리에서 한 스텝 안이라 걸침이 섞여 있다(9/22 18:40: 4방향 중 3방향이 거기서 못 누르고
+        # 한 스텝 더 뒤에서 성공). 처음부터 한 스텝 더 뒤에서 시작한다
+        for attempt in range(1, 8):
+            back = p.coarse_m * attempt + p.nudge_m
+            io.move_rel((0.0, 0.0, ref + p.lift_m - io.position()[2]))
+            here = io.position()
+            io.move_rel((good[0] - back * u[0] - here[0], good[1] - back * u[1] - here[1], 0.0))
+            if p.nudge_m > 0.0:
+                io.move_rel(_add((0.0, 0.0, 0.0), u, p.nudge_m))
+            old = cur['base']
+            cur['base'] = io.force()
+            io.log(f'스텝 긁기 다듬기 {attempt}차: 소실 지점보다 '
+                   f'{sum((a - b) * c for a, b, c in zip(lost, io.position(), u)) * 1000:.1f} mm 뒤로 돌아옴, '
+                   f'F0z {old[2]:.2f} → {cur["base"][2]:.2f} N')
+            io.move_rel((0.0, 0.0, ref - io.position()[2]))
+            if keep_contact():
+                break
+        else:
+            lift_and_fail(UNSTABLE, '마지막으로 누른 자리로 돌아왔는데 다시 누르지 못했다')
+        local_end = sum((a - b) * c for a, b, c in zip(lost, slide_start, u)) + 4 * p.coarse_m
+        # 후보가 일시적인 힘 소실이었다면 F0 재측정 뒤에는 윗면 접촉이 계속된다.
+        # 후보 주변에서도 접촉이 유지되면 거친 탐색으로 돌아가 다음 후보를 찾는다.
+        while True:
+            fine_travel = sum((a - b) * c for a, b, c in zip(io.position(), slide_start, u))
+            remaining = p.max_slide_m - fine_travel
+            if remaining <= 1e-9:
+                lift_and_fail(NO_EDGE, f'{p.max_slide_m * 1000:.1f} mm 안에 미세 탐색으로 접촉 소실을 확인하지 못했다')
+            if fine_travel >= local_end - 1e-9:
+                io.log('스텝 긁기: 후보 주변에서 접촉 유지 → 거친 탐색 재개')
+                travelled = fine_travel
+                break
+            io.move_rel(_add((0.0, 0.0, 0.0), u, min(p.fine_m, remaining)))
+            if not keep_contact():
+                q = io.position()
+                z_ref = median(hist[-10:])
+                edge = StepEdge(position=(q[0], q[1], z_ref), lost_z=q[2], z_drop_m=max(0.0, z_ref - q[2]),
+                                force_delta=tuple(state['df']), travelled_m=travelled)
+                io.move_rel((0.0, 0.0, p.lift_m))
+                return edge
+            fine_travel = sum((a - b) * c for a, b, c in zip(io.position(), slide_start, u))
+            dz = io.position()[2] - ref_z
+            z_lim = max(p.z_tol_m, max(0.0, fine_travel) * math.tan(math.radians(p.max_slope_deg)))
+            if abs(dz) > z_lim:
+                lift_and_fail(Z_DRIFT, f'미세 탐색 중 누르는 높이가 {dz * 1000:+.2f} mm 바뀜 '
+                              f'(한계 ±{z_lim * 1000:.2f} mm)', back=True)
