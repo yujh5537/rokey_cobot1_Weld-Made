@@ -322,9 +322,11 @@ def _assert_resumed_to_the_end(rig, tmp_path, stopped, result, top_before):
     assert saved['shape']['success'] is True and saved['shape']['width'] == pytest.approx(0.10)
 
     operations = [Operation(g.operation) for g in rig.peers.goals]
-    assert operations.count(Operation.DESCEND) == 1 and operations.count(Operation.HOME) == 1
+    # 첫 하강 + 방향 전환 재접촉. 재시작한 방향의 재접촉까지 5 회
+    assert operations.count(Operation.DESCEND) == 5 and operations.count(Operation.HOME) == 1
     assert [g.motion_id for g in rig.peers.goals] == list(range(1, len(operations) + 1))
-    assert len(rig.peers.tare_requests) == 2
+    # 첫 tare + 재시작 tare + 방향 전환 재접촉 tare
+    assert len(rig.peers.tare_requests) == 6
 
 
 def test_stop_in_pos_x_then_resume_in_the_same_process(sim, tmp_path):

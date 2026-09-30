@@ -475,12 +475,14 @@ def test_full_scan_recovers_the_box_and_publishes_before_homing(rig):
         Phase.DONE]
     # 모션: 기준점 → 하강 → (밀기, 방향 전환 x3) ... → 들어 올림 → 홈. 재하강은 없다
     ops = rig.operations()
-    assert ops.count(Operation.DESCEND) == 1 and ops.count(Operation.SLIDE) == 4
+    # 첫 하강 1 회 + 방향 전환 3 회의 힘 기반 재접촉
+    assert ops.count(Operation.DESCEND) == 4 and ops.count(Operation.SLIDE) == 4
     assert ops.count(Operation.MOVE_TO) == 1 + 3 * 3 + 1 and ops[-1] is Operation.HOME
     assert [g.motion_id for g in rig.peers.goals] == list(range(1, len(ops) + 1))
     assert {g.scan_id for g in rig.peers.goals} == {result.scan_id}
     assert {g.frame_id for g in rig.peers.goals} == {'base_link'}
-    assert len(rig.peers.tare_requests) == 1 and rig.peers.tare_requests[0].duration_s == 0.0
+    # 첫 tare 1 회 + 방향 전환 3 회의 재접촉 전 tare
+    assert len(rig.peers.tare_requests) == 4 and rig.peers.tare_requests[0].duration_s == 0.0
 
     assert rig.wait(lambda: rig.results)
     published = rig.results[-1]
@@ -1076,17 +1078,19 @@ def test_resume_after_stop_in_pos_x_keeps_z_top_and_finishes(rig):
     assert rig.node.state_machine.phase is Phase.DONE
     after = rig.store().load(stopped.scan_id)
     assert after.top == before.top                              # 같은 판정 좌표 · 같은 stamp. 다시 재지 않았다
-    assert rig.operations().count(Operation.DESCEND) == 1
+    assert rig.operations().count(Operation.DESCEND) == 5
 
     resumed = rig.peers.goals[sent:]
     # 올림 → (정지 확인 · tare) → 기준 원점 x · y → 다시 닿기 → +x 를 처음부터
-    assert [Operation(g.operation) for g in resumed[:4]] == [Operation.MOVE_TO] * 3 + [Operation.SLIDE]
+    assert [Operation(g.operation) for g in resumed[:5]] == (
+        [Operation.MOVE_TO] * 3 + [Operation.DESCEND, Operation.SLIDE])
     stop_pose = before.interruptions[0].pose.position_m
     lift = resumed[0].target.position
     assert (lift.x, lift.y, lift.z) == pytest.approx(
         (stop_pose[0], stop_pose[1], stop_pose[2] + VALUES['lift_height_m']))
     assert slides(resumed) == [Direction.POS_X, Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y]
-    assert len(rig.peers.tare_requests) == 2                    # 떼고 나서 F0 를 다시 잡는다
+    # 떼고 나서 F0 를 다시 잡는다. 재시작 1 + 방향 전환 재접촉 4 + 첫 tare 1
+    assert len(rig.peers.tare_requests) == 6
     assert [g.motion_id for g in rig.peers.goals] == list(range(1, len(rig.peers.goals) + 1))
     assert {g.scan_id for g in rig.peers.goals} == {stopped.scan_id}
     # 재시작은 /robot/stop · 안전복귀를 부르지 않는다. OP_HOME 은 마무리 복귀 하나뿐이다
@@ -1111,10 +1115,11 @@ def test_resume_after_stop_in_pos_x_keeps_z_top_and_finishes(rig):
 
 
 @pytest.mark.parametrize('n, descends, first_slide', [
-    (1, 1, Direction.POS_X),               # PREPARING: 기준점으로 가던 중
-    (2, 2, Direction.POS_X),               # TOP_SEARCH: 하강 중(윗면이 아직 없다 → 하강을 다시 한다)
-    (TO_ORIGIN_XY, 1, Direction.NEG_X),    # 방향 전환의 OP_MOVE_TO 중
-    (SLIDE_POS_Y, 1, Direction.POS_Y),     # 세 번째 방향
+    # descends = 첫 하강 + 방향 전환마다 1 회씩 늘어나는 힘 기반 재접촉
+    (1, 4, Direction.POS_X),               # PREPARING: 기준점으로 가던 중
+    (2, 5, Direction.POS_X),               # TOP_SEARCH: 하강 중(윗면이 아직 없다 → 하강을 다시 한다)
+    (TO_ORIGIN_XY, 4, Direction.NEG_X),    # 방향 전환의 OP_MOVE_TO 중
+    (SLIDE_POS_Y, 5, Direction.POS_Y),     # 세 번째 방향
 ])
 def test_resume_from_each_step(rig, n, descends, first_slide):
     stopped = stop_at_goal(rig, n)
@@ -1400,7 +1405,8 @@ def test_a_restarted_node_resumes_from_the_record(make_rig, rig):
     assert result.success and result.scan_id == stopped.scan_id
     after = fresh.store().load(stopped.scan_id)
     assert after.top == before.top
-    assert fresh.operations().count(Operation.DESCEND) == 0       # 이 프로세스는 하강을 보낸 적이 없다
+    # 재시작은 기록의 윗면 z 를 그대로 쓰지만, 방향 전환마다 힘 기반 재접촉 하강을 보낸다
+    assert fresh.operations().count(Operation.DESCEND) == 4
     assert fresh.peers.goals[0].motion_id == before.last_motion_id + 1
     assert slides(fresh.peers.goals) == [
         Direction.POS_X, Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y]
