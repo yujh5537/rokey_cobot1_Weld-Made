@@ -249,8 +249,10 @@ def scan_from_record(record, result_frame_id: str, motion_frame_id: str) -> Scan
 def load_scan(store, scan_id: str, result_frame_id: str, motion_frame_id: str) -> ScanInput:
     """RunWeld.scan_id 로 결과를 읽는다(5.1절). "" = scan_id 사전순 최신의 success=true 결과.
 
-    진행 기록(progress.json)만 있는 작업은 후보가 아니다. 가장 최근 성공 결과가 쓸 수 없는 모양이면
-    더 옛 결과로 조용히 넘어가지 않고 거절한다(관제자가 모르는 스캔을 따라가지 않게).
+    진행 기록(progress.json)만 있는 작업은 후보가 아니다. 읽었더니 success=false 인 결과는 건너뛴다(계약).
+    가장 최근 성공 결과가 쓸 수 없는 모양이거나, 성공 결과를 찾기 전에 **읽지 못하는 결과**가 나오면 더 옛 결과로
+    조용히 넘어가지 않고 거절한다. 읽지 못한 결과가 성공이었는지 알 수 없어 "가장 최근 성공" 을 정할 수 없고,
+    건너뛰면 관제자가 모르는 옛 스캔(큐브를 옮기기 전 좌표)을 따라간다(독립 재검 🟠3). 관제자는 scan_id 를 적는다.
     """
     if scan_id:
         try:
@@ -265,21 +267,18 @@ def load_scan(store, scan_id: str, result_frame_id: str, motion_frame_id: str) -
             raise NoScanResult(f'{scan_id}: 읽지 못했다 — {error}') from None
         return scan_from_record(record, result_frame_id, motion_frame_id)
 
-    unreadable = []
     for candidate in store.scan_ids():
         if not store.has_result(candidate):
             continue
         try:
             record = store.load_result(candidate)
         except ResultStoreError as error:
-            unreadable.append(f'{candidate}: {error}')
-            continue
+            raise NoScanResult(
+                f'{candidate}: 가장 최근 결과 후보를 읽지 못했다 — {error}. 옛 결과로 넘어가지 않는다. '
+                f'scan_id 를 적거나 이 결과를 확인한다({store.result_dir})') from None
         if record.shape.success:
             return scan_from_record(record, result_frame_id, motion_frame_id)
-    detail = f'성공한 스캔 결과가 없다({store.result_dir})'
-    if unreadable:
-        detail += '. 읽지 못한 결과: ' + '; '.join(unreadable)
-    raise NoScanResult(detail)
+    raise NoScanResult(f'성공한 스캔 결과가 없다({store.result_dir})')
 
 
 # ---- 8 선 ----
