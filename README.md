@@ -1043,4 +1043,4 @@ mode          = virtual
 
 ## 라이선스
 
-ROS 2 패키지(`ws_cobot1/src/*`)의 `package.xml`은 Apache-2.0을 선언한다. 레포 루트에 LICENSE 파일은 아직 없다. 두산 · OnRobot 제공 드라이버(`ws_dsr`, 레포 밖)와 로봇 URDF는 각 제공자의 라이선스를 따른다.
+[Apache License 2.0](LICENSE) — Copyright 2026 weld-made (박병후 · 김학민 · 남현지 · 정의석). ROS 2 패키지의 `package.xml`도 같은 라이선스를 선언한다. 두산 · OnRobot 제공 드라이버(`ws_dsr`, 레포 밖)와 로봇 URDF는 각 제공자의 라이선스를 따른다.
