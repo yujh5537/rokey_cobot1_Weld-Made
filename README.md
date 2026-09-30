@@ -1,4 +1,140 @@
-# Real M0609 + Web 3D 단일 Web PC 통합 실행 Runbook
+# weld-made — 협동로봇 추정 외력을 활용한 부재 형상 측정과 용접 경로 생성
+
+카메라도 추가 센서도 없이, 로봇이 직육면체 부재를 직접 만져 윗면 1점 · 모서리 4점을 얻고, 외곽 엣지 · 경로 후보 8선을 계산해 웹 3D로 보여 준 뒤 그 선을 45° 자세로 따라간다.
+
+![관제 화면 — 9/29 실기 스캔 중](./docs/presentation/assets/euiseok/hmi-scan-20260929.png)
+
+> 두산로보틱스 지능형 로보틱스 엔지니어 · 협동-1 프로젝트 "ROS2를 활용한 로봇 자동화 공정 시스템 구현" · TEAM C-3조 **weld-made** (박병후 · 김학민 · 남현지 · 정의석, 멘토 이일주) · 2026-09-14 ~ 09-30
+
+## 주요 기능
+
+- **티칭 없는 접촉 탐색**: 부재를 놓고 웹의 시작 버튼만 누른다. 수직 하강으로 윗면 높이 1점, 네 방향 스텝 밀기로 모서리 4점을 얻는다. 큐브 위치 · 크기를 입력하지 않는다.
+- **센서 추가 없는 접촉 판정**: 힘 센서 대신 M0609가 관절 토크로 추정한 외력만 쓴다. 탐침은 빈 인공눈물 용기다. 움직이는 중의 추정값은 믿지 않고, 한 스텝 가고 멈춰서 읽는다.
+- **형상 · 경로 후보 생성**: 5점을 팁 기하(반지름 2 mm · 내려앉은 깊이)만큼 되돌려 직육면체 꼭짓점 8 · 모서리 12를 만들고, 작업대에 닿은 아래 4개를 뺀 **경로 후보 8선**을 낸다. ROS 없는 순수 Python 모듈이다.
+- **웹 3D 관제**: M0609 자세 · 탐침 궤적 · 접촉점 · 결과 상자를 한 장면에 그린다. 명령 5종(시작 · 중지 · 안전복귀 · 재시작 · 안전 해제)은 서로 독립이다. 측정 못 한 값은 0이 아니라 빈칸이다.
+- **용접 경로 따라가기 (phase 2)**: 스캔 결과의 8선을 두 면 사이 45°, 이음선에서 3 mm 띄운 채 위빙(진폭 2 mm)으로 따라간다. 실제 아크는 없다. 웹에서 선을 골라 한 선씩 실행하고 선마다 홈을 거친다.
+- **두 겹 안전 감시**: 과대 외력 30 N · 급강하 · 샘플 끊김 500 ms를 contact_detector(1차)와 safety_monitor(2차)가 따로 본다. 정지는 웹을 거치지 않고 메인 PC 안에서 끝나며, 래치는 사람이 `/safety/reset`으로만 푼다.
+- **계약 우선**: 토픽 · 서비스 · 액션 · MQTT · 단위 · 좌표를 `docs/contracts/`에 먼저 동결했다. 인터페이스 패키지와 문서가 어긋나면 CI가 실패한다. 수치는 코드가 아니라 `real.yaml` · `sim.yaml`에 둔다.
+
+## 시스템 구성
+
+### 아키텍처
+
+![시스템 아키텍처](./docs/deliverables/01-system-architecture.png)
+
+두 PC와 로봇. PC 사이는 MQTT(1883) 하나이고, 접촉 판정 · 2차 감시 · 정지는 메인 PC 안에서 끝난다.
+
+| 위치 | 구성 | 역할 |
+|---|---|---|
+| 메인 PC (ROS 2 Jazzy) | `scan_manager` · `robot_manager` · `contact_detector` · `safety_monitor` · `mqtt_bridge` · `weld_manager` | 스캔 순서 · 모션 · 판정 · 감시 · 번역 · 용접 모션. 두산 드라이버를 부르는 노드는 `robot_manager` 하나 |
+| 웹 PC (Docker) | Mosquitto · FastAPI · PostgreSQL · Spring Boot + React/Vite | 브로커 · REST/WebSocket 중계와 명령 발급 · 측정 저장 · 이력 조회 · 3D 관제 |
+| 로봇 셀 | 두산 M0609 + OnRobot RG2 + 탐침, 컨트롤러 DRCF | 제공 드라이버(`dsr_controller2` · `onrobot_driver`)는 수정하지 않는다 |
+
+노드별 연결은 [06 ROS2 노드 구조도](docs/deliverables/06-node-graph.md), 타입 전문은 [05 인터페이스 정의서](docs/deliverables/05-interfaces.md)와 [`docs/contracts/`](docs/contracts/)에 있다.
+
+### 동작 흐름
+
+스캔(1차 MVP). 상태기계가 순서를 쥐고, 실패하면 그 자리에서 멈춘다. 자동 홈 복귀는 없다.
+
+```mermaid
+flowchart LR
+    S[웹 START<br/>/scan/run] --> G{시작 관문<br/>BUSY · 파라미터 · 래치 · 연결}
+    G -- 하나라도 걸리면 --> R[거절 · 로봇 무이동]
+    G --> P[PREPARING<br/>기준점 이동 · tare]
+    P --> T[TOP_SEARCH<br/>수직 하강 → 윗면 1점]
+    T --> E[EDGE_SEARCH ×4<br/>스텝 밀기 → 모서리 1점씩]
+    E -- 2번째부터 --> C[방향 전환<br/>50 mm 올림 → 원점 위 → 재접촉]
+    C --> E
+    E --> Y[GEOMETRY<br/>5점 → 편향 보정 → 직육면체 · 경로 후보 8]
+    Y --> H[HOMING<br/>정상 완료만]
+    H --> D[DONE<br/>result.json → /scan/result → 웹 3D]
+    P & T & E -- 미접촉 · 과대 외력 · 샘플 끊김 --> X[ERROR<br/>원인 · 단계 · 위치 기록 후 정지]
+```
+
+용접 모션(phase 2). 웹에서 고른 선을 한 선씩 실행하고, 선마다 홈을 거친다.
+
+```mermaid
+flowchart LR
+    W[웹 선택 · /weld/run<br/>선 번호 지정] --> G2{시작 관문<br/>스캔 중 · 결과 없음 → 거절}
+    G2 --> P2[PREPARING<br/>result.json → 45° · 3 mm 경유점]
+    P2 --> A[APPROACH<br/>안전 높이 → 접근점]
+    A --> L[WELDING<br/>ExecutePath line · 점마다 도착 확인]
+    L --> B[RETREAT<br/>후퇴 → 안전 높이]
+    B --> H2[HOMING<br/>다음 선은 홈에서]
+    H2 --> D2[DONE<br/>/weld/result · 선별 DONE · FAILED]
+```
+
+관제자 명령 4종(중지 · 안전복귀 · 재시작 · 안전 해제)은 서로를 부르지 않는다. 자세한 순서도는 [03 동작 순서도](docs/deliverables/03-flowchart.md), 예외 처리는 [08 예외 · 오류 리스트](docs/deliverables/08-exceptions.md).
+
+## 개발 환경
+
+| 항목 | 값 |
+|---|---|
+| 메인 PC | Ubuntu 24.04 LTS · ROS 2 Jazzy · Python 3.12 · `rmw_fastrtps_cpp` · `ROS_DOMAIN_ID=30` |
+| 로봇 드라이버 | `doosan-robot2` · `onrobot_driver` (github.com/ahnisinc/cobot_rg2 `4d5657f`, 레포 밖 `ws_dsr`) · 두산 컨트롤러 DRCF `GF02120100` · DRFL `GL013303` |
+| 시뮬레이션 | 두산 에뮬레이터 `doosanrobot/dsr_emulator:3.0.1` (Virtual) + 자체 가상 접촉 입력원 (`source:=sim`) |
+| 웹 PC | Docker Compose — Mosquitto 2 · PostgreSQL 16 · FastAPI (Python) · Spring Boot (Java 21, Gradle) |
+| 프론트 | React 19 · Three.js 0.186 · Vite |
+| 언어 · 도구 | Python 3.12 (ROS 노드 · FastAPI), JavaScript (React), Java (Spring Boot), colcon · pytest · Docker |
+
+세 단계로 검증한다: 로봇 없이 `sim` → 두산 에뮬레이터 Virtual → 실기. 입력원은 launch 인자 `source:=sim|robot_force` 하나로 바꾼다.
+
+## 사용 장비
+
+| 장비 | 모델명 · 사양 | 수량 | 용도 |
+|---|---|---|---|
+| 협동로봇 | 두산 M0609 (6축 · 가반 6 kg · 도달 900 mm · 반복정밀도 ±0.03 mm) | 1 | 접촉 탐색 · 용접 모션. 관절 토크 기반 외력 추정값을 접촉 판정에 쓴다 |
+| 로봇 컨트롤러 | 두산 DRCF, 192.168.1.100:12345 (유선) | 1 | 드라이버 연결 |
+| 그리퍼 | OnRobot RG2 | 1 | 탐침 고정 파지. 폭 변화는 판정에 쓰지 않는다 |
+| 탐침 | 빈 인공눈물 용기, 팁 반지름 약 2 mm, 몸통 지름 13 mm | 1 | 접촉 탐침 · 용접 경로 추종 (토치 대용). 별도 센서 아님 |
+| 탐침 홀더 | 3D 프린트, 닫힌 핑거 끝 → 팁 12 mm | 1 | RG2 핑거에 유격 없이 맞물림 |
+| 부재 | 약 80 mm 투명 큐브 (9/23 스캔 결과 83.00 × 80.64 × 80.76 mm) | 1 | 스캔 · 용접 대상 |
+| 작업대 | 대나무 판, 표면 z = Base 95.006 mm (실측), 코끼리테이프 위 본드 고정 | 1 | 부재 고정 |
+| 메인 PC | Ubuntu 24.04 노트북, 로봇과 유선 | 1 | ROS 2 노드 |
+| 웹 PC | Ubuntu 24.04, 메인 PC와 MQTT | 1 | 브로커 · 백엔드 · 관제 화면 (한 PC로 합쳐 실행할 수도 있다, 아래 Runbook) |
+
+툴 등록값(TCP `[0, 0, 252.12]` mm · 무게 1.3 kg)과 좌표 기준(홈 · 작업대 원점 · 탐색 기준점)은 [04 하드웨어 구성](docs/deliverables/04-hardware.md)과 [`docs/contracts/units-frames.md`](docs/contracts/units-frames.md)에 있다. 배치 사진은 산출물 04에 둔다.
+
+## 설치 및 실행
+
+### 빠른 시작
+
+```bash
+# 1. 레포 (두산 · RG2 드라이버 ws_dsr 는 레포 밖: docs/env/setup-record-20260916.md)
+git clone https://github.com/yujh5537/rokey_cobot1_Weld-Made.git
+cd rokey_cobot1_Weld-Made
+
+# 2. 메인 PC — ROS 2 빌드 (ws_dsr 를 먼저 source: alias sod)
+python3 -m pip install -r ws_cobot1/requirements.txt
+cd ws_cobot1 && colcon build --symlink-install && source install/setup.bash
+colcon test && colcon test-result --verbose
+python3 -m pytest src/scan_manager/test -q        # ROS 없이 도는 순수 계산 모듈
+
+# 3. 웹 PC — 브로커 · 백엔드 · DB
+docker compose -f docker/docker-compose.yml up -d --build
+cd frontend && npm ci && npm run dev -- --host 0.0.0.0    # http://<웹 PC>:5173
+
+# 4. 로봇 없이 (sim 입력원)
+ros2 launch contact_scan_bringup bringup.launch.py source:=sim broker_host:=<웹 PC>
+
+# 5. 실기 — 드라이버 → 툴 · TCP 등록 → 노드 (사람이 비상정지 곁에서 직접 실행)
+sodreal                                                    # 두산 드라이버, mode:=real
+python3 docs/env/apply_tool_tcp.py --tcp-x 0 --tcp-y 0     # 재기동마다 다시 등록 (빠지면 외력 12 N 치우침)
+ros2 launch contact_scan_bringup bringup.launch.py source:=robot_force broker_host:=<웹 PC>
+```
+
+주요 의존성: 메인 PC `pytest` · `PyYAML` · `paho-mqtt<2` · `numpy` (`ws_cobot1/requirements.txt`), 웹 `fastapi` · `uvicorn` · `paho-mqtt` · `psycopg` (`backend/app/requirements.txt`), 프론트 `react` · `three` (`frontend/package.json`). ROS 2 패키지는 `rosdep install --from-paths ws_cobot1/src -y --ignore-src`.
+
+실기 파라미터는 `ws_cobot1/src/contact_scan_bringup/config/real.yaml`이 기준이다. 시연 절차와 각 화면에서 할 말은 [시연 대본](docs/presentation/demo-script.md), 용접 실기 절차는 [`docs/runbooks/`](docs/runbooks/)에 있다.
+
+### 전체 실행 절차 (Runbook)
+
+아래는 실기 PC 한 대에서 드라이버 · ROS 노드 · 브로커 · 백엔드 · 프론트를 모두 띄우는 절차다(기존 README 전문).
+
+<details>
+<summary><b>Real M0609 + Web 3D 단일 PC 통합 실행 Runbook 펼치기</b></summary>
+
+### Real M0609 + Web 3D 단일 Web PC 통합 실행 Runbook
 
 기준 브랜치: `main`
 
@@ -19,7 +155,7 @@ React + Three.js
 
 ---
 
-## 1. 실행 환경
+#### 1. 실행 환경
 
 ```text
 PC              = 현재 로그인한 실기 PC
@@ -50,7 +186,7 @@ ROS force source= robot_force
 ---
 
 
-# 2. 처음 Clone하는 사용자 — 경로 준비
+### 2. 처음 Clone하는 사용자 — 경로 준비
 
 이 문서는 사용자명이나 `/home/<사용자>/...` 같은 절대경로에 의존하지 않는다.
 
@@ -104,7 +240,7 @@ source "$HOME/ws_cobot_pjt/ws_dsr/install/setup.bash"
 
 ---
 
-# 3. 전체 실행 순서
+### 3. 전체 실행 순서
 
 ```text
 T0 main 동기화 + Clean Build
@@ -121,11 +257,11 @@ T0 main 동기화 + Clean Build
 
 ---
 
-# 4. T0 — main 동기화 + Clean Build
+### 4. T0 — main 동기화 + Clean Build
 
 **터미널 T0**
 
-## T0-1 — 최신 main
+#### T0-1 — 최신 main
 
 > 처음 clone한 사용자는 위의 Clone 단계를 먼저 완료한다.
 
@@ -137,7 +273,7 @@ git switch main
 git pull --ff-only origin main
 ```
 
-## T0-2 — ROS Clean Build
+#### T0-2 — ROS Clean Build
 
 ```bash
 cd "$HOME/rokey_cobot1_Weld-Made/ws_cobot1"
@@ -154,7 +290,7 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
-## T0-3 — 실제 M0609 네트워크 확인
+#### T0-3 — 실제 M0609 네트워크 확인
 
 ```bash
 ping -c 3 192.168.1.100
@@ -170,7 +306,7 @@ ping -c 3 192.168.1.100
 
 ---
 
-# 5. T1 — Docker 4개 서비스
+### 5. T1 — Docker 4개 서비스
 
 **새 터미널 T1**
 
@@ -214,7 +350,7 @@ Docker는 background로 실행되므로 T1은 계속 점유되지 않는다.
 
 ---
 
-# 6. T2 — MQTT Monitor
+### 6. T2 — MQTT Monitor
 
 **새 터미널 T2. 계속 켜 둔다.**
 
@@ -240,7 +376,7 @@ T2는 종료할 때까지 그대로 둔다.
 
 ---
 
-# 7. T3 — M0609 Real Driver
+### 7. T3 — M0609 Real Driver
 
 **새 터미널 T3. 계속 켜 둔다.**
 
@@ -288,7 +424,7 @@ T3는 계속 켜 둔다.
 
 ---
 
-# 8. T4 — DSR 확인 + Tool/TCP 재등록
+### 8. T4 — DSR 확인 + Tool/TCP 재등록
 
 **새 터미널 T4**
 
@@ -328,7 +464,7 @@ OK: tool=rg2_probe, tcp=rg2_probe_tip [0.0, 0.0, 252.12]
 
 ---
 
-# 9. T5 — contact_scan bringup
+### 9. T5 — contact_scan bringup
 
 **새 터미널 T5. 계속 켜 둔다.**
 
@@ -377,7 +513,7 @@ T5는 계속 켜 둔다.
 
 ---
 
-# 10. T6 — START 전 ROS / MQTT 확인
+### 10. T6 — START 전 ROS / MQTT 확인
 
 **새 터미널 T6**
 
@@ -394,7 +530,7 @@ export ROS_DOMAIN_ID=30
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 ```
 
-## T6-1 — 자체 ROS 노드 확인
+#### T6-1 — 자체 ROS 노드 확인
 
 ```bash
 ros2 node list | grep -E 'robot_manager|contact_detector|safety_monitor|scan_manager|mqtt_bridge'
@@ -410,7 +546,7 @@ ros2 node list | grep -E 'robot_manager|contact_detector|safety_monitor|scan_man
 /mqtt_bridge
 ```
 
-## T6-2 — 실기 적용 파라미터 확인
+#### T6-2 — 실기 적용 파라미터 확인
 
 ```bash
 ros2 param get /contact_detector tare_max_std_n
@@ -424,7 +560,7 @@ tare_max_std_n = 1.0
 step_release_n = 2.5
 ```
 
-## T6-3 — 실제 로봇 상태 확인
+#### T6-3 — 실제 로봇 상태 확인
 
 ```bash
 ros2 topic echo /dsr01/joint_states --once
@@ -458,7 +594,7 @@ START 전 핵심 기준:
 
 ---
 
-# 11. T2 — MQTT 수신 확인
+### 11. T2 — MQTT 수신 확인
 
 T5가 정상이라면 T2에 최소 아래가 들어와야 한다.
 
@@ -500,7 +636,7 @@ robot/joints {"schema_version":"0.1", ... "names":["joint_1","joint_2","joint_3"
 
 ---
 
-# 12. T7 — Frontend 5173
+### 12. T7 — Frontend 5173
 
 **T6와 MQTT 확인까지 끝난 후 새 터미널 T7에서 실행한다.**
 
@@ -561,7 +697,7 @@ VITE_TABLE_ORIGIN_MM    = 420.255,-156.675,95.006
 
 ---
 
-# 13. START 전 최종 체크
+### 13. START 전 최종 체크
 
 ```text
 [ ] T1 Docker 4개 서비스 정상
@@ -606,7 +742,7 @@ VITE_TABLE_ORIGIN_MM    = 420.255,-156.675,95.006
 
 ---
 
-# 14. 실제 실행 데이터 흐름
+### 14. 실제 실행 데이터 흐름
 
 명령:
 
@@ -654,7 +790,7 @@ START 직후
 
 ---
 
-# 15. 웹 명령
+### 15. 웹 명령
 
 ```text
 START     새 스캔 시작
@@ -673,7 +809,7 @@ STOP은 HOME 또는 RESUME을 자동 실행하지 않는다.
 
 ---
 
-# 16. 종료 순서
+### 16. 종료 순서
 
 먼저 실제 로봇 모션이 완전히 멈춘 것을 확인한다.
 
@@ -704,11 +840,11 @@ docker compose down -v
 
 ---
 
-# 17. 빠른 문제 확인
+### 17. 빠른 문제 확인
 
-## 17-1. 웹에서 M0609 관절이 안 움직일 때
+#### 17-1. 웹에서 M0609 관절이 안 움직일 때
 
-### 1단계 — ROS
+##### 1단계 — ROS
 
 ```bash
 ros2 topic echo /dsr01/joint_states --once
@@ -722,7 +858,7 @@ ros2 topic echo /dsr01/joint_states --once
 → MQTT 확인
 ```
 
-### 2단계 — MQTT
+##### 2단계 — MQTT
 
 ```bash
 mosquitto_sub -h 127.0.0.1 -p 1883 \
@@ -740,7 +876,7 @@ mosquitto_sub -h 127.0.0.1 -p 1883 \
 
 ---
 
-## 17-2. MQTT Broker 연결 실패
+#### 17-2. MQTT Broker 연결 실패
 
 ```bash
 nc -vz 127.0.0.1 1883
@@ -757,7 +893,7 @@ docker compose ps
 
 ---
 
-## 17-3. `/dsr01/joint_states`가 없을 때
+#### 17-3. `/dsr01/joint_states`가 없을 때
 
 ```text
 T3 Real Driver 실행 중?
@@ -777,7 +913,7 @@ ws_dsr setup.bash source?
 
 ---
 
-## 17-4. Tool/TCP 실패
+#### 17-4. Tool/TCP 실패
 
 ```bash
 cd "$HOME/rokey_cobot1_Weld-Made"
@@ -795,7 +931,7 @@ OK: tool=rg2_probe, tcp=rg2_probe_tip [0.0, 0.0, 252.12]
 
 ---
 
-## 17-5. 웹 형상 위치가 맞지 않을 때
+#### 17-5. 웹 형상 위치가 맞지 않을 때
 
 T7 실행값:
 
@@ -808,9 +944,9 @@ VITE_TABLE_ORIGIN_MM=420.255,-156.675,95.006
 
 ---
 
-# 18. 단일 PC 실기 / Virtual 구분
+### 18. 단일 PC 실기 / Virtual 구분
 
-## 현재 단일 Web PC 실기
+#### 현재 단일 Web PC 실기
 
 ```text
 ROS_DOMAIN_ID = 30
@@ -823,7 +959,7 @@ source        = robot_force
 TCP           = 252.12 mm
 ```
 
-## Virtual 단독 실행
+#### Virtual 단독 실행
 
 ```text
 ROS_DOMAIN_ID = 166
@@ -835,3 +971,76 @@ mode          = virtual
 ```
 
 **실기 실행 중 Virtual 환경값을 섞지 않는다.**
+
+</details>
+
+## 프로젝트 구조
+
+```text
+.
+├── ws_cobot1/src/               ROS 2 Jazzy 자체 패키지 (메인 PC)
+│   ├── contact_scan_interfaces/   msg 15 · srv 6 · action 6 + QoS 모듈 (계약의 타입 전문)
+│   ├── scan_manager/              스캔 순서 상태기계 · geometry_estimator(형상 계산) · result_store(원본 보관)
+│   ├── robot_manager/             두산 드라이버를 부르는 유일한 노드 — 모션 · 스텝 모서리 탐색 · 샘플 발행 · ExecutePath
+│   ├── contact_detector/          tare · 접촉(CONTACT) · 모서리(EDGE) · 과대 외력 1차 판정
+│   ├── safety_monitor/            과대 외력 · 급강하 · 최신성 2차 감시 → 정지 · 래치
+│   ├── mqtt_bridge/               ROS ↔ MQTT 번역, 명령 ID 검사, m→mm · NaN→null
+│   ├── weld_manager/              phase 2 — 스캔 결과로 8선 경로 생성 · 접근 → 경로 → 후퇴 → 홈
+│   └── contact_scan_bringup/      launch + config/{sim,real}.yaml (모든 수치는 여기)
+├── backend/app/                 FastAPI — REST 명령 발급 · WebSocket 중계 · 측정 DB 쓰기
+├── backend/spring/              Spring Boot — 작업 · 공작물 · 이력 조회 API
+├── backend/mock_publisher/      로봇 없이 웹을 만들 때 쓴 MQTT 목업 발행기
+├── frontend/                    React 19 + Three.js 3D 관제 (Vite)
+├── docker/                      Mosquitto · PostgreSQL · FastAPI · Spring Boot compose
+├── scripts/github/              이슈 · 마일스톤 · CODEOWNERS 생성
+├── scripts/sim/                 Virtual 에뮬레이터 정렬 · 용접 미리보기 · P1 · P2 실행 절차
+└── docs/
+    ├── BRD.md                     비즈니스 요구사항 v3.2.0 (기준 문서)
+    ├── architecture.md            노드 책임 · 배치 · 데이터 흐름
+    ├── contracts/                 ROS 인터페이스 · MQTT 스키마 · 단위 · 좌표 (코드보다 우선, CHANGELOG)
+    ├── phase2/                    용접 모션 계약 · 결정(D1~D38) · 측정 체크리스트
+    ├── deliverables/              최종 산출물 01~09 (아키텍처 · 네트워크 · 순서도 · 하드웨어 · 인터페이스 · 노드 · 예외 · 안전)
+    ├── decisions/                 ADR — 접촉 판정 방식 · 웹 스택 · 모노레포 · 안전 감사 결정
+    ├── env/                       환경 구축 기록 · 버전 · 두산 API 호출 확인 · TCP 등록 스크립트
+    ├── test-reports/              TR 시험 결과 · 실기 세션 기록 · 저녁 통합 기록
+    ├── runbooks/                  실기 · Virtual 실행 절차
+    └── presentation/              발표 자료(weld-made.pptx) · 시연 대본 · 그림 원본
+```
+
+레포 밖: `ws_dsr/`(두산 · RG2 제공 드라이버) · `DartPlatform/`. 제공 드라이버는 수정하지 않는다. 담당은 [`ws_cobot1/src/README.md`](ws_cobot1/src/README.md).
+
+## 결과
+
+9/23 · 9/29 실기(두산 M0609, 팀원 입회)에서 잰 값이다. 목표는 BRD 9장 KPI.
+
+| 항목 | 결과 | 목표 | 판정 |
+|---|---|---|---|
+| 치수 오차 (폭 · 길이 · 높이, 캘리퍼 대비) | +1.50 / −0.36 / +0.26 mm | ±3 mm | 달성 |
+| 접촉 높이 반복 (같은 점 10회) | σ 0.040 mm | — | — |
+| 실기 종단 연속 성공 (웹 → 로봇 → 웹) | 3 / 3회 (9/23) | — | 달성 |
+| 실기 모서리 검출 | 14 / 14회 | — | 달성 |
+| 용접 모션 실기 완주 | 8선 중 7선 (L5는 팔 길이 밖, 9/29) | 8선 | 부분 |
+| 탐색 시간 | 438 s (스텝 모드) | 120 s | 미달 |
+| 접촉 검출 하중 (임계 3 N, 9/23 TR-01) | 평균 4.49 N, 10회 중 2회 초과 | 5 N 이하 | 미달 |
+| 관제 화면 반영 지연 (9/22 Virtual, TR-05) | 평균 2.64 ms · 최대 312 ms | 200 ms 이내 | 미달 (최대값) |
+| 작업 중지 반응 (9/22 Virtual, TR-05) | 706 · 600 ms | 1 s 이내 | 달성 (sim) |
+
+미달 원인과 개선안(재접근 2단 · 거친 스텝 1 mm로 약 230 s, 계산값 · 미실시)은 발표 자료 04-⑥과 [`docs/test-reports/`](docs/test-reports/)에 있다.
+
+## 배운 점 / 회고
+
+실기에서 문서대로 움직이지 않은 로봇을 측정으로 원인까지 좁혀 고치면서 남긴 것이다.
+
+1. **움직이는 중의 값은 믿지 않고, 멈춰서 읽는다.** 이동 중 추정 외력이 방향마다 1.5~8.6 N 치우쳐 힘 제어 밀기가 실기 4회 중 0회였다. 한 스텝 가고 멈춰 읽는 스텝 모드로 바꾸자 모서리 14/14가 됐다. 대신 탐색 시간 438 s를 감수했다.
+2. **드라이버의 "성공"은 접수일 뿐, 상태는 직접 잰다.** 두산 서비스의 `success`는 도착의 증거가 아니었다. 도착은 실측 위치로만, 정지 완료는 `/robot/status`의 `connected && !moving`으로만 판정한다.
+3. **모르는 값이 둘이면, 아는 값 하나로 푼다.** 탐침 교체와 작업대 교체가 겹쳐 TCP 높이와 작업대 높이를 동시에 잃었다. 80 mm 큐브 한 값으로 검산하며 하나씩 닫았다(재점검 −0.016 mm).
+4. **값만 보지 말고 그 값의 나이를 본다.** safety_monitor가 죽은 뒤 마지막 "래치 없음"을 1시간 넘게 믿었다. 상태 메시지가 5 s 넘게 끊기면 시작을 거절하게 했다.
+5. **닿지 않으면 손목 · 팔 길이 · 경로로 원인을 나눠 잰다.** 45°로 닿지 않던 L1은 툴을 돌려도 안 됐고, 손목 중심이 팔 길이(826 > 779 mm)를 넘는 것이 원인이었다. 그 선만 15°로 낮춰 완주했다. 선을 이어 돌리면 J5가 한계를 넘어, 선마다 홈을 거치는 운영으로 바꿨다.
+6. **계약이 코드보다 먼저.** 이름 · 필드 · 단위를 먼저 동결하니 넷이 따로 만들어도 한 흐름으로 이어졌다. 대신 실측이 바꾼 값을 계약에 되돌리는 일이 끝까지 남았다.
+7. **미달 · 미실시도 수치와 함께 남긴다.** 탐색 시간 · 검출 하중 · 띄움 치우침(원인 미규명, +y 3.5 mm 보정)처럼 못 한 것을 그대로 적었다.
+
+팀 자체 평가(평균 8.5 / 10)와 개인별 사례는 발표 자료 05장에 있다.
+
+## 라이선스
+
+[Apache License 2.0](LICENSE) — Copyright 2026 weld-made (박병후 · 김학민 · 남현지 · 정의석). ROS 2 패키지의 `package.xml`도 같은 라이선스를 선언한다. 두산 · OnRobot 제공 드라이버(`ws_dsr`, 레포 밖)와 로봇 URDF는 각 제공자의 라이선스를 따른다.
