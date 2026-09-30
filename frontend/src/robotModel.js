@@ -26,6 +26,7 @@ const RG2_PROBE_GRIP_JOINTS = {
 
 // 등록된 실기 TCP: 플랜지에서 탐침 끝까지 252.12 mm.
 const PROBE_TCP_LENGTH_M = 0.25212
+const PROBE_VISUAL_TRIM_M = 0.0013 // 화면 탐침 끝을 1.3 mm 줄인다
 
 // pinned RG2 visual mesh를 실기 탐침 파지각(0.721396 rad)으로 놓았을 때
 // 두 inner_finger mesh의 최외곽 끝면 z. 탐침은 이 면 밖에서 시작해야 한다.
@@ -313,10 +314,10 @@ function buildRg2Model(
     RG2_PROBE_GRIPPER_END_Z_M
 
   const probeLength =
-    PROBE_TCP_LENGTH_M - gripperEndZ
+    PROBE_TCP_LENGTH_M - PROBE_VISUAL_TRIM_M - gripperEndZ
 
   const probeTipZ =
-    PROBE_TCP_LENGTH_M
+    PROBE_TCP_LENGTH_M - PROBE_VISUAL_TRIM_M
 
   const probeRadius = 0.0015
 

@@ -11,6 +11,18 @@ export function createWeldEffect(scene) {
   beads.frustumCulled = false
   beads.count = 0
   group.add(beads)
+  // L4~L7 use continuous segments so their ends cannot be lost to point limits.
+  const verticalGeometry = new THREE.CylinderGeometry(0.007, 0.007, 1, 12)
+  const verticalBeads = Array.from({ length: 4 }, () => {
+    const mesh = new THREE.Mesh(verticalGeometry, beadMaterial)
+    mesh.visible = false
+    group.add(mesh)
+    return mesh
+  })
+  const segmentStart = new THREE.Vector3()
+  const segmentEnd = new THREE.Vector3()
+  const segmentDirection = new THREE.Vector3()
+  const segmentAxis = new THREE.Vector3(0, 1, 0)
   const positions = new Float32Array(360 * 6)
   const colors = new Float32Array(360 * 6)
   const geometry = new THREE.BufferGeometry()
@@ -39,6 +51,22 @@ export function createWeldEffect(scene) {
       count = 0
       particles.length = 0
     }
+    verticalBeads.forEach((mesh, index) => {
+      const segment = state?.verticalBeads?.[index + 4]
+      mesh.visible = Boolean(segment)
+      if (!segment) return
+      const a = segment.start
+      const b = segment.end
+      segmentStart.set(a[0] * 10, a[2] * 10, -a[1] * 10)
+      segmentEnd.set(b[0] * 10, b[2] * 10, -b[1] * 10)
+      segmentDirection.subVectors(segmentEnd, segmentStart)
+      const length = segmentDirection.length()
+      mesh.visible = length > 1e-9
+      if (!mesh.visible) return
+      mesh.position.copy(segmentStart).add(segmentEnd).multiplyScalar(0.5)
+      mesh.scale.y = length
+      mesh.quaternion.setFromUnitVectors(segmentAxis, segmentDirection.normalize())
+    })
     const points = state?.beads ?? []
     for (; count < Math.min(points.length, 5000); count++) {
       const p = points[count]

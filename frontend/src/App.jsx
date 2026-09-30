@@ -259,6 +259,7 @@ function formatScanLogMessage(payload) {
 function App() {
   const weldRef = useRef(null)
   const tipSampleRef = useRef(null)
+  const appliedJointsAtRef = useRef(null)
   const renderedScanRef = useRef(null)
   const scanResultRef = useRef(null)
   const [weld, setWeld] = useState(null)
@@ -1340,6 +1341,16 @@ function App() {
 
     const modelProbeTip = robotModel.root.getObjectByName('probe_tip')
     const modelTipWorld = new THREE.Vector3()
+    const probeShaft = robotModel.root.getObjectByName('probe_shaft')
+    const shaftRestPosition = probeShaft?.position.clone()
+    const tipRestPosition = modelProbeTip?.position.clone()
+    const shaftCenterWorld = new THREE.Vector3()
+    const shiftedCenterLocal = new THREE.Vector3()
+    const probeShiftLocal = new THREE.Vector3()
+    let probeOffsetFixed = false
+    const shaftStartWorld = new THREE.Vector3()
+    const shaftEndWorld = new THREE.Vector3()
+    const shaftHalfLength = (probeShaft?.geometry.parameters.height ?? 0) / 2
     // 작업대·부재·측정 표시는 고정 world 좌표를 유지한다.
     // 관절 모델과 실측 TCP의 수신 시차를 장면 전체 이동으로 보정하지 않는다.
     const measuredScene = new THREE.Group()
@@ -1359,15 +1370,41 @@ function App() {
 
       const sample = tipSampleRef.current
       const probeTip = modelProbeTip
-      if (probeTip) {
-        robotModel.root.updateMatrixWorld(true)
-        probeTip.getWorldPosition(modelTipWorld)
-      }
-      // 빨간 구는 파란 궤적 끝의 실측 TCP를 표시한다. 장면 원점은 고정한다.
+      // 빨간 구·궤적·부재는 그대로 두고 봉만 ROS/world Y 방향으로 옮긴다.
+      // ROS Y는 Three.js -Z다. 용접 전 한 번 구한 그리퍼 로컬 오프셋을 유지한다.
       const pathPositions = trajectoryLine.geometry.getAttribute('position')
       if (pathPositions?.count > 0) {
         measuredTipWorld.fromBufferAttribute(pathPositions, pathPositions.count - 1)
         tipMesh.position.copy(measuredTipWorld)
+      }
+      let probeSegment = null
+      if (probeTip && probeShaft) {
+        probeShaft.position.copy(shaftRestPosition)
+        probeTip.position.copy(tipRestPosition)
+        robotModel.root.updateMatrixWorld(true)
+        if (!probeOffsetFixed && !weldRef.current?.active && pathPositions?.count > 0 &&
+            sample && performance.now() - sample.receivedAt < 500 &&
+            appliedJointsAtRef.current !== null && performance.now() - appliedJointsAtRef.current < 500) {
+          probeShaft.getWorldPosition(shaftCenterWorld)
+          shaftCenterWorld.z = measuredTipWorld.z
+          shiftedCenterLocal.copy(shaftCenterWorld)
+          probeShaft.parent.worldToLocal(shiftedCenterLocal)
+          probeShiftLocal.subVectors(shiftedCenterLocal, shaftRestPosition)
+          probeOffsetFixed = true
+        }
+        probeShaft.position.add(probeShiftLocal)
+        probeTip.position.add(probeShiftLocal)
+        robotModel.root.updateMatrixWorld(true)
+        probeTip.getWorldPosition(modelTipWorld)
+        // 기울어진 봉의 양 끝을 world 좌표로 보내 모서리와 가장 가까운 지점을 구한다.
+        shaftStartWorld.set(0, -shaftHalfLength, 0)
+        shaftEndWorld.set(0, shaftHalfLength, 0)
+        probeShaft.localToWorld(shaftStartWorld)
+        probeShaft.localToWorld(shaftEndWorld)
+        probeSegment = {
+          start: threePointWorldM(shaftStartWorld),
+          end: threePointWorldM(shaftEndWorld),
+        }
       }
       tipMesh.visible = !weldRef.current?.active && Boolean(
         pathPositions?.count && sample && performance.now() - sample.receivedAt < 500
@@ -1382,7 +1419,8 @@ function App() {
           tipWorldM,
           scanResultRef.current,
           FIXTURE_ORIGIN_WORLD_MM,
-          TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM
+          TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM,
+          probeSegment
         )
       }
       const showScanOverlays = !weldRef.current?.active
@@ -1449,6 +1487,9 @@ function App() {
           positionRad
       }
     )
+    if (Object.keys(jointPositions).length === 6) {
+      appliedJointsAtRef.current = performance.now()
+    }
   }, [jointPositions])
 
 

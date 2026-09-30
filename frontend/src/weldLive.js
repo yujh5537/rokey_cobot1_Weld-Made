@@ -1,5 +1,8 @@
-// During WELD_PATH, project the visible probe tip onto the saved seam.
-// Physical contact is not required; sparks stay on the finite edge.
+import { closestEdgeParameter } from './weldContact.js'
+
+// During WELD_PATH, top seams use TCP projection; vertical seams use the
+// nearest point between the displayed shaft segment and the finite edge.
+// This estimates visual contact from geometry; it does not confirm physical contact.
 
 const ACTIVE_PHASES = new Set(['PREPARING', 'APPROACH', 'WELDING', 'RETREAT', 'HOMING', 'STOPPING'])
 const BEAD_STEP_M = 0.00025
@@ -22,6 +25,11 @@ export function updateWeldState(previous, message, scanResult, fixtureOriginMm, 
     startedMotionId: changedRun ? null : previous?.startedMotionId ?? null,
     beads: sameScan ? previous?.beads ?? [] : [],
     painted: sameScan ? previous?.painted ?? {} : {},
+    verticalBeads: sameScan ? previous?.verticalBeads ?? {} : {},
+  }
+  if (phase === 'WELDING' && next.line >= 4 && next.line <= 7 &&
+      Number.isFinite(message.line_progress) && message.line_progress >= 1) {
+    paintBead(next, next.line, 1, scanResult, fixtureOriginMm, bottomWorldMm)
   }
   // lines_done is the backend confirmation; retreat alone may follow a failure.
   if (!changedRun && sameScan && message.lines_done > (previous?.lines_done ?? 0)) {
@@ -59,6 +67,15 @@ function paintBead(state, line, progress, scanResult, fixtureOriginMm, bottomWor
   if (![...a, ...b].every(Number.isFinite)) return
   const end = Math.min(1, progress)
   const start = state.painted?.[line] ?? 0
+  if (line >= 4) {
+    const filled = Math.max(start, end)
+    state.verticalBeads = { ...state.verticalBeads, [line]: {
+      start: a,
+      end: a.map((value, i) => value + filled * (b[i] - value)),
+    } }
+    state.painted = { ...state.painted, [line]: filled }
+    return
+  }
   if (end <= start) return
   const length = Math.hypot(...b.map((v, i) => v - a[i]))
   // Use a fixed grid along each edge. Small progress updates must not add
@@ -77,7 +94,7 @@ function paintBead(state, line, progress, scanResult, fixtureOriginMm, bottomWor
   state.painted = { ...state.painted, [line]: end }
 }
 
-export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm) {
+export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm, probeSegment) {
   if (!state?.arc || state.phase !== 'WELDING' ||
       !Number.isFinite(state.receivedAt) || performance.now() - state.receivedAt > WELD_STATE_MAX_AGE_MS ||
       !sample || !tipWorldM || !scanResult || !fixtureOriginMm ||
@@ -103,14 +120,17 @@ export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOrigin
   const lengthSquared = direction.reduce((sum, value) => sum + value * value, 0)
   if (lengthSquared <= 0) return null
   const projection = tip.reduce((sum, value, i) => sum + (value - a[i]) * direction[i], 0)
-  const t = Math.max(0, Math.min(1, projection / lengthSquared))
+  const t = line >= 4
+    ? closestEdgeParameter(a, b, probeSegment)
+    : Math.max(0, Math.min(1, projection / lengthSquared))
+  if (t === null) return null
   const nearest = a.map((value, i) => value + t * direction[i])
   return [...nearest, line, t]
 }
 
-export function appendWeldSample(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm) {
+export function appendWeldSample(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm, probeSegment) {
   if (!state) return state
-  const contact = contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm)
+  const contact = contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm, probeSegment)
   const next = { ...state, contact,
     startedMotionId: contact ? state.motion_id : state.startedMotionId }
   if (state.arc && contact) {
