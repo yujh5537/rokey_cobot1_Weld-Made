@@ -45,7 +45,7 @@ P0 weld-web-main-p4 동기화
 ### P0-1 — 브랜치 동기화
 
 ```bash
-cd /home/runo/collaboration/rokey_cobot1_Weld-Made
+cd ~/collaboration/rokey_cobot1_Weld-Made
 
 git fetch origin
 git switch weld-web-main-p4
@@ -55,7 +55,7 @@ git pull --ff-only origin weld-web-main-p4
 ### P0-2 — 공통 경로
 
 ```bash
-export SIM_REPO=/home/runo/collaboration/rokey_cobot1_Weld-Made
+export SIM_REPO=~/collaboration/rokey_cobot1_Weld-Made
 export SIM_RUNTIME=/tmp/weld-web-aligned-runtime
 export SIM_INSTALL=/tmp/weld-web-main-install
 ```
@@ -64,7 +64,7 @@ export SIM_INSTALL=/tmp/weld-web-main-install
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 
 cd "$SIM_REPO/ws_cobot1"
 
@@ -121,7 +121,7 @@ mosquitto version 2.0.18 running
 기존 **P0 터미널**에서 실행한다.
 
 ```bash
-export SIM_REPO=/home/runo/collaboration/rokey_cobot1_Weld-Made
+export SIM_REPO=~/collaboration/rokey_cobot1_Weld-Made
 ```
 
 ```bash
@@ -159,7 +159,7 @@ Uvicorn running on http://127.0.0.1:8001
 같은 **P0 터미널**에서 실행한다.
 
 ```bash
-export SIM_REPO=/home/runo/collaboration/rokey_cobot1_Weld-Made
+export SIM_REPO=~/collaboration/rokey_cobot1_Weld-Made
 export SIM_RUNTIME=/tmp/weld-web-aligned-runtime
 
 cd "$SIM_REPO"
@@ -205,7 +205,7 @@ mqtt_bridge:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 source /tmp/weld-web-main-install/setup.bash
 
 export ROS_DOMAIN_ID=166
@@ -242,11 +242,11 @@ P2는 계속 켜 둔다.
 **P2가 정상 기동된 뒤** P0에서 실행한다.
 
 ```bash
-export SIM_REPO=/home/runo/collaboration/rokey_cobot1_Weld-Made
+export SIM_REPO=~/collaboration/rokey_cobot1_Weld-Made
 export SIM_RUNTIME=/tmp/weld-web-aligned-runtime
 
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 source /tmp/weld-web-main-install/setup.bash
 
 export ROS_DOMAIN_ID=166
@@ -275,7 +275,7 @@ OK: rg2_probe_tip, TCP−flange=246.98 mm
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 source /tmp/weld-web-main-install/setup.bash
 
 export ROS_DOMAIN_ID=166
@@ -308,7 +308,7 @@ P3는 계속 켜 둔다.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 source /tmp/weld-web-main-install/setup.bash
 
 export ROS_DOMAIN_ID=166
@@ -403,10 +403,10 @@ reason_code: 0
 **새 터미널 P5. 계속 켜 둔다.**
 
 ```bash
-export SIM_REPO=/home/runo/collaboration/rokey_cobot1_Weld-Made
+export SIM_REPO=~/collaboration/rokey_cobot1_Weld-Made
 
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 source /tmp/weld-web-main-install/setup.bash
 
 export ROS_DOMAIN_ID=166
@@ -428,10 +428,10 @@ python3 "$SIM_REPO/scripts/sim/markers.py" \
 P2에서 기본 RViz가 자동으로 열렸다면 그 창은 닫고 프로젝트 RViz만 실행한다.
 
 ```bash
-export SIM_REPO=/home/runo/collaboration/rokey_cobot1_Weld-Made
+export SIM_REPO=~/collaboration/rokey_cobot1_Weld-Made
 
 source /opt/ros/jazzy/setup.bash
-source /home/runo/ws_cobot_pjt/ws_dsr/install/setup.bash
+source ~/ws_cobot_pjt/ws_dsr/install/setup.bash
 source /tmp/weld-web-main-install/setup.bash
 
 export ROS_DOMAIN_ID=166
@@ -452,7 +452,7 @@ rviz2 -d "$SIM_REPO/scripts/sim/db_sim.rviz"
 새 터미널 P7:
 
 ```bash
-cd /home/runo/collaboration/rokey_cobot1_Weld-Made/frontend
+cd ~/collaboration/rokey_cobot1_Weld-Made/frontend
 
 VITE_API_TARGET=http://127.0.0.1:8001 \
 VITE_SIM_FIXTURE_URL=/fixtures/standard-20260921-aligned.json \
