@@ -3,6 +3,7 @@
 
 const ACTIVE_PHASES = new Set(['PREPARING', 'APPROACH', 'WELDING', 'RETREAT', 'HOMING', 'STOPPING'])
 const BEAD_STEP_M = 0.00025
+const WELD_STATE_MAX_AGE_MS = 2500
 
 export function updateWeldState(previous, message, scanResult, fixtureOriginMm, bottomWorldMm) {
   const runId = message.weld_id || ''
@@ -13,6 +14,7 @@ export function updateWeldState(previous, message, scanResult, fixtureOriginMm, 
     ...previous,
     ...message,
     run_id: runId,
+    receivedAt: performance.now(),
     line: message.line_index ?? previous?.line ?? 0,
     active: ACTIVE_PHASES.has(phase),
     arc: phase === 'WELDING',
@@ -24,6 +26,19 @@ export function updateWeldState(previous, message, scanResult, fixtureOriginMm, 
   // lines_done is the backend confirmation; retreat alone may follow a failure.
   if (!changedRun && sameScan && message.lines_done > (previous?.lines_done ?? 0)) {
     paintBead(next, previous.line, 1, scanResult, fixtureOriginMm, bottomWorldMm)
+  }
+  return next
+}
+
+// Final results identify completed lines even when an intermediate state was missed.
+export function applyWeldResult(state, result, scanResult, fixtureOriginMm, bottomWorldMm) {
+  if (!state || result.weld_id !== state.run_id || result.scan_id !== state.scan_id ||
+      result.scan_id !== scanResult?.scan_id || !Array.isArray(result.lines)) return state
+  const next = { ...state, arc: false, contact: null }
+  for (const line of result.lines) {
+    if (line.status === 'DONE') {
+      paintBead(next, line.index, 1, scanResult, fixtureOriginMm, bottomWorldMm)
+    }
   }
   return next
 }
@@ -48,7 +63,8 @@ function paintBead(state, line, progress, scanResult, fixtureOriginMm, bottomWor
   const length = Math.hypot(...b.map((v, i) => v - a[i]))
   // Use a fixed grid along each edge. Small progress updates must not add
   // one bead per frame and exhaust the shared 5,000-instance capacity.
-  const divisions = Math.max(1, Math.ceil(length / BEAD_STEP_M))
+  // At most 601 points per line: all eight complete edges fit in 5,000 instances.
+  const divisions = Math.min(600, Math.max(1, Math.ceil(length / BEAD_STEP_M)))
   const firstIndex = state.painted?.[line] === undefined
     ? 0 : Math.floor(start * divisions) + 1
   const lastIndex = end === 1 ? divisions : Math.floor(end * divisions)
@@ -62,11 +78,13 @@ function paintBead(state, line, progress, scanResult, fixtureOriginMm, bottomWor
 }
 
 export function contactPoint(state, sample, tipWorldM, scanResult, fixtureOriginMm, bottomWorldMm) {
-  if (!state?.arc || !sample || !tipWorldM || !scanResult || !fixtureOriginMm ||
+  if (!state?.arc || state.phase !== 'WELDING' ||
+      !Number.isFinite(state.receivedAt) || performance.now() - state.receivedAt > WELD_STATE_MAX_AGE_MS ||
+      !sample || !tipWorldM || !scanResult || !fixtureOriginMm ||
       state.scan_id !== scanResult.scan_id || sample.frameId !== 'base_link' ||
       sample.operation !== 'WELD_PATH' || !Number.isInteger(state.motion_id) ||
       state.motion_id <= 0 || sample.motionId !== state.motion_id ||
-      !Number.isFinite(state.line_progress) || state.line_progress <= 0 || state.line_progress > 1) return null
+      !Number.isFinite(state.line_progress) || state.line_progress <= 0 || state.line_progress >= 1) return null
 
   const line = state.line
   if (!Number.isInteger(line) || line < 0 || line > 7) return null

@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { buildM0609Model, disposeObject3D } from './robotModel.js'
 import { parseRobotJoints } from './robotJoints.js'
 import { createWeldEffect } from './weldEffect.js'
-import { appendWeldSample, updateWeldState } from './weldLive.js'
+import { appendWeldSample, applyWeldResult, updateWeldState } from './weldLive.js'
 import { TABLE_HEIGHT_MM, basePointWorldMm, fixturePointWorldMm, fixtureRelativeToBaseMm, robotBaseWorldMm, threePointWorldM } from './sceneFrames.js'
 import './App.css'
 
@@ -615,6 +615,10 @@ function App() {
           weldRef.current = next
           setWeld({ phase: next.phase, line: next.line,
             line_total: next.line_total, active: next.active, scan_id: next.scan_id })
+        }
+        if (topic === 'weld/result') {
+          weldRef.current = applyWeldResult(weldRef.current, payload, scanResultRef.current,
+            FIXTURE_ORIGIN_WORLD_MM, TABLE_ORIGIN_MM.z + WORKPIECE_CLEARANCE_MM)
         }
         if (topic === 'weld/command_result' && payload.success === false) {
           setWeldError(`${payload.reason ?? 'ERROR'}: ${payload.detail ?? ''}`)
@@ -1336,10 +1340,10 @@ function App() {
 
     const modelProbeTip = robotModel.root.getObjectByName('probe_tip')
     const modelTipWorld = new THREE.Vector3()
-    // 모델 탐침은 고정된 그리퍼 축을 유지한다. 측정 데이터는 하나의
-    // 표시 그룹에서 함께 정렬해 접촉점·궤적·부재 사이의 상대 좌표를 보존한다.
+    // 작업대·부재·측정 표시는 고정 world 좌표를 유지한다.
+    // 관절 모델과 실측 TCP의 수신 시차를 장면 전체 이동으로 보정하지 않는다.
     const measuredScene = new THREE.Group()
-    measuredScene.name = 'probe_aligned_measurements'
+    measuredScene.name = 'world_measurements'
     scene.add(measuredScene)
     measuredScene.add(tipMesh, trajectoryLine, contactGroup, workpieceGroup,
       edgeGroup, pathCandidateGroup, worktable, floorGrid, axesHelper)
@@ -1359,17 +1363,15 @@ function App() {
         robotModel.root.updateMatrixWorld(true)
         probeTip.getWorldPosition(modelTipWorld)
       }
-      // 궤적 마지막 점과 모델 끝의 차이를 모든 측정 표시에 동일하게 적용한다.
-      // 저장된 좌표나 로봇 모델의 봉 길이·각도는 변경하지 않는다.
+      // 빨간 구는 파란 궤적 끝의 실측 TCP를 표시한다. 장면 원점은 고정한다.
       const pathPositions = trajectoryLine.geometry.getAttribute('position')
       if (pathPositions?.count > 0) {
         measuredTipWorld.fromBufferAttribute(pathPositions, pathPositions.count - 1)
         tipMesh.position.copy(measuredTipWorld)
-        if (probeTip && sample && performance.now() - sample.receivedAt < 500) {
-          measuredScene.position.subVectors(modelTipWorld, measuredTipWorld)
-        }
       }
-      tipMesh.visible = Boolean(pathPositions?.count && sample && performance.now() - sample.receivedAt < 500)
+      tipMesh.visible = !weldRef.current?.active && Boolean(
+        pathPositions?.count && sample && performance.now() - sample.receivedAt < 500
+      )
       if (weldRef.current && probeTip) {
         const tipThree = sample
           ? toThreeBasePosition(sample.x, sample.y, sample.z) : modelTipWorld
@@ -1954,7 +1956,7 @@ function App() {
               <button key={line} disabled={!weld || weld.active || weldPending || safetyLatched || fixtureFrameMismatch || scanResult?.success !== true || !['DONE', 'IDLE', 'STOPPED'].includes(phase)}
                 onClick={() => commandWeld('start', line)}>L{line} 용접 시작</button>
             ))}
-            <button className="danger" disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button>
+            {/* <button className="danger" disabled={!weld?.active || weldPending} onClick={() => commandWeld('stop')}>용접 중지</button> */}
             <span role="status">{!weld ? '용접 상태 연결 대기' : `${({IDLE:'대기', PREPARING:'준비', APPROACH:'접근', WELDING:'용접', RETREAT:'후퇴', HOMING:'홈 복귀', DONE:'완료', STOPPING:'중지 중', STOPPED:'중단', ERROR:'오류'})[weld.phase] ?? weld.phase} · L${weld.line}`}</span>
             {fixtureFrameMismatch && <p role="alert">부재·로봇 좌표계 불일치: 저장된 ROS fixture 기준점은 재설정해야 합니다.</p>}
             {(weldError || weld?.detail) && <p role="alert">{weldError || weld.detail}</p>}
