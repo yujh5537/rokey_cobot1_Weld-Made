@@ -1025,7 +1025,7 @@ def test_each_scan_gets_a_fresh_result_stamp(rig):
 
 # ---- 재시작 (T26) ----
 # 정상 경로의 goal 순번: 1 기준점, 2 하강, 3 +x 밀기, 4~6 방향 전환, 7 -x 밀기, 8~10, 11 +y 밀기, 12~14, 15 -y 밀기, 16 들어 올림, 17 홈
-SLIDE_POS_X, TO_ORIGIN_XY, SLIDE_POS_Y, FINAL_LIFT = 3, 5, 11, 16
+SLIDE_POS_X, TO_ORIGIN_XY, SLIDE_POS_Y, FINAL_LIFT = 3, 5, 13, 19
 # 안전복귀(/scan/home)가 보내는 모션. 계약 7.5: 수직 올림 → 도착 확인 → HOME
 HOME_MOTIONS = [Operation.MOVE_TO, Operation.HOME]
 

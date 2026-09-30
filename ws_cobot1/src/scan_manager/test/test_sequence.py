@@ -32,7 +32,7 @@ from sequence_helpers import make_params
 from sequence_helpers import READY
 
 ORDER = (Direction.POS_X, Direction.NEG_X, Direction.POS_Y, Direction.NEG_Y)
-CHANGE = ['lift', 'to_origin_xy', 'recontact']
+CHANGE = ['lift', 'to_origin_xy', 'recontact_approach', 'recontact']
 RETURN_LABELS = {'final_lift', 'home'}
 
 
@@ -77,29 +77,34 @@ def test_prepare_moves_then_confirms_still_then_tares(ports, params):
     assert ports.trace[3] == ('notify', Signal.PREPARE_DONE)
 
 
-def test_direction_change_is_three_moves_without_descend(ports, params):
+def test_direction_change_recontacts_by_force(ports, params):
     run(ports, params)
 
     descends = [r for _, r in ports.requests if r.operation is Operation.DESCEND]
-    assert len(descends) == 1  # 첫 하강뿐이다. 방향 전환에서 재하강하지 않는다(7.3절)
+    assert len(descends) == 4  # 첫 하강 + 방향 전환 3 회의 힘 기반 재접촉
     requests = [r for _, r in ports.requests]
     first_slide = requests[2]
-    lift, to_origin_xy, recontact, next_slide = requests[3:7]
-    assert [r.operation for r in (lift, to_origin_xy, recontact)] == [Operation.MOVE_TO] * 3
+    lift, to_origin_xy, approach, recontact, next_slide = requests[3:8]
+    assert [r.operation for r in (lift, to_origin_xy, approach)] == [Operation.MOVE_TO] * 3
+    assert recontact.operation is Operation.DESCEND
     assert next_slide.operation is Operation.SLIDE and next_slide.direction is Direction.NEG_X
 
-    origin_x, origin_y, _ = params.origin_position
+    origin_x, origin_y, origin_z = params.origin_position
     first_contact_z = ports.first_contact[2]
     assert lift.target_position[:2] != (origin_x, origin_y)  # 멈춘 자리에서 수직으로만 올린다
     assert to_origin_xy.target_position == (origin_x, origin_y, lift.target_position[2])
-    assert recontact.target_position == pytest.approx(
-        (origin_x, origin_y, first_contact_z + params.recontact_margin_m))
+    # 접근은 첫 접촉 + margin 을 목표로 하되, 올린 높이와 기준 원점 z 사이로 자른다
+    assert approach.target_position == pytest.approx((origin_x, origin_y, min(
+        lift.target_position[2], max(origin_z, first_contact_z + params.recontact_margin_m))))
+    # 접촉은 위치가 아니라 힘으로 찾는다
+    assert recontact.target_position is None
+    assert recontact.max_distance == params.max_descend_m
     # 내림만 저속이다
     assert (lift.speed, to_origin_xy.speed) == (params.move_speed_mps,) * 2
-    assert recontact.speed == params.recontact_speed_mps
+    assert approach.speed == recontact.speed == params.recontact_speed_mps
     assert first_slide.speed == next_slide.speed == params.slide_speed_mps
     # 탐색 중 자세는 기준점의 자세 그대로다
-    assert {r.target_orientation for r in (lift, to_origin_xy, recontact)} == {
+    assert {r.target_orientation for r in (lift, to_origin_xy, approach)} == {
         params.origin_orientation}
 
 
@@ -107,9 +112,11 @@ def test_first_contact_z_is_the_detection_not_the_stop_pose(ports, params):
     run(ports, params)
     descend_result_z = BOX_SIZE[2] - params.descend_speed_mps * params.detect_latency_s
     assert ports.first_contact[2] == pytest.approx(descend_result_z)
-    recontact = next(r for _, r in ports.requests if r.label == 'recontact')
-    assert recontact.target_position[2] == pytest.approx(
-        descend_result_z + params.recontact_margin_m)
+    approach = next(r for _, r in ports.requests if r.label == 'recontact_approach')
+    lifted = next(r for _, r in ports.requests if r.label == 'lift').target_position[2]
+    _, _, origin_z = params.origin_position
+    assert approach.target_position[2] == pytest.approx(
+        min(lifted, max(origin_z, descend_result_z + params.recontact_margin_m)))
 
 
 def test_measurement_is_recorded_before_the_state_machine_is_told(ports, params):
@@ -627,7 +634,7 @@ for _direction in ORDER[1:]:
     NORMAL_LABELS += CHANGE + [f'slide_{_direction.name}']
 MEASURING = len(NORMAL_LABELS)            # 여기까지가 측정. 그 뒤는 마무리 복귀
 NORMAL_LABELS += ['final_lift', 'home']
-RESUME_APPROACH = ['resume_lift', 'to_origin_xy', 'recontact']
+RESUME_APPROACH = ['resume_lift', 'to_origin_xy', 'recontact_approach', 'recontact']
 
 
 def resume(ports, params):
@@ -722,7 +729,7 @@ def test_resume_from_a_direction_change_redoes_it_from_where_the_robot_is(ports,
     stopped_at(ports, params, NORMAL_LABELS.index(label) + 1)
     assert set(ports.edges) == {Direction.POS_X}
     resume(ports, params)
-    assert ports.labels_since_resume()[:4] == RESUME_APPROACH + ['slide_NEG_X']
+    assert ports.labels_since_resume()[:5] == RESUME_APPROACH + ['slide_NEG_X']
 
 
 @pytest.mark.parametrize('signal, n, phase, progress', [
@@ -824,7 +831,7 @@ def test_stop_then_resume_twice_in_different_directions(ports, params):
     assert (ports.resume_point.phase, ports.resume_point.progress) == (Phase.EDGE_SEARCH, 2)
 
     assert resume(ports, params).kind is OutcomeKind.DONE
-    assert ports.labels_since_resume()[:4] == RESUME_APPROACH + ['slide_POS_Y']
+    assert ports.labels_since_resume()[:5] == RESUME_APPROACH + ['slide_POS_Y']
     assert_box_recovered(ports)
 
 
