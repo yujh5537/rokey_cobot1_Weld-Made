@@ -88,11 +88,15 @@ Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를
 
 #### 3. 전체 공정 플로우차트
 
+**정상 공정:** 접촉 탐색 → 형상·경로 계산 → 스캔 마무리 → 선택한 용접 경로 실행
+
 [![Archify 전체 공정 플로우차트 — 스캔·용접 경로 실행과 예외 분기](./docs/architecture/04_flow.png)](https://rokey-cobot1-weld-made.netlify.app/04_flow.html)
 
 접촉 스캔과 용접 경로 실행의 상태 전이를 보여줍니다. 요청 거절·실패·정지·재개·수동 HOME 분기를 포함하며, 실제 용접 전원 제어와는 구분합니다.
 
 [인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/04_flow.html) · [원본 SVG](./docs/architecture/04_flow.svg)
+
+추가 문서: [03 동작 순서도](./docs/deliverables/03-flowchart.md) · [08 예외 · 오류 리스트](./docs/deliverables/08-exceptions.md)
 
 #### 4. ERD
 
@@ -101,40 +105,6 @@ Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를
 실제 초기화 SQL의 7개 테이블·71개 컬럼과 관계를 보여줍니다. PK·FK·UNIQUE·NULL·기본값·ON DELETE 정책과 카디널리티를 표시했습니다.
 
 [인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/03_erd.html) · [원본 SVG](./docs/architecture/03_erd.svg)
-
-### 동작 흐름
-
-스캔(1차 MVP). 상태기계가 순서를 쥐고, 실패하면 그 자리에서 멈춘다. 자동 홈 복귀는 없다.
-
-```mermaid
-flowchart LR
-    S[웹 START<br/>/scan/run] --> G{시작 관문<br/>BUSY · 파라미터 · 래치 · 연결}
-    G -- 하나라도 걸리면 --> R[거절 · 로봇 무이동]
-    G --> P[PREPARING<br/>기준점 이동 · tare]
-    P --> T[TOP_SEARCH<br/>수직 하강 → 윗면 1점]
-    T --> E[EDGE_SEARCH ×4<br/>스텝 밀기 → 모서리 1점씩]
-    E -- 2번째부터 --> C[방향 전환<br/>50 mm 올림 → 원점 위 → 재접촉]
-    C --> E
-    E --> Y[GEOMETRY<br/>5점 → 편향 보정 → 직육면체 · 경로 후보 8]
-    Y --> H[HOMING<br/>정상 완료만]
-    H --> D[DONE<br/>result.json → /scan/result → 웹 3D]
-    P & T & E -- 미접촉 · 과대 외력 · 샘플 끊김 --> X[ERROR<br/>원인 · 단계 · 위치 기록 후 정지]
-```
-
-용접 모션(phase 2). 웹에서 고른 선을 한 선씩 실행하고, 선마다 홈을 거친다.
-
-```mermaid
-flowchart LR
-    W[웹 선택 · /weld/run<br/>선 번호 지정] --> G2{시작 관문<br/>스캔 중 · 결과 없음 → 거절}
-    G2 --> P2[PREPARING<br/>result.json → 45° · 3 mm 경유점]
-    P2 --> A[APPROACH<br/>안전 높이 → 접근점]
-    A --> L[WELDING<br/>ExecutePath line · 점마다 도착 확인]
-    L --> B[RETREAT<br/>후퇴 → 안전 높이]
-    B --> H2[HOMING<br/>다음 선은 홈에서]
-    H2 --> D2[DONE<br/>/weld/result · 선별 DONE · FAILED]
-```
-
-관제자 명령 4종(중지 · 안전복귀 · 재시작 · 안전 해제)은 서로를 부르지 않는다. 자세한 순서도는 [03 동작 순서도](docs/deliverables/03-flowchart.md), 예외 처리는 [08 예외 · 오류 리스트](docs/deliverables/08-exceptions.md).
 
 ## 개발 환경
 
