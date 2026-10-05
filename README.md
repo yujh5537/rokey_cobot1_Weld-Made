@@ -6,6 +6,35 @@
 
 > 두산로보틱스 지능형 로보틱스 엔지니어 · 협동-1 프로젝트 "ROS2를 활용한 로봇 자동화 공정 시스템 구현" · TEAM C-3조 **weld-made** (박병후 · 김학민 · 남현지 · 정의석, 멘토 이일주) · 2026-09-14 ~ 09-30
 
+## 시연 영상
+
+실제 M0609 동작과 웹 3D 관제 화면을 함께 볼 수 있다. GIF를 누르면 저장소의 대응 영상 파일로 이동한다.
+
+### 실물·웹 통합 시연
+
+[![통합 시연 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/통합.gif)](./docs/demonstration-video/통합-5x.mp4)
+
+**[통합 5배속 영상 보기](./docs/demonstration-video/통합-5x.mp4)** · 약 40초 · [전체 길이 원본](./docs/demonstration-video/통합.webm) · 3분 39초  
+실제 M0609와 뒤편 웹 관제 화면을 한 프레임에서 보며 접촉 탐색과 용접 경로 추종을 확인할 수 있다.
+
+### 실제 로봇 공정 · 웹 3D 관제
+
+| 실제 로봇 공정 | 웹 3D 관제 |
+|---|---|
+| **[실제 로봇 공정 5배속 영상 보기](./docs/demonstration-video/전체시연통합-5x.mp4)** | [![웹 3D 관제 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/관제통합.gif)](./docs/demonstration-video/관제통합-5x.webm) |
+| [전체 길이 원본](./docs/demonstration-video/전체시연통합.webm) · 3분 18초 | **[관제 5배속 영상 보기](./docs/demonstration-video/관제통합-5x.webm)** · [전체 길이 원본](./docs/demonstration-video/관제통합.webm) |
+| 로봇·시편·관제 모니터를 함께 촬영한 접촉 탐색과 경로 추종 과정이다. 상단 통합 GIF와 장면이 겹치므로 여기서는 영상 링크만 제공한다. | 탐색 진행 상태, 탐침 위치, 측정 결과와 선별 경로 실행 화면이다. |
+
+<details>
+<summary><b>시스템 실행 준비 영상</b></summary>
+
+[![터미널 실행 준비 GIF — 클릭하면 원본 영상 재생](./docs/demonstration-video/터미널x4.gif)](./docs/demonstration-video/터미널x4.mp4)
+
+**[실행 준비 영상 보기](./docs/demonstration-video/터미널x4.mp4)** · 28초 · 4배속  
+빌드부터 Docker 서비스, 로봇 드라이버, ROS 2 노드와 프런트엔드 기동까지 보여준다.
+
+</details>
+
 ## 주요 기능
 
 - **티칭 없는 접촉 탐색**: 부재를 놓고 웹의 시작 버튼만 누른다. 수직 하강으로 윗면 높이 1점, 네 방향 스텝 밀기로 모서리 4점을 얻는다. 큐브 위치 · 크기를 입력하지 않는다.
@@ -34,39 +63,39 @@
 
 노드별 연결은 [06 ROS2 노드 구조도](docs/deliverables/06-node-graph.md), 타입 전문은 [05 인터페이스 정의서](docs/deliverables/05-interfaces.md)와 [`docs/contracts/`](docs/contracts/)에 있다.
 
-### 동작 흐름
+### 구현 아키텍처
 
-스캔(1차 MVP). 상태기계가 순서를 쥐고, 실패하면 그 자리에서 멈춘다. 자동 홈 복귀는 없다.
+실행 코드와 DB 스키마를 기준으로 정리한 네 가지 도면이다. 이미지를 누르면 해당 도면이 열린다.
 
-```mermaid
-flowchart LR
-    S[웹 START<br/>/scan/run] --> G{시작 관문<br/>BUSY · 파라미터 · 래치 · 연결}
-    G -- 하나라도 걸리면 --> R[거절 · 로봇 무이동]
-    G --> P[PREPARING<br/>기준점 이동 · tare]
-    P --> T[TOP_SEARCH<br/>수직 하강 → 윗면 1점]
-    T --> E[EDGE_SEARCH ×4<br/>스텝 밀기 → 모서리 1점씩]
-    E -- 2번째부터 --> C[방향 전환<br/>50 mm 올림 → 원점 위 → 재접촉]
-    C --> E
-    E --> Y[GEOMETRY<br/>5점 → 편향 보정 → 직육면체 · 경로 후보 8]
-    Y --> H[HOMING<br/>정상 완료만]
-    H --> D[DONE<br/>result.json → /scan/result → 웹 3D]
-    P & T & E -- 미접촉 · 과대 외력 · 샘플 끊김 --> X[ERROR<br/>원인 · 단계 · 위치 기록 후 정지]
-```
+**[전체 아키텍처 사이트](https://rokey-cobot1-weld-made.netlify.app/)**
 
-용접 모션(phase 2). 웹에서 고른 선을 한 선씩 실행하고, 선마다 홈을 거친다.
+#### 1. 시스템 아키텍쳐
 
-```mermaid
-flowchart LR
-    W[웹 선택 · /weld/run<br/>선 번호 지정] --> G2{시작 관문<br/>스캔 중 · 결과 없음 → 거절}
-    G2 --> P2[PREPARING<br/>result.json → 45° · 3 mm 경유점]
-    P2 --> A[APPROACH<br/>안전 높이 → 접근점]
-    A --> L[WELDING<br/>ExecutePath line · 점마다 도착 확인]
-    L --> B[RETREAT<br/>후퇴 → 안전 높이]
-    B --> H2[HOMING<br/>다음 선은 홈에서]
-    H2 --> D2[DONE<br/>/weld/result · 선별 DONE · FAILED]
-```
+[![Archify 시스템 아키텍쳐 — Web PC·Main PC·외부 로봇 컨트롤러](./docs/architecture/01_system.png)](https://rokey-cobot1-weld-made.netlify.app/01_system.html)
 
-관제자 명령 4종(중지 · 안전복귀 · 재시작 · 안전 해제)은 서로를 부르지 않는다. 자세한 순서도는 [03 동작 순서도](docs/deliverables/03-flowchart.md), 예외 처리는 [08 예외 · 오류 리스트](docs/deliverables/08-exceptions.md).
+Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를 보여준다. MQTT와 ROS 2를 통한 제어·상태 전달 경로를 정리했다.
+
+#### 2. ROS 2 통신 아키텍쳐
+
+[![Archify ROS 2 통신 아키텍쳐 — 노드 간 토픽·서비스·액션](./docs/architecture/02_ros2.png)](https://rokey-cobot1-weld-made.netlify.app/02_ros2.html)
+
+노드 간 토픽·서비스·액션의 이름과 타입, 송수신 방향을 보여준다. 모션 실행·접촉 판정·안전 감시·MQTT 중계 관계를 확인할 수 있다.
+
+#### 3. 전체 공정 플로우차트
+
+**정상 공정:** 접촉 탐색 → 형상·경로 계산 → 스캔 마무리 → 선택한 용접 경로 실행
+
+[![Archify 전체 공정 플로우차트 — 스캔·용접 경로 실행과 예외 분기](./docs/architecture/04_flow.png)](https://rokey-cobot1-weld-made.netlify.app/04_flow.html)
+
+접촉 스캔과 용접 경로 실행의 상태 전이를 보여준다. 요청 거절·실패·정지·재개·수동 HOME 분기를 포함하며, 실제 용접 전원 제어와는 구분한다.
+
+추가 문서: [03 동작 순서도](./docs/deliverables/03-flowchart.md) · [08 예외 · 오류 리스트](./docs/deliverables/08-exceptions.md)
+
+#### 4. ERD
+
+[![Archify ERD — 7개 테이블·71개 컬럼과 데이터 관계](./docs/architecture/03_erd.png)](https://rokey-cobot1-weld-made.netlify.app/03_erd.html)
+
+실제 초기화 SQL의 7개 테이블·71개 컬럼과 관계를 보여준다. PK·FK·UNIQUE·NULL·기본값·ON DELETE 정책과 카디널리티를 표시했다.
 
 ## 개발 환경
 
