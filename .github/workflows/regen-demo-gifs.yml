@@ -1,0 +1,100 @@
+name: Regenerate demo GIFs
+
+on:
+  push:
+    branches:
+      - docs/demo-video-layout
+    paths:
+      - ".github/workflows/regen-demo-gifs.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/demo-video-layout
+          fetch-depth: 0
+
+      - name: Ensure ffmpeg
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+
+      - name: Regenerate high-quality GIFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd docs/demonstration-video
+
+          make_gif() {
+            local input="$1"
+            local output="$2"
+            local fps="$3"
+            local width="$4"
+            local palette="${output%.gif}-palette.png"
+
+            rm -f "$palette" "$output"
+            ffmpeg -y -v error -i "$input"               -vf "fps=${fps},scale=${width}:-2:flags=lanczos,palettegen=max_colors=256:stats_mode=diff"               -frames:v 1 "$palette"
+
+            ffmpeg -y -v error -i "$input" -i "$palette"               -lavfi "fps=${fps},scale=${width}:-2:flags=lanczos[x];[x][1:v]paletteuse=dither=sierra2_4a:diff_mode=rectangle"               -loop 0 "$output"
+
+            rm -f "$palette"
+          }
+
+          # 5x integrated demo: source is 1280x720 / 30 fps.
+          make_gif "통합-5x.mp4" "통합.gif" 30 720
+
+          # 5x real-robot demo: square source. Push quality close to GitHub's
+          # 100 MB single-file limit, then fall back only if needed.
+          make_gif "전체시연통합-5x.mp4" "전체시연통합.gif" 20 500
+          max_bytes=$((98 * 1024 * 1024))
+          actual_bytes=$(stat -c%s "전체시연통합.gif")
+          if [ "$actual_bytes" -gt "$max_bytes" ]; then
+            echo "Square GIF exceeded 98 MiB; falling back to 480px / 18fps."
+            make_gif "전체시연통합-5x.mp4" "전체시연통합.gif" 18 480
+          fi
+
+          # 5x web 3D monitoring demo: ~29.3 fps source.
+          make_gif "관제통합-5x.webm" "관제통합.gif" 30 720
+
+          # Setup video is intentionally the existing x4 source; preserve smoothness.
+          make_gif "터미널x4.mp4" "터미널x4.gif" 50 720
+
+          echo
+          echo "Generated GIFs:"
+          ls -lh 통합.gif 전체시연통합.gif 관제통합.gif 터미널x4.gif
+
+          for f in 통합.gif 전체시연통합.gif 관제통합.gif 터미널x4.gif; do
+            bytes=$(stat -c%s "$f")
+            if [ "$bytes" -ge $((100 * 1024 * 1024)) ]; then
+              echo "ERROR: $f is >= 100 MiB ($bytes bytes)"
+              exit 1
+            fi
+            ffprobe -v error -select_streams v:0               -show_entries stream=width,height,r_frame_rate,nb_frames               -show_entries format=duration,size               -of default=nw=1 "$f"
+          done
+
+      - name: Commit regenerated GIFs
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add             docs/demonstration-video/통합.gif             docs/demonstration-video/전체시연통합.gif             docs/demonstration-video/관제통합.gif             docs/demonstration-video/터미널x4.gif
+
+          if git diff --cached --quiet; then
+            echo "No GIF changes to commit."
+            exit 0
+          fi
+
+          git commit -m "docs: regenerate demo GIFs at high quality"
+          git push origin HEAD:docs/demo-video-layout
