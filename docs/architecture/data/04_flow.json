@@ -1,0 +1,1575 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "전체 공정 플로우차트",
+    "locale": "en",
+    "output": "audit-fixed/04_flow.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/yujh5537/rokey_cobot1_Weld-Made.git",
+      "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+      "provider": "github",
+      "link_mode": "web"
+    },
+    "animation": "trace",
+    "relationship_font_size": 9.5
+  },
+  "components": [
+    {
+      "id": "start",
+      "type": "backend",
+      "label": "START",
+      "pos": [
+        352,
+        60
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 321,
+          "end_line": 365
+        }
+      ],
+      "shape": "terminator"
+    },
+    {
+      "id": "idle",
+      "type": "frontend",
+      "label": "스캔 대기",
+      "pos": [
+        352,
+        250
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 321,
+          "end_line": 365
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "gate",
+      "type": "cloud",
+      "label": "스캔 접수 검사",
+      "pos": [
+        372,
+        420
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 406,
+          "end_line": 455
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "prepare",
+      "type": "frontend",
+      "label": "PREPARING",
+      "pos": [
+        352,
+        630
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 491,
+          "end_line": 505
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 417,
+          "end_line": 433
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "top",
+      "type": "frontend",
+      "label": "TOP_SEARCH",
+      "pos": [
+        352,
+        820
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 506,
+          "end_line": 512
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 417,
+          "end_line": 433
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "edge",
+      "type": "frontend",
+      "label": "EDGE_SEARCH",
+      "pos": [
+        352,
+        1010
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 513,
+          "end_line": 535
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 417,
+          "end_line": 433
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "geometry",
+      "type": "frontend",
+      "label": "GEOMETRY",
+      "pos": [
+        352,
+        1200
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+          "line": 1519,
+          "end_line": 1533
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 460,
+          "end_line": 475
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "home",
+      "type": "frontend",
+      "label": "스캔 HOMING",
+      "pos": [
+        352,
+        1390
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/sequence.py",
+          "line": 539,
+          "end_line": 551
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "done",
+      "type": "backend",
+      "label": "스캔 DONE",
+      "pos": [
+        352,
+        1580
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 516,
+          "end_line": 518
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "weldgate",
+      "type": "cloud",
+      "label": "용접 선택",
+      "pos": [
+        372,
+        1750
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 367,
+          "end_line": 433
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "wg",
+      "type": "cloud",
+      "label": "용접 접수 검사",
+      "pos": [
+        372,
+        1940
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 367,
+          "end_line": 433
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "approach",
+      "type": "frontend",
+      "label": "APPROACH",
+      "pos": [
+        352,
+        2150
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 390,
+          "end_line": 392
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "welding",
+      "type": "frontend",
+      "label": "WELDING",
+      "pos": [
+        352,
+        2340
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 395,
+          "end_line": 399
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "retreat",
+      "type": "frontend",
+      "label": "RETREAT",
+      "pos": [
+        352,
+        2530
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 400,
+          "end_line": 402
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "wresult",
+      "type": "frontend",
+      "label": "용접 결과 발행",
+      "pos": [
+        352,
+        2720
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 364,
+          "end_line": 385
+        },
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 752,
+          "end_line": 761
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "weldhome",
+      "type": "frontend",
+      "label": "용접 HOMING",
+      "pos": [
+        352,
+        2910
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 364,
+          "end_line": 385
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "wdone",
+      "type": "backend",
+      "label": "용접 DONE",
+      "pos": [
+        352,
+        3100
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 364,
+          "end_line": 385
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "reject",
+      "type": "security",
+      "label": "스캔 요청 거절",
+      "pos": [
+        32,
+        440
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 321,
+          "end_line": 365
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "stop",
+      "type": "frontend",
+      "label": "스캔 STOPPING",
+      "pos": [
+        672,
+        820
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 466,
+          "end_line": 474
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+          "line": 577,
+          "end_line": 594
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 500,
+          "end_line": 510
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "stopped",
+      "type": "frontend",
+      "label": "스캔 STOPPED",
+      "pos": [
+        672,
+        1010
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 131,
+          "end_line": 131
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "error",
+      "type": "security",
+      "label": "스캔 ERROR",
+      "pos": [
+        672,
+        1200
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 500,
+          "end_line": 510
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "rg",
+      "type": "cloud",
+      "label": "RESUME 검사",
+      "pos": [
+        692,
+        1370
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 413,
+          "end_line": 431
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/resume.py",
+          "line": 105,
+          "end_line": 125
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/resume.py",
+          "line": 172,
+          "end_line": 254
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "resume",
+      "type": "frontend",
+      "label": "RESUMING",
+      "pos": [
+        32,
+        1580
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 479,
+          "end_line": 480
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "rreject",
+      "type": "security",
+      "label": "재개 요청 거절",
+      "pos": [
+        940,
+        1390
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 413,
+          "end_line": 431
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "retry",
+      "type": "frontend",
+      "label": "안전 정지 감시",
+      "pos": [
+        940,
+        820
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_core.py",
+          "line": 220,
+          "end_line": 271
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "wreject",
+      "type": "security",
+      "label": "용접 요청 거절",
+      "pos": [
+        32,
+        1960
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 354,
+          "end_line": 433
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "linefail",
+      "type": "cloud",
+      "label": "204 계속 검사",
+      "pos": [
+        960,
+        2320
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 340,
+          "end_line": 358
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "tip",
+      "type": "cloud",
+      "label": "팁 높이 검사",
+      "pos": [
+        692,
+        2510
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 404,
+          "end_line": 436
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "recover",
+      "type": "frontend",
+      "label": "안전 복구 이동",
+      "pos": [
+        672,
+        2720
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 404,
+          "end_line": 436
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "next",
+      "type": "frontend",
+      "label": "다음 선 판정",
+      "pos": [
+        52,
+        2700
+      ],
+      "size": [
+        140,
+        140
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 344,
+          "end_line": 371
+        }
+      ],
+      "shape": "decision"
+    },
+    {
+      "id": "wstop",
+      "type": "frontend",
+      "label": "용접 STOPPING",
+      "pos": [
+        32,
+        2340
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/state_machine.py",
+          "line": 143,
+          "end_line": 149
+        },
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 321,
+          "end_line": 335
+        },
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 494,
+          "end_line": 510
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "wstopped",
+      "type": "frontend",
+      "label": "용접 STOPPED",
+      "pos": [
+        32,
+        2530
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 494,
+          "end_line": 510
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "werror",
+      "type": "security",
+      "label": "용접 ERROR",
+      "pos": [
+        672,
+        3290
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 494,
+          "end_line": 510
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "mhome",
+      "type": "frontend",
+      "label": "용접 수동 HOME",
+      "pos": [
+        32,
+        3430
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/state_machine.py",
+          "line": 150,
+          "end_line": 170
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "rest",
+      "type": "backend",
+      "label": "HOME 전 상태",
+      "pos": [
+        32,
+        3630
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/state_machine.py",
+          "line": 150,
+          "end_line": 170
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "scanmhome",
+      "type": "frontend",
+      "label": "스캔 수동 HOME",
+      "pos": [
+        940,
+        1200
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 475,
+          "end_line": 478
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 516,
+          "end_line": 518
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "scanrest",
+      "type": "backend",
+      "label": "HOME 전 상태",
+      "pos": [
+        940,
+        1580
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 475,
+          "end_line": 478
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 516,
+          "end_line": 518
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "wstoperror",
+      "type": "security",
+      "label": "용접 ERROR",
+      "pos": [
+        32,
+        3000
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 321,
+          "end_line": 335
+        },
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 494,
+          "end_line": 510
+        }
+      ],
+      "shape": "process"
+    },
+    {
+      "id": "end",
+      "type": "backend",
+      "label": "END",
+      "pos": [
+        352,
+        3750
+      ],
+      "size": [
+        180,
+        100
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/sequence.py",
+          "line": 364,
+          "end_line": 385
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/state_machine.py",
+          "line": 516,
+          "end_line": 518
+        }
+      ],
+      "shape": "terminator"
+    }
+  ],
+  "connections": [
+    {
+      "id": "main0",
+      "from": "start",
+      "to": "idle",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main1",
+      "from": "idle",
+      "to": "gate",
+      "label": "START",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main2",
+      "from": "gate",
+      "to": "prepare",
+      "label": "접수 성공",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main3",
+      "from": "prepare",
+      "to": "top",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main4",
+      "from": "top",
+      "to": "edge",
+      "label": "TOP_FOUND",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main5",
+      "from": "edge",
+      "to": "geometry",
+      "label": "4/4",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main6",
+      "from": "geometry",
+      "to": "home",
+      "label": "형상 성공",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main7",
+      "from": "home",
+      "to": "done",
+      "label": "홈 성공",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main8",
+      "from": "done",
+      "to": "weldgate",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main9",
+      "from": "weldgate",
+      "to": "wg",
+      "label": "YES / 수동 START",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main10",
+      "from": "wg",
+      "to": "approach",
+      "label": "검사 통과 · 접수",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main11",
+      "from": "approach",
+      "to": "welding",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main12",
+      "from": "welding",
+      "to": "retreat",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main13",
+      "from": "retreat",
+      "to": "wresult",
+      "label": "선 처리 끝",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main14",
+      "from": "wresult",
+      "to": "weldhome",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "main15",
+      "from": "weldhome",
+      "to": "wdone",
+      "label": "홈 성공",
+      "variant": "emphasis"
+    },
+    {
+      "id": "end-done",
+      "from": "wdone",
+      "to": "end",
+      "label": "",
+      "variant": "emphasis"
+    },
+    {
+      "id": "reject",
+      "from": "gate",
+      "to": "reject",
+      "label": "조건 불충족",
+      "variant": "security"
+    },
+    {
+      "id": "wait",
+      "from": "reject",
+      "to": "idle",
+      "label": "다음 START",
+      "variant": "dashed"
+    },
+    {
+      "id": "edgewait",
+      "from": "edge",
+      "to": "edge",
+      "label": "미완료: 다음 방향",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "contactwait",
+      "from": "top",
+      "to": "top",
+      "label": "event_id 대기 / 제한 시간",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "stop",
+      "from": "top",
+      "to": "stop",
+      "label": "STOP 접수",
+      "variant": "security"
+    },
+    {
+      "id": "stopsuccess",
+      "from": "stop",
+      "to": "stopped",
+      "label": "새 stamp AND connected AND !moving",
+      "variant": "default"
+    },
+    {
+      "id": "stopfail",
+      "from": "stop",
+      "to": "error",
+      "label": "확인 실패 407 / 재개 단계 삭제",
+      "variant": "security"
+    },
+    {
+      "id": "fail",
+      "from": "edge",
+      "to": "error",
+      "label": "모션·접촉·안전 실패",
+      "variant": "security"
+    },
+    {
+      "id": "shape-fail",
+      "from": "geometry",
+      "to": "error",
+      "label": "형상 실패",
+      "variant": "security"
+    },
+    {
+      "id": "homefail",
+      "from": "home",
+      "to": "error",
+      "label": "홈 실패 / 측정 결과 유지",
+      "variant": "security"
+    },
+    {
+      "id": "stoppedresume",
+      "from": "stopped",
+      "to": "rg",
+      "label": "수동 RESUME",
+      "variant": "dashed"
+    },
+    {
+      "id": "errorresume",
+      "from": "error",
+      "to": "rg",
+      "label": "수동 요청 / 코드만으로 허용 안 됨",
+      "variant": "dashed",
+      "labelAt": [
+        755,
+        1317
+      ]
+    },
+    {
+      "id": "resumeaccept",
+      "from": "rg",
+      "to": "resume",
+      "label": "모든 검사 통과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "resumereject",
+      "from": "rg",
+      "to": "rreject",
+      "label": "불충족 → 거절",
+      "variant": "security"
+    },
+    {
+      "id": "resume-prepare",
+      "from": "resume",
+      "to": "prepare",
+      "label": "저장 단계=PREPARING",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          235,
+          1630
+        ],
+        [
+          235,
+          680
+        ]
+      ]
+    },
+    {
+      "id": "resume-top",
+      "from": "resume",
+      "to": "top",
+      "label": "저장 단계=TOP_SEARCH",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          260,
+          1630
+        ],
+        [
+          260,
+          870
+        ]
+      ],
+      "labelAt": [
+        330,
+        790
+      ]
+    },
+    {
+      "id": "resume-edge",
+      "from": "resume",
+      "to": "edge",
+      "label": "저장 단계=EDGE_SEARCH",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          285,
+          1630
+        ],
+        [
+          285,
+          1060
+        ]
+      ]
+    },
+    {
+      "id": "resume-geometry",
+      "from": "resume",
+      "to": "geometry",
+      "label": "저장 단계=GEOMETRY",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          310,
+          1630
+        ],
+        [
+          310,
+          1250
+        ]
+      ],
+      "labelAt": [
+        348,
+        1520
+      ]
+    },
+    {
+      "id": "safe",
+      "from": "top",
+      "to": "retry",
+      "label": "감시 이상 / latch",
+      "variant": "security"
+    },
+    {
+      "id": "safe-retry",
+      "from": "retry",
+      "to": "retry",
+      "label": "미확인 + timeout + 주기",
+      "variant": "dashed"
+    },
+    {
+      "id": "safe-error",
+      "from": "retry",
+      "to": "error",
+      "label": "스캔 안전 실패",
+      "variant": "security"
+    },
+    {
+      "id": "scanonly",
+      "from": "weldgate",
+      "to": "end",
+      "label": "NO / 스캔만 종료",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "wg-reject",
+      "from": "wg",
+      "to": "wreject",
+      "label": "접수 전 조건 실패",
+      "variant": "security"
+    },
+    {
+      "id": "linefailure",
+      "from": "welding",
+      "to": "linefail",
+      "label": "개별 선 실패",
+      "variant": "security"
+    },
+    {
+      "id": "cannotcontinue",
+      "from": "linefail",
+      "to": "werror",
+      "label": "OFF 또는 복구 불가",
+      "variant": "security"
+    },
+    {
+      "id": "checktip",
+      "from": "linefail",
+      "to": "tip",
+      "label": "계속 처리 대상",
+      "variant": "default"
+    },
+    {
+      "id": "unknown",
+      "from": "tip",
+      "to": "werror",
+      "label": "팁 위치 모름",
+      "variant": "security"
+    },
+    {
+      "id": "safeheight",
+      "from": "tip",
+      "to": "next",
+      "label": "안전 높이 이상 / 이동 없음",
+      "variant": "default",
+      "labelAt": [
+        358,
+        2660
+      ]
+    },
+    {
+      "id": "lowheight",
+      "from": "tip",
+      "to": "recover",
+      "label": "안전 높이 미만",
+      "variant": "security"
+    },
+    {
+      "id": "recovery-end",
+      "from": "recover",
+      "to": "werror",
+      "label": "성공·실패 모두 ERROR",
+      "variant": "security",
+      "labelAt": [
+        748,
+        2836
+      ]
+    },
+    {
+      "id": "nextline",
+      "from": "next",
+      "to": "approach",
+      "label": "남은 선 있음",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "lastfailed",
+      "from": "next",
+      "to": "wresult",
+      "label": "선 처리 끝",
+      "variant": "default",
+      "labelAt": [
+        325,
+        2707
+      ]
+    },
+    {
+      "id": "normal-next",
+      "from": "retreat",
+      "to": "approach",
+      "label": "다음 선",
+      "variant": "dashed"
+    },
+    {
+      "id": "wstop",
+      "from": "welding",
+      "to": "wstop",
+      "label": "STOP 접수",
+      "variant": "security",
+      "labelAt": [
+        310,
+        2310
+      ]
+    },
+    {
+      "id": "wconfirmed",
+      "from": "wstop",
+      "to": "wstopped",
+      "label": "새 stamp + connected + !moving",
+      "variant": "default"
+    },
+    {
+      "id": "wstopfail",
+      "from": "wstop",
+      "to": "wstoperror",
+      "label": "확인 실패 → ERROR",
+      "variant": "security"
+    },
+    {
+      "id": "wfail",
+      "from": "welding",
+      "to": "werror",
+      "label": "전체 실패",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "whomefail",
+      "from": "weldhome",
+      "to": "werror",
+      "label": "홈 실패 · 발행 유지",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "werrend",
+      "from": "werror",
+      "to": "end",
+      "label": "명령 실패 종료",
+      "variant": "security"
+    },
+    {
+      "id": "manualhome",
+      "from": "wstopped",
+      "to": "mhome",
+      "label": "수동 HOME",
+      "variant": "dashed",
+      "labelAt": [
+        55,
+        3235
+      ]
+    },
+    {
+      "id": "manualhomeerror",
+      "from": "werror",
+      "to": "mhome",
+      "label": "수동 HOME",
+      "variant": "dashed"
+    },
+    {
+      "id": "manualhomescan",
+      "from": "error",
+      "to": "scanmhome",
+      "label": "별도 수동 HOME",
+      "variant": "dashed"
+    },
+    {
+      "id": "mhomesuccess",
+      "from": "mhome",
+      "to": "rest",
+      "label": "안전복귀 성공",
+      "variant": "default"
+    },
+    {
+      "id": "mhomefailure",
+      "from": "mhome",
+      "to": "werror",
+      "label": "HOME 실패 → ERROR",
+      "variant": "security"
+    },
+    {
+      "id": "restend",
+      "from": "rest",
+      "to": "end",
+      "label": "HOME 명령 종료",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom"
+    },
+    {
+      "id": "scan-home-success",
+      "from": "scanmhome",
+      "to": "scanrest",
+      "label": "성공 → HOME 전 상태",
+      "variant": "default"
+    },
+    {
+      "id": "scan-home-fail",
+      "from": "scanmhome",
+      "to": "error",
+      "label": "HOME 실패",
+      "variant": "security",
+      "labelAt": [
+        896,
+        1277
+      ]
+    },
+    {
+      "id": "wstoperror-end",
+      "from": "wstoperror",
+      "to": "end",
+      "label": "명령 실패 종료",
+      "variant": "security",
+      "labelAt": [
+        330,
+        3445
+      ]
+    },
+    {
+      "id": "wstoperror-home",
+      "from": "wstoperror",
+      "to": "mhome",
+      "label": "별도 수동 HOME",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "결과와 명령 종료의 구분",
+      "items": [
+        "스캔: GEOMETRY에서 저장·scan/result 발행 → HOMING → DONE. 형상 실패도 저장·발행한다. 측정 성공 후 홈 실패·중단은 측정 결과를 무효화하지 않는다.",
+        "용접: 선 처리 결과 저장 시도·weld/result 발행 → HOMING → DONE 또는 홈 실패. _published가 이미 있으면 홈 중 실패·중단 시 재발행하지 않는다. 파일 저장 실패도 log 후 발행·복귀를 계속한다."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "204 실패의 실제 분기",
+      "items": [
+        "continue_on_line_failure OFF 또는 line_recoverable=false → ERROR. 계속 처리 대상도 팁 위치가 없으면 ERROR.",
+        "팁 z ≥ z_safe - path_tolerance_m이면 이동 없이 다음 선으로 진행한다. 실패 선 자동 재시도 없음.",
+        "팁이 낮으면 툴 축 뒤로 후퇴 → 안전 높이 상승 → ERROR. 복구 이동 실패도 ERROR. 복구 성공은 다음 선 진행을 의미하지 않는다."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "RESUME 허용 목록과 실제 조건",
+      "items": [
+        "403/404/407은 실패 코드 허용 목록일 뿐 재개 보장이 아니다. 유효한 재개 단계·미소비 기록·설정·탐색 순서·좌표계·로봇·안전 보호 조건을 확인한다.",
+        "START → TOP_SEARCH → STOP → STOPPING → FAILED(407) → ERROR에서 재개 단계가 지워진다. RESUME accepted=False, reason=105: 재개할 단계가 없다.",
+        "마무리 HOMING 중 중단·실패는 측정 단계 재개 불가. 수동 HOME 이후 재접근은 미구현으로 RESUME 거절. reset은 재개 지점을 만들지 않는다."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "STOP · HOME · 접수 조건",
+      "items": [
+        "scan/weld 정지 확인은 확인 대기 시작 이후 stamp의 RobotStatus AND connected AND !moving. 오래된 moving=false는 통과하지 못한다.",
+        "접수 전 START 실패는 요청 거절·기존 phase 유지. 접수 후 실행 실패는 ERROR. STOP 확인 성공은 STOPPED, 확인 실패는 ERROR. 용접 RESUME 없음.",
+        "STOPPED에서 현재 실행 요청은 끝나며 수동 HOME은 별도 요청이다. 정상 마무리 HOMING과 다르다. 수동 HOME 성공은 출발했던 휴지 상태 IDLE/DONE/STOPPED/ERROR로 돌아간다.",
+        "TOP_SEARCH/WELDING의 STOP 선은 대표 경로다. 다른 active phase, RESUMING, 마무리 HOMING도 중단·실패 처리한다.",
+        "안전 정지 재요청: 정지 미확인 AND confirm timeout 초과 AND retry 주기 경과.",
+        "WELDING은 실제 경로 이동 구현이다. 용접 전원 제어 연결은 확인되지 않았다."
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "1 · 접촉 스캔",
+      "wraps": [
+        "start",
+        "idle",
+        "gate",
+        "prepare",
+        "top",
+        "edge",
+        "geometry",
+        "home",
+        "done",
+        "reject",
+        "stop",
+        "stopped",
+        "error",
+        "rg",
+        "resume",
+        "rreject",
+        "retry",
+        "scanmhome",
+        "scanrest"
+      ],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "2 · 용접 경로 실행",
+      "wraps": [
+        "weldgate",
+        "wg",
+        "approach",
+        "welding",
+        "retreat",
+        "wresult",
+        "weldhome",
+        "wdone",
+        "wreject",
+        "linefail",
+        "tip",
+        "recover",
+        "next",
+        "wstop",
+        "wstopped",
+        "werror",
+        "mhome",
+        "rest",
+        "wstoperror",
+        "end"
+      ],
+      "pad": 12
+    }
+  ]
+}

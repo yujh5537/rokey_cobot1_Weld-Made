@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "01a7228c-6bcb-419e-8cdc-cbe2ff98102d",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/29663fd5a592/no-copy/data/04_flow.json",
+  "output": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+  "specification": {
+    "sha256": "369f8557a37249141efc6d39049d48782194883c9e9d73c6f9f65eb94055410d",
+    "bytes": 33069
+  },
+  "artifact": {
+    "sha256": "5b978c245a5b60da870b410973509d782f50f9181a3abab242575ddbd40c1181",
+    "bytes": 864948
+  }
+}

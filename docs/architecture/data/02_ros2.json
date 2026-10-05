@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ROS 2 통신 아키텍쳐",
+    "locale": "en",
+    "output": "audit-fixed/02_ros2.html",
+    "quality_profile": "standard",
+    "repository": {
+      "url": "https://github.com/yujh5537/rokey_cobot1_Weld-Made.git",
+      "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+      "provider": "github",
+      "link_mode": "web"
+    },
+    "animation": "trace",
+    "viewBox": [
+      1240,
+      645.9921743991057
+    ]
+  },
+  "components": [
+    {
+      "id": "mqtt_bridge",
+      "type": "backend",
+      "label": "mqtt_bridge",
+      "sublabel": "ROS 2 node",
+      "pos": [
+        475,
+        25
+      ],
+      "size": [
+        235,
+        96
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+          "line": 237,
+          "end_line": 247
+        }
+      ]
+    },
+    {
+      "id": "scan_manager",
+      "type": "backend",
+      "label": "scan_manager",
+      "sublabel": "ROS 2 node",
+      "pos": [
+        30,
+        175
+      ],
+      "size": [
+        235,
+        96
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+          "line": 229,
+          "end_line": 239
+        }
+      ]
+    },
+    {
+      "id": "weld_manager",
+      "type": "backend",
+      "label": "weld_manager",
+      "sublabel": "ROS 2 node",
+      "pos": [
+        945,
+        175
+      ],
+      "size": [
+        235,
+        96
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 137,
+          "end_line": 147
+        }
+      ]
+    },
+    {
+      "id": "contact_detector",
+      "type": "backend",
+      "label": "contact_detector",
+      "sublabel": "ROS 2 node",
+      "pos": [
+        30,
+        340
+      ],
+      "size": [
+        235,
+        96
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+          "line": 140,
+          "end_line": 150
+        }
+      ]
+    },
+    {
+      "id": "safety_monitor",
+      "type": "backend",
+      "label": "safety_monitor",
+      "sublabel": "ROS 2 node",
+      "pos": [
+        945,
+        340
+      ],
+      "size": [
+        235,
+        96
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+          "line": 86,
+          "end_line": 96
+        }
+      ]
+    },
+    {
+      "id": "robot_manager",
+      "type": "backend",
+      "label": "robot_manager",
+      "sublabel": "ROS 2 node",
+      "pos": [
+        475,
+        390
+      ],
+      "size": [
+        235,
+        96
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+          "line": 381,
+          "end_line": 391
+        }
+      ]
+    },
+    {
+      "id": "driver",
+      "type": "backend",
+      "label": "dsr_controller2",
+      "sublabel": "/dsr01/dsr_controller2/*",
+      "pos": [
+        475,
+        510
+      ],
+      "size": [
+        255,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+          "line": 35,
+          "end_line": 45
+        }
+      ]
+    },
+    {
+      "id": "joints",
+      "type": "external",
+      "label": "JointState 입력",
+      "sublabel": "/dsr01/joint_states · 변경 가능",
+      "pos": [
+        945,
+        25
+      ],
+      "size": [
+        235,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+          "line": 190,
+          "end_line": 206
+        },
+        {
+          "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+          "line": 242,
+          "end_line": 249
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "r1",
+      "to": "scan_manager",
+      "label": "R1 · Scan control",
+      "variant": "default",
+      "from": "mqtt_bridge"
+    },
+    {
+      "id": "r2",
+      "to": "mqtt_bridge",
+      "label": "R2 · Scan telemetry",
+      "variant": "default",
+      "from": "scan_manager"
+    },
+    {
+      "id": "r3",
+      "to": "weld_manager",
+      "label": "R3 · Weld control",
+      "variant": "default",
+      "from": "mqtt_bridge",
+      "labelAt": [
+        850,
+        75
+      ]
+    },
+    {
+      "id": "r4",
+      "to": "mqtt_bridge",
+      "label": "R4 · Weld telemetry",
+      "variant": "default",
+      "from": "weld_manager",
+      "labelAt": [
+        820,
+        125
+      ]
+    },
+    {
+      "id": "r5",
+      "to": "safety_monitor",
+      "label": "R5 · ResetSafety",
+      "variant": "security",
+      "from": "mqtt_bridge",
+      "labelAt": [
+        942,
+        285
+      ]
+    },
+    {
+      "id": "r6",
+      "to": "robot_manager",
+      "label": "R6 · Motion / stop / config",
+      "variant": "default",
+      "from": "scan_manager"
+    },
+    {
+      "id": "r7",
+      "to": "robot_manager",
+      "label": "R7 · Motion / path / stop",
+      "variant": "default",
+      "from": "weld_manager"
+    },
+    {
+      "id": "r8",
+      "to": "contact_detector",
+      "label": "R8 · State / tare / config",
+      "variant": "default",
+      "from": "scan_manager",
+      "labelAt": [
+        100,
+        292
+      ]
+    },
+    {
+      "id": "r9",
+      "to": "weld_manager",
+      "label": "R9 · ScanState",
+      "variant": "default",
+      "from": "scan_manager",
+      "labelAt": [
+        290,
+        107
+      ]
+    },
+    {
+      "id": "r10",
+      "to": "scan_manager",
+      "label": "R10 · WeldState",
+      "variant": "default",
+      "from": "weld_manager"
+    },
+    {
+      "id": "r11",
+      "to": "scan_manager",
+      "label": "R11 · Sample / status / event",
+      "variant": "default",
+      "from": "robot_manager"
+    },
+    {
+      "id": "r12",
+      "to": "weld_manager",
+      "label": "R12 · Sample / status",
+      "variant": "default",
+      "from": "robot_manager"
+    },
+    {
+      "id": "r13",
+      "to": "mqtt_bridge",
+      "label": "R13 · Sample / status / event",
+      "variant": "default",
+      "from": "robot_manager"
+    },
+    {
+      "id": "r14",
+      "to": "contact_detector",
+      "label": "R14 · RobotSample",
+      "variant": "default",
+      "from": "robot_manager"
+    },
+    {
+      "id": "r15",
+      "to": "safety_monitor",
+      "label": "R15 · Sample / status",
+      "variant": "default",
+      "from": "robot_manager"
+    },
+    {
+      "id": "r16",
+      "to": "robot_manager",
+      "label": "R16 · ContactEvent",
+      "variant": "default",
+      "from": "contact_detector",
+      "labelAt": [
+        360,
+        455
+      ]
+    },
+    {
+      "id": "r17",
+      "to": "scan_manager",
+      "label": "R17 · ContactEvent",
+      "variant": "default",
+      "from": "contact_detector",
+      "labelAt": [
+        213,
+        319
+      ]
+    },
+    {
+      "id": "r18",
+      "to": "mqtt_bridge",
+      "label": "R18 · ContactEvent",
+      "variant": "default",
+      "from": "contact_detector"
+    },
+    {
+      "id": "r19",
+      "to": "robot_manager",
+      "label": "R19 · StopRobot",
+      "variant": "security",
+      "from": "safety_monitor",
+      "labelAt": [
+        921,
+        450
+      ]
+    },
+    {
+      "id": "r20",
+      "to": "scan_manager",
+      "label": "R20 · SafetyStatus",
+      "variant": "security",
+      "from": "safety_monitor",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          1210,
+          388
+        ],
+        [
+          1210,
+          323
+        ],
+        [
+          18,
+          323
+        ],
+        [
+          18,
+          223
+        ]
+      ],
+      "labelAt": [
+        410,
+        317
+      ]
+    },
+    {
+      "id": "r21",
+      "to": "weld_manager",
+      "label": "R21 · SafetyStatus",
+      "variant": "security",
+      "from": "safety_monitor"
+    },
+    {
+      "id": "r22",
+      "to": "mqtt_bridge",
+      "label": "R22 · SafetyStatus",
+      "variant": "security",
+      "from": "safety_monitor",
+      "labelAt": [
+        800,
+        260
+      ]
+    },
+    {
+      "id": "r23",
+      "to": "safety_monitor",
+      "label": "R23 · Parameters",
+      "variant": "dashed",
+      "from": "scan_manager"
+    },
+    {
+      "id": "r24",
+      "to": "mqtt_bridge",
+      "label": "R24 · JointState",
+      "variant": "default",
+      "from": "joints"
+    },
+    {
+      "id": "r25",
+      "to": "driver",
+      "label": "R25 · dsr_msgs2 services",
+      "variant": "default",
+      "from": "robot_manager",
+      "labelAt": [
+        593,
+        500
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "연결별 인터페이스",
+      "items": [
+        "R 번호로 사이트 하단과 INTERFACES.html의 이름·타입·송수신 방향·실행 근거를 확인할 수 있습니다."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "타입과 방향",
+      "items": [
+        "프로젝트 타입의 공통 접두사: contact_scan_interfaces/msg, /srv, /action.",
+        "토픽 화살표: publisher → subscriber. 서비스·액션 화살표: client → server; 응답·feedback·result는 같은 ROS 호출의 역방향이다.",
+        "/robot/sample: RobotSample → contact_detector, safety_monitor, scan_manager, weld_manager, mqtt_bridge.",
+        "/robot/status: RobotStatus → safety_monitor, scan_manager, weld_manager, mqtt_bridge.",
+        "/contact/event: ContactEvent — contact_detector와 robot_manager가 발행. scan_manager, robot_manager, mqtt_bridge가 구독. robot_manager의 발행은 step SLIDE EDGE 경로.",
+        "/scan/state: ScanState → contact_detector, weld_manager, mqtt_bridge; /scan/result: ScanResult 및 /scan/log: ScanLog → mqtt_bridge.",
+        "/weld/state: WeldState → scan_manager, mqtt_bridge; /weld/result: WeldResult 및 /weld/log: ScanLog → mqtt_bridge.",
+        "/safety/status: SafetyStatus → scan_manager, weld_manager, mqtt_bridge."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "액션과 서비스",
+      "items": [
+        "/scan/run: RunScan; /scan/home: ReturnHome; /scan/resume: Resume — mqtt_bridge client → scan_manager server.",
+        "/scan/stop: StopScan; /scan/set_config: SetConfig — mqtt_bridge → scan_manager.",
+        "/weld/run: RunWeld; /weld/home: ReturnHome; /weld/stop: StopWeld — mqtt_bridge → weld_manager.",
+        "/robot/execute_motion: ExecuteMotion — scan_manager와 weld_manager → robot_manager.",
+        "/robot/execute_path: ExecutePath — weld_manager → robot_manager.",
+        "/robot/stop: StopRobot — scan_manager, weld_manager, safety_monitor → robot_manager.",
+        "/contact/tare: TareForce — scan_manager → contact_detector; /safety/reset: ResetSafety — mqtt_bridge → safety_monitor.",
+        "/{robot_manager,contact_detector,safety_monitor}/{set_parameters,get_parameters}: rcl_interfaces/srv/{SetParameters,GetParameters} — scan_manager client, rclpy 표준 server."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "외부 드라이버 / MQTT",
+      "items": [
+        "JointState 기본값은 /dsr01/joint_states. joint_state_topic 파라미터로 변경 가능. 외부 발행자를 코드만으로 단일 노드로 확정하지 않았다.",
+        "dsr_msgs2: GetCurrentPosx, GetToolForce, GetRobotState; MoveLine, MoveJoint, MoveSplineTask, MoveStop; TaskComplianceCtrl, ReleaseComplianceCtrl, SetDesiredForce, ReleaseForce.",
+        "서비스 경로 /dsr01/dsr_controller2/{aux_control,system,motion,force}/*; dsr_namespace는 real.yaml에서 dsr01.",
+        "MQTT JSON: robot/sample, robot/status, robot/joints, robot/gripper_joints, scan/state, scan/result, scan/log, scan/command_result, weld/state, weld/result, weld/log, weld/command_result, contact/event, safety/status, cmd/ack, hb/ros, conn/ros.",
+        "cmd/scan/start→/scan/run; home→/scan/home; resume→/scan/resume; stop→/scan/stop; set_config→/scan/set_config. cmd/weld/start→/weld/run; home→/weld/home; stop→/weld/stop. cmd/safety/reset→/safety/reset.",
+        "hb/web→/web/heartbeat: WebHeartbeat 구현. 현재 subscriber 없음. 연결된 완성 경로로 표시하지 않았다."
+      ]
+    }
+  ],
+  "boundaries": []
+}

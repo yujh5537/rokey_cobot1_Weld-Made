@@ -1,0 +1,16 @@
+✔ Successful native clipboard write reports copied only after resolution (3.234414ms)
+✔ Asynchronous clipboard rejection gives resolved-Blob gesture retry and save (1.933079ms)
+✔ No Clipboard API keeps explicit PNG save fallback; never claims copied (1.46984ms)
+✔ Raster failure is caught and does not offer an invalid PNG (1.476712ms)
+✔ Auto-height iframe feedback does not change height budget or reset layout (1.552498ms)
+✔ Standalone and cross-origin reader keep normal viewport fallback (1.804584ms)
+✔ Prepared PNG uses a resolved Blob within the Copy click gesture (1.533214ms)
+✔ Semantic camera does not refocus on iframe height-only resize (1.469587ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 174.748292

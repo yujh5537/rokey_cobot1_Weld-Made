@@ -1,0 +1,3548 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "standard",
+  "startedAt": "2026-10-05T10:05:22.681Z",
+  "specification": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/data/02_ros2.json",
+    "sha256": "4d39268ef9fc76ef7620d5a3088583810b191bc48201e6146fb95d3e5fa2457f",
+    "bytes": 12411
+  },
+  "artifact": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+    "sha256": "b426fff15c83e8a529e389e842f63b4095c43f5886fb4e7a9a1f3f96fce7632f",
+    "bytes": 791529
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/29663fd5a592/no-copy/data/02_ros2.json",
+        "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+        "--quality",
+        "standard",
+        "--repo-root",
+        "/workspace/scratch/29663fd5a592/weld-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "4d39268ef9fc76ef7620d5a3088583810b191bc48201e6146fb95d3e5fa2457f",
+          "bytes": 12411
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "standard",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 23,
+          "compositionIssues": [
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R1 · Scan control",
+              "labelRelationship": {
+                "id": "r1",
+                "from": "mqtt_bridge",
+                "to": "scan_manager",
+                "label": "R1 · Scan control",
+                "collectionIndex": 0,
+                "artifactIndex": 1
+              },
+              "otherRelationship": {
+                "id": "r2",
+                "from": "scan_manager",
+                "to": "mqtt_bridge",
+                "label": "R2 · Scan telemetry",
+                "collectionIndex": 1,
+                "artifactIndex": 2
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 87.7,
+                "y": 97,
+                "width": 91.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                161.5,
+                175
+              ],
+              "to": [
+                161.5,
+                73
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R2 · Scan telemetry",
+              "labelRelationship": {
+                "id": "r2",
+                "from": "scan_manager",
+                "to": "mqtt_bridge",
+                "label": "R2 · Scan telemetry",
+                "collectionIndex": 1,
+                "artifactIndex": 2
+              },
+              "otherRelationship": {
+                "id": "r1",
+                "from": "mqtt_bridge",
+                "to": "scan_manager",
+                "label": "R1 · Scan control",
+                "collectionIndex": 0,
+                "artifactIndex": 1
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 267.7,
+                "y": 53,
+                "width": 101.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 101.2,
+              "threshold": 2,
+              "from": [
+                475,
+                59
+              ],
+              "to": [
+                133.5,
+                59
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R4 · Weld telemetry",
+              "labelRelationship": {
+                "id": "r4",
+                "from": "weld_manager",
+                "to": "mqtt_bridge",
+                "label": "R4 · Weld telemetry",
+                "collectionIndex": 3,
+                "artifactIndex": 4
+              },
+              "otherRelationship": {
+                "id": "r3",
+                "from": "mqtt_bridge",
+                "to": "weld_manager",
+                "label": "R3 · Weld control",
+                "collectionIndex": 2,
+                "artifactIndex": 3
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 769.4,
+                "y": 115,
+                "width": 101.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                827.5,
+                73
+              ],
+              "to": [
+                827.5,
+                223
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R5 · ResetSafety",
+              "labelRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "otherRelationship": {
+                "id": "r12",
+                "from": "robot_manager",
+                "to": "weld_manager",
+                "label": "R12 · Sample / status",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 898.6,
+                "y": 275,
+                "width": 86.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                921,
+                424
+              ],
+              "to": [
+                921,
+                223
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R6 · Motion / stop / config",
+              "labelRelationship": {
+                "id": "r6",
+                "from": "scan_manager",
+                "to": "robot_manager",
+                "label": "R6 · Motion / stop / config",
+                "collectionIndex": 5,
+                "artifactIndex": 6
+              },
+              "otherRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 287,
+                "y": 295.5,
+                "width": 139.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                289,
+                424
+              ],
+              "to": [
+                289,
+                237
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                764.4,
+                73
+              ],
+              "to": [
+                764.4,
+                388
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 130,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                713,
+                388
+              ],
+              "to": [
+                713,
+                145
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R8 · State / tare / config",
+              "labelRelationship": {
+                "id": "r8",
+                "from": "scan_manager",
+                "to": "contact_detector",
+                "label": "R8 · State / tare / config",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "otherRelationship": {
+                "id": "r17",
+                "from": "contact_detector",
+                "to": "scan_manager",
+                "label": "R17 · ContactEvent",
+                "collectionIndex": 16,
+                "artifactIndex": 17
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 32.6,
+                "y": 282,
+                "width": 134.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                147.5,
+                340
+              ],
+              "to": [
+                147.5,
+                271
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R11 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "otherRelationship": {
+                "id": "r6",
+                "from": "scan_manager",
+                "to": "robot_manager",
+                "label": "R6 · Motion / stop / config",
+                "collectionIndex": 5,
+                "artifactIndex": 6
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 214.4,
+                "y": 310.5,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                356.8,
+                251
+              ],
+              "to": [
+                356.8,
+                380
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R11 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 214.4,
+                "y": 310.5,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 149.2,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R13 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r13",
+                "from": "robot_manager",
+                "to": "mqtt_bridge",
+                "label": "R13 · Sample / status / event",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 517.9,
+                "y": 370,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 7.5,
+              "threshold": 2,
+              "from": [
+                265,
+                381
+              ],
+              "to": [
+                525.4,
+                381
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R14 · RobotSample",
+              "labelRelationship": {
+                "id": "r14",
+                "from": "robot_manager",
+                "to": "contact_detector",
+                "label": "R14 · RobotSample",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "otherRelationship": {
+                "id": "r16",
+                "from": "contact_detector",
+                "to": "robot_manager",
+                "label": "R16 · ContactEvent",
+                "collectionIndex": 15,
+                "artifactIndex": 16
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 324.2,
+                "y": 403.5,
+                "width": 91.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                370,
+                388
+              ],
+              "to": [
+                370,
+                438
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R16 · ContactEvent",
+              "labelRelationship": {
+                "id": "r16",
+                "from": "contact_detector",
+                "to": "robot_manager",
+                "label": "R16 · ContactEvent",
+                "collectionIndex": 15,
+                "artifactIndex": 16
+              },
+              "otherRelationship": {
+                "id": "r14",
+                "from": "robot_manager",
+                "to": "contact_detector",
+                "label": "R14 · RobotSample",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 311.8,
+                "y": 445,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 38.2,
+              "threshold": 2,
+              "from": [
+                475,
+                452
+              ],
+              "to": [
+                370,
+                452
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R17 · ContactEvent",
+              "labelRelationship": {
+                "id": "r17",
+                "from": "contact_detector",
+                "to": "scan_manager",
+                "label": "R17 · ContactEvent",
+                "collectionIndex": 16,
+                "artifactIndex": 17
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 164.8,
+                "y": 309,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R18 · ContactEvent",
+              "labelRelationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 477.2,
+                "y": 317.3,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R21 · SafetyStatus",
+              "labelRelationship": {
+                "id": "r21",
+                "from": "safety_monitor",
+                "to": "weld_manager",
+                "label": "R21 · SafetyStatus",
+                "collectionIndex": 20,
+                "artifactIndex": 21
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 1021.3,
+                "y": 320,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R22 · SafetyStatus",
+              "labelRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "otherRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 751.8,
+                "y": 250,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                764.4,
+                73
+              ],
+              "to": [
+                764.4,
+                388
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R23 · Parameters",
+              "labelRelationship": {
+                "id": "r23",
+                "from": "scan_manager",
+                "to": "safety_monitor",
+                "label": "R23 · Parameters",
+                "collectionIndex": 22,
+                "artifactIndex": 23
+              },
+              "otherRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 632.4,
+                "y": 131,
+                "width": 86.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 0,
+              "threshold": 2,
+              "from": [
+                713,
+                388
+              ],
+              "to": [
+                713,
+                145
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                734,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r12",
+                "from": "robot_manager",
+                "to": "weld_manager",
+                "label": "R12 · Sample / status",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                921,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r13",
+                "from": "robot_manager",
+                "to": "mqtt_bridge",
+                "label": "R13 · Sample / status / event",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                592.5,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                525.4,
+                323
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 463,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/29663fd5a592/no-copy/data/02_ros2.json",
+        "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+        "--quality",
+        "standard",
+        "--repo-root",
+        "/workspace/scratch/29663fd5a592/weld-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "b431fe5c-c598-4887-9f41-47367c031514",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/workspace/scratch/29663fd5a592/no-copy/data/02_ros2.json",
+        "output": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+        "specification": {
+          "sha256": "4d39268ef9fc76ef7620d5a3088583810b191bc48201e6146fb95d3e5fa2457f",
+          "bytes": 12411
+        },
+        "artifact": {
+          "sha256": "b426fff15c83e8a529e389e842f63b4095c43f5886fb4e7a9a1f3f96fce7632f",
+          "bytes": 791529
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "standard",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 23,
+          "compositionIssues": [
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R1 · Scan control",
+              "labelRelationship": {
+                "id": "r1",
+                "from": "mqtt_bridge",
+                "to": "scan_manager",
+                "label": "R1 · Scan control",
+                "collectionIndex": 0,
+                "artifactIndex": 1
+              },
+              "otherRelationship": {
+                "id": "r2",
+                "from": "scan_manager",
+                "to": "mqtt_bridge",
+                "label": "R2 · Scan telemetry",
+                "collectionIndex": 1,
+                "artifactIndex": 2
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 87.7,
+                "y": 97,
+                "width": 91.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                161.5,
+                175
+              ],
+              "to": [
+                161.5,
+                73
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R2 · Scan telemetry",
+              "labelRelationship": {
+                "id": "r2",
+                "from": "scan_manager",
+                "to": "mqtt_bridge",
+                "label": "R2 · Scan telemetry",
+                "collectionIndex": 1,
+                "artifactIndex": 2
+              },
+              "otherRelationship": {
+                "id": "r1",
+                "from": "mqtt_bridge",
+                "to": "scan_manager",
+                "label": "R1 · Scan control",
+                "collectionIndex": 0,
+                "artifactIndex": 1
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 267.7,
+                "y": 53,
+                "width": 101.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 101.2,
+              "threshold": 2,
+              "from": [
+                475,
+                59
+              ],
+              "to": [
+                133.5,
+                59
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R4 · Weld telemetry",
+              "labelRelationship": {
+                "id": "r4",
+                "from": "weld_manager",
+                "to": "mqtt_bridge",
+                "label": "R4 · Weld telemetry",
+                "collectionIndex": 3,
+                "artifactIndex": 4
+              },
+              "otherRelationship": {
+                "id": "r3",
+                "from": "mqtt_bridge",
+                "to": "weld_manager",
+                "label": "R3 · Weld control",
+                "collectionIndex": 2,
+                "artifactIndex": 3
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 769.4,
+                "y": 115,
+                "width": 101.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                827.5,
+                73
+              ],
+              "to": [
+                827.5,
+                223
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R5 · ResetSafety",
+              "labelRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "otherRelationship": {
+                "id": "r12",
+                "from": "robot_manager",
+                "to": "weld_manager",
+                "label": "R12 · Sample / status",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 898.6,
+                "y": 275,
+                "width": 86.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                921,
+                424
+              ],
+              "to": [
+                921,
+                223
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R6 · Motion / stop / config",
+              "labelRelationship": {
+                "id": "r6",
+                "from": "scan_manager",
+                "to": "robot_manager",
+                "label": "R6 · Motion / stop / config",
+                "collectionIndex": 5,
+                "artifactIndex": 6
+              },
+              "otherRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 287,
+                "y": 295.5,
+                "width": 139.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                289,
+                424
+              ],
+              "to": [
+                289,
+                237
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                764.4,
+                73
+              ],
+              "to": [
+                764.4,
+                388
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 130,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                713,
+                388
+              ],
+              "to": [
+                713,
+                145
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R8 · State / tare / config",
+              "labelRelationship": {
+                "id": "r8",
+                "from": "scan_manager",
+                "to": "contact_detector",
+                "label": "R8 · State / tare / config",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "otherRelationship": {
+                "id": "r17",
+                "from": "contact_detector",
+                "to": "scan_manager",
+                "label": "R17 · ContactEvent",
+                "collectionIndex": 16,
+                "artifactIndex": 17
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 32.6,
+                "y": 282,
+                "width": 134.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                147.5,
+                340
+              ],
+              "to": [
+                147.5,
+                271
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R11 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "otherRelationship": {
+                "id": "r6",
+                "from": "scan_manager",
+                "to": "robot_manager",
+                "label": "R6 · Motion / stop / config",
+                "collectionIndex": 5,
+                "artifactIndex": 6
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 214.4,
+                "y": 310.5,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                356.8,
+                251
+              ],
+              "to": [
+                356.8,
+                380
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R11 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 214.4,
+                "y": 310.5,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 149.2,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R13 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r13",
+                "from": "robot_manager",
+                "to": "mqtt_bridge",
+                "label": "R13 · Sample / status / event",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 517.9,
+                "y": 370,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 7.5,
+              "threshold": 2,
+              "from": [
+                265,
+                381
+              ],
+              "to": [
+                525.4,
+                381
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R14 · RobotSample",
+              "labelRelationship": {
+                "id": "r14",
+                "from": "robot_manager",
+                "to": "contact_detector",
+                "label": "R14 · RobotSample",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "otherRelationship": {
+                "id": "r16",
+                "from": "contact_detector",
+                "to": "robot_manager",
+                "label": "R16 · ContactEvent",
+                "collectionIndex": 15,
+                "artifactIndex": 16
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 324.2,
+                "y": 403.5,
+                "width": 91.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                370,
+                388
+              ],
+              "to": [
+                370,
+                438
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R16 · ContactEvent",
+              "labelRelationship": {
+                "id": "r16",
+                "from": "contact_detector",
+                "to": "robot_manager",
+                "label": "R16 · ContactEvent",
+                "collectionIndex": 15,
+                "artifactIndex": 16
+              },
+              "otherRelationship": {
+                "id": "r14",
+                "from": "robot_manager",
+                "to": "contact_detector",
+                "label": "R14 · RobotSample",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 311.8,
+                "y": 445,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 38.2,
+              "threshold": 2,
+              "from": [
+                475,
+                452
+              ],
+              "to": [
+                370,
+                452
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R17 · ContactEvent",
+              "labelRelationship": {
+                "id": "r17",
+                "from": "contact_detector",
+                "to": "scan_manager",
+                "label": "R17 · ContactEvent",
+                "collectionIndex": 16,
+                "artifactIndex": 17
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 164.8,
+                "y": 309,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R18 · ContactEvent",
+              "labelRelationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 477.2,
+                "y": 317.3,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R21 · SafetyStatus",
+              "labelRelationship": {
+                "id": "r21",
+                "from": "safety_monitor",
+                "to": "weld_manager",
+                "label": "R21 · SafetyStatus",
+                "collectionIndex": 20,
+                "artifactIndex": 21
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 1021.3,
+                "y": 320,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R22 · SafetyStatus",
+              "labelRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "otherRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 751.8,
+                "y": 250,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                764.4,
+                73
+              ],
+              "to": [
+                764.4,
+                388
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R23 · Parameters",
+              "labelRelationship": {
+                "id": "r23",
+                "from": "scan_manager",
+                "to": "safety_monitor",
+                "label": "R23 · Parameters",
+                "collectionIndex": 22,
+                "artifactIndex": 23
+              },
+              "otherRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 632.4,
+                "y": 131,
+                "width": 86.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 0,
+              "threshold": 2,
+              "from": [
+                713,
+                388
+              ],
+              "to": [
+                713,
+                145
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                734,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r12",
+                "from": "robot_manager",
+                "to": "weld_manager",
+                "label": "R12 · Sample / status",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                921,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r13",
+                "from": "robot_manager",
+                "to": "mqtt_bridge",
+                "label": "R13 · Sample / status / event",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                592.5,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                525.4,
+                323
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/yujh5537/rokey_cobot1_Weld-Made",
+          "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+          "references": 9
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 171,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "check",
+        "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+        "artifact": {
+          "sha256": "b426fff15c83e8a529e389e842f63b4095c43f5886fb4e7a9a1f3f96fce7632f",
+          "bytes": 791529
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": [
+              "[composition/label-route-clearance] standard label \"R1 · Scan control\" on relationship id \"r1\" (\"mqtt_bridge\" -> \"scan_manager\") is 0px from relationship id \"r2\" (\"scan_manager\" -> \"mqtt_bridge\") segment 0 [161.5, 175] -> [161.5, 73] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R2 · Scan telemetry\" on relationship id \"r2\" (\"scan_manager\" -> \"mqtt_bridge\") is 0px from relationship id \"r1\" (\"mqtt_bridge\" -> \"scan_manager\") segment 0 [475, 59] -> [133.5, 59] with 101.2px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R4 · Weld telemetry\" on relationship id \"r4\" (\"weld_manager\" -> \"mqtt_bridge\") is 0px from relationship id \"r3\" (\"mqtt_bridge\" -> \"weld_manager\") segment 1 [827.5, 73] -> [827.5, 223] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R5 · ResetSafety\" on relationship id \"r5\" (\"mqtt_bridge\" -> \"safety_monitor\") is 0px from relationship id \"r12\" (\"robot_manager\" -> \"weld_manager\") segment 1 [921, 424] -> [921, 223] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R6 · Motion / stop / config\" on relationship id \"r6\" (\"scan_manager\" -> \"robot_manager\") is 0px from relationship id \"r11\" (\"robot_manager\" -> \"scan_manager\") segment 1 [289, 424] -> [289, 237] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R7 · Motion / path / stop\" on relationship id \"r7\" (\"weld_manager\" -> \"robot_manager\") is 0px from relationship id \"r5\" (\"mqtt_bridge\" -> \"safety_monitor\") segment 1 [764.4, 73] -> [764.4, 388] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R7 · Motion / path / stop\" on relationship id \"r7\" (\"weld_manager\" -> \"robot_manager\") is 0px from relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") segment 2 [1210, 323] -> [18, 323] with 130px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R7 · Motion / path / stop\" on relationship id \"r7\" (\"weld_manager\" -> \"robot_manager\") is 0px from relationship id \"r22\" (\"safety_monitor\" -> \"mqtt_bridge\") segment 1 [713, 388] -> [713, 145] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R8 · State / tare / config\" on relationship id \"r8\" (\"scan_manager\" -> \"contact_detector\") is 0px from relationship id \"r17\" (\"contact_detector\" -> \"scan_manager\") segment 0 [147.5, 340] -> [147.5, 271] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R11 · Sample / status / event\" on relationship id \"r11\" (\"robot_manager\" -> \"scan_manager\") is 0px from relationship id \"r6\" (\"scan_manager\" -> \"robot_manager\") segment 1 [356.8, 251] -> [356.8, 380] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R11 · Sample / status / event\" on relationship id \"r11\" (\"robot_manager\" -> \"scan_manager\") is 0px from relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") segment 2 [1210, 323] -> [18, 323] with 149.2px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R13 · Sample / status / event\" on relationship id \"r13\" (\"robot_manager\" -> \"mqtt_bridge\") is 0px from relationship id \"r18\" (\"contact_detector\" -> \"mqtt_bridge\") segment 0 [265, 381] -> [525.4, 381] with 7.5px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R14 · RobotSample\" on relationship id \"r14\" (\"robot_manager\" -> \"contact_detector\") is 0px from relationship id \"r16\" (\"contact_detector\" -> \"robot_manager\") segment 1 [370, 388] -> [370, 438] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R16 · ContactEvent\" on relationship id \"r16\" (\"contact_detector\" -> \"robot_manager\") is 0px from relationship id \"r14\" (\"robot_manager\" -> \"contact_detector\") segment 0 [475, 452] -> [370, 452] with 38.2px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R17 · ContactEvent\" on relationship id \"r17\" (\"contact_detector\" -> \"scan_manager\") is 0px from relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") segment 2 [1210, 323] -> [18, 323] with 96.4px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R18 · ContactEvent\" on relationship id \"r18\" (\"contact_detector\" -> \"mqtt_bridge\") is 0px from relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") segment 2 [1210, 323] -> [18, 323] with 96.4px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R21 · SafetyStatus\" on relationship id \"r21\" (\"safety_monitor\" -> \"weld_manager\") is 0px from relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") segment 2 [1210, 323] -> [18, 323] with 96.4px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R22 · SafetyStatus\" on relationship id \"r22\" (\"safety_monitor\" -> \"mqtt_bridge\") is 0px from relationship id \"r5\" (\"mqtt_bridge\" -> \"safety_monitor\") segment 1 [764.4, 73] -> [764.4, 388] with 14px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"R23 · Parameters\" on relationship id \"r23\" (\"scan_manager\" -> \"safety_monitor\") is 0px from relationship id \"r22\" (\"safety_monitor\" -> \"mqtt_bridge\") segment 1 [713, 388] -> [713, 145] (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel."
+            ]
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": [
+              "[composition/proper-crossing] standard relationship id \"r7\" (\"weld_manager\" -> \"robot_manager\") crosses relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") at [734, 323]",
+              "[composition/proper-crossing] standard relationship id \"r12\" (\"robot_manager\" -> \"weld_manager\") crosses relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") at [921, 323]",
+              "[composition/proper-crossing] standard relationship id \"r13\" (\"robot_manager\" -> \"mqtt_bridge\") crosses relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") at [592.5, 323]",
+              "[composition/proper-crossing] standard relationship id \"r18\" (\"contact_detector\" -> \"mqtt_bridge\") crosses relationship id \"r20\" (\"safety_monitor\" -> \"scan_manager\") at [525.4, 323]"
+            ]
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "standard",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 23
+          },
+          "metrics": {
+            "properCrossings": 4,
+            "resolvedCrossovers": 23,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 19,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 0,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6,
+            "maxBends": 4,
+            "routesOverSuggestedBends": 7,
+            "maxStretch": 1.436,
+            "routesOverSuggestedStretch": 2,
+            "minSegmentPx": 12,
+            "minInteriorSegmentPx": 37,
+            "shortSegmentCount": 1,
+            "shortEndpointSegmentCount": 1,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "id": "r2",
+                  "from": "scan_manager",
+                  "to": "mqtt_bridge",
+                  "label": "R2 · Scan telemetry",
+                  "collectionIndex": 1,
+                  "artifactIndex": 2
+                },
+                "right": {
+                  "id": "r23",
+                  "from": "scan_manager",
+                  "to": "safety_monitor",
+                  "label": "R23 · Parameters",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "point": [
+                  161.5,
+                  151
+                ],
+                "sharedNode": "scan_manager"
+              },
+              {
+                "left": {
+                  "id": "r3",
+                  "from": "mqtt_bridge",
+                  "to": "weld_manager",
+                  "label": "R3 · Weld control",
+                  "collectionIndex": 2,
+                  "artifactIndex": 3
+                },
+                "right": {
+                  "id": "r23",
+                  "from": "scan_manager",
+                  "to": "safety_monitor",
+                  "label": "R23 · Parameters",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "point": [
+                  827.5,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r4",
+                  "from": "weld_manager",
+                  "to": "mqtt_bridge",
+                  "label": "R4 · Weld telemetry",
+                  "collectionIndex": 3,
+                  "artifactIndex": 4
+                },
+                "right": {
+                  "id": "r23",
+                  "from": "scan_manager",
+                  "to": "safety_monitor",
+                  "label": "R23 · Parameters",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "point": [
+                  734,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r5",
+                  "from": "mqtt_bridge",
+                  "to": "safety_monitor",
+                  "label": "R5 · ResetSafety",
+                  "collectionIndex": 4,
+                  "artifactIndex": 5
+                },
+                "right": {
+                  "id": "r7",
+                  "from": "weld_manager",
+                  "to": "robot_manager",
+                  "label": "R7 · Motion / path / stop",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "point": [
+                  764.4000000000001,
+                  237
+                ]
+              },
+              {
+                "left": {
+                  "id": "r5",
+                  "from": "mqtt_bridge",
+                  "to": "safety_monitor",
+                  "label": "R5 · ResetSafety",
+                  "collectionIndex": 4,
+                  "artifactIndex": 5
+                },
+                "right": {
+                  "id": "r9",
+                  "from": "scan_manager",
+                  "to": "weld_manager",
+                  "label": "R9 · ScanState",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "point": [
+                  764.4,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r5",
+                  "from": "mqtt_bridge",
+                  "to": "safety_monitor",
+                  "label": "R5 · ResetSafety",
+                  "collectionIndex": 4,
+                  "artifactIndex": 5
+                },
+                "right": {
+                  "id": "r10",
+                  "from": "weld_manager",
+                  "to": "scan_manager",
+                  "label": "R10 · WeldState",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "point": [
+                  764.4000000000001,
+                  209
+                ]
+              },
+              {
+                "left": {
+                  "id": "r5",
+                  "from": "mqtt_bridge",
+                  "to": "safety_monitor",
+                  "label": "R5 · ResetSafety",
+                  "collectionIndex": 4,
+                  "artifactIndex": 5
+                },
+                "right": {
+                  "id": "r12",
+                  "from": "robot_manager",
+                  "to": "weld_manager",
+                  "label": "R12 · Sample / status",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "point": [
+                  921,
+                  387.9999999999999
+                ]
+              },
+              {
+                "left": {
+                  "id": "r6",
+                  "from": "scan_manager",
+                  "to": "robot_manager",
+                  "label": "R6 · Motion / stop / config",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "right": {
+                  "id": "r11",
+                  "from": "robot_manager",
+                  "to": "scan_manager",
+                  "label": "R11 · Sample / status / event",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "point": [
+                  289,
+                  251
+                ],
+                "sharedNode": "scan_manager"
+              },
+              {
+                "left": {
+                  "id": "r6",
+                  "from": "scan_manager",
+                  "to": "robot_manager",
+                  "label": "R6 · Motion / stop / config",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "right": {
+                  "id": "r18",
+                  "from": "contact_detector",
+                  "to": "mqtt_bridge",
+                  "label": "R18 · ContactEvent",
+                  "collectionIndex": 17,
+                  "artifactIndex": 18
+                },
+                "point": [
+                  447.59999999999997,
+                  381
+                ]
+              },
+              {
+                "left": {
+                  "id": "r7",
+                  "from": "weld_manager",
+                  "to": "robot_manager",
+                  "label": "R7 · Motion / path / stop",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "right": {
+                  "id": "r12",
+                  "from": "robot_manager",
+                  "to": "weld_manager",
+                  "label": "R12 · Sample / status",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "point": [
+                  921,
+                  237
+                ],
+                "sharedNode": "weld_manager"
+              },
+              {
+                "left": {
+                  "id": "r7",
+                  "from": "weld_manager",
+                  "to": "robot_manager",
+                  "label": "R7 · Motion / path / stop",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "right": {
+                  "id": "r22",
+                  "from": "safety_monitor",
+                  "to": "mqtt_bridge",
+                  "label": "R22 · SafetyStatus",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "point": [
+                  734,
+                  388
+                ]
+              },
+              {
+                "left": {
+                  "id": "r9",
+                  "from": "scan_manager",
+                  "to": "weld_manager",
+                  "label": "R9 · ScanState",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "id": "r13",
+                  "from": "robot_manager",
+                  "to": "mqtt_bridge",
+                  "label": "R13 · Sample / status / event",
+                  "collectionIndex": 12,
+                  "artifactIndex": 13
+                },
+                "point": [
+                  592.5,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r9",
+                  "from": "scan_manager",
+                  "to": "weld_manager",
+                  "label": "R9 · ScanState",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "id": "r18",
+                  "from": "contact_detector",
+                  "to": "mqtt_bridge",
+                  "label": "R18 · ContactEvent",
+                  "collectionIndex": 17,
+                  "artifactIndex": 18
+                },
+                "point": [
+                  432.29999999999995,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r9",
+                  "from": "scan_manager",
+                  "to": "weld_manager",
+                  "label": "R9 · ScanState",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "id": "r22",
+                  "from": "safety_monitor",
+                  "to": "mqtt_bridge",
+                  "label": "R22 · SafetyStatus",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "point": [
+                  712.8461538461538,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r10",
+                  "from": "weld_manager",
+                  "to": "scan_manager",
+                  "label": "R10 · WeldState",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "id": "r13",
+                  "from": "robot_manager",
+                  "to": "mqtt_bridge",
+                  "label": "R13 · Sample / status / event",
+                  "collectionIndex": 12,
+                  "artifactIndex": 13
+                },
+                "point": [
+                  592.5,
+                  209
+                ]
+              },
+              {
+                "left": {
+                  "id": "r10",
+                  "from": "weld_manager",
+                  "to": "scan_manager",
+                  "label": "R10 · WeldState",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "id": "r18",
+                  "from": "contact_detector",
+                  "to": "mqtt_bridge",
+                  "label": "R18 · ContactEvent",
+                  "collectionIndex": 17,
+                  "artifactIndex": 18
+                },
+                "point": [
+                  432.29999999999995,
+                  172
+                ]
+              },
+              {
+                "left": {
+                  "id": "r10",
+                  "from": "weld_manager",
+                  "to": "scan_manager",
+                  "label": "R10 · WeldState",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "id": "r22",
+                  "from": "safety_monitor",
+                  "to": "mqtt_bridge",
+                  "label": "R22 · SafetyStatus",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "point": [
+                  713,
+                  209
+                ]
+              },
+              {
+                "left": {
+                  "id": "r11",
+                  "from": "robot_manager",
+                  "to": "scan_manager",
+                  "label": "R11 · Sample / status / event",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "right": {
+                  "id": "r14",
+                  "from": "robot_manager",
+                  "to": "contact_detector",
+                  "label": "R14 · RobotSample",
+                  "collectionIndex": 13,
+                  "artifactIndex": 14
+                },
+                "point": [
+                  370,
+                  424
+                ],
+                "sharedNode": "robot_manager"
+              },
+              {
+                "left": {
+                  "id": "r11",
+                  "from": "robot_manager",
+                  "to": "scan_manager",
+                  "label": "R11 · Sample / status / event",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "right": {
+                  "id": "r18",
+                  "from": "contact_detector",
+                  "to": "mqtt_bridge",
+                  "label": "R18 · ContactEvent",
+                  "collectionIndex": 17,
+                  "artifactIndex": 18
+                },
+                "point": [
+                  289.00000000000006,
+                  381
+                ]
+              },
+              {
+                "left": {
+                  "id": "r12",
+                  "from": "robot_manager",
+                  "to": "weld_manager",
+                  "label": "R12 · Sample / status",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "right": {
+                  "id": "r15",
+                  "from": "robot_manager",
+                  "to": "safety_monitor",
+                  "label": "R15 · Sample / status",
+                  "collectionIndex": 14,
+                  "artifactIndex": 15
+                },
+                "point": [
+                  827.5,
+                  424
+                ],
+                "sharedNode": "robot_manager"
+              },
+              {
+                "left": {
+                  "id": "r12",
+                  "from": "robot_manager",
+                  "to": "weld_manager",
+                  "label": "R12 · Sample / status",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "right": {
+                  "id": "r22",
+                  "from": "safety_monitor",
+                  "to": "mqtt_bridge",
+                  "label": "R22 · SafetyStatus",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "point": [
+                  921,
+                  388
+                ]
+              },
+              {
+                "left": {
+                  "id": "r13",
+                  "from": "robot_manager",
+                  "to": "mqtt_bridge",
+                  "label": "R13 · Sample / status / event",
+                  "collectionIndex": 12,
+                  "artifactIndex": 13
+                },
+                "right": {
+                  "id": "r23",
+                  "from": "scan_manager",
+                  "to": "safety_monitor",
+                  "label": "R23 · Parameters",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "point": [
+                  592.5,
+                  151
+                ]
+              },
+              {
+                "left": {
+                  "id": "r18",
+                  "from": "contact_detector",
+                  "to": "mqtt_bridge",
+                  "label": "R18 · ContactEvent",
+                  "collectionIndex": 17,
+                  "artifactIndex": 18
+                },
+                "right": {
+                  "id": "r23",
+                  "from": "scan_manager",
+                  "to": "safety_monitor",
+                  "label": "R23 · Parameters",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "point": [
+                  432.29999999999995,
+                  151
+                ]
+              }
+            ],
+            "crowdedSides": [
+              {
+                "node": "scan_manager",
+                "label": "scan_manager",
+                "side": "right",
+                "relationships": 8,
+                "sidePx": 96,
+                "neededPx": 130
+              },
+              {
+                "node": "weld_manager",
+                "label": "weld_manager",
+                "side": "left",
+                "relationships": 6,
+                "sidePx": 96,
+                "neededPx": 102
+              },
+              {
+                "node": "safety_monitor",
+                "label": "safety_monitor",
+                "side": "left",
+                "relationships": 6,
+                "sidePx": 96,
+                "neededPx": 102
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "r6",
+                  "from": "scan_manager",
+                  "to": "robot_manager",
+                  "label": "R6 · Motion / stop / config",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "bends": 4,
+                "stretch": 1
+              },
+              {
+                "relationship": {
+                  "id": "r9",
+                  "from": "scan_manager",
+                  "to": "weld_manager",
+                  "label": "R9 · ScanState",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "bends": 3,
+                "stretch": 1.057
+              },
+              {
+                "relationship": {
+                  "id": "r10",
+                  "from": "weld_manager",
+                  "to": "scan_manager",
+                  "label": "R10 · WeldState",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "bends": 4,
+                "stretch": 1.107
+              },
+              {
+                "relationship": {
+                  "id": "r18",
+                  "from": "contact_detector",
+                  "to": "mqtt_bridge",
+                  "label": "R18 · ContactEvent",
+                  "collectionIndex": 17,
+                  "artifactIndex": 18
+                },
+                "bends": 4,
+                "stretch": 1.369
+              },
+              {
+                "relationship": {
+                  "id": "r20",
+                  "from": "safety_monitor",
+                  "to": "scan_manager",
+                  "label": "R20 · SafetyStatus",
+                  "collectionIndex": 19,
+                  "artifactIndex": 20
+                },
+                "bends": 4,
+                "stretch": 1.064
+              },
+              {
+                "relationship": {
+                  "id": "r22",
+                  "from": "safety_monitor",
+                  "to": "mqtt_bridge",
+                  "label": "R22 · SafetyStatus",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "bends": 3,
+                "stretch": 1
+              },
+              {
+                "relationship": {
+                  "id": "r23",
+                  "from": "scan_manager",
+                  "to": "safety_monitor",
+                  "label": "R23 · Parameters",
+                  "collectionIndex": 22,
+                  "artifactIndex": 23
+                },
+                "bends": 3,
+                "stretch": 1.077
+              },
+              {
+                "relationship": {
+                  "id": "r25",
+                  "from": "robot_manager",
+                  "to": "driver",
+                  "label": "R25 · dsr_msgs2 services",
+                  "collectionIndex": 24,
+                  "artifactIndex": 25
+                },
+                "bends": 2,
+                "stretch": 1.436
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": false,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "legacy-930",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 930,
+            "actualBudgetPx": 930,
+            "limit": "legacy",
+            "requestedTargetPx": null,
+            "requestedTargetMet": null,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "r1",
+              "from": "mqtt_bridge",
+              "to": "scan_manager"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 6,
+            "semanticTextCount": 41
+          },
+          "issues": [
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R1 · Scan control",
+              "labelRelationship": {
+                "id": "r1",
+                "from": "mqtt_bridge",
+                "to": "scan_manager",
+                "label": "R1 · Scan control",
+                "collectionIndex": 0,
+                "artifactIndex": 1
+              },
+              "otherRelationship": {
+                "id": "r2",
+                "from": "scan_manager",
+                "to": "mqtt_bridge",
+                "label": "R2 · Scan telemetry",
+                "collectionIndex": 1,
+                "artifactIndex": 2
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 87.7,
+                "y": 97,
+                "width": 91.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                161.5,
+                175
+              ],
+              "to": [
+                161.5,
+                73
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R2 · Scan telemetry",
+              "labelRelationship": {
+                "id": "r2",
+                "from": "scan_manager",
+                "to": "mqtt_bridge",
+                "label": "R2 · Scan telemetry",
+                "collectionIndex": 1,
+                "artifactIndex": 2
+              },
+              "otherRelationship": {
+                "id": "r1",
+                "from": "mqtt_bridge",
+                "to": "scan_manager",
+                "label": "R1 · Scan control",
+                "collectionIndex": 0,
+                "artifactIndex": 1
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 267.7,
+                "y": 53,
+                "width": 101.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 101.2,
+              "threshold": 2,
+              "from": [
+                475,
+                59
+              ],
+              "to": [
+                133.5,
+                59
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R4 · Weld telemetry",
+              "labelRelationship": {
+                "id": "r4",
+                "from": "weld_manager",
+                "to": "mqtt_bridge",
+                "label": "R4 · Weld telemetry",
+                "collectionIndex": 3,
+                "artifactIndex": 4
+              },
+              "otherRelationship": {
+                "id": "r3",
+                "from": "mqtt_bridge",
+                "to": "weld_manager",
+                "label": "R3 · Weld control",
+                "collectionIndex": 2,
+                "artifactIndex": 3
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 769.4,
+                "y": 115,
+                "width": 101.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                827.5,
+                73
+              ],
+              "to": [
+                827.5,
+                223
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R5 · ResetSafety",
+              "labelRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "otherRelationship": {
+                "id": "r12",
+                "from": "robot_manager",
+                "to": "weld_manager",
+                "label": "R12 · Sample / status",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 898.6,
+                "y": 275,
+                "width": 86.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                921,
+                424
+              ],
+              "to": [
+                921,
+                223
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R6 · Motion / stop / config",
+              "labelRelationship": {
+                "id": "r6",
+                "from": "scan_manager",
+                "to": "robot_manager",
+                "label": "R6 · Motion / stop / config",
+                "collectionIndex": 5,
+                "artifactIndex": 6
+              },
+              "otherRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 287,
+                "y": 295.5,
+                "width": 139.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                289,
+                424
+              ],
+              "to": [
+                289,
+                237
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                764.4,
+                73
+              ],
+              "to": [
+                764.4,
+                388
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 130,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R7 · Motion / path / stop",
+              "labelRelationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 669,
+                "y": 317.5,
+                "width": 130,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                713,
+                388
+              ],
+              "to": [
+                713,
+                145
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R8 · State / tare / config",
+              "labelRelationship": {
+                "id": "r8",
+                "from": "scan_manager",
+                "to": "contact_detector",
+                "label": "R8 · State / tare / config",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "otherRelationship": {
+                "id": "r17",
+                "from": "contact_detector",
+                "to": "scan_manager",
+                "label": "R17 · ContactEvent",
+                "collectionIndex": 16,
+                "artifactIndex": 17
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 32.6,
+                "y": 282,
+                "width": 134.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                147.5,
+                340
+              ],
+              "to": [
+                147.5,
+                271
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R11 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "otherRelationship": {
+                "id": "r6",
+                "from": "scan_manager",
+                "to": "robot_manager",
+                "label": "R6 · Motion / stop / config",
+                "collectionIndex": 5,
+                "artifactIndex": 6
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 214.4,
+                "y": 310.5,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                356.8,
+                251
+              ],
+              "to": [
+                356.8,
+                380
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R11 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r11",
+                "from": "robot_manager",
+                "to": "scan_manager",
+                "label": "R11 · Sample / status / event",
+                "collectionIndex": 10,
+                "artifactIndex": 11
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 214.4,
+                "y": 310.5,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 149.2,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R13 · Sample / status / event",
+              "labelRelationship": {
+                "id": "r13",
+                "from": "robot_manager",
+                "to": "mqtt_bridge",
+                "label": "R13 · Sample / status / event",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 517.9,
+                "y": 370,
+                "width": 149.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 7.5,
+              "threshold": 2,
+              "from": [
+                265,
+                381
+              ],
+              "to": [
+                525.4,
+                381
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R14 · RobotSample",
+              "labelRelationship": {
+                "id": "r14",
+                "from": "robot_manager",
+                "to": "contact_detector",
+                "label": "R14 · RobotSample",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "otherRelationship": {
+                "id": "r16",
+                "from": "contact_detector",
+                "to": "robot_manager",
+                "label": "R16 · ContactEvent",
+                "collectionIndex": 15,
+                "artifactIndex": 16
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 324.2,
+                "y": 403.5,
+                "width": 91.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                370,
+                388
+              ],
+              "to": [
+                370,
+                438
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R16 · ContactEvent",
+              "labelRelationship": {
+                "id": "r16",
+                "from": "contact_detector",
+                "to": "robot_manager",
+                "label": "R16 · ContactEvent",
+                "collectionIndex": 15,
+                "artifactIndex": 16
+              },
+              "otherRelationship": {
+                "id": "r14",
+                "from": "robot_manager",
+                "to": "contact_detector",
+                "label": "R14 · RobotSample",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 311.8,
+                "y": 445,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 38.2,
+              "threshold": 2,
+              "from": [
+                475,
+                452
+              ],
+              "to": [
+                370,
+                452
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R17 · ContactEvent",
+              "labelRelationship": {
+                "id": "r17",
+                "from": "contact_detector",
+                "to": "scan_manager",
+                "label": "R17 · ContactEvent",
+                "collectionIndex": 16,
+                "artifactIndex": 17
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 164.8,
+                "y": 309,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R18 · ContactEvent",
+              "labelRelationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 477.2,
+                "y": 317.3,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R21 · SafetyStatus",
+              "labelRelationship": {
+                "id": "r21",
+                "from": "safety_monitor",
+                "to": "weld_manager",
+                "label": "R21 · SafetyStatus",
+                "collectionIndex": 20,
+                "artifactIndex": 21
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "segmentIndex": 2,
+              "labelRect": {
+                "x": 1021.3,
+                "y": 320,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 96.4,
+              "threshold": 2,
+              "from": [
+                1210,
+                323
+              ],
+              "to": [
+                18,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R22 · SafetyStatus",
+              "labelRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "otherRelationship": {
+                "id": "r5",
+                "from": "mqtt_bridge",
+                "to": "safety_monitor",
+                "label": "R5 · ResetSafety",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 751.8,
+                "y": 250,
+                "width": 96.4,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 14,
+              "threshold": 2,
+              "from": [
+                764.4,
+                73
+              ],
+              "to": [
+                764.4,
+                388
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "R23 · Parameters",
+              "labelRelationship": {
+                "id": "r23",
+                "from": "scan_manager",
+                "to": "safety_monitor",
+                "label": "R23 · Parameters",
+                "collectionIndex": 22,
+                "artifactIndex": 23
+              },
+              "otherRelationship": {
+                "id": "r22",
+                "from": "safety_monitor",
+                "to": "mqtt_bridge",
+                "label": "R22 · SafetyStatus",
+                "collectionIndex": 21,
+                "artifactIndex": 22
+              },
+              "segmentIndex": 1,
+              "labelRect": {
+                "x": 632.4,
+                "y": 131,
+                "width": 86.8,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 0,
+              "threshold": 2,
+              "from": [
+                713,
+                388
+              ],
+              "to": [
+                713,
+                145
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r7",
+                "from": "weld_manager",
+                "to": "robot_manager",
+                "label": "R7 · Motion / path / stop",
+                "collectionIndex": 6,
+                "artifactIndex": 7
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                734,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r12",
+                "from": "robot_manager",
+                "to": "weld_manager",
+                "label": "R12 · Sample / status",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                921,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r13",
+                "from": "robot_manager",
+                "to": "mqtt_bridge",
+                "label": "R13 · Sample / status / event",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                592.5,
+                323
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "r18",
+                "from": "contact_detector",
+                "to": "mqtt_bridge",
+                "label": "R18 · ContactEvent",
+                "collectionIndex": 17,
+                "artifactIndex": 18
+              },
+              "otherRelationship": {
+                "id": "r20",
+                "from": "safety_monitor",
+                "to": "scan_manager",
+                "label": "R20 · SafetyStatus",
+                "collectionIndex": 19,
+                "artifactIndex": 20
+              },
+              "point": [
+                525.4,
+                323
+              ]
+            }
+          ]
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "b431fe5c-c598-4887-9f41-47367c031514"
+      }
+    },
+    "browser-check": {
+      "status": "skipped",
+      "exitCode": 2,
+      "durationMs": 17,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "browser-check",
+        "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "skipped",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "b431fe5c-c598-4887-9f41-47367c031514",
+        "artifact": {
+          "path": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+          "sha256": "b426fff15c83e8a529e389e842f63b4095c43f5886fb4e7a9a1f3f96fce7632f",
+          "bytes": 791529
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "unavailable",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/chrome-unavailable",
+            "severity": "warning",
+            "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+            "subject": {
+              "artifact": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html"
+            },
+            "evidence": {
+              "executable": null
+            },
+            "supportedFixes": [
+              "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "skipped",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "readability": {
+          "status": "skipped",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "02_ros2.browser-check.json",
+          "files": []
+        },
+        "error": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path."
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.finalize.json",
+    "summaryReceipt": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-05T10:05:23.389Z",
+  "durationMs": 708,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  }
+}

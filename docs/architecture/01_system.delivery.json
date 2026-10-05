@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "cf35a4de-7aa0-44ad-8be2-c98f42c53cf3",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/29663fd5a592/no-copy/data/01_system.json",
+  "output": "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+  "specification": {
+    "sha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+    "bytes": 11316
+  },
+  "artifact": {
+    "sha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9",
+    "bytes": 787293
+  }
+}

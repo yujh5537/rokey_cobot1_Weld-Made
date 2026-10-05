@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "standard",
+  "specification": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/data/01_system.json",
+    "sha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+    "bytes": 11316
+  },
+  "artifact": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+    "sha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9",
+    "bytes": 787293
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/workspace/scratch/29663fd5a592/no-copy/01_system.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/workspace/scratch/29663fd5a592/no-copy/01_system.finalize.json",
+    "summaryReceipt": "/workspace/scratch/29663fd5a592/no-copy/01_system.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/29663fd5a592/no-copy/01_system.browser-check.json"
+  },
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 651
+}

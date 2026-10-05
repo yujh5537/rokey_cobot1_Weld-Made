@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "c4f310c1-bf90-45e0-8488-a5f43b982d66",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/29663fd5a592/no-copy/data/03_erd.json",
+  "output": "/workspace/scratch/29663fd5a592/no-copy/03_erd.html",
+  "specification": {
+    "sha256": "1d76ae6c889dee2e67bd3e1543800c7b26ccf9ea1cb001fce81a5a96c1781a55",
+    "bytes": 23047
+  },
+  "artifact": {
+    "sha256": "263085f4ff56ce11c16e12d525016b5e4c4b2b9fa43469dd94a73e2f8529fe0a",
+    "bytes": 819787
+  }
+}

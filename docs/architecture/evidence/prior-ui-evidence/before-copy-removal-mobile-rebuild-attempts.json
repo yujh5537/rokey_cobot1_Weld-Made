@@ -1,0 +1,6 @@
+{
+  "first": "failed: browser-check provenance state after completed delivery; not UI rendering failure",
+  "second": "success: validate/deliver/check pass; browser/visual skipped; assets byte-identical",
+  "evidence": "relocated-regeneration.json",
+  "actualMobileUI": "unconfirmed"
+}

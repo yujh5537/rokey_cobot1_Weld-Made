@@ -1,0 +1,99 @@
+{
+  "diagrams": [
+    {
+      "diagram": "01_system",
+      "copyMenuAbsent": true,
+      "otherExportMenuActions": [
+        "route-share-card",
+        "reach-share-card",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "canonicalSvgMarkupIdentical": true,
+      "preservedByteIdentical": [
+        "data/01_system.json",
+        "01_system.svg",
+        "01_system.png"
+      ],
+      "candidateSha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+      "htmlSha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9"
+    },
+    {
+      "diagram": "02_ros2",
+      "copyMenuAbsent": true,
+      "otherExportMenuActions": [
+        "route-share-card",
+        "reach-share-card",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "canonicalSvgMarkupIdentical": true,
+      "preservedByteIdentical": [
+        "data/02_ros2.json",
+        "02_ros2.svg",
+        "02_ros2.png"
+      ],
+      "candidateSha256": "4d39268ef9fc76ef7620d5a3088583810b191bc48201e6146fb95d3e5fa2457f",
+      "htmlSha256": "b426fff15c83e8a529e389e842f63b4095c43f5886fb4e7a9a1f3f96fce7632f"
+    },
+    {
+      "diagram": "03_erd",
+      "copyMenuAbsent": true,
+      "otherExportMenuActions": [
+        "route-share-card",
+        "reach-share-card",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "canonicalSvgMarkupIdentical": true,
+      "preservedByteIdentical": [
+        "data/03_erd.json",
+        "03_erd.svg",
+        "03_erd.png"
+      ],
+      "candidateSha256": "1d76ae6c889dee2e67bd3e1543800c7b26ccf9ea1cb001fce81a5a96c1781a55",
+      "htmlSha256": "263085f4ff56ce11c16e12d525016b5e4c4b2b9fa43469dd94a73e2f8529fe0a"
+    },
+    {
+      "diagram": "04_flow",
+      "copyMenuAbsent": true,
+      "otherExportMenuActions": [
+        "route-share-card",
+        "reach-share-card",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "canonicalSvgMarkupIdentical": true,
+      "preservedByteIdentical": [
+        "data/04_flow.json",
+        "04_flow.svg",
+        "04_flow.png"
+      ],
+      "candidateSha256": "369f8557a37249141efc6d39049d48782194883c9e9d73c6f9f65eb94055410d",
+      "htmlSha256": "5b978c245a5b60da870b410973509d782f50f9181a3abab242575ddbd40c1181"
+    }
+  ],
+  "embeddedPayloadByteExact": true,
+  "actualBrowser": "unconfirmed; no new browser interaction performed",
+  "method": "Actual regenerated HTML DOM and canonical SVG comparison; no screenshot or native Export download claimed"
+}

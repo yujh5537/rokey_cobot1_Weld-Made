@@ -1,0 +1,62 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> archify@3.0.1 test
+> npm run check:viewer && npm run check:brand-marks && npm run check:validators && npm run check:release-identity && node test/golden.mjs && node ../scripts/run-tests.mjs
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> archify@3.0.1 check:viewer
+> node ../scripts/generate-viewer.mjs --check
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> archify@3.0.1 check:brand-marks
+> node scripts/generate-brand-marks.mjs --check
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> archify@3.0.1 check:validators
+> node scripts/generate-validators.mjs --check
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> archify@3.0.1 check:release-identity
+> node ../scripts/check-release-identity.mjs
+
+release identity ok: 3.0.1
+golden renders (renderer output must match checked-in examples)
+  FAIL  workflow: workflow-agent-tool-call-rendered.html — fresh render differs from examples/workflow-agent-tool-call-rendered.html; if the change is intentional, re-render the examples and commit them
+  FAIL  workflow: packaged workflow-agent-tool-call-rendered.html — fresh render differs from archify/examples/workflow-agent-tool-call-rendered.html; re-render the packaged examples and rebuild archify.zip
+  FAIL  sequence: sequence-cache-miss-request.html — fresh render differs from examples/sequence-cache-miss-request.html; if the change is intentional, re-render the examples and commit them
+  FAIL  sequence: packaged sequence-cache-miss-request.html — fresh render differs from archify/examples/sequence-cache-miss-request.html; re-render the packaged examples and rebuild archify.zip
+  FAIL  dataflow: dataflow-product-analytics.html — fresh render differs from examples/dataflow-product-analytics.html; if the change is intentional, re-render the examples and commit them
+  FAIL  dataflow: packaged dataflow-product-analytics.html — fresh render differs from archify/examples/dataflow-product-analytics.html; re-render the packaged examples and rebuild archify.zip
+  FAIL  lifecycle: lifecycle-agent-run.html — fresh render differs from examples/lifecycle-agent-run.html; if the change is intentional, re-render the examples and commit them
+  FAIL  lifecycle: packaged lifecycle-agent-run.html — fresh render differs from archify/examples/lifecycle-agent-run.html; re-render the packaged examples and rebuild archify.zip
+  FAIL  architecture: web-app-rendered.html — fresh render differs from examples/web-app-rendered.html; if the change is intentional, re-render the examples and commit them
+  FAIL  architecture: packaged web-app-rendered.html — fresh render differs from archify/examples/web-app-rendered.html; re-render the packaged examples and rebuild archify.zip
+schema enforcement (invalid JSON must fail with a path-prefixed message)
+  ok    card dot outside enum
+  ok    node id starting with a digit
+  ok    extra property rejected
+  ok    legacy meta.views accepted and ignored
+  ok    column beyond layout maximum
+  ok    missing schema_version
+  ok    cross-lane state overlap
+  ok    zero component width rejected by schema
+  ok    zero component height rejected by schema
+  ok    negative component width rejected by schema
+template freshness (architecture example must carry the current template)
+  ok    web-app.html style blocks match template
+  FAIL  web-app.html script blocks match template — examples/web-app.html was generated from a stale template — re-derive it
+version sync
+  ok    template generator meta matches package.json version
+  ok    package-lock.json version matches package.json
+  ok    SKILL.md metadata version matches package.json major.minor
+  ok    README.md badge matches package.json version
+  ok    README_EN.md badge matches package.json version
+  ok    README_ZH.md badge matches package.json version
+  ok    README_JA.md badge matches package.json version
+  ok    GitHub Pages version labels match package.json
+
+11 check(s) failed

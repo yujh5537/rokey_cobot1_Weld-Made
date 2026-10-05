@@ -1,0 +1,674 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "standard",
+  "startedAt": "2026-10-05T10:05:21.946Z",
+  "specification": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/data/01_system.json",
+    "sha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+    "bytes": 11316
+  },
+  "artifact": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+    "sha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9",
+    "bytes": 787293
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/29663fd5a592/no-copy/data/01_system.json",
+        "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+        "--quality",
+        "standard",
+        "--repo-root",
+        "/workspace/scratch/29663fd5a592/weld-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+          "bytes": 11316
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "standard",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 2,
+          "compositionIssues": [
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "ContactEvent",
+              "labelRelationship": {
+                "id": "e13",
+                "from": "contact",
+                "to": "robot",
+                "label": "ContactEvent",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "e12",
+                "from": "robot",
+                "to": "contact",
+                "label": "RobotSample",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 341.2,
+                "y": 602,
+                "width": 67.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 67.6,
+              "threshold": 2,
+              "from": [
+                500,
+                608
+              ],
+              "to": [
+                250,
+                608
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "StopRobot",
+              "labelRelationship": {
+                "id": "e15",
+                "from": "safety",
+                "to": "robot",
+                "label": "StopRobot",
+                "collectionIndex": 14,
+                "artifactIndex": 15
+              },
+              "otherRelationship": {
+                "id": "e14",
+                "from": "robot",
+                "to": "safety",
+                "label": "RobotSample / RobotStatus",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 808.4,
+                "y": 595,
+                "width": 53.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 53.2,
+              "threshold": 2,
+              "from": [
+                710,
+                601
+              ],
+              "to": [
+                960,
+                601
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 410,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/29663fd5a592/no-copy/data/01_system.json",
+        "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+        "--quality",
+        "standard",
+        "--repo-root",
+        "/workspace/scratch/29663fd5a592/weld-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "cf35a4de-7aa0-44ad-8be2-c98f42c53cf3",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/workspace/scratch/29663fd5a592/no-copy/data/01_system.json",
+        "output": "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+        "specification": {
+          "sha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+          "bytes": 11316
+        },
+        "artifact": {
+          "sha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9",
+          "bytes": 787293
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "standard",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 2,
+          "compositionIssues": [
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "ContactEvent",
+              "labelRelationship": {
+                "id": "e13",
+                "from": "contact",
+                "to": "robot",
+                "label": "ContactEvent",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "e12",
+                "from": "robot",
+                "to": "contact",
+                "label": "RobotSample",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 341.2,
+                "y": 602,
+                "width": 67.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 67.6,
+              "threshold": 2,
+              "from": [
+                500,
+                608
+              ],
+              "to": [
+                250,
+                608
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "StopRobot",
+              "labelRelationship": {
+                "id": "e15",
+                "from": "safety",
+                "to": "robot",
+                "label": "StopRobot",
+                "collectionIndex": 14,
+                "artifactIndex": 15
+              },
+              "otherRelationship": {
+                "id": "e14",
+                "from": "robot",
+                "to": "safety",
+                "label": "RobotSample / RobotStatus",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 808.4,
+                "y": 595,
+                "width": 53.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 53.2,
+              "threshold": 2,
+              "from": [
+                710,
+                601
+              ],
+              "to": [
+                960,
+                601
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/yujh5537/rokey_cobot1_Weld-Made",
+          "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+          "references": 16
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 176,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "check",
+        "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+        "artifact": {
+          "sha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9",
+          "bytes": 787293
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": [
+              "[composition/label-route-clearance] standard label \"ContactEvent\" on relationship id \"e13\" (\"contact\" -> \"robot\") is 0px from relationship id \"e12\" (\"robot\" -> \"contact\") segment 0 [500, 608] -> [250, 608] with 67.6px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel.",
+              "[composition/label-route-clearance] standard label \"StopRobot\" on relationship id \"e15\" (\"safety\" -> \"robot\") is 0px from relationship id \"e14\" (\"robot\" -> \"safety\") segment 0 [710, 601] -> [960, 601] with 53.2px hidden by the mask (minimum 2px) — use renderer-supported label controls (message y for sequence; otherwise labelAt, labelDx, labelDy, or labelSegment), or adjust the other relationship route/via/channel."
+            ]
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "standard",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 2
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 1,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 2,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 0,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6,
+            "maxBends": 4,
+            "routesOverSuggestedBends": 2,
+            "maxStretch": 1.621,
+            "routesOverSuggestedStretch": 1,
+            "minSegmentPx": 14,
+            "minInteriorSegmentPx": 16,
+            "shortSegmentCount": 2,
+            "shortEndpointSegmentCount": 2,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "id": "e8",
+                  "from": "scan",
+                  "to": "files",
+                  "label": "스캔 저장",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "right": {
+                  "id": "e11",
+                  "from": "weld",
+                  "to": "robot",
+                  "label": "ExecuteMotion / ExecutePath",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "point": [
+                  375.06666666666666,
+                  375
+                ]
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "e7",
+                  "from": "bridge",
+                  "to": "weld",
+                  "label": "서비스 / 액션 ↔",
+                  "collectionIndex": 6,
+                  "artifactIndex": 7
+                },
+                "bends": 3,
+                "stretch": 1.058,
+                "directCorridorBlockers": [
+                  {
+                    "id": "scan",
+                    "label": "scan_manager",
+                    "box": [
+                      500,
+                      330,
+                      210,
+                      76
+                    ]
+                  }
+                ]
+              },
+              {
+                "relationship": {
+                  "id": "e9",
+                  "from": "weld",
+                  "to": "files",
+                  "label": "스캔 읽기 / 용접 저장",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "bends": 4,
+                "stretch": 1.621
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": false,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "legacy-930",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 930,
+            "actualBudgetPx": 930,
+            "limit": "legacy",
+            "requestedTargetPx": null,
+            "requestedTargetMet": null,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "e1",
+              "from": "web",
+              "to": "api"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 6,
+            "semanticTextCount": 46
+          },
+          "issues": [
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "ContactEvent",
+              "labelRelationship": {
+                "id": "e13",
+                "from": "contact",
+                "to": "robot",
+                "label": "ContactEvent",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "otherRelationship": {
+                "id": "e12",
+                "from": "robot",
+                "to": "contact",
+                "label": "RobotSample",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 341.2,
+                "y": 602,
+                "width": 67.6,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 67.6,
+              "threshold": 2,
+              "from": [
+                500,
+                608
+              ],
+              "to": [
+                250,
+                608
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/label-route-clearance",
+              "label": "StopRobot",
+              "labelRelationship": {
+                "id": "e15",
+                "from": "safety",
+                "to": "robot",
+                "label": "StopRobot",
+                "collectionIndex": 14,
+                "artifactIndex": 15
+              },
+              "otherRelationship": {
+                "id": "e14",
+                "from": "robot",
+                "to": "safety",
+                "label": "RobotSample / RobotStatus",
+                "collectionIndex": 13,
+                "artifactIndex": 14
+              },
+              "segmentIndex": 0,
+              "labelRect": {
+                "x": 808.4,
+                "y": 595,
+                "width": 53.2,
+                "height": 14
+              },
+              "clearance": 0,
+              "intersectionLength": 53.2,
+              "threshold": 2,
+              "from": [
+                710,
+                601
+              ],
+              "to": [
+                960,
+                601
+              ]
+            }
+          ]
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "cf35a4de-7aa0-44ad-8be2-c98f42c53cf3"
+      }
+    },
+    "browser-check": {
+      "status": "skipped",
+      "exitCode": 2,
+      "durationMs": 14,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify-official/archify/bin/archify.mjs",
+        "browser-check",
+        "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "skipped",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "cf35a4de-7aa0-44ad-8be2-c98f42c53cf3",
+        "artifact": {
+          "path": "/workspace/scratch/29663fd5a592/no-copy/01_system.html",
+          "sha256": "74c1517c7d2c4eb6dc5f6be86eefdec0f3c4bfbc1c8bdf1fdbaab36b8621cbd9",
+          "bytes": 787293
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "unavailable",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/chrome-unavailable",
+            "severity": "warning",
+            "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+            "subject": {
+              "artifact": "/workspace/scratch/29663fd5a592/no-copy/01_system.html"
+            },
+            "evidence": {
+              "executable": null
+            },
+            "supportedFixes": [
+              "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "skipped",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "readability": {
+          "status": "skipped",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "01_system.browser-check.json",
+          "files": []
+        },
+        "error": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path."
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/workspace/scratch/29663fd5a592/no-copy/01_system.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/workspace/scratch/29663fd5a592/no-copy/01_system.finalize.json",
+    "summaryReceipt": "/workspace/scratch/29663fd5a592/no-copy/01_system.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/29663fd5a592/no-copy/01_system.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-05T10:05:22.597Z",
+  "durationMs": 651,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  }
+}

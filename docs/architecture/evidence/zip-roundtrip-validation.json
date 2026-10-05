@@ -1,0 +1,889 @@
+{
+  "transientStateFiles": 0,
+  "zipCRC": "pass",
+  "manifestFilesVerified": 103,
+  "pngs": [
+    {
+      "diagram": "01_system",
+      "bytes": 206720,
+      "sha256": "bd61464c713a0b4625d35dd6e11c00dc3ba8c749a826e3b5c370e9bf307d5403",
+      "dimensions": [
+        1860,
+        1380
+      ],
+      "chunks": [
+        {
+          "type": "IHDR",
+          "bytes": 13
+        },
+        {
+          "type": "bKGD",
+          "bytes": 6
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 1545
+        },
+        {
+          "type": "IEND",
+          "bytes": 0
+        }
+      ],
+      "iend": true,
+      "crc": "pass",
+      "decode": "pass",
+      "bottomPixelsSha256": "486549d695d84328e4ed536722de8565000c717e096b20b23f24a636e5e36ae7"
+    },
+    {
+      "diagram": "02_ros2",
+      "bytes": 187704,
+      "sha256": "60ed0b58c000cf2655addfa1ac2e50fbb27b2a241018b17ced2ce8b38e94ca33",
+      "dimensions": [
+        1860,
+        968
+      ],
+      "chunks": [
+        {
+          "type": "IHDR",
+          "bytes": 13
+        },
+        {
+          "type": "bKGD",
+          "bytes": 6
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 7141
+        },
+        {
+          "type": "IEND",
+          "bytes": 0
+        }
+      ],
+      "iend": true,
+      "crc": "pass",
+      "decode": "pass",
+      "bottomPixelsSha256": "389b569620a5f65c605b4253e8fb8de2c6da536833e3345b8f6ad9ed8833d7e8"
+    },
+    {
+      "diagram": "03_erd",
+      "bytes": 485731,
+      "sha256": "14148b4ac94e39666e5dfcd8f7cb232445cf193f870ace6730f6c531d5af8d3a",
+      "dimensions": [
+        1848,
+        5385
+      ],
+      "chunks": [
+        {
+          "type": "IHDR",
+          "bytes": 13
+        },
+        {
+          "type": "bKGD",
+          "bytes": 6
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 1620
+        },
+        {
+          "type": "IEND",
+          "bytes": 0
+        }
+      ],
+      "iend": true,
+      "crc": "pass",
+      "decode": "pass",
+      "bottomPixelsSha256": "3a9eee1318f52b29f22fddcdf7388758817e4fe32c0ddc1deb0252a87681c23e"
+    },
+    {
+      "diagram": "04_flow",
+      "bytes": 686361,
+      "sha256": "3ea18b5a7aa9e3206cf47411eef78f6992f88e8aa592db82c0c84095ea1ba383",
+      "dimensions": [
+        1777,
+        5913
+      ],
+      "chunks": [
+        {
+          "type": "IHDR",
+          "bytes": 13
+        },
+        {
+          "type": "bKGD",
+          "bytes": 6
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 8192
+        },
+        {
+          "type": "IDAT",
+          "bytes": 5354
+        },
+        {
+          "type": "IEND",
+          "bytes": 0
+        }
+      ],
+      "iend": true,
+      "crc": "pass",
+      "decode": "pass",
+      "bottomPixelsSha256": "0e4e21f90ec229e9cecd5ddbd8ef47b806341652ef7aae54d21bd88eeeed8f61"
+    }
+  ],
+  "receiptSha": "pass",
+  "method": "Completed ZIP physically extracted to separate directory; SHA/size/PNG CRC/IEND/full Pillow pixels including bottom decoded again."
+}

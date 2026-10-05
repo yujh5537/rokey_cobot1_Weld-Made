@@ -1,0 +1,920 @@
+[
+  {
+    "edge": "r1",
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/RunScan",
+    "name": "/scan/run",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 291,
+    "kind": "Action",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "ActionServer",
+      "type": "RunScan",
+      "name": "/scan/run",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 271
+    }
+  },
+  {
+    "edge": "r1",
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/ReturnHome",
+    "name": "/scan/home",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 292,
+    "kind": "Action",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "ActionServer",
+      "type": "ReturnHome",
+      "name": "/scan/home",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 271
+    }
+  },
+  {
+    "edge": "r1",
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/Resume",
+    "name": "/scan/resume",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 293,
+    "kind": "Action",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "ActionServer",
+      "type": "Resume",
+      "name": "/scan/resume",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 271
+    }
+  },
+  {
+    "edge": "r1",
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/StopScan",
+    "name": "/scan/stop",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 294,
+    "kind": "Service",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_service",
+      "type": "StopScan",
+      "name": "/scan/stop",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 281
+    }
+  },
+  {
+    "edge": "r1",
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/SetConfig",
+    "name": "/scan/set_config",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 295,
+    "kind": "Service",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_service",
+      "type": "SetConfig",
+      "name": "/scan/set_config",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 284
+    }
+  },
+  {
+    "edge": "r2",
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 229,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "ScanState",
+      "name": "/scan/state",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 256
+    }
+  },
+  {
+    "edge": "r2",
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ScanResult",
+    "name": "/scan/result",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 230,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "ScanResult",
+      "name": "/scan/result",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 261
+    }
+  },
+  {
+    "edge": "r2",
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ScanLog",
+    "name": "/scan/log",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 231,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "ScanLog",
+      "name": "/scan/log",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 266
+    }
+  },
+  {
+    "edge": "r3",
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/RunWeld",
+    "name": "/weld/run",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 297,
+    "kind": "Action",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "ActionServer",
+      "type": "RunWeld",
+      "name": "/weld/run",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 158
+    }
+  },
+  {
+    "edge": "r3",
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/ReturnHome",
+    "name": "/weld/home",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 298,
+    "kind": "Action",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "ActionServer",
+      "type": "ReturnHome",
+      "name": "/weld/home",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 158
+    }
+  },
+  {
+    "edge": "r3",
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/StopWeld",
+    "name": "/weld/stop",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 299,
+    "kind": "Service",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "create_service",
+      "type": "StopWeld",
+      "name": "/weld/stop",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 164
+    }
+  },
+  {
+    "edge": "r4",
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/WeldState",
+    "name": "/weld/state",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 137,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "WeldState",
+      "name": "/weld/state",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 287
+    }
+  },
+  {
+    "edge": "r4",
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/WeldResult",
+    "name": "/weld/result",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 138,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "WeldResult",
+      "name": "/weld/result",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 287
+    }
+  },
+  {
+    "edge": "r4",
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ScanLog",
+    "name": "/weld/log",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 139,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "ScanLog",
+      "name": "/weld/log",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 287
+    }
+  },
+  {
+    "edge": "r5",
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/ResetSafety",
+    "name": "/safety/reset",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 296,
+    "kind": "Service",
+    "peer": {
+      "node": "safety_monitor",
+      "operation": "create_service",
+      "type": "ResetSafety",
+      "name": "/safety/reset",
+      "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+      "line": 90
+    }
+  },
+  {
+    "edge": "r6",
+    "node": "scan_manager",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/ExecuteMotion",
+    "name": "/robot/execute_motion",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 253,
+    "kind": "Action",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "ActionServer",
+      "type": "ExecuteMotion",
+      "name": "/robot/execute_motion",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 422
+    }
+  },
+  {
+    "edge": "r6",
+    "node": "scan_manager",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 256,
+    "kind": "Service",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "create_service",
+      "type": "StopRobot",
+      "name": "/robot/stop",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 421
+    }
+  },
+  {
+    "edge": "r6",
+    "name": "/robot_manager/set_parameters",
+    "type": "rcl_interfaces/srv/SetParameters",
+    "kind": "Service",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 267,
+    "notes": "기본 rclpy parameter interface"
+  },
+  {
+    "edge": "r6",
+    "name": "/robot_manager/get_parameters",
+    "type": "rcl_interfaces/srv/GetParameters",
+    "kind": "Service",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 267,
+    "notes": "기본 rclpy parameter interface"
+  },
+  {
+    "edge": "r7",
+    "node": "weld_manager",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/ExecuteMotion",
+    "name": "/robot/execute_motion",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 154,
+    "kind": "Action",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "ActionServer",
+      "type": "ExecuteMotion",
+      "name": "/robot/execute_motion",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 422
+    }
+  },
+  {
+    "edge": "r7",
+    "node": "weld_manager",
+    "operation": "ActionClient",
+    "type": "contact_scan_interfaces/action/ExecutePath",
+    "name": "/robot/execute_path",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 155,
+    "kind": "Action",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "ActionServer",
+      "type": "ExecutePath",
+      "name": "/robot/execute_path",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 428
+    }
+  },
+  {
+    "edge": "r7",
+    "node": "weld_manager",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 156,
+    "kind": "Service",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "create_service",
+      "type": "StopRobot",
+      "name": "/robot/stop",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 421
+    }
+  },
+  {
+    "edge": "r8",
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 229,
+    "kind": "Topic",
+    "peer": {
+      "node": "contact_detector",
+      "operation": "create_subscription",
+      "type": "ScanState",
+      "name": "/scan/state",
+      "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+      "line": 142
+    }
+  },
+  {
+    "edge": "r8",
+    "node": "scan_manager",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/TareForce",
+    "name": "/contact/tare",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 255,
+    "kind": "Service",
+    "peer": {
+      "node": "contact_detector",
+      "operation": "create_service",
+      "type": "TareForce",
+      "name": "/contact/tare",
+      "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+      "line": 146
+    }
+  },
+  {
+    "edge": "r8",
+    "name": "/contact_detector/set_parameters",
+    "type": "rcl_interfaces/srv/SetParameters",
+    "kind": "Service",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 267,
+    "notes": "기본 rclpy parameter interface"
+  },
+  {
+    "edge": "r8",
+    "name": "/contact_detector/get_parameters",
+    "type": "rcl_interfaces/srv/GetParameters",
+    "kind": "Service",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 267,
+    "notes": "기본 rclpy parameter interface"
+  },
+  {
+    "edge": "r9",
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 229,
+    "kind": "Topic",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "create_subscription",
+      "type": "ScanState",
+      "name": "/scan/state",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 146
+    }
+  },
+  {
+    "edge": "r10",
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/WeldState",
+    "name": "/weld/state",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 137,
+    "kind": "Topic",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_subscription",
+      "type": "WeldState",
+      "name": "/weld/state",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 251
+    }
+  },
+  {
+    "edge": "r11",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 381,
+    "kind": "Topic",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_subscription",
+      "type": "RobotSample",
+      "name": "/robot/sample",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 244
+    }
+  },
+  {
+    "edge": "r11",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 383,
+    "kind": "Topic",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_subscription",
+      "type": "ContactEvent",
+      "name": "/contact/event",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 248
+    }
+  },
+  {
+    "edge": "r11",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 385,
+    "kind": "Topic",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_subscription",
+      "type": "RobotStatus",
+      "name": "/robot/status",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 240
+    }
+  },
+  {
+    "edge": "r12",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 381,
+    "kind": "Topic",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "create_subscription",
+      "type": "RobotSample",
+      "name": "/robot/sample",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 152
+    }
+  },
+  {
+    "edge": "r12",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 385,
+    "kind": "Topic",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "create_subscription",
+      "type": "RobotStatus",
+      "name": "/robot/status",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 148
+    }
+  },
+  {
+    "edge": "r13",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 381,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "RobotSample",
+      "name": "/robot/sample",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 237
+    }
+  },
+  {
+    "edge": "r13",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 383,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "ContactEvent",
+      "name": "/contact/event",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 271
+    }
+  },
+  {
+    "edge": "r13",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 385,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "RobotStatus",
+      "name": "/robot/status",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 251
+    }
+  },
+  {
+    "edge": "r14",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 381,
+    "kind": "Topic",
+    "peer": {
+      "node": "contact_detector",
+      "operation": "create_subscription",
+      "type": "RobotSample",
+      "name": "/robot/sample",
+      "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+      "line": 141
+    }
+  },
+  {
+    "edge": "r15",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 381,
+    "kind": "Topic",
+    "peer": {
+      "node": "safety_monitor",
+      "operation": "create_subscription",
+      "type": "RobotSample",
+      "name": "/robot/sample",
+      "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+      "line": 87
+    }
+  },
+  {
+    "edge": "r15",
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 385,
+    "kind": "Topic",
+    "peer": {
+      "node": "safety_monitor",
+      "operation": "create_subscription",
+      "type": "RobotStatus",
+      "name": "/robot/status",
+      "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+      "line": 88
+    }
+  },
+  {
+    "edge": "r16",
+    "node": "contact_detector",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 140,
+    "kind": "Topic",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "create_subscription",
+      "type": "ContactEvent",
+      "name": "/contact/event",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 386
+    }
+  },
+  {
+    "edge": "r17",
+    "node": "contact_detector",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 140,
+    "kind": "Topic",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_subscription",
+      "type": "ContactEvent",
+      "name": "/contact/event",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 248
+    }
+  },
+  {
+    "edge": "r18",
+    "node": "contact_detector",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 140,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "ContactEvent",
+      "name": "/contact/event",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 271
+    }
+  },
+  {
+    "edge": "r19",
+    "node": "safety_monitor",
+    "operation": "create_client",
+    "type": "contact_scan_interfaces/srv/StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 89,
+    "kind": "Service",
+    "peer": {
+      "node": "robot_manager",
+      "operation": "create_service",
+      "type": "StopRobot",
+      "name": "/robot/stop",
+      "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+      "line": 421
+    }
+  },
+  {
+    "edge": "r20",
+    "node": "safety_monitor",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 86,
+    "kind": "Topic",
+    "peer": {
+      "node": "scan_manager",
+      "operation": "create_subscription",
+      "type": "SafetyStatus",
+      "name": "/safety/status",
+      "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+      "line": 246
+    }
+  },
+  {
+    "edge": "r21",
+    "node": "safety_monitor",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 86,
+    "kind": "Topic",
+    "peer": {
+      "node": "weld_manager",
+      "operation": "create_subscription",
+      "type": "SafetyStatus",
+      "name": "/safety/status",
+      "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+      "line": 150
+    }
+  },
+  {
+    "edge": "r22",
+    "node": "safety_monitor",
+    "operation": "create_publisher",
+    "type": "contact_scan_interfaces/msg/SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 86,
+    "kind": "Topic",
+    "peer": {
+      "node": "mqtt_bridge",
+      "operation": "create_subscription",
+      "type": "SafetyStatus",
+      "name": "/safety/status",
+      "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+      "line": 276
+    }
+  },
+  {
+    "edge": "r23",
+    "name": "/safety_monitor/set_parameters",
+    "type": "rcl_interfaces/srv/SetParameters",
+    "kind": "Service",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 267,
+    "notes": "기본 rclpy parameter interface"
+  },
+  {
+    "edge": "r23",
+    "name": "/safety_monitor/get_parameters",
+    "type": "rcl_interfaces/srv/GetParameters",
+    "kind": "Service",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 267,
+    "notes": "기본 rclpy parameter interface"
+  },
+  {
+    "edge": "r24",
+    "name": "/dsr01/joint_states",
+    "type": "sensor_msgs/msg/JointState",
+    "kind": "Topic",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 190,
+    "notes": "joint_state_topic 변경 가능 · 외부 발행자 미확정"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/aux_control/get_current_posx",
+    "type": "dsr_msgs2/srv/GetCurrentPosx",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 31,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/aux_control/get_tool_force",
+    "type": "dsr_msgs2/srv/GetToolForce",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 32,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/system/get_robot_state",
+    "type": "dsr_msgs2/srv/GetRobotState",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 33,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/motion/move_line",
+    "type": "dsr_msgs2/srv/MoveLine",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 34,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/motion/move_joint",
+    "type": "dsr_msgs2/srv/MoveJoint",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 35,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/motion/move_spline_task",
+    "type": "dsr_msgs2/srv/MoveSplineTask",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 36,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/motion/move_stop",
+    "type": "dsr_msgs2/srv/MoveStop",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 37,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/force/task_compliance_ctrl",
+    "type": "dsr_msgs2/srv/TaskComplianceCtrl",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 38,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/force/release_compliance_ctrl",
+    "type": "dsr_msgs2/srv/ReleaseComplianceCtrl",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 39,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/force/set_desired_force",
+    "type": "dsr_msgs2/srv/SetDesiredForce",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 40,
+    "notes": "dsr_namespace 변경 가능"
+  },
+  {
+    "edge": "r25",
+    "name": "/dsr01/dsr_controller2/force/release_force",
+    "type": "dsr_msgs2/srv/ReleaseForce",
+    "kind": "Service",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+    "line": 41,
+    "notes": "dsr_namespace 변경 가능"
+  }
+]

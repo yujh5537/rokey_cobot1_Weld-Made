@@ -1,0 +1,488 @@
+diff --git a/archify/assets/template.html b/archify/assets/template.html
+index 792c822f..9f9a111b 100644
+--- a/archify/assets/template.html
++++ b/archify/assets/template.html
+@@ -4951,7 +4951,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+           <span class="export-menu-heading" aria-hidden="true">{{i18n:viewer.export.share}}</span>
+           <button data-action="route-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled><span class="export-item-copy"><strong>{{i18n:viewer.export.routeShareCard}}</strong><small class="hint">1200&times;630 PNG</small></span></button>
+           <button data-action="reach-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled><span class="export-item-copy"><strong>{{i18n:viewer.export.reachShareCard}}</strong><small class="hint">1200&times;630 PNG</small></span></button>
+-          <button data-action="copy" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>{{i18n:viewer.export.copyDiagram}}</strong><small class="hint">{{i18n:viewer.export.clipboardPng}}</small></span></button>
+         </div>
+         <div class="export-menu-section" role="group" aria-label="{{i18n:viewer.export.raster}}">
+           <span class="export-menu-heading" aria-hidden="true">{{i18n:viewer.export.image}}</span>
+@@ -6824,7 +6823,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+           it.title = viewerText('viewer.export.unsupported');
+         }
+         if (it.dataset.action === 'copy' && !canCopyImage()) {
+-          it.disabled = true;
++          // Keep the PNG preview/save fallback available without Clipboard API.
+           it.title = viewerText('viewer.export.clipboardUnsupported');
+         }
+       });
+@@ -7050,34 +7049,86 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+         document.documentElement.removeAttribute('data-last-export-error');
+       }
+ 
++      var preparedCopy = null;
++      function prepareCopyImage() {
++        var pending = { blob: null, promise: null };
++        preparedCopy = pending;
++        pending.promise = rasterize('png');
++        pending.promise.then(function (blob) { pending.blob = blob; }).catch(function () {
++          if (preparedCopy === pending) preparedCopy = null;
++        });
++      }
+       function writePngToClipboard(blobPromise) {
+-        // WebKit requires ClipboardItem to be constructed synchronously inside
+-        // the user gesture. Chromium accepts the same pending Promise<Blob>;
+-        // engines that reject promise values fall back to an awaited Blob.
++        // Invoke write synchronously during the click. Catch asynchronous
++        // promise-valued ClipboardItem rejection too (the old catch did not).
+         try {
+-          return navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+-        } catch (_) {
+-          return blobPromise.then(function (blob) {
+-            return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+-          });
+-        }
++          return Promise.resolve(navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]));
++        } catch (error) { return Promise.reject(error); }
++      }
++
++      function showCopyFallback(blob, error) {
++        var dialog = document.createElement('dialog');
++        dialog.setAttribute('aria-label', '다이어그램 PNG 복사');
++        dialog.style.cssText = 'max-width:min(720px,90vw);max-height:85vh;padding:20px;border-radius:12px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);border:1px solid #64748b;';
++        var message = document.createElement('p');
++        message.setAttribute('role', 'status');
++        message.textContent = 'PNG는 준비됐지만 클립보드 복사는 완료되지 않았습니다. 다시 복사하거나 PNG로 저장하세요.';
++        dialog.appendChild(message);
++        var preview = document.createElement('img');
++        var url = URL.createObjectURL(blob);
++        preview.src = url;
++        preview.alt = '복사할 다이어그램 PNG 미리보기';
++        preview.style.cssText = 'display:block;max-width:100%;max-height:50vh;object-fit:contain;margin:12px auto;';
++        dialog.appendChild(preview);
++        var retry = document.createElement('button');
++        retry.type = 'button'; retry.textContent = '다시 복사';
++        retry.disabled = !canCopyImage();
++        retry.addEventListener('click', function () {
++          // A new explicit gesture, with a resolved Blob, restores activation
++          // in engines that reject a pending promise-valued ClipboardItem.
++          try {
++            Promise.resolve(navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])).then(function () {
++              document.documentElement.setAttribute('data-last-copy-status', 'copied');
++              toast(viewerText('viewer.export.copiedPng')); cleanup();
++            }).catch(function (err) {
++              message.textContent = '복사가 허용되지 않았습니다. 브라우저 클립보드 권한을 확인하거나 PNG로 저장하세요. ' + (err.name || 'ClipboardError');
++              document.documentElement.setAttribute('data-last-copy-status', 'blocked');
++            });
++          } catch (err) { message.textContent = '클립보드 복사를 사용할 수 없습니다. PNG로 저장하세요.'; }
++        });
++        var save = document.createElement('button');
++        save.type = 'button'; save.textContent = 'PNG 저장';
++        save.addEventListener('click', function () { download(blob, diagramFilename() + '.png'); });
++        var dismiss = document.createElement('button');
++        dismiss.type = 'button'; dismiss.textContent = '닫기';
++        function cleanup() { URL.revokeObjectURL(url); dialog.remove(); try { btn.focus({ preventScroll: true }); } catch (_) {} }
++        dismiss.addEventListener('click', cleanup);
++        dialog.addEventListener('cancel', function (event) { event.preventDefault(); cleanup(); });
++        [retry, save, dismiss].forEach(function (control) { control.style.margin = '6px'; dialog.appendChild(control); });
++        document.body.appendChild(dialog);
++        if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+       }
+ 
+       function runCopy() {
+         close(true);
+         clearExportReceipt();
+-        if (!canCopyImage()) {
+-          alert(viewerText('viewer.export.clipboardUnsupported.short'));
+-          return;
+-        }
+-        var blobPromise = rasterize('png');
+-        return writePngToClipboard(blobPromise).then(function () {
++        document.documentElement.setAttribute('data-last-copy-status', 'preparing');
++        var prepared = preparedCopy;
++        var blobPromise = prepared ? prepared.promise : rasterize('png');
++        // Handle raster failure even when clipboard permission rejects first.
++        blobPromise.catch(function () {});
++        var write = canCopyImage() ? writePngToClipboard(prepared && prepared.blob ? prepared.blob : blobPromise) : Promise.reject(new Error('Clipboard API unavailable'));
++        return write.then(function () {
++          document.documentElement.setAttribute('data-last-copy-status', 'copied');
+           toast(viewerText('viewer.export.copiedPng'));
+         }).catch(function (err) {
+-          console.error(err);
+-          alert(viewerText('viewer.export.copyFailed', {
+-            message: exportMessage(err)
+-          }));
++          return blobPromise.then(function (blob) {
++            document.documentElement.setAttribute('data-last-copy-status', 'prepared-not-copied');
++            showCopyFallback(blob, err);
++          });
++        }).catch(function (err) {
++          document.documentElement.setAttribute('data-last-copy-status', 'failed');
++          alert(viewerText('viewer.export.copyFailed', { message: exportMessage(err) }));
+         });
+       }
+ 
+@@ -9522,9 +9573,27 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+       function fitDockedRail() {
+         if (html.getAttribute('data-reader-rail') !== 'true' || !railPanel) return;
+         var top = railPanel.getBoundingClientRect().top + window.scrollY;
+-        var floor = window.innerHeight - number(window.getComputedStyle(body).paddingBottom) - top;
++        var floor = readerViewportHeight() - number(window.getComputedStyle(body).paddingBottom) - top;
+         html.style.setProperty('--archify-rail-max', Math.max(diagram.getBoundingClientRect().height, floor) + 'px');
+       }
++      // An auto-height embedding must not use its own growing height as
++      // the viewport budget: that feeds layout changes back into the host.
++      function readerViewportHeight() {
++        try {
++          if (window.parent !== window && window.parent.location.origin === window.location.origin)
++            return window.parent.innerHeight;
++        } catch (_) {}
++        return window.innerHeight;
++      }
++      function readerDocumentHeight() {
++        try {
++          if (window.parent !== window && window.parent.location.origin === window.location.origin) {
++            var style = window.getComputedStyle(body);
++            return shell.getBoundingClientRect().height + number(style.paddingTop) + number(style.paddingBottom);
++          }
++        } catch (_) {}
++        return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
++      }
+       function chromeMetrics() {
+         var bodyStyle = window.getComputedStyle(body);
+         var diagramStyle = window.getComputedStyle(diagram);
+@@ -9565,10 +9634,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+           settleFrame = 0;
+           if (!eligible() || !lastWidth) return;
+           fitDockedRail();
+-          var overflow = Math.max(
+-            document.documentElement.scrollHeight,
+-            document.body.scrollHeight
+-          ) - window.innerHeight - belowFold();
++          var overflow = readerDocumentHeight() - readerViewportHeight() - belowFold();
+           if (overflow > 1 && lastWidth > Math.ceil(minWidth)) {
+             applyWidth(Math.max(minWidth, lastWidth - overflow * ratio - 4), minWidth);
+             settledCap = lastWidth;
+@@ -9633,7 +9699,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+         var stackedBelow = mode === 'bottom' ? 0 : docked ? 0 : outerHeight(cards);
+         var fixedHeight = chrome.bodyY + chrome.diagramY + SAFE_BOTTOM_GAP +
+           outerHeight(header) + stackedBelow;
+-        var availableSvgHeight = Math.max(1, window.innerHeight - fixedHeight);
++        var availableSvgHeight = Math.max(1, readerViewportHeight() - fixedHeight);
+         var desiredWidth = availableSvgHeight * ratio + chrome.diagramX + (docked ? railExtra : 0);
+         var width = Math.max(minWidth, Math.min(maxWidth, desiredWidth, settledCap || desiredWidth));
+         applyWidth(width, minWidth);
+@@ -9677,10 +9743,19 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+       }
+       archifyLayoutOwners.reader = { schedule: schedule, pending: layoutPending, snapshot: stableSnapshot };
+ 
+-      window.addEventListener('resize', function () {
++      var previousViewport = window.innerWidth + '|' + readerViewportHeight();
++      function viewportResized() {
++        var currentViewport = window.innerWidth + '|' + readerViewportHeight();
++        if (currentViewport === previousViewport) return; // iframe height-only resize
++        previousViewport = currentViewport;
+         settledCap = 0;
+         schedule();
+-      }, { passive: true });
++      }
++      window.addEventListener('resize', viewportResized, { passive: true });
++      try {
++        if (window.parent !== window && window.parent.location.origin === window.location.origin)
++          window.parent.addEventListener('resize', viewportResized, { passive: true });
++      } catch (_) {}
+       window.addEventListener('load', schedule, { once: true });
+       if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule).catch(function () {});
+       if (typeof ResizeObserver === 'function') {
+@@ -9721,6 +9796,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+       schedule();
+ 
+       return {
++        viewportHeight: readerViewportHeight,
+         measure: measure,
+         schedule: schedule,
+         whenStable: whenStable,
+@@ -10613,14 +10689,28 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+       container.addEventListener('pointerup', onPointerEnd);
+       container.addEventListener('pointercancel', onPointerEnd);
+       container.addEventListener('scroll', onScroll, { passive: true });
+-      window.addEventListener('resize', function () {
++      function cameraViewportKey() {
++        var height = Archify.readerLayout && Archify.readerLayout.viewportHeight
++          ? Archify.readerLayout.viewportHeight() : window.innerHeight;
++        return window.innerWidth + '|' + height;
++      }
++      var lastCameraViewport = cameraViewportKey();
++      function cameraViewportResized() {
++        var key = cameraViewportKey();
++        if (key === lastCameraViewport) return; // no refocus from host auto-height
++        lastCameraViewport = key;
+         if (resizeFrame) cancelAnimationFrame(resizeFrame);
+         resizeFrame = requestAnimationFrame(function () {
+           resizeFrame = 0;
+           if (state.mode === 'semantic') syncSemantic();
+           else apply();
+         });
+-      });
++      }
++      window.addEventListener('resize', cameraViewportResized);
++      try {
++        if (window.parent !== window && window.parent.location.origin === window.location.origin)
++          window.parent.addEventListener('resize', cameraViewportResized, { passive: true });
++      } catch (_) {}
+       window.addEventListener('hashchange', function () { requestAnimationFrame(syncSemantic); });
+       apply();
+       pinControls();
+diff --git a/viewer/export.js b/viewer/export.js
+index 72d15d83..3842748c 100644
+--- a/viewer/export.js
++++ b/viewer/export.js
+@@ -1076,7 +1076,7 @@
+           it.title = viewerText('viewer.export.unsupported');
+         }
+         if (it.dataset.action === 'copy' && !canCopyImage()) {
+-          it.disabled = true;
++          // Keep the PNG preview/save fallback available without Clipboard API.
+           it.title = viewerText('viewer.export.clipboardUnsupported');
+         }
+       });
+@@ -1302,34 +1302,86 @@
+         document.documentElement.removeAttribute('data-last-export-error');
+       }
+ 
++      var preparedCopy = null;
++      function prepareCopyImage() {
++        var pending = { blob: null, promise: null };
++        preparedCopy = pending;
++        pending.promise = rasterize('png');
++        pending.promise.then(function (blob) { pending.blob = blob; }).catch(function () {
++          if (preparedCopy === pending) preparedCopy = null;
++        });
++      }
+       function writePngToClipboard(blobPromise) {
+-        // WebKit requires ClipboardItem to be constructed synchronously inside
+-        // the user gesture. Chromium accepts the same pending Promise<Blob>;
+-        // engines that reject promise values fall back to an awaited Blob.
++        // Invoke write synchronously during the click. Catch asynchronous
++        // promise-valued ClipboardItem rejection too (the old catch did not).
+         try {
+-          return navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+-        } catch (_) {
+-          return blobPromise.then(function (blob) {
+-            return navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+-          });
+-        }
++          return Promise.resolve(navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]));
++        } catch (error) { return Promise.reject(error); }
++      }
++
++      function showCopyFallback(blob, error) {
++        var dialog = document.createElement('dialog');
++        dialog.setAttribute('aria-label', '다이어그램 PNG 복사');
++        dialog.style.cssText = 'max-width:min(720px,90vw);max-height:85vh;padding:20px;border-radius:12px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);border:1px solid #64748b;';
++        var message = document.createElement('p');
++        message.setAttribute('role', 'status');
++        message.textContent = 'PNG는 준비됐지만 클립보드 복사는 완료되지 않았습니다. 다시 복사하거나 PNG로 저장하세요.';
++        dialog.appendChild(message);
++        var preview = document.createElement('img');
++        var url = URL.createObjectURL(blob);
++        preview.src = url;
++        preview.alt = '복사할 다이어그램 PNG 미리보기';
++        preview.style.cssText = 'display:block;max-width:100%;max-height:50vh;object-fit:contain;margin:12px auto;';
++        dialog.appendChild(preview);
++        var retry = document.createElement('button');
++        retry.type = 'button'; retry.textContent = '다시 복사';
++        retry.disabled = !canCopyImage();
++        retry.addEventListener('click', function () {
++          // A new explicit gesture, with a resolved Blob, restores activation
++          // in engines that reject a pending promise-valued ClipboardItem.
++          try {
++            Promise.resolve(navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])).then(function () {
++              document.documentElement.setAttribute('data-last-copy-status', 'copied');
++              toast(viewerText('viewer.export.copiedPng')); cleanup();
++            }).catch(function (err) {
++              message.textContent = '복사가 허용되지 않았습니다. 브라우저 클립보드 권한을 확인하거나 PNG로 저장하세요. ' + (err.name || 'ClipboardError');
++              document.documentElement.setAttribute('data-last-copy-status', 'blocked');
++            });
++          } catch (err) { message.textContent = '클립보드 복사를 사용할 수 없습니다. PNG로 저장하세요.'; }
++        });
++        var save = document.createElement('button');
++        save.type = 'button'; save.textContent = 'PNG 저장';
++        save.addEventListener('click', function () { download(blob, diagramFilename() + '.png'); });
++        var dismiss = document.createElement('button');
++        dismiss.type = 'button'; dismiss.textContent = '닫기';
++        function cleanup() { URL.revokeObjectURL(url); dialog.remove(); try { btn.focus({ preventScroll: true }); } catch (_) {} }
++        dismiss.addEventListener('click', cleanup);
++        dialog.addEventListener('cancel', function (event) { event.preventDefault(); cleanup(); });
++        [retry, save, dismiss].forEach(function (control) { control.style.margin = '6px'; dialog.appendChild(control); });
++        document.body.appendChild(dialog);
++        if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+       }
+ 
+       function runCopy() {
+         close(true);
+         clearExportReceipt();
+-        if (!canCopyImage()) {
+-          alert(viewerText('viewer.export.clipboardUnsupported.short'));
+-          return;
+-        }
+-        var blobPromise = rasterize('png');
+-        return writePngToClipboard(blobPromise).then(function () {
++        document.documentElement.setAttribute('data-last-copy-status', 'preparing');
++        var prepared = preparedCopy;
++        var blobPromise = prepared ? prepared.promise : rasterize('png');
++        // Handle raster failure even when clipboard permission rejects first.
++        blobPromise.catch(function () {});
++        var write = canCopyImage() ? writePngToClipboard(prepared && prepared.blob ? prepared.blob : blobPromise) : Promise.reject(new Error('Clipboard API unavailable'));
++        return write.then(function () {
++          document.documentElement.setAttribute('data-last-copy-status', 'copied');
+           toast(viewerText('viewer.export.copiedPng'));
+         }).catch(function (err) {
+-          console.error(err);
+-          alert(viewerText('viewer.export.copyFailed', {
+-            message: exportMessage(err)
+-          }));
++          return blobPromise.then(function (blob) {
++            document.documentElement.setAttribute('data-last-copy-status', 'prepared-not-copied');
++            showCopyFallback(blob, err);
++          });
++        }).catch(function (err) {
++          document.documentElement.setAttribute('data-last-copy-status', 'failed');
++          alert(viewerText('viewer.export.copyFailed', { message: exportMessage(err) }));
+         });
+       }
+ 
+diff --git a/viewer/reader-layout.js b/viewer/reader-layout.js
+index beada7c3..2f1a937a 100644
+--- a/viewer/reader-layout.js
++++ b/viewer/reader-layout.js
+@@ -179,9 +179,27 @@
+       function fitDockedRail() {
+         if (html.getAttribute('data-reader-rail') !== 'true' || !railPanel) return;
+         var top = railPanel.getBoundingClientRect().top + window.scrollY;
+-        var floor = window.innerHeight - number(window.getComputedStyle(body).paddingBottom) - top;
++        var floor = readerViewportHeight() - number(window.getComputedStyle(body).paddingBottom) - top;
+         html.style.setProperty('--archify-rail-max', Math.max(diagram.getBoundingClientRect().height, floor) + 'px');
+       }
++      // An auto-height embedding must not use its own growing height as
++      // the viewport budget: that feeds layout changes back into the host.
++      function readerViewportHeight() {
++        try {
++          if (window.parent !== window && window.parent.location.origin === window.location.origin)
++            return window.parent.innerHeight;
++        } catch (_) {}
++        return window.innerHeight;
++      }
++      function readerDocumentHeight() {
++        try {
++          if (window.parent !== window && window.parent.location.origin === window.location.origin) {
++            var style = window.getComputedStyle(body);
++            return shell.getBoundingClientRect().height + number(style.paddingTop) + number(style.paddingBottom);
++          }
++        } catch (_) {}
++        return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
++      }
+       function chromeMetrics() {
+         var bodyStyle = window.getComputedStyle(body);
+         var diagramStyle = window.getComputedStyle(diagram);
+@@ -222,10 +240,7 @@
+           settleFrame = 0;
+           if (!eligible() || !lastWidth) return;
+           fitDockedRail();
+-          var overflow = Math.max(
+-            document.documentElement.scrollHeight,
+-            document.body.scrollHeight
+-          ) - window.innerHeight - belowFold();
++          var overflow = readerDocumentHeight() - readerViewportHeight() - belowFold();
+           if (overflow > 1 && lastWidth > Math.ceil(minWidth)) {
+             applyWidth(Math.max(minWidth, lastWidth - overflow * ratio - 4), minWidth);
+             settledCap = lastWidth;
+@@ -290,7 +305,7 @@
+         var stackedBelow = mode === 'bottom' ? 0 : docked ? 0 : outerHeight(cards);
+         var fixedHeight = chrome.bodyY + chrome.diagramY + SAFE_BOTTOM_GAP +
+           outerHeight(header) + stackedBelow;
+-        var availableSvgHeight = Math.max(1, window.innerHeight - fixedHeight);
++        var availableSvgHeight = Math.max(1, readerViewportHeight() - fixedHeight);
+         var desiredWidth = availableSvgHeight * ratio + chrome.diagramX + (docked ? railExtra : 0);
+         var width = Math.max(minWidth, Math.min(maxWidth, desiredWidth, settledCap || desiredWidth));
+         applyWidth(width, minWidth);
+@@ -334,10 +349,19 @@
+       }
+       archifyLayoutOwners.reader = { schedule: schedule, pending: layoutPending, snapshot: stableSnapshot };
+ 
+-      window.addEventListener('resize', function () {
++      var previousViewport = window.innerWidth + '|' + readerViewportHeight();
++      function viewportResized() {
++        var currentViewport = window.innerWidth + '|' + readerViewportHeight();
++        if (currentViewport === previousViewport) return; // iframe height-only resize
++        previousViewport = currentViewport;
+         settledCap = 0;
+         schedule();
+-      }, { passive: true });
++      }
++      window.addEventListener('resize', viewportResized, { passive: true });
++      try {
++        if (window.parent !== window && window.parent.location.origin === window.location.origin)
++          window.parent.addEventListener('resize', viewportResized, { passive: true });
++      } catch (_) {}
+       window.addEventListener('load', schedule, { once: true });
+       if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule).catch(function () {});
+       if (typeof ResizeObserver === 'function') {
+@@ -378,6 +402,7 @@
+       schedule();
+ 
+       return {
++        viewportHeight: readerViewportHeight,
+         measure: measure,
+         schedule: schedule,
+         whenStable: whenStable,
+diff --git a/viewer/template.source.html b/viewer/template.source.html
+index 9d140711..90910ae8 100644
+--- a/viewer/template.source.html
++++ b/viewer/template.source.html
+@@ -252,7 +252,6 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
+           <span class="export-menu-heading" aria-hidden="true">{{i18n:viewer.export.share}}</span>
+           <button data-action="route-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled><span class="export-item-copy"><strong>{{i18n:viewer.export.routeShareCard}}</strong><small class="hint">1200&times;630 PNG</small></span></button>
+           <button data-action="reach-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled><span class="export-item-copy"><strong>{{i18n:viewer.export.reachShareCard}}</strong><small class="hint">1200&times;630 PNG</small></span></button>
+-          <button data-action="copy" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>{{i18n:viewer.export.copyDiagram}}</strong><small class="hint">{{i18n:viewer.export.clipboardPng}}</small></span></button>
+         </div>
+         <div class="export-menu-section" role="group" aria-label="{{i18n:viewer.export.raster}}">
+           <span class="export-menu-heading" aria-hidden="true">{{i18n:viewer.export.image}}</span>
+diff --git a/viewer/viewer-camera.js b/viewer/viewer-camera.js
+index e8f912d0..5cf54dc2 100644
+--- a/viewer/viewer-camera.js
++++ b/viewer/viewer-camera.js
+@@ -491,14 +491,28 @@
+       container.addEventListener('pointerup', onPointerEnd);
+       container.addEventListener('pointercancel', onPointerEnd);
+       container.addEventListener('scroll', onScroll, { passive: true });
+-      window.addEventListener('resize', function () {
++      function cameraViewportKey() {
++        var height = Archify.readerLayout && Archify.readerLayout.viewportHeight
++          ? Archify.readerLayout.viewportHeight() : window.innerHeight;
++        return window.innerWidth + '|' + height;
++      }
++      var lastCameraViewport = cameraViewportKey();
++      function cameraViewportResized() {
++        var key = cameraViewportKey();
++        if (key === lastCameraViewport) return; // no refocus from host auto-height
++        lastCameraViewport = key;
+         if (resizeFrame) cancelAnimationFrame(resizeFrame);
+         resizeFrame = requestAnimationFrame(function () {
+           resizeFrame = 0;
+           if (state.mode === 'semantic') syncSemantic();
+           else apply();
+         });
+-      });
++      }
++      window.addEventListener('resize', cameraViewportResized);
++      try {
++        if (window.parent !== window && window.parent.location.origin === window.location.origin)
++          window.parent.addEventListener('resize', cameraViewportResized, { passive: true });
++      } catch (_) {}
+       window.addEventListener('hashchange', function () { requestAnimationFrame(syncSemantic); });
+       apply();
+       pinControls();

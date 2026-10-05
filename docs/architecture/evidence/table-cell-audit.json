@@ -1,0 +1,4085 @@
+{
+  "tableCount": 7,
+  "columnCount": 71,
+  "relationshipCount": 5,
+  "textCells": 291,
+  "minFont": 12,
+  "cellOverlapCount": 0,
+  "method": "Numerical cell rectangles + renderer estimated text width. Actual browser SVG getBBox unavailable.",
+  "cells": [
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        120.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "workpiece_id",
+      "cell": [
+        178.24,
+        120.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        146.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK",
+      "cell": [
+        485.44,
+        120.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        172.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "name",
+      "cell": [
+        178.24,
+        172.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        198.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        172.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        224.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "description",
+      "cell": [
+        178.24,
+        224.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        250.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        224.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        276.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "active",
+      "cell": [
+        178.24,
+        276.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · TRUE",
+      "cell": [
+        178.24,
+        302.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        276.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        40.0,
+        328.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "created_at",
+      "cell": [
+        178.24,
+        328.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        178.24,
+        354.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        328.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        40.0,
+        380.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "updated_at",
+      "cell": [
+        178.24,
+        380.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        178.24,
+        406.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        380.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        120.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "work_order_id",
+      "cell": [
+        818.24,
+        120.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        146.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK",
+      "cell": [
+        1125.44,
+        120.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        172.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "workpiece_id",
+      "cell": [
+        818.24,
+        172.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        198.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "FK",
+      "cell": [
+        1125.44,
+        172.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        224.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "name",
+      "cell": [
+        818.24,
+        224.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        250.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        224.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        276.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "status",
+      "cell": [
+        818.24,
+        276.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · 'READY'",
+      "cell": [
+        818.24,
+        302.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        276.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        328.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "note",
+      "cell": [
+        818.24,
+        328.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        354.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        328.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        680.0,
+        380.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "created_at",
+      "cell": [
+        818.24,
+        380.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        818.24,
+        406.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        380.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        680.0,
+        432.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "updated_at",
+      "cell": [
+        818.24,
+        432.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        818.24,
+        458.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        432.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "workpiece_id → workpieces(workpiece_id) ON DELETE RESTRICT",
+      "cell": [
+        680.0,
+        484.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        680.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "work_order_id",
+      "cell": [
+        818.24,
+        680.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        706.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK,FK",
+      "cell": [
+        1125.44,
+        680.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        732.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "scan_id",
+      "cell": [
+        818.24,
+        732.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        758.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK,FK,UK",
+      "cell": [
+        1125.44,
+        732.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        680.0,
+        784.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "linked_at",
+      "cell": [
+        818.24,
+        784.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        818.24,
+        810.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        784.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "work_order_id → work_orders(work_order_id) ON DELETE CASCADE",
+      "cell": [
+        680.0,
+        836.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "scan_id → scan_jobs(scan_id) ON DELETE CASCADE",
+      "cell": [
+        680.0,
+        860.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "PRIMARY KEY (work_order_id, scan_id)",
+      "cell": [
+        680.0,
+        884.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        1090.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "scan_id",
+      "cell": [
+        818.24,
+        1090.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        1116.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK",
+      "cell": [
+        1125.44,
+        1090.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        680.0,
+        1142.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "success",
+      "cell": [
+        818.24,
+        1142.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1168.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1142.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "integer",
+      "cell": [
+        680.0,
+        1194.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "reason_code",
+      "cell": [
+        818.24,
+        1194.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1220.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1194.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        1246.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "reason",
+      "cell": [
+        818.24,
+        1246.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1272.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1246.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        1298.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "detail",
+      "cell": [
+        818.24,
+        1298.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1324.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1298.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        1350.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "frame_id",
+      "cell": [
+        818.24,
+        1350.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1376.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1350.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        680.0,
+        1402.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "started_at_ms",
+      "cell": [
+        818.24,
+        1402.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1428.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1402.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        680.0,
+        1454.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "finished_at_ms",
+      "cell": [
+        818.24,
+        1454.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1480.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1454.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        680.0,
+        1506.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "published_at_ms",
+      "cell": [
+        818.24,
+        1506.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        818.24,
+        1532.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1506.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        680.0,
+        1558.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "created_at",
+      "cell": [
+        818.24,
+        1558.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        818.24,
+        1584.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        1558.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        2290.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "scan_id",
+      "cell": [
+        178.24,
+        2290.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        2316.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK,FK",
+      "cell": [
+        485.44,
+        2290.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        2342.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "stamp_ms",
+      "cell": [
+        178.24,
+        2342.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        2368.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2342.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2394.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "z_top_mm",
+      "cell": [
+        178.24,
+        2394.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2420.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2394.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        2446.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "z_top_valid",
+      "cell": [
+        178.24,
+        2446.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        2472.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2446.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2498.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "x_pos_mm",
+      "cell": [
+        178.24,
+        2498.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2524.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2498.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        2550.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "x_pos_valid",
+      "cell": [
+        178.24,
+        2550.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        2576.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2550.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2602.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "x_neg_mm",
+      "cell": [
+        178.24,
+        2602.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2628.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2602.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        2654.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "x_neg_valid",
+      "cell": [
+        178.24,
+        2654.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        2680.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2654.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2706.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "y_pos_mm",
+      "cell": [
+        178.24,
+        2706.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2732.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2706.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        2758.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "y_pos_valid",
+      "cell": [
+        178.24,
+        2758.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        2784.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2758.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2810.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "y_neg_mm",
+      "cell": [
+        178.24,
+        2810.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2836.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2810.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        2862.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "y_neg_valid",
+      "cell": [
+        178.24,
+        2862.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        2888.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2862.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2914.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "width_mm",
+      "cell": [
+        178.24,
+        2914.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2940.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2914.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        2966.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "length_mm",
+      "cell": [
+        178.24,
+        2966.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2992.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2966.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        3018.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "height_mm",
+      "cell": [
+        178.24,
+        3018.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        3044.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3018.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        3070.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "dims_valid",
+      "cell": [
+        178.24,
+        3070.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        3096.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3070.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        3122.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "support_z_mm",
+      "cell": [
+        178.24,
+        3122.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        3148.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3122.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        3174.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "support_z_valid",
+      "cell": [
+        178.24,
+        3174.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        3200.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3174.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "jsonb",
+      "cell": [
+        40.0,
+        3226.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "vertices",
+      "cell": [
+        178.24,
+        3226.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        3252.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3226.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "jsonb",
+      "cell": [
+        40.0,
+        3278.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "edges",
+      "cell": [
+        178.24,
+        3278.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        3304.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3278.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "jsonb",
+      "cell": [
+        40.0,
+        3330.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "path_candidates",
+      "cell": [
+        178.24,
+        3330.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        3356.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3330.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        3382.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "box_valid",
+      "cell": [
+        178.24,
+        3382.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        3408.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3382.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        40.0,
+        3434.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "created_at",
+      "cell": [
+        178.24,
+        3434.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        178.24,
+        3460.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        3434.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "scan_id → scan_jobs(scan_id) ON DELETE CASCADE",
+      "cell": [
+        40.0,
+        3486.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        680.0,
+        2290.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "scan_id",
+      "cell": [
+        818.24,
+        2290.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        2316.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK,FK",
+      "cell": [
+        1125.44,
+        2290.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "jsonb",
+      "cell": [
+        680.0,
+        2342.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "config",
+      "cell": [
+        818.24,
+        2342.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        818.24,
+        2368.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        2342.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        680.0,
+        2394.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "created_at",
+      "cell": [
+        818.24,
+        2394.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        818.24,
+        2420.0,
+        307.20000000000005,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        1125.44,
+        2394.0,
+        66.55999999999995,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "scan_id → scan_jobs(scan_id) ON DELETE CASCADE",
+      "cell": [
+        680.0,
+        2446.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigserial",
+      "cell": [
+        40.0,
+        1090.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "id",
+      "cell": [
+        178.24,
+        1090.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        1116.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "PK",
+      "cell": [
+        485.44,
+        1090.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        1142.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "scan_id",
+      "cell": [
+        178.24,
+        1142.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        1168.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1142.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1194.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "event_id",
+      "cell": [
+        178.24,
+        1194.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        1220.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1194.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1246.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "motion_id",
+      "cell": [
+        178.24,
+        1246.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1272.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1246.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1298.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "sample_id",
+      "cell": [
+        178.24,
+        1298.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1324.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1298.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        1350.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "event_type",
+      "cell": [
+        178.24,
+        1350.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL",
+      "cell": [
+        178.24,
+        1376.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1350.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        1402.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "source",
+      "cell": [
+        178.24,
+        1402.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1428.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1402.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "text",
+      "cell": [
+        40.0,
+        1454.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "frame_id",
+      "cell": [
+        178.24,
+        1454.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1480.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1454.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "jsonb",
+      "cell": [
+        40.0,
+        1506.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "pose",
+      "cell": [
+        178.24,
+        1506.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1532.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1506.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "jsonb",
+      "cell": [
+        40.0,
+        1558.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "wrench",
+      "cell": [
+        178.24,
+        1558.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1584.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1558.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1610.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "pose_stamp_ms",
+      "cell": [
+        178.24,
+        1610.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1636.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1610.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1662.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "force_stamp_ms",
+      "cell": [
+        178.24,
+        1662.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1688.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1662.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1714.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "detect_stamp_ms",
+      "cell": [
+        178.24,
+        1714.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1740.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1714.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        1766.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "force_delta_n",
+      "cell": [
+        178.24,
+        1766.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1792.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1766.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "double precision",
+      "cell": [
+        40.0,
+        1818.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "z_drop_mm",
+      "cell": [
+        178.24,
+        1818.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1844.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1818.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "boolean",
+      "cell": [
+        40.0,
+        1870.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "z_drop_valid",
+      "cell": [
+        178.24,
+        1870.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · FALSE",
+      "cell": [
+        178.24,
+        1896.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1870.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "integer",
+      "cell": [
+        40.0,
+        1922.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "debounce_count",
+      "cell": [
+        178.24,
+        1922.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        1948.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1922.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "bigint",
+      "cell": [
+        40.0,
+        1974.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "published_at_ms",
+      "cell": [
+        178.24,
+        1974.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NULL",
+      "cell": [
+        178.24,
+        2000.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        1974.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "type",
+      "text": "timestamptz",
+      "cell": [
+        40.0,
+        2026.0,
+        138.24,
+        52.0
+      ],
+      "font": 13.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "name",
+      "text": "created_at",
+      "cell": [
+        178.24,
+        2026.0,
+        307.2,
+        26.0
+      ],
+      "font": 14.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "null-default",
+      "text": "NOT NULL · NOW()",
+      "cell": [
+        178.24,
+        2052.0,
+        307.2,
+        26.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    },
+    {
+      "role": "key",
+      "text": "",
+      "cell": [
+        485.44,
+        2026.0,
+        66.56,
+        52.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-database"
+      ]
+    },
+    {
+      "role": "constraint",
+      "text": "UNIQUE (scan_id, event_id)",
+      "cell": [
+        40.0,
+        2078.0,
+        512.0,
+        24.0
+      ],
+      "font": 12.0,
+      "cssClass": [
+        "t-primary"
+      ]
+    }
+  ]
+}

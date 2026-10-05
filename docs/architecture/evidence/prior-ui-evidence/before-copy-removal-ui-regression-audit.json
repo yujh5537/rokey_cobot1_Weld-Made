@@ -1,0 +1,79 @@
+{
+  "referenceFile": "cobot3-archify-technical-visual-architectures(4).zip",
+  "referenceSha256": "7e45b31101ed3e59629cd3b9765dc6537fd448ebed581f035d82d68cf8c3400b",
+  "baseline": "Weld-Made-architectures-ui-fixed.zip",
+  "diagrams": [
+    {
+      "diagram": "01_system",
+      "semanticContentUnchanged": true,
+      "candidateByteIdentical": false,
+      "candidateSha256": "fe0d162eef0a723625152b84c9a888c9c4e35e14c21608403cd91138c5e9649c",
+      "htmlSha256": "060e62a5d7ecdb9650499b853689a0d138132ed772d30a146d1c2ed56d52a323",
+      "componentCount": 14,
+      "connectionCount": 16,
+      "viewBox": [
+        1240,
+        920.2815099168266
+      ],
+      "referenceViewBox": [
+        1563,
+        1160
+      ],
+      "aspectRatioExactlyMatched": true,
+      "qualityProfile": "standard, matching attached Cobot3 reference"
+    },
+    {
+      "diagram": "02_ros2",
+      "semanticContentUnchanged": true,
+      "candidateByteIdentical": false,
+      "candidateSha256": "4d39268ef9fc76ef7620d5a3088583810b191bc48201e6146fb95d3e5fa2457f",
+      "htmlSha256": "b841d4eff5f0438b9456fecc9c1bf12117941bcfc4d6abb97ab2530d63c700ff",
+      "componentCount": 8,
+      "connectionCount": 25,
+      "viewBox": [
+        1240,
+        645.9921743991057
+      ],
+      "referenceViewBox": [
+        1789,
+        932
+      ],
+      "aspectRatioExactlyMatched": true,
+      "qualityProfile": "standard, matching attached Cobot3 reference"
+    },
+    {
+      "diagram": "03_erd",
+      "semanticContentUnchanged": true,
+      "candidateByteIdentical": true,
+      "candidateSha256": "1d76ae6c889dee2e67bd3e1543800c7b26ccf9ea1cb001fce81a5a96c1781a55",
+      "htmlSha256": "72840e31046bd7f23ecb9d833cf557534fb40f23e29b5902f7328956ff37b571",
+      "componentCount": 7,
+      "connectionCount": 5,
+      "viewBox": null
+    },
+    {
+      "diagram": "04_flow",
+      "semanticContentUnchanged": true,
+      "candidateByteIdentical": true,
+      "candidateSha256": "369f8557a37249141efc6d39049d48782194883c9e9d73c6f9f65eb94055410d",
+      "htmlSha256": "6c52132200a3fd9ae982a4d49030ae739e267cf1a65b6ba23981872010e77efc",
+      "componentCount": 39,
+      "connectionCount": 66,
+      "viewBox": null
+    }
+  ],
+  "tests": {
+    "copyLayoutCameraUnitTests": "8/8 pass",
+    "npmTest": "11 golden/template checks failed; current ui-npm-test.txt",
+    "directBrowser": "unconfirmed: ERR_BLOCKED_BY_CLIENT policy previously blocked requested local viewer; no bypass attempted",
+    "nativeClipboard": "unconfirmed",
+    "nativeExportDownload": "unconfirmed",
+    "freshZipRegeneration": {
+      "status": "validate/deliver/check pass; all candidate/HTML/SVG/PNG/preview hashes byte-identical; browser/visual skipped",
+      "report": "relocated-regeneration.json",
+      "executionStateRecoveryCount": 1
+    }
+  },
+  "projectCodeModified": false,
+  "deployed": false
+}

@@ -1,0 +1,28 @@
+{
+  "project_branch": "main",
+  "project_commit": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+  "archify_version": "3.0.1",
+  "archify_commit": "bb6f126f1748a4079df1d263302466eb4333e3b0",
+  "date": "2026-10-05",
+  "source_modified": false,
+  "public_deployed": false,
+  "renderer_by_diagram": {
+    "01_system": "official architecture renderer + viewer UI patch",
+    "02_ros2": "official architecture renderer + viewer UI patch",
+    "03_erd": "extended architecture renderer + same viewer UI patch",
+    "04_flow": "extended architecture renderer + same viewer UI patch"
+  },
+  "viewer_css_js_modified": true,
+  "extension_patch_sha256": "87d3eb84d2dd0c1a2b3f9241ac5903cc0428bef1029f2849469ef560bc66decb",
+  "repair": "Remove Copy Diagram menu and its prewarm call; preserve mobile wrapper and prior camera/reader fixes",
+  "candidate_content_modified": true,
+  "html_svg_embedded_content_modified": true,
+  "asset_generator_modified": true,
+  "native_export_verified": false,
+  "viewer_patch_sha256": "5ff36c30b0d98247e327094511d051e6e72c6d53ce7397ae3f1459af4068f708",
+  "candidate_semantic_content_modified": false,
+  "reference_zip": "cobot3-archify-technical-visual-architectures(4).zip",
+  "mobile_wrapper_modified": true,
+  "mobile_ui_verified": false,
+  "copy_diagram_removed": true
+}
