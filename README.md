@@ -8,29 +8,28 @@
 
 ## 시연 영상
 
-실제 M0609 동작과 웹 3D 관제 화면을 함께 볼 수 있다. 제목을 누르면 저장소의 원본 영상으로 이동한다.
+실제 M0609 동작과 웹 3D 관제 화면을 함께 볼 수 있다. GIF를 누르면 저장소의 대응 영상 파일로 이동한다.
 
 ### 실물·웹 통합 시연
 
-**[통합 시연 영상 보기](./docs/demonstration-video/통합.webm)** · 3분 39초  
-실물 로봇과 웹 관제 화면을 나란히 배치해 접촉 탐색과 용접 경로 추종을 함께 보여준다.
+[![통합 시연 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/통합.gif)](./docs/demonstration-video/통합-5x.mp4)
 
-<!-- GIF 교체 위치: 통합 시연. GIF를 추가할 때 이미지의 링크 대상은 위 원본 영상 경로를 유지한다. -->
+**[통합 5배속 영상 보기](./docs/demonstration-video/통합-5x.mp4)** · 약 40초 · [전체 길이 원본](./docs/demonstration-video/통합.webm) · 3분 39초  
+실제 M0609와 뒤편 웹 관제 화면을 한 프레임에서 보며 접촉 탐색과 용접 경로 추종을 확인할 수 있다.
 
 | 실제 로봇 공정 | 웹 3D 관제 |
 |---|---|
-| [실물 시연 영상 보기](./docs/demonstration-video/전체시연통합.webm) · 3분 18초 | [관제 시연 영상 보기](./docs/demonstration-video/관제통합.webm) · 3분 15초 |
+| [![실물 시연 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/전체시연통합.gif)](./docs/demonstration-video/전체시연통합-5x.mp4) | [![관제 시연 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/관제통합.gif)](./docs/demonstration-video/관제통합-5x.webm) |
+| **[5배속 영상 보기](./docs/demonstration-video/전체시연통합-5x.mp4)** · [전체 길이 원본](./docs/demonstration-video/전체시연통합.webm) | **[5배속 영상 보기](./docs/demonstration-video/관제통합-5x.webm)** · [전체 길이 원본](./docs/demonstration-video/관제통합.webm) |
 | 로봇·시편·관제 모니터를 함께 촬영한 접촉 탐색과 경로 추종 과정이다. | 탐색 진행 상태, 탐침 위치, 측정 결과와 선별 경로 실행 화면이다. |
-
-<!-- GIF 교체 위치: 위 표의 각 영상 링크 앞에 해당 원본 영상을 링크 대상으로 하는 GIF 미리보기를 넣는다. -->
 
 <details>
 <summary><b>시스템 실행 준비 영상</b></summary>
 
+[![터미널 실행 준비 GIF — 클릭하면 원본 영상 재생](./docs/demonstration-video/터미널x4.gif)](./docs/demonstration-video/터미널x4.mp4)
+
 **[실행 준비 영상 보기](./docs/demonstration-video/터미널x4.mp4)** · 28초 · 4배속  
 빌드부터 Docker 서비스, 로봇 드라이버, ROS 2 노드와 프런트엔드 기동까지 보여준다.
-
-<!-- GIF 교체 위치: 실행 준비. 원본이 이미 4배속이므로 추가 배속 없이 미리보기를 넣는다. -->
 
 </details>
 
