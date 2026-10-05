@@ -23,34 +23,34 @@
 
 ### 실제 로봇 공정 · 웹 3D 관제
 
-<table align="center" width="100%">
-  <tr>
-    <td align="center" valign="top" width="50%">
-      <b>실제 로봇 공정</b><br><br>
-      <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
-        <img src="./docs/demonstration-video/전체시연통합.gif" alt="실제 로봇 공정 GIF — 클릭하면 5배속 영상 재생" width="100%">
-      </a>
-      <br><br>
-      <sub>실제 M0609의 접촉 탐색과 용접 경로 추종 과정</sub>
-      <br><br>
-      <b><a href="./docs/demonstration-video/전체시연통합-5x.mp4">5배속 영상 보기</a></b>
-      ·
-      <a href="./docs/demonstration-video/전체시연통합.webm">원본 영상</a>
-    </td>
-    <td align="center" valign="top" width="50%">
-      <b>웹 3D 관제</b><br><br>
-      <a href="./docs/demonstration-video/관제통합-5x.webm">
-        <img src="./docs/demonstration-video/관제통합.gif" alt="웹 3D 관제 GIF — 클릭하면 5배속 영상 재생" width="100%">
-      </a>
-      <br><br>
-      <sub>탐색 상태 · 탐침 위치 · 측정 결과 · 경로 실행 화면</sub>
-      <br><br>
-      <b><a href="./docs/demonstration-video/관제통합-5x.webm">5배속 영상 보기</a></b>
-      ·
-      <a href="./docs/demonstration-video/관제통합.webm">원본 영상</a>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <b>실제 로봇 공정</b>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <b>웹 3D 관제</b>
+</p>
+
+<div align="center">
+  <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
+    <img src="./docs/demonstration-video/전체시연통합.gif" alt="실제 로봇 공정 GIF — 클릭하면 5배속 영상 재생" width="49%">
+  </a>
+  <a href="./docs/demonstration-video/관제통합-5x.webm">
+    <img src="./docs/demonstration-video/관제통합.gif" alt="웹 3D 관제 GIF — 클릭하면 5배속 영상 재생" width="49%">
+  </a>
+</div>
+
+<p align="center">
+  <sub>실제 M0609의 접촉 탐색과 용접 경로 추종 과정</sub>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <sub>탐색 상태 · 탐침 위치 · 측정 결과 · 경로 실행 화면</sub>
+</p>
+
+<p align="center">
+  <b><a href="./docs/demonstration-video/전체시연통합-5x.mp4">실제 로봇 공정 5배속</a></b>
+  · <a href="./docs/demonstration-video/전체시연통합.webm">원본</a>
+  &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;
+  <b><a href="./docs/demonstration-video/관제통합-5x.webm">웹 3D 관제 5배속</a></b>
+  · <a href="./docs/demonstration-video/관제통합.webm">원본</a>
+</p>
 
 <details>
 <summary><b>시스템 실행 준비 영상 보기</b></summary>
