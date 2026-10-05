@@ -21,9 +21,9 @@
 
 | 실제 로봇 공정 | 웹 3D 관제 |
 |---|---|
-| **[실제 로봇 공정 5배속 영상 보기](./docs/demonstration-video/전체시연통합-5x.mp4)** | [![웹 3D 관제 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/관제통합.gif)](./docs/demonstration-video/관제통합-5x.webm) |
-| [전체 길이 원본](./docs/demonstration-video/전체시연통합.webm) · 3분 18초 | **[관제 5배속 영상 보기](./docs/demonstration-video/관제통합-5x.webm)** · [전체 길이 원본](./docs/demonstration-video/관제통합.webm) |
-| 로봇·시편·관제 모니터를 함께 촬영한 접촉 탐색과 경로 추종 과정이다. 상단 통합 GIF와 장면이 겹치므로 여기서는 영상 링크만 제공한다. | 탐색 진행 상태, 탐침 위치, 측정 결과와 선별 경로 실행 화면이다. |
+| [![실제 로봇 공정 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/전체시연통합.gif)](./docs/demonstration-video/전체시연통합-5x.mp4) | [![웹 3D 관제 GIF — 클릭하면 5배속 영상 재생](./docs/demonstration-video/관제통합.gif)](./docs/demonstration-video/관제통합-5x.webm) |
+| **[실제 로봇 공정 5배속 영상 보기](./docs/demonstration-video/전체시연통합-5x.mp4)** · [전체 길이 원본](./docs/demonstration-video/전체시연통합.webm) | **[관제 5배속 영상 보기](./docs/demonstration-video/관제통합-5x.webm)** · [전체 길이 원본](./docs/demonstration-video/관제통합.webm) |
+| 실제 로봇 공정의 접촉 탐색과 경로 추종 과정을 보여준다. | 웹 3D 관제의 탐색 진행 상태, 탐침 위치, 측정 결과와 선별 경로 실행 화면을 보여준다. |
 
 <details>
 <summary><b>시스템 실행 준비 영상</b></summary>
