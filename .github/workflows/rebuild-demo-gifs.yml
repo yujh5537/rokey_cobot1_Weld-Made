@@ -1,0 +1,68 @@
+name: Rebuild exact demo GIF previews
+
+on:
+  push:
+    branches:
+      - docs/fix-exact-demo-gifs
+    paths:
+      - ".github/workflows/rebuild-demo-gifs.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/fix-exact-demo-gifs
+          fetch-depth: 0
+
+      - name: Ensure ffmpeg
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+
+      - name: Rebuild GIFs from the four requested video files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd docs/demonstration-video
+
+          make_gif () {
+            src="$1"
+            dst="$2"
+            width="$3"
+            ffmpeg -y -i "$src" -filter_complex               "fps=6,scale='min(${width},iw)':-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"               "$dst"
+          }
+
+          # 1) 맨 위 정중앙: 통합-5x -> 통합.gif
+          make_gif "통합-5x.mp4" "통합.gif" 640
+
+          # 2) 실제 로봇 공정: 전체시연통합-5x -> 전체시연통합.gif
+          make_gif "전체시연통합-5x.mp4" "전체시연통합.gif" 600
+
+          # 3) 웹 3D 관제: 관제통합-5x -> 관제통합.gif
+          make_gif "관제통합-5x.webm" "관제통합.gif" 640
+
+          # 4) 실행 준비: 기존 터미널x4.mp4 -> 터미널x4.gif
+          make_gif "터미널x4.mp4" "터미널x4.gif" 640
+
+          for f in 통합.gif 전체시연통합.gif 관제통합.gif 터미널x4.gif; do
+            test -s "$f"
+            echo "OK $(du -h "$f" | cut -f1) $f"
+          done
+
+      - name: Commit GIFs and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/rebuild-demo-gifs.yml
+          git add docs/demonstration-video/*.gif
+          git commit -m "docs: rebuild GIFs from requested demo videos"
+          git push origin HEAD:docs/fix-exact-demo-gifs
