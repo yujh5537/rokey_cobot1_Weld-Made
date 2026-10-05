@@ -29,7 +29,7 @@
       <b>실제 로봇 공정</b>
       <br><br>
       <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
-        <img src="./docs/demonstration-video/전체시연통합.gif" alt="실제 로봇 공정 GIF — 클릭하면 5배속 영상 재생" width="96%">
+        <img src="./docs/demonstration-video/전체시연통합.gif" alt="실제 로봇 공정 GIF — 클릭하면 5배속 영상 재생" width="1000">
       </a>
       <br><br>
       <sub>접촉 탐색 · 용접 경로 추종</sub>
@@ -42,7 +42,7 @@
       <b>웹 3D 관제</b>
       <br><br>
       <a href="./docs/demonstration-video/관제통합-5x.webm">
-        <img src="./docs/demonstration-video/관제통합.gif" alt="웹 3D 관제 GIF — 클릭하면 5배속 영상 재생" width="96%">
+        <img src="./docs/demonstration-video/관제통합.gif" alt="웹 3D 관제 GIF — 클릭하면 5배속 영상 재생" width="1000">
       </a>
       <br><br>
       <sub>상태 · 탐침 · 측정 결과 · 경로 실행</sub>
