@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "시스템 아키텍쳐",
+    "locale": "en",
+    "output": "audit-fixed/01_system.html",
+    "quality_profile": "standard",
+    "repository": {
+      "url": "https://github.com/yujh5537/rokey_cobot1_Weld-Made.git",
+      "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+      "provider": "github",
+      "link_mode": "web"
+    },
+    "animation": "trace",
+    "viewBox": [
+      1240,
+      920.2815099168266
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "React · Three.js",
+      "sublabel": "관제 화면 / 3D 로봇",
+      "pos": [
+        40,
+        50
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/App.jsx",
+          "line": 578,
+          "end_line": 600
+        },
+        {
+          "path": "frontend/src/App.jsx",
+          "line": 278,
+          "end_line": 285
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "명령 POST · 실시간 /ws",
+      "pos": [
+        500,
+        50
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 350,
+          "end_line": 360
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL 16",
+      "sublabel": "7 tables / TCP 5432",
+      "pos": [
+        500,
+        170
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker/docker-compose.yml",
+          "line": 21,
+          "end_line": 31
+        }
+      ]
+    },
+    {
+      "id": "spring",
+      "type": "backend",
+      "label": "Spring Boot",
+      "sublabel": "작업 · 공작물 · 이력 API",
+      "pos": [
+        40,
+        170
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker/docker-compose.yml",
+          "line": 86,
+          "end_line": 96
+        }
+      ]
+    },
+    {
+      "id": "broker",
+      "type": "messagebus",
+      "label": "Mosquitto",
+      "sublabel": "단일 MQTT Broker :1883",
+      "pos": [
+        960,
+        50
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker/docker-compose.yml",
+          "line": 4,
+          "end_line": 14
+        }
+      ]
+    },
+    {
+      "id": "bridge",
+      "type": "messagebus",
+      "label": "mqtt_bridge",
+      "sublabel": "ROS ↔ JSON / MQTT",
+      "pos": [
+        960,
+        330
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+          "line": 237,
+          "end_line": 247
+        }
+      ]
+    },
+    {
+      "id": "scan",
+      "type": "backend",
+      "label": "scan_manager",
+      "sublabel": "스캔 FSM / 설정 전파",
+      "pos": [
+        500,
+        330
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+          "line": 229,
+          "end_line": 239
+        }
+      ]
+    },
+    {
+      "id": "weld",
+      "type": "backend",
+      "label": "weld_manager",
+      "sublabel": "용접 경로 실행 / 스캔 결과 읽기",
+      "pos": [
+        40,
+        330
+      ],
+      "size": [
+        225,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+          "line": 137,
+          "end_line": 147
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "type": "database",
+      "label": "로컬 결과 파일",
+      "sublabel": "~/scan_results/real",
+      "pos": [
+        40,
+        450
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/result_store/store.py",
+          "line": 294,
+          "end_line": 326
+        },
+        {
+          "path": "ws_cobot1/src/scan_manager/scan_manager/result_store/store.py",
+          "line": 488,
+          "end_line": 505
+        }
+      ]
+    },
+    {
+      "id": "robot",
+      "type": "backend",
+      "label": "robot_manager",
+      "sublabel": "샘플링 · 모션 · 정지",
+      "pos": [
+        500,
+        570
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+          "line": 381,
+          "end_line": 391
+        }
+      ]
+    },
+    {
+      "id": "contact",
+      "type": "backend",
+      "label": "contact_detector",
+      "sublabel": "힘 / 접촉 / 엣지 판정",
+      "pos": [
+        40,
+        570
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+          "line": 140,
+          "end_line": 150
+        }
+      ]
+    },
+    {
+      "id": "safety",
+      "type": "security",
+      "label": "safety_monitor",
+      "sublabel": "2차 감시 / 정지 요청",
+      "pos": [
+        960,
+        570
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+          "line": 86,
+          "end_line": 96
+        }
+      ]
+    },
+    {
+      "id": "driver",
+      "type": "backend",
+      "label": "dsr_controller2",
+      "sublabel": "별도 bringup / dsr_msgs2",
+      "pos": [
+        500,
+        680
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/robot_manager/robot_manager/dsr_client.py",
+          "line": 35,
+          "end_line": 45
+        }
+      ]
+    },
+    {
+      "id": "controller",
+      "type": "external",
+      "label": "M0609 컨트롤러",
+      "sublabel": "외부 구현 / 저장소 미포함",
+      "pos": [
+        500,
+        805
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "ws_cobot1/src/contact_scan_bringup/launch/bringup.launch.py",
+          "line": 45,
+          "end_line": 75
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "e1",
+      "to": "api",
+      "label": "HTTP commands / WS",
+      "variant": "emphasis",
+      "from": "web"
+    },
+    {
+      "id": "e2",
+      "to": "db",
+      "label": "scan/result · contact/event",
+      "variant": "default",
+      "from": "api",
+      "labelAt": [
+        605,
+        140
+      ]
+    },
+    {
+      "id": "e3",
+      "to": "db",
+      "label": "JPA / JDBC",
+      "variant": "default",
+      "from": "spring"
+    },
+    {
+      "id": "e4",
+      "to": "broker",
+      "label": "MQTT JSON ↔",
+      "variant": "emphasis",
+      "from": "api",
+      "labelAt": [
+        835,
+        75
+      ]
+    },
+    {
+      "id": "e5",
+      "to": "bridge",
+      "label": "MQTT JSON ↔",
+      "variant": "emphasis",
+      "from": "broker",
+      "labelAt": [
+        1065,
+        140
+      ]
+    },
+    {
+      "id": "e6",
+      "to": "scan",
+      "label": "서비스 / 액션 ↔",
+      "variant": "default",
+      "from": "bridge"
+    },
+    {
+      "id": "e7",
+      "to": "weld",
+      "label": "서비스 / 액션 ↔",
+      "variant": "default",
+      "from": "bridge"
+    },
+    {
+      "id": "e8",
+      "to": "files",
+      "label": "스캔 저장",
+      "variant": "default",
+      "from": "scan"
+    },
+    {
+      "id": "e9",
+      "to": "files",
+      "label": "스캔 읽기 / 용접 저장",
+      "variant": "default",
+      "from": "weld",
+      "labelAt": [
+        138,
+        420
+      ]
+    },
+    {
+      "id": "e10",
+      "to": "robot",
+      "label": "ExecuteMotion / StopRobot",
+      "variant": "default",
+      "from": "scan",
+      "labelAt": [
+        612,
+        420
+      ]
+    },
+    {
+      "id": "e11",
+      "to": "robot",
+      "label": "ExecuteMotion / ExecutePath",
+      "variant": "default",
+      "from": "weld"
+    },
+    {
+      "id": "e12",
+      "to": "contact",
+      "label": "RobotSample",
+      "variant": "default",
+      "from": "robot"
+    },
+    {
+      "id": "e13",
+      "to": "robot",
+      "label": "ContactEvent",
+      "variant": "default",
+      "from": "contact"
+    },
+    {
+      "id": "e14",
+      "to": "safety",
+      "label": "RobotSample / RobotStatus",
+      "variant": "default",
+      "from": "robot"
+    },
+    {
+      "id": "e15",
+      "to": "robot",
+      "label": "StopRobot",
+      "variant": "security",
+      "from": "safety"
+    },
+    {
+      "id": "e16",
+      "to": "driver",
+      "label": "dsr_msgs2 services",
+      "variant": "emphasis",
+      "from": "robot",
+      "labelAt": [
+        605,
+        660
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "실행 영역",
+      "items": [
+        "Web PC: compose의 Mosquitto · FastAPI · Spring · PostgreSQL + 별도 React 개발 서버.",
+        "Main PC: bringup의 커스텀 노드 6개 + 별도로 실행하는 두산 드라이버.",
+        "실제 PC IP와 구동 여부는 저장소만으로 확정할 수 없다. broker_host와 sodreal host로 지정한다.",
+        "로봇 컨트롤러와 드라이버의 내부 연결 구현은 저장소에 없어 연결선을 확정하지 않았다."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "제어와 상태",
+      "items": [
+        "화살표 ↔ 라벨은 같은 연결의 요청·응답 / 발행·구독 양방향을 요약한다. 정확한 단방향 ROS 연결은 ROS 2 통신도에서 확인.",
+        "React → FastAPI: /commands/scan/*, /commands/weld/*, /commands/safety/reset; FastAPI → React: /ws topic/payload JSON.",
+        "FastAPI → Broker: cmd/scan/*, cmd/weld/*, cmd/safety/reset; Bridge → Broker: robot/*, scan/*, weld/*, contact/event, safety/status, cmd/ack, hb/ros, conn/ros."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "구현과 미연결",
+      "items": [
+        "Spring Boot API와 DB 연동은 구현되어 있으나 현재 React App.jsx에서 Spring API 호출은 확인되지 않는다.",
+        "hb/web · conn/web 수신과 /web/heartbeat 발행은 브리지에 있다. Web 발행자와 ROS 구독자는 현재 정상 경로에서 확인되지 않아 연결하지 않았다.",
+        "용접은 경로 이동·시각화·파일 기록 구현이다. 실제 아크 전원 제어 연결은 확인되지 않았다.",
+        "weld/result는 FastAPI WS로 전달하지만 PostgreSQL 저장 분기는 없다. 용접 전용 DB 테이블을 추가하지 않았다."
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Web PC · Docker + frontend",
+      "wraps": [
+        "web",
+        "api",
+        "db",
+        "spring",
+        "broker"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Main PC · ROS 2 / 로컬 파일",
+      "wraps": [
+        "bridge",
+        "scan",
+        "weld",
+        "files",
+        "robot",
+        "contact",
+        "safety",
+        "driver"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "diamondEndpoints": [
+    {
+      "edge": "main1",
+      "side": "to",
+      "node": "gate",
+      "endpoint": [
+        442.0,
+        420.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "main2",
+      "side": "from",
+      "node": "gate",
+      "endpoint": [
+        442.0,
+        560.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "main8",
+      "side": "to",
+      "node": "weldgate",
+      "endpoint": [
+        442.0,
+        1750.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "main9",
+      "side": "from",
+      "node": "weldgate",
+      "endpoint": [
+        442.0,
+        1890.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "main9",
+      "side": "to",
+      "node": "wg",
+      "endpoint": [
+        442.0,
+        1940.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "main10",
+      "side": "from",
+      "node": "wg",
+      "endpoint": [
+        442.0,
+        2080.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "reject",
+      "side": "from",
+      "node": "gate",
+      "endpoint": [
+        379.0,
+        497.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "stoppedresume",
+      "side": "to",
+      "node": "rg",
+      "endpoint": [
+        762.0,
+        1370.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "errorresume",
+      "side": "to",
+      "node": "rg",
+      "endpoint": [
+        762.0,
+        1370.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "resumeaccept",
+      "side": "from",
+      "node": "rg",
+      "endpoint": [
+        762.0,
+        1510.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "resumereject",
+      "side": "from",
+      "node": "rg",
+      "endpoint": [
+        832.0,
+        1440.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "scanonly",
+      "side": "from",
+      "node": "weldgate",
+      "endpoint": [
+        512.0,
+        1820.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "wg-reject",
+      "side": "from",
+      "node": "wg",
+      "endpoint": [
+        372.0,
+        2010.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "linefailure",
+      "side": "to",
+      "node": "linefail",
+      "endpoint": [
+        967.0,
+        2383.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "cannotcontinue",
+      "side": "from",
+      "node": "linefail",
+      "endpoint": [
+        1030.0,
+        2460.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "checktip",
+      "side": "from",
+      "node": "linefail",
+      "endpoint": [
+        967.0,
+        2397.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "checktip",
+      "side": "to",
+      "node": "tip",
+      "endpoint": [
+        762.0,
+        2510.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "unknown",
+      "side": "from",
+      "node": "tip",
+      "endpoint": [
+        832.0,
+        2580.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "safeheight",
+      "side": "from",
+      "node": "tip",
+      "endpoint": [
+        832.0,
+        2580.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "safeheight",
+      "side": "to",
+      "node": "next",
+      "endpoint": [
+        122.0,
+        2840.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "lowheight",
+      "side": "from",
+      "node": "tip",
+      "endpoint": [
+        755.0,
+        2643.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "nextline",
+      "side": "from",
+      "node": "next",
+      "endpoint": [
+        192.0,
+        2770.0
+      ],
+      "boundaryValue": 1.0
+    },
+    {
+      "edge": "lastfailed",
+      "side": "from",
+      "node": "next",
+      "endpoint": [
+        192.0,
+        2770.0
+      ],
+      "boundaryValue": 1.0
+    }
+  ],
+  "regions": [
+    {
+      "label": "1 · 접촉 스캔",
+      "y": 36.0,
+      "end": 1700.0
+    },
+    {
+      "label": "2 · 용접 경로 실행",
+      "y": 1726.0,
+      "end": 3870.0
+    }
+  ],
+  "overlap": 0,
+  "startTopEndBottom": true,
+  "connectionsPreserved": 66,
+  "nextDecision": true,
+  "endKind": "end"
+}

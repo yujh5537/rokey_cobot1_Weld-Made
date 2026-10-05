@@ -1,0 +1,7 @@
+{
+  "firstAttempt": "failed: browser-check saw residual own delivery provenance state; not a functional browser failure",
+  "secondAttempt": "actual four finalize commands completed validate/deliver/check; browser and visual skipped for Chrome unavailable",
+  "helperAdjustment": "Do not exit retry loop early merely because first three gates pass; require acceptable overall status. Existing verified own-state recovery and maximum retries unchanged.",
+  "artifactIdentity": "allPreservedAssetsByteIdentical=true",
+  "actualBrowserUI": "unconfirmed"
+}

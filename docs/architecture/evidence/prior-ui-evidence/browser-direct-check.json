@@ -1,0 +1,297 @@
+{
+  "date": "2026-10-05",
+  "viewport": [
+    1348,
+    936
+  ],
+  "checks": [
+    {
+      "diagram": "system",
+      "search": [
+        "      - paragraph: 2 of 14 nodes"
+      ],
+      "path": [
+        "        - 'button \"Route position 1 of 2: robot_manager\"': robot_manager",
+        "        - 'button \"Route position 2 of 2: contact_detector\"': contact_detector"
+      ],
+      "lens": [
+        "      - paragraph: 7 Backend nodes · 15 touching relationships · connected peers remain visible"
+      ],
+      "theme": "light/dark viewer observed",
+      "map": [
+        "      - generic: 14 nodes · full map",
+        "        - generic: 150%"
+      ],
+      "presentation": [
+        "        - generic: Still",
+        "      - button \"Exit presentation stage\" [active] [pressed]:"
+      ],
+      "detail": [
+        "        - link \"Open verified source ws_cobot1/src/robot_manager/robot_manager/robot_manager.py at revision 8933b73\":",
+        "          - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L381-L391"
+      ],
+      "export": {
+        "unconfirmed": "Error: Timed out after 6000ms waiting for download."
+      },
+      "pan": {
+        "before": "transform: translate(-264.5px, -377.5px) scale(1.5); clip-path: inset(251.667px 176.333px);",
+        "after": "transform: translate(-224.5px, -347.5px) scale(1.5); clip-path: inset(231.667px 203px 271.667px 149.667px);",
+        "changed": true
+      },
+      "effects": "Classic→Signal Flow→Classic observed",
+      "bottom": {
+        "clientWidth": 1348,
+        "height": 2633,
+        "top": 1697,
+        "viewport": 936,
+        "width": 1348
+      }
+    },
+    {
+      "diagram": "ros",
+      "search": [
+        "      - paragraph: 2 of 8 nodes"
+      ],
+      "path": [
+        "        - 'button \"Route position 1 of 2: robot_manager\"': robot_manager",
+        "        - 'button \"Route position 2 of 2: contact_detector\"': contact_detector"
+      ],
+      "lens": [
+        "      - paragraph: 7 Backend nodes · 25 touching relationships · connected peers remain visible"
+      ],
+      "theme": "light/dark viewer observed",
+      "map": [
+        "      - generic: 8 nodes · full map",
+        "        - generic: 150%"
+      ],
+      "presentation": [
+        "        - generic: Still",
+        "      - button \"Exit presentation stage\" [active] [pressed]:"
+      ],
+      "detail": [
+        "        - link \"Open verified source ws_cobot1/src/robot_manager/robot_manager/robot_manager.py at revision 8933b73\":",
+        "          - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L381-L391",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L289-L296",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L271-L276",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L290-L297",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L271-L276",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L291-L298",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L271-L276",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L292-L299",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L281-L286",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L293-L300",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L284-L289",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L227-L234",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L256-L261",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L228-L235",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L261-L266",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L229-L236",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L266-L271",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L295-L302",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L158-L163",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L296-L303",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L158-L163",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L297-L304",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L164-L169",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L135-L142",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L287-L292",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L136-L143",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L287-L292",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L137-L144",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L287-L292",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L294-L301",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L90-L95",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L251-L258",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L422-L427",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L254-L261",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L421-L426",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L265-L272",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L265-L272",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L152-L159",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L422-L427",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L153-L160",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L428-L433",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L154-L161",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L421-L426",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L227-L234",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/contact_detector/contact_detector/contact_detector.py#L142-L147",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L253-L260",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/contact_detector/contact_detector/contact_detector.py#L146-L151",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L265-L272",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L265-L272",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L227-L234",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L146-L151",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L135-L142",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L251-L256",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L379-L386",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L244-L249",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L381-L388",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L248-L253",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L383-L390",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L240-L245",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L379-L386",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L152-L157",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L383-L390",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L148-L153",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L379-L386",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L237-L242",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L381-L388",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L271-L276",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L383-L390",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L251-L256",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L379-L386",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/contact_detector/contact_detector/contact_detector.py#L141-L146",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L379-L386",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L87-L92",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L383-L390",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L88-L93",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/contact_detector/contact_detector/contact_detector.py#L138-L145",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L386-L391",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/contact_detector/contact_detector/contact_detector.py#L138-L145",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L248-L253",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/contact_detector/contact_detector/contact_detector.py#L138-L145",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L271-L276",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L87-L94",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/robot_manager.py#L421-L426",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L84-L91",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L246-L251",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L84-L91",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/weld_manager.py#L150-L155",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py#L84-L91",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L276-L281",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L265-L272",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/scan_manager/scan_manager/scan_manager.py#L265-L272",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py#L188-L195",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L29-L36",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L30-L37",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L31-L38",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L32-L39",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L33-L40",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L34-L41",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L35-L42",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L36-L43",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L37-L44",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L38-L45",
+        "            - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/robot_manager/robot_manager/dsr_client.py#L39-L46"
+      ],
+      "export": {
+        "unconfirmed": "Error: Timed out after 6000ms waiting for download."
+      },
+      "bottom": {
+        "clientWidth": 1348,
+        "height": 8392,
+        "top": 7456,
+        "viewport": 936,
+        "width": 1348
+      },
+      "effects": "Classic→Signal Flow→Classic observed"
+    },
+    {
+      "diagram": "erd",
+      "search": [
+        "      - paragraph: 5 of 7 nodes"
+      ],
+      "path": [
+        "        - 'button \"Route position 1 of 2: measurements\"': measurements",
+        "        - 'button \"Route position 2 of 2: scan_jobs\"': scan_jobs"
+      ],
+      "lens": [
+        "      - paragraph: 7 Database nodes · 5 touching relationships · connected peers remain visible"
+      ],
+      "theme": "light/dark viewer observed",
+      "map": [
+        "      - generic: 7 nodes · 150% viewport",
+        "        - generic: 150%"
+      ],
+      "presentation": [
+        "        - generic: Still",
+        "      - button \"Exit presentation stage\" [active] [pressed]:"
+      ],
+      "detail": [
+        "        - link \"Open verified source docker/postgres/init/002_business_schema.sql at revision 8933b73\":",
+        "          - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/docker/postgres/init/002_business_schema.sql#L37-L47"
+      ],
+      "export": {
+        "unconfirmed": "Error: Timed out after 6000ms waiting for download."
+      },
+      "bottom": {
+        "clientWidth": 1348,
+        "height": 8881,
+        "top": 7945,
+        "viewport": 936,
+        "width": 1348
+      },
+      "effects": "Classic→Signal Flow→Classic observed"
+    },
+    {
+      "diagram": "flow",
+      "search": [
+        "          - generic \"End · end · 2 · 용접 경로 실행\": End · end",
+        "      - paragraph: 1 of 39 nodes"
+      ],
+      "path": [
+        "        - 'button \"Route position 1 of 11: START\"': START",
+        "        - 'button \"Route position 2 of 11: 스캔 대기\"': 스캔 대기",
+        "        - 'button \"Route position 3 of 11: 스캔 접수 검사\"': 스캔 접수 검사",
+        "        - 'button \"Route position 4 of 11: PREPARING\"': PREPARING",
+        "        - 'button \"Route position 5 of 11: TOP_SEARCH\"': TOP_SEARCH",
+        "        - 'button \"Route position 6 of 11: EDGE_SEARCH\"': EDGE_SEARCH",
+        "        - 'button \"Route position 7 of 11: GEOMETRY\"': GEOMETRY",
+        "        - 'button \"Route position 8 of 11: 스캔 HOMING\"': 스캔 HOMING",
+        "        - 'button \"Route position 9 of 11: 스캔 DONE\"': 스캔 DONE",
+        "        - 'button \"Route position 10 of 11: 용접 선택\"': 용접 선택",
+        "        - 'button \"Route position 11 of 11: END\"': END"
+      ],
+      "lens": [
+        "      - paragraph: 1 End node · 5 touching relationships · connected peers remain visible"
+      ],
+      "theme": "light/dark viewer observed",
+      "map": [
+        "      - generic: 39 nodes · full map",
+        "        - generic: 150%"
+      ],
+      "presentation": [
+        "        - generic: Still",
+        "      - button \"Exit presentation stage\" [active] [pressed]:"
+      ],
+      "detail": [
+        "        - link \"Open verified source ws_cobot1/src/weld_manager/weld_manager/sequence.py at revision 8933b73\":",
+        "          - /url: https://github.com/yujh5537/rokey_cobot1_Weld-Made/blob/8933b739ee43294605e57dca07625bad2f9e8ca4/ws_cobot1/src/weld_manager/weld_manager/sequence.py#L390-L392"
+      ],
+      "export": {
+        "unconfirmed": "Error: Timed out after 6000ms waiting for download."
+      },
+      "effects": "Classic → Signal Flow → Classic observed",
+      "pan": {
+        "before": "transform: translate(-264.5px, -880px) scale(1.5); clip-path: inset(586.667px 176.333px);",
+        "after": "transform: translate(-264.5px, -880px) scale(1.5); clip-path: inset(586.667px 176.333px);",
+        "changed": false
+      },
+      "bottom": {
+        "clientWidth": 1348,
+        "height": 5338,
+        "top": 4402,
+        "viewport": 936,
+        "width": 1348
+      }
+    }
+  ],
+  "png": {
+    "complete": true,
+    "width": 1777,
+    "height": 5913,
+    "bottom": {
+      "top": 4992,
+      "height": 5913,
+      "viewport": 921
+    },
+    "actualBottomENDObserved": true
+  },
+  "limits": [
+    "Native Export download completion timed out after 6000ms on all four; downloaded file opening unconfirmed.",
+    "System pan transform changed at 150%; Flow drag transform change not confirmed. ROS/ERD pan not reconfirmed this run.",
+    "Source href/local ranges verified; external source navigation not reconfirmed.",
+    "Resize API unavailable.",
+    "Flow full-image shrink makes labels small; layout preserved after visual review."
+  ]
+}

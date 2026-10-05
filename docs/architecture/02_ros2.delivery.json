@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "b431fe5c-c598-4887-9f41-47367c031514",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/workspace/scratch/29663fd5a592/no-copy/data/02_ros2.json",
+  "output": "/workspace/scratch/29663fd5a592/no-copy/02_ros2.html",
+  "specification": {
+    "sha256": "4d39268ef9fc76ef7620d5a3088583810b191bc48201e6146fb95d3e5fa2457f",
+    "bytes": 12411
+  },
+  "artifact": {
+    "sha256": "b426fff15c83e8a529e389e842f63b4095c43f5886fb4e7a9a1f3f96fce7632f",
+    "bytes": 791529
+  }
+}

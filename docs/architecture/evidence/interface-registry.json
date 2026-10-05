@@ -1,0 +1,546 @@
+[
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 237
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "JointState",
+    "name": "self._joint_state_topic",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 242
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 251
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 256
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "ScanResult",
+    "name": "/scan/result",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 261
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "ScanLog",
+    "name": "/scan/log",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 266
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 271
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 276
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "WeldState",
+    "name": "/weld/state",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 287
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "WeldResult",
+    "name": "/weld/result",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 287
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_subscription",
+    "type": "ScanLog",
+    "name": "/weld/log",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 287
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_publisher",
+    "type": "WebHeartbeat",
+    "name": "/web/heartbeat",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 290
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "RunScan",
+    "name": "/scan/run",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 291
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "ReturnHome",
+    "name": "/scan/home",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 292
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "Resume",
+    "name": "/scan/resume",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 293
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "StopScan",
+    "name": "/scan/stop",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 294
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "SetConfig",
+    "name": "/scan/set_config",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 295
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "ResetSafety",
+    "name": "/safety/reset",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 296
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "RunWeld",
+    "name": "/weld/run",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 297
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "ActionClient",
+    "type": "ReturnHome",
+    "name": "/weld/home",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 298
+  },
+  {
+    "node": "mqtt_bridge",
+    "operation": "create_client",
+    "type": "StopWeld",
+    "name": "/weld/stop",
+    "path": "ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py",
+    "line": 299
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 229
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "ScanResult",
+    "name": "/scan/result",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 230
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_publisher",
+    "type": "ScanLog",
+    "name": "/scan/log",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 231
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_subscription",
+    "type": "RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 240
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_subscription",
+    "type": "RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 244
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_subscription",
+    "type": "SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 246
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_subscription",
+    "type": "ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 248
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_subscription",
+    "type": "WeldState",
+    "name": "/weld/state",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 251
+  },
+  {
+    "node": "scan_manager",
+    "operation": "ActionClient",
+    "type": "ExecuteMotion",
+    "name": "/robot/execute_motion",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 253
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_client",
+    "type": "TareForce",
+    "name": "/contact/tare",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 255
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_client",
+    "type": "StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 256
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_client",
+    "type": "SetParameters",
+    "name": "f'/{node}/set_parameters'",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 262
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_client",
+    "type": "GetParameters",
+    "name": "f'/{node}/get_parameters'",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 264
+  },
+  {
+    "node": "scan_manager",
+    "operation": "ActionServer",
+    "type": "RunScan",
+    "name": "/scan/run",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 271
+  },
+  {
+    "node": "scan_manager",
+    "operation": "ActionServer",
+    "type": "ReturnHome",
+    "name": "/scan/home",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 271
+  },
+  {
+    "node": "scan_manager",
+    "operation": "ActionServer",
+    "type": "Resume",
+    "name": "/scan/resume",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 271
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_service",
+    "type": "StopScan",
+    "name": "/scan/stop",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 281
+  },
+  {
+    "node": "scan_manager",
+    "operation": "create_service",
+    "type": "SetConfig",
+    "name": "/scan/set_config",
+    "path": "ws_cobot1/src/scan_manager/scan_manager/scan_manager.py",
+    "line": 284
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "WeldState",
+    "name": "/weld/state",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 137
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "WeldResult",
+    "name": "/weld/result",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 138
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_publisher",
+    "type": "ScanLog",
+    "name": "/weld/log",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 139
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_subscription",
+    "type": "ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 146
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_subscription",
+    "type": "RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 148
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_subscription",
+    "type": "SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 150
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_subscription",
+    "type": "RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 152
+  },
+  {
+    "node": "weld_manager",
+    "operation": "ActionClient",
+    "type": "ExecuteMotion",
+    "name": "/robot/execute_motion",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 154
+  },
+  {
+    "node": "weld_manager",
+    "operation": "ActionClient",
+    "type": "ExecutePath",
+    "name": "/robot/execute_path",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 155
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_client",
+    "type": "StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 156
+  },
+  {
+    "node": "weld_manager",
+    "operation": "ActionServer",
+    "type": "RunWeld",
+    "name": "/weld/run",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 158
+  },
+  {
+    "node": "weld_manager",
+    "operation": "ActionServer",
+    "type": "ReturnHome",
+    "name": "/weld/home",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 158
+  },
+  {
+    "node": "weld_manager",
+    "operation": "create_service",
+    "type": "StopWeld",
+    "name": "/weld/stop",
+    "path": "ws_cobot1/src/weld_manager/weld_manager/weld_manager.py",
+    "line": 164
+  },
+  {
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 381
+  },
+  {
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 383
+  },
+  {
+    "node": "robot_manager",
+    "operation": "create_publisher",
+    "type": "RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 385
+  },
+  {
+    "node": "robot_manager",
+    "operation": "create_subscription",
+    "type": "ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 386
+  },
+  {
+    "node": "robot_manager",
+    "operation": "create_service",
+    "type": "StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 421
+  },
+  {
+    "node": "robot_manager",
+    "operation": "ActionServer",
+    "type": "ExecuteMotion",
+    "name": "/robot/execute_motion",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 422
+  },
+  {
+    "node": "robot_manager",
+    "operation": "ActionServer",
+    "type": "ExecutePath",
+    "name": "/robot/execute_path",
+    "path": "ws_cobot1/src/robot_manager/robot_manager/robot_manager.py",
+    "line": 428
+  },
+  {
+    "node": "contact_detector",
+    "operation": "create_publisher",
+    "type": "ContactEvent",
+    "name": "/contact/event",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 140
+  },
+  {
+    "node": "contact_detector",
+    "operation": "create_subscription",
+    "type": "RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 141
+  },
+  {
+    "node": "contact_detector",
+    "operation": "create_subscription",
+    "type": "ScanState",
+    "name": "/scan/state",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 142
+  },
+  {
+    "node": "contact_detector",
+    "operation": "create_service",
+    "type": "TareForce",
+    "name": "/contact/tare",
+    "path": "ws_cobot1/src/contact_detector/contact_detector/contact_detector.py",
+    "line": 146
+  },
+  {
+    "node": "safety_monitor",
+    "operation": "create_publisher",
+    "type": "SafetyStatus",
+    "name": "/safety/status",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 86
+  },
+  {
+    "node": "safety_monitor",
+    "operation": "create_subscription",
+    "type": "RobotSample",
+    "name": "/robot/sample",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 87
+  },
+  {
+    "node": "safety_monitor",
+    "operation": "create_subscription",
+    "type": "RobotStatus",
+    "name": "/robot/status",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 88
+  },
+  {
+    "node": "safety_monitor",
+    "operation": "create_client",
+    "type": "StopRobot",
+    "name": "/robot/stop",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 89
+  },
+  {
+    "node": "safety_monitor",
+    "operation": "create_service",
+    "type": "ResetSafety",
+    "name": "/safety/reset",
+    "path": "ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py",
+    "line": 90
+  }
+]

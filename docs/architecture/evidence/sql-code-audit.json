@@ -1,0 +1,107 @@
+[
+  {
+    "table": "scan_jobs",
+    "columns": 10,
+    "sql": "docker/postgres/init/001_schema.sql",
+    "sha256": "c8b23a590a2bbdb6eaa0fef30838434696e6944ee36cfdfa96336218f97699fd",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  },
+  {
+    "table": "measurements",
+    "columns": 23,
+    "sql": "docker/postgres/init/001_schema.sql",
+    "sha256": "c8b23a590a2bbdb6eaa0fef30838434696e6944ee36cfdfa96336218f97699fd",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  },
+  {
+    "table": "contact_events",
+    "columns": 19,
+    "sql": "docker/postgres/init/001_schema.sql",
+    "sha256": "c8b23a590a2bbdb6eaa0fef30838434696e6944ee36cfdfa96336218f97699fd",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  },
+  {
+    "table": "scan_configs",
+    "columns": 3,
+    "sql": "docker/postgres/init/001_schema.sql",
+    "sha256": "c8b23a590a2bbdb6eaa0fef30838434696e6944ee36cfdfa96336218f97699fd",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  },
+  {
+    "table": "workpieces",
+    "columns": 6,
+    "sql": "docker/postgres/init/002_business_schema.sql",
+    "sha256": "313ac169c6d889bc66f05ac85e9aa03e735890c383228477259220e556109f5d",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  },
+  {
+    "table": "work_orders",
+    "columns": 7,
+    "sql": "docker/postgres/init/002_business_schema.sql",
+    "sha256": "313ac169c6d889bc66f05ac85e9aa03e735890c383228477259220e556109f5d",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  },
+  {
+    "table": "work_order_scans",
+    "columns": 3,
+    "sql": "docker/postgres/init/002_business_schema.sql",
+    "sha256": "313ac169c6d889bc66f05ac85e9aa03e735890c383228477259220e556109f5d",
+    "checked": [
+      "type",
+      "NULL",
+      "PK",
+      "FK",
+      "UNIQUE",
+      "explicit default",
+      "ON DELETE"
+    ]
+  }
+]

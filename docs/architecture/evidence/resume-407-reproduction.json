@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-05",
+  "projectCommit": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+  "steps": [
+    "Outcome(accepted=True, reason=<Reason.OK: 0>, detail='', changed=True, state=Snapshot(scan_id='audit', phase=<Phase.PREPARING: 1>, direction=<Direction.NONE: 0>, progress=0, progress_total=4, motion_id=0))",
+    "Snapshot(scan_id='audit', phase=<Phase.TOP_SEARCH: 2>, direction=<Direction.NONE: 0>, progress=0, progress_total=4, motion_id=0)",
+    "Outcome(accepted=True, reason=<Reason.OK: 0>, detail='', changed=True, state=Snapshot(scan_id='audit', phase=<Phase.STOPPING: 7>, direction=<Direction.NONE: 0>, progress=0, progress_total=4, motion_id=0))",
+    "Snapshot(scan_id='audit', phase=<Phase.ERROR: 6>, direction=<Direction.NONE: 0>, progress=0, progress_total=4, motion_id=0)",
+    "Outcome(accepted=False, reason=<Reason.NO_RESUMABLE_SCAN: 105>, detail='재개할 단계가 없다', changed=False, state=Snapshot(scan_id='audit', phase=<Phase.ERROR: 6>, direction=<Direction.NONE: 0>, progress=0, progress_total=4, motion_id=0))"
+  ],
+  "accepted": false,
+  "reason": 105,
+  "detail": "재개할 단계가 없다"
+}

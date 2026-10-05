@@ -1,0 +1,1756 @@
+## 01_system:web frontend/src/App.jsx L578-600
+578:   // FastAPI WebSocket
+579:   // =========================
+580: 
+581:   useEffect(() => {
+582:     const wsProtocol =
+583:       window.location.protocol === 'https:'
+584:         ? 'wss'
+585:         : 'ws'
+586: 
+587:     const wsUrl =
+588:       `${wsProtocol}://${window.location.host}/ws`
+589: 
+590:     const websocket = new WebSocket(wsUrl)
+591:     let jointTimeout
+592:     let displayedScanId = null
+593: 
+594: 
+595:     // WebSocket 연결 성공
+596:     websocket.onopen = () => {
+597:       console.log('[WS] connected')
+598: 
+599:       setWsConnected(true)
+600:       addLog('FastAPI WebSocket 연결')
+
+## 01_system:web frontend/src/App.jsx L278-285
+278:       const response = await fetch(`/commands/weld/${command}`, {
+279:         method: 'POST', headers: { 'Content-Type': 'application/json' },
+280:         body: JSON.stringify({ payload }),
+281:       })
+282:       const result = await response.json()
+283:       if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`)
+284:       addLog(`용접 ${command === 'start' ? `L${line} 시작` : command} 요청: ${result.request_id}`)
+285:     } catch (error) { setWeldError(error.message) }
+
+## 01_system:api backend/app/main.py L350-360
+350: @app.get("/health")
+351: def health_check():
+352:     return {
+353:         "status": "ok"
+354:     }
+355: 
+356: 
+357: # =========================================================
+358: # WebSocket
+359: # =========================================================
+360: 
+
+## 01_system:db docker/docker-compose.yml L21-31
+21:     restart: unless-stopped
+22: 
+23:     environment:
+24:       POSTGRES_DB: ${POSTGRES_DB}
+25:       POSTGRES_USER: ${POSTGRES_USER}
+26:       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+27: 
+28:     ports:
+29:       - "${POSTGRES_PORT:-5432}:5432"
+30: 
+31:     volumes:
+
+## 01_system:spring docker/docker-compose.yml L86-96
+86:     environment:
+87:       DB_HOST: postgres
+88:       DB_PORT: 5432
+89:       POSTGRES_DB: ${POSTGRES_DB}
+90:       POSTGRES_USER: ${POSTGRES_USER}
+91:       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+92: 
+93:     depends_on:
+94:       postgres:
+95:         condition: service_healthy
+96: 
+
+## 01_system:broker docker/docker-compose.yml L4-14
+4:   mosquitto:
+5:     image: eclipse-mosquitto:2
+6:     container_name: weld_made_mosquitto
+7:     restart: unless-stopped
+8: 
+9:     ports:
+10:       - "${MQTT_PORT:-1883}:1883"
+11: 
+12:     volumes:
+13:       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+14:       - mosquitto_data:/mosquitto/data
+
+## 01_system:bridge ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py L237-247
+237:         self.create_subscription(
+238:             RobotSample, "/robot/sample",
+239:             _safe_ros_callback(self.get_logger(), "/robot/sample", self._on_robot_sample),
+240:             QOS_SENSOR,
+241:         )
+242:         self.create_subscription(
+243:             JointState, self._joint_state_topic,
+244:             _safe_ros_callback(
+245:                 self.get_logger(),
+246:                 self._joint_state_topic,
+247:                 self._on_joint_state,
+
+## 01_system:scan ws_cobot1/src/scan_manager/scan_manager/scan_manager.py L229-239
+229:         self._state_pub = self.create_publisher(ScanState, '/scan/state', QOS_STATE)
+230:         self._result_pub = self.create_publisher(ScanResult, '/scan/result', QOS_STATE)
+231:         self._log_pub = self.create_publisher(ScanLog, '/scan/log', QOS_LOG)
+232:         self.state_machine = ScanStateMachine(
+233:             direction_order=[Direction[name] for name in self._direction_order],
+234:             on_change=self._on_change)
+235: 
+236:         subs = MutuallyExclusiveCallbackGroup()       # 시퀀스가 기다리는 동안에도 항상 처리된다
+237:         actions = ReentrantCallbackGroup()
+238:         services = MutuallyExclusiveCallbackGroup()
+239:         clients = ReentrantCallbackGroup()
+
+## 01_system:weld ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L137-147
+137:         self._state_pub = self.create_publisher(WeldState, '/weld/state', QOS_STATE)
+138:         self._result_pub = self.create_publisher(WeldResult, '/weld/result', QOS_STATE)
+139:         self._log_pub = self.create_publisher(ScanLog, '/weld/log', QOS_LOG)
+140:         self.state_machine = WeldStateMachine(on_change=self._on_change)
+141: 
+142:         subs = MutuallyExclusiveCallbackGroup()       # 시퀀스가 기다리는 동안에도 항상 처리된다
+143:         actions = ReentrantCallbackGroup()
+144:         services = MutuallyExclusiveCallbackGroup()
+145:         clients = ReentrantCallbackGroup()
+146:         self.create_subscription(ScanState, '/scan/state', self._keep('_scan_state'), QOS_STATE,
+147:                                  callback_group=subs)
+
+## 01_system:files ws_cobot1/src/scan_manager/scan_manager/result_store/store.py L294-326
+294:     def save_result(self, scan_id: str, shape: ShapeResult, bias_corrections=None) -> ResultRecord:
+295:         """최종 결과 원본을 쓴다(GEOMETRY 끝, /scan/result 발행 전). 실패한 형상도 저장한다.
+296: 
+297:         두 번째 호출은 ResultAlreadySaved 다. 재시작으로 GEOMETRY 에 돌아왔는데 result_saved 가 이미
+298:         참이면 다시 계산하지 말고 load_result 로 읽는다.
+299:         """
+300:         if not isinstance(shape, ShapeResult):
+301:             raise ValueError('shape 는 ShapeResult 여야 한다')
+302:         corrections = dict(bias_corrections or {})
+303:         if any(not isinstance(c, BiasCorrection) for c in corrections.values()):
+304:             raise ValueError('bias_corrections 의 값은 BiasCorrection 이어야 한다')
+305:         with self._lock:
+306:             record = self.load(scan_id)
+307:             path = self._path(scan_id, RESULT_FILE)
+308:             if path.exists():
+309:                 if not record.result_saved:
+310:                     # result.json 을 쓴 직후에 죽어 진행 기록에 표시가 빠진 경우. 있는 파일대로 고친다
+311:                     self._mark_result_saved(scan_id, self.load_result(scan_id).shape.success)
+312:                 raise ResultAlreadySaved(f'{scan_id} 의 결과는 이미 저장됐다')
+313:             result = ResultRecord(
+314:                 scan_id=scan_id, shape=shape, bias_corrections=corrections,
+315:                 config=record.config, node_params=record.node_params, saved_at=self._now())
+316:             _atomic_write(path, result.to_dict())
+317:             self._mark_result_saved(scan_id, shape.success)
+318:             return result
+319: 
+320:     # ---- 읽기 ----
+321: 
+322:     def load(self, scan_id: str) -> ScanRecord:
+323:         """지정한 작업의 진행 기록. 그 작업의 파일만 읽는다."""
+324:         path = self._path(check_scan_id(scan_id), PROGRESS_FILE)
+325:         return self._parse(scan_id, path, KIND_PROGRESS, ScanRecord)
+326: 
+
+## 01_system:files ws_cobot1/src/scan_manager/scan_manager/result_store/store.py L488-505
+488: def _atomic_write(path: Path, data: dict) -> None:
+489:     """임시 파일 → fsync → os.replace → 디렉터리 fsync. 실패하면 이전 파일이 그대로 남는다."""
+490:     # allow_nan=False: NaN · inf 가 남아 있으면 파일을 만들기 전에 ValueError 로 멈춘다
+491:     text = json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False)
+492:     tmp = path.with_name(f'.{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+493:     try:
+494:         with open(tmp, 'w', encoding='utf-8') as file:
+495:             file.write(text)
+496:             file.write('\n')
+497:             file.flush()
+498:             os.fsync(file.fileno())
+499:         os.replace(tmp, path)
+500:     except BaseException:
+501:         try:
+502:             tmp.unlink()
+503:         except OSError:
+504:             pass
+505:         raise
+
+## 01_system:robot ws_cobot1/src/robot_manager/robot_manager/robot_manager.py L381-391
+381:         self.sample_pub = self.create_publisher(RobotSample, '/robot/sample', QOS_SENSOR)
+382:         # 스텝 모드 SLIDE 의 EDGE 만 낸다. event_id 는 contact_detector 와 겹치지 않게 STEP_EVENT_ID_BASE 위를 쓴다
+383:         self.event_pub = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
+384:         self.step_event_count = 0
+385:         self.status_pub = self.create_publisher(RobotStatus, '/robot/status', QOS_STATE)
+386:         self.create_subscription(ContactEvent, '/contact/event', self.on_event, QOS_EVENT,
+387:                                  callback_group=group)
+388: 
+389:         self.sample_id = 0
+390:         self.cycle = 0
+391:         self.attempt = None
+
+## 01_system:contact ws_cobot1/src/contact_detector/contact_detector/contact_detector.py L140-150
+140:         self.publisher = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
+141:         self.create_subscription(RobotSample, '/robot/sample', self.on_sample, QOS_SENSOR)
+142:         self.create_subscription(ScanState, '/scan/state', self.on_scan_state, QOS_STATE)
+143:         # tare 는 구간이 끝날 때까지 기다리는 코루틴이다. 기다리는 동안 그 콜백 그룹은 '실행 중'으로 잡히므로,
+144:         # 서비스와 그 타이머를 샘플 구독(기본 그룹)과 다른 그룹에 둔다. 같은 그룹이면 샘플도 타이머도 돌지 못한다
+145:         self.tare_timer_group = MutuallyExclusiveCallbackGroup()
+146:         self.create_service(TareForce, '/contact/tare', self.on_tare,
+147:                             callback_group=MutuallyExclusiveCallbackGroup())
+148:         self.add_on_set_parameters_callback(self.on_set_parameters)
+149: 
+150:         if self.sim is not None:
+
+## 01_system:safety ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py L86-96
+86:         self.publisher = self.create_publisher(SafetyStatus, '/safety/status', QOS_STATE)
+87:         self.create_subscription(RobotSample, '/robot/sample', self.on_sample, QOS_SENSOR)
+88:         self.create_subscription(RobotStatus, '/robot/status', self.on_status, QOS_STATE)
+89:         self.stop_client = self.create_client(StopRobot, '/robot/stop')
+90:         self.create_service(ResetSafety, '/safety/reset', self.on_reset)
+91:         self.create_timer(self.values['check_period_s'], self.on_check)
+92:         self.create_timer(self.values['status_publish_period_s'], lambda: self.publish(force=True))
+93:         self.add_on_set_parameters_callback(self.on_set_parameters)
+94: 
+95:         self.get_logger().info(' '.join(f'{k}={v}' for k, v in self.values.items()))
+96:         self.publish(force=True)             # 기동 직후 1회. STATE 는 TRANSIENT_LOCAL 이라 늦게 뜬 구독자도 받는다
+
+## 01_system:driver ws_cobot1/src/robot_manager/robot_manager/dsr_client.py L35-45
+35:     'move_joint': (MoveJoint, 'motion/move_joint'),
+36:     'move_spline': (MoveSplineTask, 'motion/move_spline_task'),   # phase 2 ExecutePath (spline)
+37:     'move_stop': (MoveStop, 'motion/move_stop'),
+38:     'compliance_on': (TaskComplianceCtrl, 'force/task_compliance_ctrl'),
+39:     'compliance_off': (ReleaseComplianceCtrl, 'force/release_compliance_ctrl'),
+40:     'force_on': (SetDesiredForce, 'force/set_desired_force'),
+41:     'force_off': (ReleaseForce, 'force/release_force'),
+42: }
+43: 
+44: 
+45: def prefix(namespace):
+
+## 01_system:controller ws_cobot1/src/contact_scan_bringup/launch/bringup.launch.py L45-75
+45: def _launch_nodes(context):
+46:     source = LaunchConfiguration('source').perform(context)
+47:     broker_host = LaunchConfiguration('broker_host').perform(context)
+48:     config_override = LaunchConfiguration('config_file').perform(context)
+49:     if source not in CONFIG_BY_SOURCE:
+50:         raise RuntimeError(
+51:             f"source:={source} 는 지원하지 않는다. {' | '.join(CONFIG_BY_SOURCE)} 중에서 고른다")
+52: 
+53:     if config_override and source != 'sim':
+54:         raise RuntimeError('config_file 은 source:=sim 에서만 사용할 수 있다')
+55:     config = config_override or os.path.join(
+56:         get_package_share_directory('contact_scan_bringup'), 'config', CONFIG_BY_SOURCE[source])
+57:     if not os.path.isfile(config):
+58:         raise RuntimeError(f'파라미터 파일이 없다: {config}')
+59: 
+60:     actions = [LogInfo(msg=f'[bringup] source={source}, 파라미터 파일={config}')]
+61:     for name in NODES:
+62:         if not _is_installed(name):
+63:             actions.append(LogInfo(msg=f'[bringup] {name}: 패키지가 설치되지 않아 건너뜀'))
+64:             continue
+65:         parameters = [config]
+66:         if name == 'mqtt_bridge':
+67:             parameters.append({'broker_host': broker_host})
+68:         actions.append(Node(
+69:             package=name,
+70:             executable=name,
+71:             name=name,
+72:             output='screen',
+73:             emulate_tty=True,
+74:             parameters=parameters,
+75:         ))
+
+## 02_ros2:mqtt_bridge ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py L237-247
+237:         self.create_subscription(
+238:             RobotSample, "/robot/sample",
+239:             _safe_ros_callback(self.get_logger(), "/robot/sample", self._on_robot_sample),
+240:             QOS_SENSOR,
+241:         )
+242:         self.create_subscription(
+243:             JointState, self._joint_state_topic,
+244:             _safe_ros_callback(
+245:                 self.get_logger(),
+246:                 self._joint_state_topic,
+247:                 self._on_joint_state,
+
+## 02_ros2:scan_manager ws_cobot1/src/scan_manager/scan_manager/scan_manager.py L229-239
+229:         self._state_pub = self.create_publisher(ScanState, '/scan/state', QOS_STATE)
+230:         self._result_pub = self.create_publisher(ScanResult, '/scan/result', QOS_STATE)
+231:         self._log_pub = self.create_publisher(ScanLog, '/scan/log', QOS_LOG)
+232:         self.state_machine = ScanStateMachine(
+233:             direction_order=[Direction[name] for name in self._direction_order],
+234:             on_change=self._on_change)
+235: 
+236:         subs = MutuallyExclusiveCallbackGroup()       # 시퀀스가 기다리는 동안에도 항상 처리된다
+237:         actions = ReentrantCallbackGroup()
+238:         services = MutuallyExclusiveCallbackGroup()
+239:         clients = ReentrantCallbackGroup()
+
+## 02_ros2:weld_manager ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L137-147
+137:         self._state_pub = self.create_publisher(WeldState, '/weld/state', QOS_STATE)
+138:         self._result_pub = self.create_publisher(WeldResult, '/weld/result', QOS_STATE)
+139:         self._log_pub = self.create_publisher(ScanLog, '/weld/log', QOS_LOG)
+140:         self.state_machine = WeldStateMachine(on_change=self._on_change)
+141: 
+142:         subs = MutuallyExclusiveCallbackGroup()       # 시퀀스가 기다리는 동안에도 항상 처리된다
+143:         actions = ReentrantCallbackGroup()
+144:         services = MutuallyExclusiveCallbackGroup()
+145:         clients = ReentrantCallbackGroup()
+146:         self.create_subscription(ScanState, '/scan/state', self._keep('_scan_state'), QOS_STATE,
+147:                                  callback_group=subs)
+
+## 02_ros2:contact_detector ws_cobot1/src/contact_detector/contact_detector/contact_detector.py L140-150
+140:         self.publisher = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
+141:         self.create_subscription(RobotSample, '/robot/sample', self.on_sample, QOS_SENSOR)
+142:         self.create_subscription(ScanState, '/scan/state', self.on_scan_state, QOS_STATE)
+143:         # tare 는 구간이 끝날 때까지 기다리는 코루틴이다. 기다리는 동안 그 콜백 그룹은 '실행 중'으로 잡히므로,
+144:         # 서비스와 그 타이머를 샘플 구독(기본 그룹)과 다른 그룹에 둔다. 같은 그룹이면 샘플도 타이머도 돌지 못한다
+145:         self.tare_timer_group = MutuallyExclusiveCallbackGroup()
+146:         self.create_service(TareForce, '/contact/tare', self.on_tare,
+147:                             callback_group=MutuallyExclusiveCallbackGroup())
+148:         self.add_on_set_parameters_callback(self.on_set_parameters)
+149: 
+150:         if self.sim is not None:
+
+## 02_ros2:safety_monitor ws_cobot1/src/safety_monitor/safety_monitor/safety_monitor.py L86-96
+86:         self.publisher = self.create_publisher(SafetyStatus, '/safety/status', QOS_STATE)
+87:         self.create_subscription(RobotSample, '/robot/sample', self.on_sample, QOS_SENSOR)
+88:         self.create_subscription(RobotStatus, '/robot/status', self.on_status, QOS_STATE)
+89:         self.stop_client = self.create_client(StopRobot, '/robot/stop')
+90:         self.create_service(ResetSafety, '/safety/reset', self.on_reset)
+91:         self.create_timer(self.values['check_period_s'], self.on_check)
+92:         self.create_timer(self.values['status_publish_period_s'], lambda: self.publish(force=True))
+93:         self.add_on_set_parameters_callback(self.on_set_parameters)
+94: 
+95:         self.get_logger().info(' '.join(f'{k}={v}' for k, v in self.values.items()))
+96:         self.publish(force=True)             # 기동 직후 1회. STATE 는 TRANSIENT_LOCAL 이라 늦게 뜬 구독자도 받는다
+
+## 02_ros2:robot_manager ws_cobot1/src/robot_manager/robot_manager/robot_manager.py L381-391
+381:         self.sample_pub = self.create_publisher(RobotSample, '/robot/sample', QOS_SENSOR)
+382:         # 스텝 모드 SLIDE 의 EDGE 만 낸다. event_id 는 contact_detector 와 겹치지 않게 STEP_EVENT_ID_BASE 위를 쓴다
+383:         self.event_pub = self.create_publisher(ContactEvent, '/contact/event', QOS_EVENT)
+384:         self.step_event_count = 0
+385:         self.status_pub = self.create_publisher(RobotStatus, '/robot/status', QOS_STATE)
+386:         self.create_subscription(ContactEvent, '/contact/event', self.on_event, QOS_EVENT,
+387:                                  callback_group=group)
+388: 
+389:         self.sample_id = 0
+390:         self.cycle = 0
+391:         self.attempt = None
+
+## 02_ros2:driver ws_cobot1/src/robot_manager/robot_manager/dsr_client.py L35-45
+35:     'move_joint': (MoveJoint, 'motion/move_joint'),
+36:     'move_spline': (MoveSplineTask, 'motion/move_spline_task'),   # phase 2 ExecutePath (spline)
+37:     'move_stop': (MoveStop, 'motion/move_stop'),
+38:     'compliance_on': (TaskComplianceCtrl, 'force/task_compliance_ctrl'),
+39:     'compliance_off': (ReleaseComplianceCtrl, 'force/release_compliance_ctrl'),
+40:     'force_on': (SetDesiredForce, 'force/set_desired_force'),
+41:     'force_off': (ReleaseForce, 'force/release_force'),
+42: }
+43: 
+44: 
+45: def prefix(namespace):
+
+## 02_ros2:joints ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py L190-206
+190:         for name, default in (
+191:             ("broker_host", "127.0.0.1"), ("broker_port", 1883),
+192:             ("topic_prefix", ""), ("dedup_cache_size", 100),
+193:             ("cmd_expiry_s", 5.0), ("sample_publish_hz", 10.0),
+194:             ("joint_publish_hz", 20.0), ("joint_state_topic", "/dsr01/joint_states"),
+195:             ("heartbeat_hz", 1.0), ("keepalive_s", 60),
+196:         ):
+197:             self.declare_parameter(name, default)
+198: 
+199:         self._host = str(self.get_parameter("broker_host").value)
+200:         self._port = int(self.get_parameter("broker_port").value)
+201:         self._prefix = normalize_topic_prefix(str(self.get_parameter("topic_prefix").value))
+202:         self._sample_hz = float(self.get_parameter("sample_publish_hz").value)
+203:         self._joint_hz = float(self.get_parameter("joint_publish_hz").value)
+204:         if not math.isfinite(self._joint_hz) or self._joint_hz <= 0:
+205:             raise ValueError("joint_publish_hz must be a finite positive number")
+206:         self._joint_state_topic = str(self.get_parameter("joint_state_topic").value)
+
+## 02_ros2:joints ws_cobot1/src/mqtt_bridge/mqtt_bridge/mqtt_bridge.py L242-249
+242:         self.create_subscription(
+243:             JointState, self._joint_state_topic,
+244:             _safe_ros_callback(
+245:                 self.get_logger(),
+246:                 self._joint_state_topic,
+247:                 self._on_joint_state,
+248:             ),
+249:             QOS_SENSOR,
+
+## 03_erd:workpieces docker/postgres/init/002_business_schema.sql L6-16
+6: CREATE TABLE IF NOT EXISTS workpieces (
+7:     workpiece_id TEXT PRIMARY KEY,
+8: 
+9:     name TEXT NOT NULL,
+10:     description TEXT,
+11: 
+12:     active BOOLEAN NOT NULL DEFAULT TRUE,
+13: 
+14:     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+15:     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+16: );
+
+## 03_erd:work_orders docker/postgres/init/002_business_schema.sql L20-30
+20: CREATE TABLE IF NOT EXISTS work_orders (
+21:     work_order_id TEXT PRIMARY KEY,
+22: 
+23:     workpiece_id TEXT NOT NULL
+24:         REFERENCES workpieces(workpiece_id)
+25:         ON DELETE RESTRICT,
+26: 
+27:     name TEXT NOT NULL,
+28:     status TEXT NOT NULL DEFAULT 'READY',
+29:     note TEXT,
+30: 
+
+## 03_erd:work_order_scans docker/postgres/init/002_business_schema.sql L37-47
+37: CREATE TABLE IF NOT EXISTS work_order_scans (
+38:     work_order_id TEXT NOT NULL
+39:         REFERENCES work_orders(work_order_id)
+40:         ON DELETE CASCADE,
+41: 
+42:     scan_id TEXT NOT NULL UNIQUE
+43:         REFERENCES scan_jobs(scan_id)
+44:         ON DELETE CASCADE,
+45: 
+46:     linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+47: 
+
+## 03_erd:scan_jobs docker/postgres/init/001_schema.sql L6-16
+6: CREATE TABLE IF NOT EXISTS scan_jobs (
+7:     scan_id TEXT PRIMARY KEY,
+8: 
+9:     success BOOLEAN,
+10:     reason_code INTEGER,
+11:     reason TEXT,
+12:     detail TEXT,
+13:     frame_id TEXT,
+14: 
+15:     started_at_ms BIGINT,
+16:     finished_at_ms BIGINT,
+
+## 03_erd:measurements docker/postgres/init/001_schema.sql L24-34
+24: CREATE TABLE IF NOT EXISTS measurements (
+25:     scan_id TEXT PRIMARY KEY
+26:         REFERENCES scan_jobs(scan_id)
+27:         ON DELETE CASCADE,
+28: 
+29:     stamp_ms BIGINT NOT NULL,
+30: 
+31:     z_top_mm DOUBLE PRECISION,
+32:     z_top_valid BOOLEAN NOT NULL DEFAULT FALSE,
+33: 
+34:     x_pos_mm DOUBLE PRECISION,
+
+## 03_erd:scan_configs docker/postgres/init/001_schema.sql L98-106
+98: CREATE TABLE IF NOT EXISTS scan_configs (
+99:     scan_id TEXT PRIMARY KEY
+100:         REFERENCES scan_jobs(scan_id)
+101:         ON DELETE CASCADE,
+102: 
+103:     config JSONB NOT NULL,
+104: 
+105:     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+106: );
+
+## 03_erd:contact_events docker/postgres/init/001_schema.sql L64-74
+64: CREATE TABLE IF NOT EXISTS contact_events (
+65:     id BIGSERIAL PRIMARY KEY,
+66: 
+67:     scan_id TEXT NOT NULL,
+68:     event_id BIGINT NOT NULL,
+69:     motion_id BIGINT,
+70:     sample_id BIGINT,
+71: 
+72:     event_type TEXT NOT NULL,
+73:     source TEXT,
+74:     frame_id TEXT,
+
+## 04_flow:start ws_cobot1/src/scan_manager/scan_manager/state_machine.py L321-365
+321:     def request(
+322:         self,
+323:         command: Command,
+324:         *,
+325:         conditions: Optional[Conditions] = None,
+326:         scan_id: str = '',
+327:     ) -> Outcome:
+328:         """관제자 명령을 처리한다. 거절은 예외가 아니라 Outcome 으로 돌려준다.
+329: 
+330:         scan_id: START 는 새로 발급한 ID(필수), RESUME 은 goal 의 scan_id("" = 가장 최근 중단 작업).
+331:         """
+332:         command = Command(command)
+333:         conditions = conditions or Conditions()
+334:         with self._lock:
+335:             if command is Command.START and not scan_id:
+336:                 raise ValueError('START 에는 scan_manager 가 발급한 scan_id 가 필요하다')
+337:             reason, detail = self._check(command, conditions, scan_id)
+338:             if reason is not Reason.OK:
+339:                 return Outcome(False, reason, detail, False, self.snapshot())
+340: 
+341:             before = self._phase
+342:             if before in ACTIVE_PHASES or command is not Command.STOP:
+343:                 self._apply_command(command, scan_id)
+344:             changed = self._phase is not before
+345:             if changed:
+346:                 self._emit()
+347:             return Outcome(True, Reason.OK, '', changed, self.snapshot())
+348: 
+349:     def check(
+350:         self,
+351:         command: Command,
+352:         *,
+353:         conditions: Optional[Conditions] = None,
+354:         scan_id: str = '',
+355:     ):
+356:         """request() 가 내릴 판정 (Reason, detail) 만 돌려준다. 상태는 바뀌지 않는다.
+357: 
+358:         재시작은 접수 전에 기록을 읽어 계획을 세운다. 그 전에 상태 기계의 답을 먼저 알아야
+359:         거절될 요청이 RESUMING 에 들어가지 않는다.
+360:         """
+361:         with self._lock:
+362:             return self._check(Command(command), conditions or Conditions(), scan_id)
+363: 
+364:     def restore(
+365:         self,
+
+## 04_flow:idle ws_cobot1/src/scan_manager/scan_manager/state_machine.py L321-365
+321:     def request(
+322:         self,
+323:         command: Command,
+324:         *,
+325:         conditions: Optional[Conditions] = None,
+326:         scan_id: str = '',
+327:     ) -> Outcome:
+328:         """관제자 명령을 처리한다. 거절은 예외가 아니라 Outcome 으로 돌려준다.
+329: 
+330:         scan_id: START 는 새로 발급한 ID(필수), RESUME 은 goal 의 scan_id("" = 가장 최근 중단 작업).
+331:         """
+332:         command = Command(command)
+333:         conditions = conditions or Conditions()
+334:         with self._lock:
+335:             if command is Command.START and not scan_id:
+336:                 raise ValueError('START 에는 scan_manager 가 발급한 scan_id 가 필요하다')
+337:             reason, detail = self._check(command, conditions, scan_id)
+338:             if reason is not Reason.OK:
+339:                 return Outcome(False, reason, detail, False, self.snapshot())
+340: 
+341:             before = self._phase
+342:             if before in ACTIVE_PHASES or command is not Command.STOP:
+343:                 self._apply_command(command, scan_id)
+344:             changed = self._phase is not before
+345:             if changed:
+346:                 self._emit()
+347:             return Outcome(True, Reason.OK, '', changed, self.snapshot())
+348: 
+349:     def check(
+350:         self,
+351:         command: Command,
+352:         *,
+353:         conditions: Optional[Conditions] = None,
+354:         scan_id: str = '',
+355:     ):
+356:         """request() 가 내릴 판정 (Reason, detail) 만 돌려준다. 상태는 바뀌지 않는다.
+357: 
+358:         재시작은 접수 전에 기록을 읽어 계획을 세운다. 그 전에 상태 기계의 답을 먼저 알아야
+359:         거절될 요청이 RESUMING 에 들어가지 않는다.
+360:         """
+361:         with self._lock:
+362:             return self._check(Command(command), conditions or Conditions(), scan_id)
+363: 
+364:     def restore(
+365:         self,
+
+## 04_flow:gate ws_cobot1/src/scan_manager/scan_manager/state_machine.py L406-455
+406:     def _check(self, command, conditions, scan_id):
+407:         phase = self._phase
+408:         if phase not in COMMAND_TRANSITIONS[command]:
+409:             if command is Command.RESUME and phase in REST_PHASES:
+410:                 return Reason.NO_RESUMABLE_SCAN, f'phase={phase.name}'
+411:             return Reason.BUSY, f'phase={phase.name}'
+412: 
+413:         if command is Command.RESUME:
+414:             if phase is Phase.ERROR and not failure_is_resumable(self._failure):
+415:                 # 허용 목록 밖이다. 안전 점검 · 복귀 뒤 새 START 만 가능하다 (계약 9장, v0.1.21)
+416:                 code = None if self._failure is None else self._failure.reason_code
+417:                 return Reason.NOT_SUPPORTED, (
+418:                     f'오류 사유 {code} 는 재시작 허용 목록에 없다. 안전 점검 뒤 새 START 로 시작한다'
+419:                     if code else '오류로 끝났는데 사유 기록이 없다. 새 START 로 시작한다')
+420:             if self._resume_phase is None:
+421:                 return Reason.NO_RESUMABLE_SCAN, '재개할 단계가 없다'
+422:             if scan_id and scan_id != self._scan_id:
+423:                 return Reason.NO_RESUMABLE_SCAN, f'중단된 작업은 {self._scan_id}'
+424:             if self._moved_since_stop:
+425:                 return Reason.NOT_SUPPORTED, '홈 안전복귀 뒤의 재접근 절차는 TBD'
+426: 
+427:         if command in (Command.START, Command.RESUME):
+428:             # 용접 중이면 WELD_ACTIVE(601). 순서는 BUSY → 601 → 래치 → 로봇이다(계약 1차 5.1 · 5.3,
+429:             # phase 2 7.1, 9/26 결정): weld_manager 의 600 이 래치 앞에 있는 것과 대칭이다.
+430:             # ERROR 재시작(허용 목록)도 이 블록을 지나므로 같이 막힌다. 안전복귀(HOME)는 여기 들어오지 않는다.
+431:             weld = weld_active(conditions)
+432:             if weld:
+433:                 return Reason.WELD_ACTIVE, weld
+434:             if conditions.safety_latched is None:
+435:                 return Reason.SAFETY_LATCHED, '/safety/status 미수신'
+436:             # 끊김을 래치보다 먼저 본다: 끊긴 뒤의 latched 는 죽은 감시자가 남긴 옛 값이라 믿을 수 없다.
+437:             # 안전복귀(HOME)는 이 관문에 들어오지 않는다 — 감시자가 죽었다고 돌아오지 못하면 안 된다(규칙 3).
+438:             stale = status_stale(
+439:                 '/safety/status', 'safety_status_timeout_s',
+440:                 conditions.safety_status_age_s, conditions.safety_status_timeout_s)
+441:             if stale:
+442:                 return Reason.SAFETY_LATCHED, stale
+443:             if conditions.safety_latched:
+444:                 return Reason.SAFETY_LATCHED, ''
+445:         if command in (Command.START, Command.RESUME, Command.HOME):
+446:             if conditions.robot_connected is None:
+447:                 return Reason.ROBOT_DISCONNECTED, '/robot/status 미수신'
+448:             stale = status_stale(
+449:                 '/robot/status', 'robot_status_timeout_s',
+450:                 conditions.robot_status_age_s, conditions.robot_status_timeout_s)
+451:             if stale:
+452:                 return Reason.ROBOT_DISCONNECTED, stale
+453:             if not conditions.robot_connected:
+454:                 return Reason.ROBOT_DISCONNECTED, ''
+455:         return Reason.OK, ''
+
+## 04_flow:prepare ws_cobot1/src/scan_manager/scan_manager/sequence.py L491-505
+491:     def _prepare(self):
+492:         # tare 는 무접촉 · 정지 상태에서 한다. 그 자리가 측정을 시작할 기준 원점 상공이다.
+493:         self._execute(self._plan.to_origin())
+494:         self._settle_and_tare()
+495:         self._notify(Signal.PREPARE_DONE)
+496: 
+497:     def _settle_and_tare(self):
+498:         self._check_stop()
+499:         if not self._ports.wait_still():
+500:             raise _Fail(Reason.ROBOT_MOVING, 'tare 전에 정지(connected && !moving)를 확인하지 못했다')
+501:         self._check_stop()
+502:         tare = self._ports.tare()
+503:         if not tare.success:
+504:             raise _Fail(tare.reason_code or Reason.TARE_FAILED, f'tare: {tare.detail}')
+505: 
+
+## 04_flow:prepare ws_cobot1/src/scan_manager/scan_manager/sequence.py L417-433
+417:     def _measure(self, request: MotionRequest, target) -> Tuple[MatchedEvent, MotionResult]:
+418:         result = self._execute(request, target)
+419:         event = self._ports.wait_event(result.event_id)
+420:         if event is None:
+421:             # 측정값 없이 통과시키지 않는다
+422:             self._attempt_failed(
+423:                 target, Reason.TIMEOUT,
+424:                 f'{request.label}: event_id={result.event_id} 인 ContactEvent 가 오지 않았다', result)
+425:         if self._ports.stop_requested():
+426:             # 버린다(T26 결정). 정지 요청 뒤의 판정은 감속 중의 값일 수 있어 편향 보정의 속도 가정과 어긋나고,
+427:             # 재시작이 그 방향을 기준 원점에서 처음부터 다시 밀기 때문에 잃는 것이 없다.
+428:             self._ports.log_info(
+429:                 f'{request.label}: 중지 접수 뒤에 도착한 측정값은 기록하지 않는다(판정 좌표)',
+430:                 event.position)
+431:             raise _Stop()
+432:         return event, result
+433: 
+
+## 04_flow:top ws_cobot1/src/scan_manager/scan_manager/sequence.py L506-512
+506:     def _find_top(self) -> float:
+507:         request = self._plan.descend()
+508:         event, result = self._measure(request, TOP)
+509:         self._ports.record_top(event, result, request)
+510:         self._notify(Signal.TOP_FOUND)
+511:         return event.position[2]  # 첫 접촉 z = 판정 좌표의 z (7.3절)
+512: 
+
+## 04_flow:top ws_cobot1/src/scan_manager/scan_manager/sequence.py L417-433
+417:     def _measure(self, request: MotionRequest, target) -> Tuple[MatchedEvent, MotionResult]:
+418:         result = self._execute(request, target)
+419:         event = self._ports.wait_event(result.event_id)
+420:         if event is None:
+421:             # 측정값 없이 통과시키지 않는다
+422:             self._attempt_failed(
+423:                 target, Reason.TIMEOUT,
+424:                 f'{request.label}: event_id={result.event_id} 인 ContactEvent 가 오지 않았다', result)
+425:         if self._ports.stop_requested():
+426:             # 버린다(T26 결정). 정지 요청 뒤의 판정은 감속 중의 값일 수 있어 편향 보정의 속도 가정과 어긋나고,
+427:             # 재시작이 그 방향을 기준 원점에서 처음부터 다시 밀기 때문에 잃는 것이 없다.
+428:             self._ports.log_info(
+429:                 f'{request.label}: 중지 접수 뒤에 도착한 측정값은 기록하지 않는다(판정 좌표)',
+430:                 event.position)
+431:             raise _Stop()
+432:         return event, result
+433: 
+
+## 04_flow:edge ws_cobot1/src/scan_manager/scan_manager/sequence.py L513-535
+513:     def _find_edge(self, direction: Direction):
+514:         request = self._plan.slide(direction)
+515:         event, result = self._measure(request, direction)
+516:         self._ports.record_edge(direction, event, result, request)
+517:         self._notify(Signal.EDGE_FOUND)
+518: 
+519:     def _change_direction(self, first_contact_z: float):
+520:         if self._position is None:
+521:             raise _Fail(Reason.ROBOT_ERROR, '방향 전환: 직전 모션의 정지 좌표를 모른다')
+522:         self._recontact(self._plan.change_direction(self._position, first_contact_z))
+523: 
+524:     def _recontact(self, requests):
+525:         for request in requests:
+526:             if request.operation is Operation.DESCEND:
+527:                 self._settle_and_tare()
+528:                 event, _ = self._measure(request, None)
+529:                 # 방향별 재접촉은 동작 확인용이다. 원래 윗면 측정과 progress는 유지한다.
+530:                 self._ports.log_info(
+531:                     f'윗면 재접촉 확인: z={event.position[2]:.5f} m (판정 좌표)',
+532:                     event.position)
+533:             else:
+534:                 self._execute(request)
+535: 
+
+## 04_flow:edge ws_cobot1/src/scan_manager/scan_manager/sequence.py L417-433
+417:     def _measure(self, request: MotionRequest, target) -> Tuple[MatchedEvent, MotionResult]:
+418:         result = self._execute(request, target)
+419:         event = self._ports.wait_event(result.event_id)
+420:         if event is None:
+421:             # 측정값 없이 통과시키지 않는다
+422:             self._attempt_failed(
+423:                 target, Reason.TIMEOUT,
+424:                 f'{request.label}: event_id={result.event_id} 인 ContactEvent 가 오지 않았다', result)
+425:         if self._ports.stop_requested():
+426:             # 버린다(T26 결정). 정지 요청 뒤의 판정은 감속 중의 값일 수 있어 편향 보정의 속도 가정과 어긋나고,
+427:             # 재시작이 그 방향을 기준 원점에서 처음부터 다시 밀기 때문에 잃는 것이 없다.
+428:             self._ports.log_info(
+429:                 f'{request.label}: 중지 접수 뒤에 도착한 측정값은 기록하지 않는다(판정 좌표)',
+430:                 event.position)
+431:             raise _Stop()
+432:         return event, result
+433: 
+
+## 04_flow:geometry ws_cobot1/src/scan_manager/scan_manager/scan_manager.py L1519-1533
+1519:     def compute_geometry(self):
+1520:         node, job = self._node, self._job
+1521:         output = compute_shape(
+1522:             job.top, job.edges, job.params, started_at=job.started_at,
+1523:             finished_at=node._now_stamp())
+1524:         # 원본 저장 → 발행 순서(계약 7.4절). 실패한 형상도 저장한다.
+1525:         node._write(node._store.save_result, job.scan_id, output.shape, output.bias_corrections)
+1526:         node._publish_result(job, output.shape)
+1527:         top = output.top_correction
+1528:         node.log(
+1529:             ScanLog.LEVEL_INFO if output.shape.success else ScanLog.LEVEL_ERROR,
+1530:             output.shape.reason_code,
+1531:             f'형상 계산 {"성공" if output.shape.success else "실패: " + output.shape.detail}. '
+1532:             f'윗면 보정 {top.correction_m} m (result_store 에는 방향별 보정만 남는다)')
+1533:         return StepOutcome(output.shape.success, output.shape.reason_code, output.shape.detail)
+
+## 04_flow:geometry ws_cobot1/src/scan_manager/scan_manager/sequence.py L460-475
+460:     def run(self) -> RunOutcome:
+461:         try:
+462:             self._search()
+463:             self._geometry()
+464:         except _Stop:
+465:             return self._finish_stop(during_final_homing=False)
+466:         except _Fail as failure:
+467:             return self._finish_fail(failure)
+468: 
+469:         # 여기부터는 측정이 끝난 뒤다. 실패해도 ScanResult 는 그대로 유효하다(7.4절).
+470:         try:
+471:             self._final_homing()
+472:         except _Stop:
+473:             return self._finish_stop(during_final_homing=True)
+474:         except _Fail as failure:
+475:             return self._finish_fail(failure, OutcomeKind.HOMING_FAILED)
+
+## 04_flow:home ws_cobot1/src/scan_manager/scan_manager/sequence.py L539-551
+539:     def _geometry(self):
+540:         self._check_stop()
+541:         outcome = self._shape()
+542:         if not outcome.success:
+543:             raise _Fail(outcome.reason_code or Reason.INVALID_SHAPE, outcome.detail)
+544:         self._notify(Signal.GEOMETRY_DONE)
+545: 
+546:     def _final_homing(self):
+547:         if self._position is None:
+548:             raise _Fail(Reason.ROBOT_ERROR, '마무리 복귀: 직전 모션의 정지 좌표를 모른다')
+549:         self._execute(self._plan.lift(self._position, label='final_lift'))
+550:         self._execute(self._plan.home())
+551:         self._notify(Signal.HOMING_DONE)
+
+## 04_flow:done ws_cobot1/src/scan_manager/scan_manager/state_machine.py L516-518
+516:             elif signal is Signal.HOMING_DONE:
+517:                 origin = self._homing_origin
+518:                 target = Phase.DONE if origin is None else origin
+
+## 04_flow:weldgate ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L367-433
+367:     def _start_problem(self, request):
+368:         """5.1절 시작 거절 표를 순서대로 본다. 문제면 (reason_code, detail), 통과면 (params, plan, weld_id)."""
+369:         if self.state_machine.is_busy:
+370:             return Reason.BUSY, f'phase={self.state_machine.phase.name}'
+371:         base = weld_params.check(self._parameter_values())
+372:         if not base.ok:         # yaml 이 비었다(표 밖, 노드 설정 문제)
+373:             return Reason.INVALID_VALUE, f'weld_manager 파라미터: {base.describe()}'
+374:         p = base.params
+375:         now_ns = self.get_clock().now().nanoseconds
+376:         with self._status_cond:
+377:             scan, robot = self._scan_state, self._robot_status
+378:         if scan is None:
+379:             return Reason.INVALID_REQUEST, '/scan/state 를 받지 못했다(scan_manager 가 떠 있는가)'
+380:         age = _age_s(now_ns, scan.stamp)
+381:         if age > p.scan_state_timeout_s:
+382:             return Reason.INVALID_REQUEST, f'/scan/state 가 {age:.1f} s 전 것이다(> {p.scan_state_timeout_s} s)'
+383:         if scan.phase not in _SCAN_REST:
+384:             return Reason.SCAN_ACTIVE, f'스캔 진행 중(scan phase={scan.phase})'
+385:         with self._status_cond:
+386:             safety_seen = self._safety_status is not None
+387:         if not safety_seen:
+388:             # safety_monitor 가 떠 있지 않은 채 용접 이동을 시작하지 않는다(1차 scan_manager 와 같은 막음, 병후 #197 ①)
+389:             return Reason.SAFETY_LATCHED, '/safety/status 를 받지 못했다(safety_monitor 가 떠 있는가)'
+390:         latched = self.safety_reason_code()
+391:         if latched:
+392:             return Reason.SAFETY_LATCHED, f'안전 래치 중(reason_code={latched})'
+393:         if robot is None or not robot.connected:
+394:             return Reason.ROBOT_DISCONNECTED, '/robot/status 가 없거나 connected=false'
+395:         try:
+396:             store = ResultStore(os.path.expanduser(p.result_dir))
+397:             scan_input = load_scan(store, request.scan_id, p.result_frame_id, p.motion_frame_id)
+398:         except NoScanResult as error:
+399:             return Reason.NO_SCAN_RESULT, str(error)
+400:         problem = line_range_problem(request.start_line, request.end_line)
+401:         if problem:
+402:             return Reason.LINE_OUT_OF_RANGE, problem
+403:         override = conversions.override_from_msg(request.config_override) if request.use_override else {}
+404:         problems = weld_params.check_override(override)
+405:         checked = weld_params.check(self._parameter_values(), override)
+406:         if problems or not checked.ok:
+407:             return Reason.INVALID_VALUE, 'config_override: ' + '; '.join(problems or checked.invalid)
+408:         p = checked.params
+409:         sample, why = self._fresh_sample(p.sample_timeout_s)
+410:         if sample is None:
+411:             return Reason.NO_SAMPLE, why
+412:         if sample.frame_id != p.motion_frame_id:
+413:             return Reason.NO_SAMPLE, f'/robot/sample 의 frame_id {sample.frame_id!r} 가 {p.motion_frame_id!r} 가 아니다'
+414:         f = sample.wrench.force
+415:         force = math.sqrt(f.x * f.x + f.y * f.y + f.z * f.z)
+416:         if force > p.tool_check_max_force_n:
+417:             return (Reason.TOOL_REG_SUSPECT,
+418:                     f'무접촉 |F| {force:.2f} N > tool_check_max_force_n {p.tool_check_max_force_n} N '
+419:                     '(툴 · TCP 등록이 빠졌는지 본다)')
+420:         try:
+421:             plan = plan_weld(scan_input, request.start_line, request.end_line, p)
+422:         except PathRejected as error:
+423:             return Reason.PATH_REJECTED, str(error)
+424:         # 팁이 z_safe 아래여도 거절하지 않는다. 러너가 먼저 수직 상승한다(D30). 홈이라고 가정하지 않는다
+425:         start_pose = Pose(conversions.position_of(sample.pose), conversions.orientation_of(sample.pose))
+426:         return p, plan, weld_record.new_weld_id(datetime.now()), start_pose
+427: 
+428:     def _execute_run(self, goal_handle):
+429:         request = goal_handle.request
+430:         result = RunWeld.Result()
+431:         checked = self._start_problem(request)
+432:         if not isinstance(checked[0], weld_params.WeldParams):
+433:             return self._reject(goal_handle, result, *checked)
+
+## 04_flow:wg ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L367-433
+367:     def _start_problem(self, request):
+368:         """5.1절 시작 거절 표를 순서대로 본다. 문제면 (reason_code, detail), 통과면 (params, plan, weld_id)."""
+369:         if self.state_machine.is_busy:
+370:             return Reason.BUSY, f'phase={self.state_machine.phase.name}'
+371:         base = weld_params.check(self._parameter_values())
+372:         if not base.ok:         # yaml 이 비었다(표 밖, 노드 설정 문제)
+373:             return Reason.INVALID_VALUE, f'weld_manager 파라미터: {base.describe()}'
+374:         p = base.params
+375:         now_ns = self.get_clock().now().nanoseconds
+376:         with self._status_cond:
+377:             scan, robot = self._scan_state, self._robot_status
+378:         if scan is None:
+379:             return Reason.INVALID_REQUEST, '/scan/state 를 받지 못했다(scan_manager 가 떠 있는가)'
+380:         age = _age_s(now_ns, scan.stamp)
+381:         if age > p.scan_state_timeout_s:
+382:             return Reason.INVALID_REQUEST, f'/scan/state 가 {age:.1f} s 전 것이다(> {p.scan_state_timeout_s} s)'
+383:         if scan.phase not in _SCAN_REST:
+384:             return Reason.SCAN_ACTIVE, f'스캔 진행 중(scan phase={scan.phase})'
+385:         with self._status_cond:
+386:             safety_seen = self._safety_status is not None
+387:         if not safety_seen:
+388:             # safety_monitor 가 떠 있지 않은 채 용접 이동을 시작하지 않는다(1차 scan_manager 와 같은 막음, 병후 #197 ①)
+389:             return Reason.SAFETY_LATCHED, '/safety/status 를 받지 못했다(safety_monitor 가 떠 있는가)'
+390:         latched = self.safety_reason_code()
+391:         if latched:
+392:             return Reason.SAFETY_LATCHED, f'안전 래치 중(reason_code={latched})'
+393:         if robot is None or not robot.connected:
+394:             return Reason.ROBOT_DISCONNECTED, '/robot/status 가 없거나 connected=false'
+395:         try:
+396:             store = ResultStore(os.path.expanduser(p.result_dir))
+397:             scan_input = load_scan(store, request.scan_id, p.result_frame_id, p.motion_frame_id)
+398:         except NoScanResult as error:
+399:             return Reason.NO_SCAN_RESULT, str(error)
+400:         problem = line_range_problem(request.start_line, request.end_line)
+401:         if problem:
+402:             return Reason.LINE_OUT_OF_RANGE, problem
+403:         override = conversions.override_from_msg(request.config_override) if request.use_override else {}
+404:         problems = weld_params.check_override(override)
+405:         checked = weld_params.check(self._parameter_values(), override)
+406:         if problems or not checked.ok:
+407:             return Reason.INVALID_VALUE, 'config_override: ' + '; '.join(problems or checked.invalid)
+408:         p = checked.params
+409:         sample, why = self._fresh_sample(p.sample_timeout_s)
+410:         if sample is None:
+411:             return Reason.NO_SAMPLE, why
+412:         if sample.frame_id != p.motion_frame_id:
+413:             return Reason.NO_SAMPLE, f'/robot/sample 의 frame_id {sample.frame_id!r} 가 {p.motion_frame_id!r} 가 아니다'
+414:         f = sample.wrench.force
+415:         force = math.sqrt(f.x * f.x + f.y * f.y + f.z * f.z)
+416:         if force > p.tool_check_max_force_n:
+417:             return (Reason.TOOL_REG_SUSPECT,
+418:                     f'무접촉 |F| {force:.2f} N > tool_check_max_force_n {p.tool_check_max_force_n} N '
+419:                     '(툴 · TCP 등록이 빠졌는지 본다)')
+420:         try:
+421:             plan = plan_weld(scan_input, request.start_line, request.end_line, p)
+422:         except PathRejected as error:
+423:             return Reason.PATH_REJECTED, str(error)
+424:         # 팁이 z_safe 아래여도 거절하지 않는다. 러너가 먼저 수직 상승한다(D30). 홈이라고 가정하지 않는다
+425:         start_pose = Pose(conversions.position_of(sample.pose), conversions.orientation_of(sample.pose))
+426:         return p, plan, weld_record.new_weld_id(datetime.now()), start_pose
+427: 
+428:     def _execute_run(self, goal_handle):
+429:         request = goal_handle.request
+430:         result = RunWeld.Result()
+431:         checked = self._start_problem(request)
+432:         if not isinstance(checked[0], weld_params.WeldParams):
+433:             return self._reject(goal_handle, result, *checked)
+
+## 04_flow:approach ws_cobot1/src/weld_manager/weld_manager/sequence.py L390-392
+390:         self._move_to(f'{line.name} 접근 1', line.approach1, line.orientation, p.travel_speed_mps)
+391:         self._move_to(f'{line.name} 접근 2', line.approach2, line.orientation, p.approach_speed_mps)
+392:         self._notify(Signal.WELD)
+
+## 04_flow:welding ws_cobot1/src/weld_manager/weld_manager/sequence.py L395-399
+395:         self._execute(MotionRequest(
+396:             MotionKind.PATH, f'{line.name} 경로', speed=p.weld_speed_mps,
+397:             orientation=line.orientation, waypoints=line.path, line_index=index,
+398:             path_length_m=line.path_length_m, path_tolerance_m=p.path_tolerance_m,
+399:             timeout_s=p.motion_timeout_s + len(line.path) * p.path_point_dwell_s))
+
+## 04_flow:retreat ws_cobot1/src/weld_manager/weld_manager/sequence.py L400-402
+400:         self._notify(Signal.RETREAT)
+401:         # 5절 표 · 6절(38b55e8): P_ret 까지는 경로(weld_speed), 그 뒤 z_safe 상승은 travel_speed
+402:         self._move_to(f'{line.name} 후퇴', line.retreat, line.orientation, p.travel_speed_mps)
+
+## 04_flow:wresult ws_cobot1/src/weld_manager/weld_manager/sequence.py L364-385
+364:             failed = [i for i in range(self._plan.start_line, self._plan.end_line + 1)
+365:                       if self._lines[i].status is LineStatus.FAILED]
+366:             if failed:
+367:                 # D33: 작업은 끝까지 갔다. 결과는 success=false, 코드는 첫 FAILED 선의 것, detail 에 실패 선 목록
+368:                 code, detail = self._lines[failed[0]].reason_code, ','.join(f'L{i}' for i in failed) + ' FAILED'
+369:             else:
+370:                 code, detail = 0, ''
+371:             self._publish(success=not failed, reason_code=code, detail=detail)
+372:             self._homing = True
+373:             self._notify(Signal.HOMING)
+374:             # 7.3절: HOMING = OP_MOVE_TO z_safe → OP_HOME. 마지막 후퇴(또는 복구 뒤 자리)가 이미 z_safe 라 거의 제자리 이동이다.
+375:             # 마지막 선이 도달 불가로 실패했으면 그 선의 후퇴점도 못 가므로, 실제로 서 있는 z_safe 자리를 쓴다
+376:             safe = self._safe_pose
+377:             self._move_to('마무리 올림', safe.position, safe.orientation, p.travel_speed_mps)
+378:             self._home()
+379:             self._notify(Signal.HOMING_DONE)
+380:             kind = OutcomeKind.PARTIAL if failed else OutcomeKind.DONE
+381:             return RunOutcome(kind, code, detail, self._published, self.last_motion_id)
+382:         except _Stop:
+383:             return self._finish_stop()
+384:         except _Fail as failure:
+385:             return self._finish_fail(failure)
+
+## 04_flow:wresult ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L752-761
+752:     def save_result(self, record):
+753:         node, job = self._node, self._job
+754:         try:
+755:             path = node._writer.submit(weld_record.save, self._p.result_dir, record).result()
+756:             node.log('info', record.reason_code, f'용접 결과 저장: {path}')
+757:         except Exception as exc:     # 파일 실패로 결과 발행 · 복귀를 막지 않는다
+758:             node.log('error', Reason.ROBOT_ERROR, f'용접 결과 파일 저장 실패: {exc!r}')
+759:         job.record = record
+760:         job.record_msg = conversions.record_to_msg(record, node._now_msg())
+761:         node._publish_quietly(node._result_pub, lambda: job.record_msg)
+
+## 04_flow:weldhome ws_cobot1/src/weld_manager/weld_manager/sequence.py L364-385
+364:             failed = [i for i in range(self._plan.start_line, self._plan.end_line + 1)
+365:                       if self._lines[i].status is LineStatus.FAILED]
+366:             if failed:
+367:                 # D33: 작업은 끝까지 갔다. 결과는 success=false, 코드는 첫 FAILED 선의 것, detail 에 실패 선 목록
+368:                 code, detail = self._lines[failed[0]].reason_code, ','.join(f'L{i}' for i in failed) + ' FAILED'
+369:             else:
+370:                 code, detail = 0, ''
+371:             self._publish(success=not failed, reason_code=code, detail=detail)
+372:             self._homing = True
+373:             self._notify(Signal.HOMING)
+374:             # 7.3절: HOMING = OP_MOVE_TO z_safe → OP_HOME. 마지막 후퇴(또는 복구 뒤 자리)가 이미 z_safe 라 거의 제자리 이동이다.
+375:             # 마지막 선이 도달 불가로 실패했으면 그 선의 후퇴점도 못 가므로, 실제로 서 있는 z_safe 자리를 쓴다
+376:             safe = self._safe_pose
+377:             self._move_to('마무리 올림', safe.position, safe.orientation, p.travel_speed_mps)
+378:             self._home()
+379:             self._notify(Signal.HOMING_DONE)
+380:             kind = OutcomeKind.PARTIAL if failed else OutcomeKind.DONE
+381:             return RunOutcome(kind, code, detail, self._published, self.last_motion_id)
+382:         except _Stop:
+383:             return self._finish_stop()
+384:         except _Fail as failure:
+385:             return self._finish_fail(failure)
+
+## 04_flow:wdone ws_cobot1/src/weld_manager/weld_manager/sequence.py L364-385
+364:             failed = [i for i in range(self._plan.start_line, self._plan.end_line + 1)
+365:                       if self._lines[i].status is LineStatus.FAILED]
+366:             if failed:
+367:                 # D33: 작업은 끝까지 갔다. 결과는 success=false, 코드는 첫 FAILED 선의 것, detail 에 실패 선 목록
+368:                 code, detail = self._lines[failed[0]].reason_code, ','.join(f'L{i}' for i in failed) + ' FAILED'
+369:             else:
+370:                 code, detail = 0, ''
+371:             self._publish(success=not failed, reason_code=code, detail=detail)
+372:             self._homing = True
+373:             self._notify(Signal.HOMING)
+374:             # 7.3절: HOMING = OP_MOVE_TO z_safe → OP_HOME. 마지막 후퇴(또는 복구 뒤 자리)가 이미 z_safe 라 거의 제자리 이동이다.
+375:             # 마지막 선이 도달 불가로 실패했으면 그 선의 후퇴점도 못 가므로, 실제로 서 있는 z_safe 자리를 쓴다
+376:             safe = self._safe_pose
+377:             self._move_to('마무리 올림', safe.position, safe.orientation, p.travel_speed_mps)
+378:             self._home()
+379:             self._notify(Signal.HOMING_DONE)
+380:             kind = OutcomeKind.PARTIAL if failed else OutcomeKind.DONE
+381:             return RunOutcome(kind, code, detail, self._published, self.last_motion_id)
+382:         except _Stop:
+383:             return self._finish_stop()
+384:         except _Fail as failure:
+385:             return self._finish_fail(failure)
+
+## 04_flow:reject ws_cobot1/src/scan_manager/scan_manager/state_machine.py L321-365
+321:     def request(
+322:         self,
+323:         command: Command,
+324:         *,
+325:         conditions: Optional[Conditions] = None,
+326:         scan_id: str = '',
+327:     ) -> Outcome:
+328:         """관제자 명령을 처리한다. 거절은 예외가 아니라 Outcome 으로 돌려준다.
+329: 
+330:         scan_id: START 는 새로 발급한 ID(필수), RESUME 은 goal 의 scan_id("" = 가장 최근 중단 작업).
+331:         """
+332:         command = Command(command)
+333:         conditions = conditions or Conditions()
+334:         with self._lock:
+335:             if command is Command.START and not scan_id:
+336:                 raise ValueError('START 에는 scan_manager 가 발급한 scan_id 가 필요하다')
+337:             reason, detail = self._check(command, conditions, scan_id)
+338:             if reason is not Reason.OK:
+339:                 return Outcome(False, reason, detail, False, self.snapshot())
+340: 
+341:             before = self._phase
+342:             if before in ACTIVE_PHASES or command is not Command.STOP:
+343:                 self._apply_command(command, scan_id)
+344:             changed = self._phase is not before
+345:             if changed:
+346:                 self._emit()
+347:             return Outcome(True, Reason.OK, '', changed, self.snapshot())
+348: 
+349:     def check(
+350:         self,
+351:         command: Command,
+352:         *,
+353:         conditions: Optional[Conditions] = None,
+354:         scan_id: str = '',
+355:     ):
+356:         """request() 가 내릴 판정 (Reason, detail) 만 돌려준다. 상태는 바뀌지 않는다.
+357: 
+358:         재시작은 접수 전에 기록을 읽어 계획을 세운다. 그 전에 상태 기계의 답을 먼저 알아야
+359:         거절될 요청이 RESUMING 에 들어가지 않는다.
+360:         """
+361:         with self._lock:
+362:             return self._check(Command(command), conditions or Conditions(), scan_id)
+363: 
+364:     def restore(
+365:         self,
+
+## 04_flow:stop ws_cobot1/src/scan_manager/scan_manager/state_machine.py L466-474
+466:         elif command is Command.STOP:
+467:             if phase in RESUMABLE_PHASES:
+468:                 self._resume_phase = phase
+469:                 self._moved_since_stop = False
+470:             elif phase is Phase.HOMING and self._homing_origin is None:
+471:                 # 측정은 끝났으므로 재시작 대상이 아니다(7.4절)
+472:                 self._resume_phase = None
+473:             # RESUMING · 안전복귀 HOMING 중의 중지는 기존 재개 지점을 그대로 둔다
+474:             self._enter(Phase.STOPPING)
+
+## 04_flow:stop ws_cobot1/src/scan_manager/scan_manager/scan_manager.py L577-594
+577:     def wait_still(self, timeout_s) -> bool:
+578:         """**지금보다 뒤에 찍힌** /robot/status 로 connected && !moving 을 확인한다(계약 1장 "접수 ≠ 완료").
+579: 
+580:         요청 전의 오래된 moving=false 로 통과시키지 않는다.
+581:         """
+582:         asked_at = self.get_clock().now().nanoseconds
+583:         if asked_at <= 0:
+584:             self.get_logger().error('ROS 시계가 0 이다(use_sim_time 인데 /clock 없음?). 정지를 확인할 수 없다')
+585:             return False
+586: 
+587:         def still():
+588:             status = self._robot_status
+589:             if status is None or not status.connected or status.moving:
+590:                 return False
+591:             return status.stamp.sec * 1_000_000_000 + status.stamp.nanosec > asked_at
+592: 
+593:         with self._status_cond:
+594:             return self._wait(still, timeout_s, self._status_cond.wait)
+
+## 04_flow:stop ws_cobot1/src/scan_manager/scan_manager/state_machine.py L500-510
+500:             if signal is Signal.FAILED:
+501:                 if not reason_code:
+502:                     raise ValueError('FAILED 에는 0 이 아닌 reason_code 가 필요하다')
+503:                 failure = Failure(int(reason_code), detail, phase)
+504:                 self._failure = failure
+505:                 # 재개 지점은 **허용 목록에 있는 사유일 때만** 남긴다 (계약 9장, v0.1.21).
+506:                 # 그 밖에는 지운다 — 남겨 두면 허용 판정이 한 겹만 틀려도 오염된 기준으로 재개한다.
+507:                 # 실패한 그 단계가 곧 재개 지점이다(중지와 달리 FAILED 는 _resume_phase 를 세우는
+508:                 # 경로를 거치지 않는다). 마무리 HOMING 은 RESUMABLE_PHASES 에 없어 저절로 빠진다.
+509:                 self._resume_phase = (
+510:                     phase if failure_is_resumable(failure) and phase in RESUMABLE_PHASES else None)
+
+## 04_flow:stopped ws_cobot1/src/scan_manager/scan_manager/state_machine.py L131-131
+131:     Signal.STOP_CONFIRMED: _to({Phase.STOPPING}, Phase.STOPPED),
+
+## 04_flow:error ws_cobot1/src/scan_manager/scan_manager/state_machine.py L500-510
+500:             if signal is Signal.FAILED:
+501:                 if not reason_code:
+502:                     raise ValueError('FAILED 에는 0 이 아닌 reason_code 가 필요하다')
+503:                 failure = Failure(int(reason_code), detail, phase)
+504:                 self._failure = failure
+505:                 # 재개 지점은 **허용 목록에 있는 사유일 때만** 남긴다 (계약 9장, v0.1.21).
+506:                 # 그 밖에는 지운다 — 남겨 두면 허용 판정이 한 겹만 틀려도 오염된 기준으로 재개한다.
+507:                 # 실패한 그 단계가 곧 재개 지점이다(중지와 달리 FAILED 는 _resume_phase 를 세우는
+508:                 # 경로를 거치지 않는다). 마무리 HOMING 은 RESUMABLE_PHASES 에 없어 저절로 빠진다.
+509:                 self._resume_phase = (
+510:                     phase if failure_is_resumable(failure) and phase in RESUMABLE_PHASES else None)
+
+## 04_flow:rg ws_cobot1/src/scan_manager/scan_manager/state_machine.py L413-431
+413:         if command is Command.RESUME:
+414:             if phase is Phase.ERROR and not failure_is_resumable(self._failure):
+415:                 # 허용 목록 밖이다. 안전 점검 · 복귀 뒤 새 START 만 가능하다 (계약 9장, v0.1.21)
+416:                 code = None if self._failure is None else self._failure.reason_code
+417:                 return Reason.NOT_SUPPORTED, (
+418:                     f'오류 사유 {code} 는 재시작 허용 목록에 없다. 안전 점검 뒤 새 START 로 시작한다'
+419:                     if code else '오류로 끝났는데 사유 기록이 없다. 새 START 로 시작한다')
+420:             if self._resume_phase is None:
+421:                 return Reason.NO_RESUMABLE_SCAN, '재개할 단계가 없다'
+422:             if scan_id and scan_id != self._scan_id:
+423:                 return Reason.NO_RESUMABLE_SCAN, f'중단된 작업은 {self._scan_id}'
+424:             if self._moved_since_stop:
+425:                 return Reason.NOT_SUPPORTED, '홈 안전복귀 뒤의 재접근 절차는 TBD'
+426: 
+427:         if command in (Command.START, Command.RESUME):
+428:             # 용접 중이면 WELD_ACTIVE(601). 순서는 BUSY → 601 → 래치 → 로봇이다(계약 1차 5.1 · 5.3,
+429:             # phase 2 7.1, 9/26 결정): weld_manager 의 600 이 래치 앞에 있는 것과 대칭이다.
+430:             # ERROR 재시작(허용 목록)도 이 블록을 지나므로 같이 막힌다. 안전복귀(HOME)는 여기 들어오지 않는다.
+431:             weld = weld_active(conditions)
+
+## 04_flow:rg ws_cobot1/src/scan_manager/scan_manager/resume.py L105-125
+105: def failure_resume_refusal(record) -> str:
+106:     """ERROR 로 끝난 기록을 이을 수 없는 이유. 이을 수 있으면 "".
+107: 
+108:     허용 목록(계약 9장, state_machine.RESUMABLE_FAILURE_CODES)을 통과한 뒤에도 기록이 갖춰져야 한다.
+109:     - 실패한 단계가 재개할 수 있는 단계여야 한다(마무리 HOMING 중의 실패는 측정이 끝난 뒤다)
+110:     - 그 실패에서 이미 재시작했으면 다시 하지 않는다
+111:     - 안전복귀를 한 번이라도 접수했으면 로봇이 실패 지점에 없다. 재접근 절차는 TBD(계약 5.3)
+112:     """
+113:     failure = record.failure
+114:     if failure is None:
+115:         return f'{record.scan_id}: 오류로 끝났는데 사유 기록이 없다'
+116:     if not failure_is_resumable(failure):
+117:         return (f'{record.scan_id}: 오류 사유 {failure.reason_code} 는 재시작 허용 목록에 없다. '
+118:                 '안전 점검 뒤 새 START 로 시작한다')
+119:     if failure.phase not in RESUMABLE_PHASES:
+120:         return f'{record.scan_id}: {failure.phase.name} 에서 난 실패는 재개할 단계가 아니다'
+121:     if failure.resumed_at is not None:
+122:         return f'{record.scan_id}: 그 실패에서 시작한 재시작이 이미 있다'
+123:     if record.home_return.requested:
+124:         return f'{record.scan_id}: 안전복귀 뒤의 재접근 절차는 TBD'
+125:     return ''
+
+## 04_flow:rg ws_cobot1/src/scan_manager/scan_manager/resume.py L172-254
+172: def plan_resume(record, *, result_file_exists: bool, direction_order) -> Union[Resumption, Refusal]:
+173:     """기록 하나 → 이어 갈 계획.
+174: 
+175:     direction_order: 이 노드의 상태 기계가 들고 있는 탐색 순서. 기록의 순서와 같아야 한다
+176:       (상태 기계가 progress 로 방향을 되찾는다).
+177:     """
+178:     scan_id = record.scan_id
+179:     phase = record.state.phase
+180:     from_failure = phase is Phase.ERROR
+181:     if phase not in (Phase.STOPPED, Phase.ERROR):
+182:         return _refuse(f'{scan_id} 의 기록이 STOPPED · ERROR 가 아니다(phase={phase.name})')
+183:     if from_failure:
+184:         # ERROR 로 끝난 작업(계약 9장 허용 목록, v0.1.21). 재개 지점 · 중단 좌표를 중지 기록이
+185:         # 아니라 실패 기록에서 만든다 — FAILED 는 Interruption 을 남기지 않는다
+186:         why = failure_resume_refusal(record)
+187:         if why:
+188:             return _refuse(why, Reason.NOT_SUPPORTED)
+189:         resume_phase, stop_pose = record.failure.phase, record.failure.pose
+190:     else:
+191:         last, point = record.last_interruption, record.resume_point
+192:         if last is None or last.resumed_at is not None or point is None:
+193:             return _refuse(f'{scan_id}: 재시작하지 않은 중지 기록이 없다')
+194:         if resume_point_consumed(record):
+195:             return _refuse(f'{scan_id}: 그 중지에서 시작한 재시작이 이미 측정 단계로 돌아갔다')
+196:         # 아래 셋은 상태 기계가 먼저 거른다. 기록이 메모리와 어긋난 경우의 대비다
+197:         if record.failure is not None:
+198:             return _refuse(
+199:                 f'{scan_id}: 오류로 끝난 기록이 STOPPED 로 남아 있다', Reason.NOT_SUPPORTED)
+200:         if record.home_return_since_resume_point:
+201:             return _refuse(f'{scan_id}: 홈 안전복귀 뒤의 재접근 절차는 TBD', Reason.NOT_SUPPORTED)
+202:         if point.during_final_homing:
+203:             return _refuse(f'{scan_id}: 마무리 복귀 중에 중지된 작업이다. 측정은 끝났다(7.4절)')
+204:         resume_phase, stop_pose = point.phase, last.pose
+205: 
+206:     order = tuple(record.direction_order)
+207:     if order != tuple(Direction(d) for d in direction_order):
+208:         return _refuse(
+209:             f'기록의 탐색 순서 {[d.name for d in order]} 가 이 노드의 direction_order 와 다르다',
+210:             Reason.INVALID_VALUE)
+211:     config = config_values(record.config)
+212:     checked = scan_params.check({
+213:         **record.node_params,
+214:         **{name: config[name] for name in scan_params.MOTION_CONFIG_NAMES},
+215:         'direction_order': [d.name for d in order]})
+216:     if not checked.ok:
+217:         return _refuse(f'기록의 설정으로 이을 수 없다. {checked.describe()}', Reason.INVALID_VALUE)
+218:     params = checked.params
+219: 
+220:     confirmed = record.confirmed_edges
+221:     if confirmed != order[:len(confirmed)]:
+222:         return _refuse(
+223:             f'{scan_id}: 확정된 방향 {[d.name for d in confirmed]} 가 탐색 순서의 앞부분이 아니다')
+224:     poses = [record.edges[d].detection.pose for d in confirmed]
+225:     if record.top.valid:
+226:         poses.append(record.top.detection.pose)
+227:     if stop_pose is not None:
+228:         poses.append(stop_pose)
+229:     for pose in poses:
+230:         if pose.frame_id != params.motion_frame_id:
+231:             return _refuse(
+232:                 f'{scan_id}: 기록된 좌표의 frame_id={pose.frame_id!r} 가 {params.motion_frame_id!r} 가 아니다')
+233: 
+234:     top = None
+235:     if record.top.valid:
+236:         top = TopMeasurement(
+237:             tuple(record.top.detection.pose.position_m), params.descend_speed_mps)
+238:     edges = {}
+239:     for direction in confirmed:
+240:         detection = record.edges[direction].detection
+241:         edges[direction] = EdgeMeasurement(
+242:             tuple(detection.pose.position_m), detection.z_drop_m, params.slide_speed_mps)
+243:     try:
+244:         plan = ResumePlan(
+245:             phase=resume_phase, progress=record.state.progress, confirmed=confirmed,
+246:             first_contact_z=None if top is None else top.position_m[2],
+247:             position=None if stop_pose is None else tuple(stop_pose.position_m),
+248:             result_saved=record.result_saved or result_file_exists)
+249:     except ValueError as error:
+250:         return _refuse(f'{scan_id}: {error}')
+251:     return Resumption(
+252:         plan=plan, params=params, config=config, top=top, edges=edges, stop_pose=stop_pose,
+253:         started_at=record.started_at, last_motion_id=record.last_motion_id,
+254:         from_failure=from_failure)
+
+## 04_flow:resume ws_cobot1/src/scan_manager/scan_manager/state_machine.py L479-480
+479:         elif command is Command.RESUME:
+480:             self._enter(Phase.RESUMING)
+
+## 04_flow:rreject ws_cobot1/src/scan_manager/scan_manager/state_machine.py L413-431
+413:         if command is Command.RESUME:
+414:             if phase is Phase.ERROR and not failure_is_resumable(self._failure):
+415:                 # 허용 목록 밖이다. 안전 점검 · 복귀 뒤 새 START 만 가능하다 (계약 9장, v0.1.21)
+416:                 code = None if self._failure is None else self._failure.reason_code
+417:                 return Reason.NOT_SUPPORTED, (
+418:                     f'오류 사유 {code} 는 재시작 허용 목록에 없다. 안전 점검 뒤 새 START 로 시작한다'
+419:                     if code else '오류로 끝났는데 사유 기록이 없다. 새 START 로 시작한다')
+420:             if self._resume_phase is None:
+421:                 return Reason.NO_RESUMABLE_SCAN, '재개할 단계가 없다'
+422:             if scan_id and scan_id != self._scan_id:
+423:                 return Reason.NO_RESUMABLE_SCAN, f'중단된 작업은 {self._scan_id}'
+424:             if self._moved_since_stop:
+425:                 return Reason.NOT_SUPPORTED, '홈 안전복귀 뒤의 재접근 절차는 TBD'
+426: 
+427:         if command in (Command.START, Command.RESUME):
+428:             # 용접 중이면 WELD_ACTIVE(601). 순서는 BUSY → 601 → 래치 → 로봇이다(계약 1차 5.1 · 5.3,
+429:             # phase 2 7.1, 9/26 결정): weld_manager 의 600 이 래치 앞에 있는 것과 대칭이다.
+430:             # ERROR 재시작(허용 목록)도 이 블록을 지나므로 같이 막힌다. 안전복귀(HOME)는 여기 들어오지 않는다.
+431:             weld = weld_active(conditions)
+
+## 04_flow:retry ws_cobot1/src/safety_monitor/safety_monitor/safety_core.py L220-271
+220: class StopTracker:
+221:     """정지 요청 1건의 상태. 서비스 호출은 노드가 한다 (여기서는 기다리지 않는다)."""
+222: 
+223:     def __init__(self, confirm_timeout_s: float, retry_period_s: float):
+224:         if confirm_timeout_s <= 0 or retry_period_s <= 0:
+225:             raise ValueError('stop_confirm_timeout_s, stop_retry_period_s 는 0 보다 커야 한다')
+226:         self.confirm_timeout_s = confirm_timeout_s
+227:         self.retry_period_s = retry_period_s
+228:         self.phase = StopPhase.NONE
+229:         self.requested_s: Optional[float] = None       # 첫 요청 시각. 제한 시간은 여기서 잰다
+230:         self.last_sent_s: Optional[float] = None
+231:         self.detail = ''
+232: 
+233:     @property
+234:     def confirmed(self) -> bool:
+235:         return self.phase is StopPhase.CONFIRMED
+236: 
+237:     @property
+238:     def required(self) -> bool:
+239:         return self.phase is not StopPhase.NONE
+240: 
+241:     def request(self, now_s: float):
+242:         if self.phase in (StopPhase.NONE, StopPhase.CONFIRMED):
+243:             self.requested_s = now_s
+244:         self.phase = StopPhase.REQUESTED
+245:         self.last_sent_s = now_s
+246: 
+247:     def on_response(self, accepted: bool, detail: str = ''):
+248:         if self.phase is StopPhase.CONFIRMED:
+249:             return                                     # 이미 멈춘 뒤 늦게 온 응답
+250:         self.phase = StopPhase.ACCEPTED if accepted else StopPhase.REJECTED
+251:         self.detail = detail
+252: 
+253:     def on_status(self, connected: bool, moving: bool):
+254:         """정지 완료는 connected && !moving 으로만 확인한다 (계약 1장)."""
+255:         if self.phase in (StopPhase.NONE, StopPhase.CONFIRMED):
+256:             return
+257:         if connected and not moving:
+258:             self.phase = StopPhase.CONFIRMED
+259: 
+260:     def due_for_retry(self, now_s: float) -> bool:
+261:         """제한 시간을 넘겼고 재시도 주기가 지났는가.
+262: 
+263:         재시도는 느리게 한다. 드라이버가 응답하지 않는 원인이 호출 과부하일 수 있다
+264:         (docs/env/api-check-log.md). 세게 두드리면 더 나빠진다.
+265:         """
+266:         if self.phase in (StopPhase.NONE, StopPhase.CONFIRMED):
+267:             return False
+268:         if now_s - self.requested_s <= self.confirm_timeout_s:
+269:             return False
+270:         self.phase = StopPhase.UNCONFIRMED
+271:         return now_s - self.last_sent_s >= self.retry_period_s
+
+## 04_flow:wreject ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L354-433
+354:     def _reject(self, goal_handle, result, reason_code, detail):
+355:         """거절할 goal 을 끝내는 한 곳. phase 를 바꾸지 않고 Result(success=false, 1xx · 6xx · 3xx)로 끝낸다."""
+356:         result.success = False
+357:         result.reason_code = int(reason_code)
+358:         result.detail = detail
+359:         if hasattr(result, 'result'):
+360:             result.result = conversions.blank_result_msg()
+361:         if hasattr(result, 'final_pose'):
+362:             result.final_pose = conversions.nan_pose()
+363:         self.log('warn', reason_code, f'명령 거절: {detail}')
+364:         goal_handle.abort()
+365:         return result
+366: 
+367:     def _start_problem(self, request):
+368:         """5.1절 시작 거절 표를 순서대로 본다. 문제면 (reason_code, detail), 통과면 (params, plan, weld_id)."""
+369:         if self.state_machine.is_busy:
+370:             return Reason.BUSY, f'phase={self.state_machine.phase.name}'
+371:         base = weld_params.check(self._parameter_values())
+372:         if not base.ok:         # yaml 이 비었다(표 밖, 노드 설정 문제)
+373:             return Reason.INVALID_VALUE, f'weld_manager 파라미터: {base.describe()}'
+374:         p = base.params
+375:         now_ns = self.get_clock().now().nanoseconds
+376:         with self._status_cond:
+377:             scan, robot = self._scan_state, self._robot_status
+378:         if scan is None:
+379:             return Reason.INVALID_REQUEST, '/scan/state 를 받지 못했다(scan_manager 가 떠 있는가)'
+380:         age = _age_s(now_ns, scan.stamp)
+381:         if age > p.scan_state_timeout_s:
+382:             return Reason.INVALID_REQUEST, f'/scan/state 가 {age:.1f} s 전 것이다(> {p.scan_state_timeout_s} s)'
+383:         if scan.phase not in _SCAN_REST:
+384:             return Reason.SCAN_ACTIVE, f'스캔 진행 중(scan phase={scan.phase})'
+385:         with self._status_cond:
+386:             safety_seen = self._safety_status is not None
+387:         if not safety_seen:
+388:             # safety_monitor 가 떠 있지 않은 채 용접 이동을 시작하지 않는다(1차 scan_manager 와 같은 막음, 병후 #197 ①)
+389:             return Reason.SAFETY_LATCHED, '/safety/status 를 받지 못했다(safety_monitor 가 떠 있는가)'
+390:         latched = self.safety_reason_code()
+391:         if latched:
+392:             return Reason.SAFETY_LATCHED, f'안전 래치 중(reason_code={latched})'
+393:         if robot is None or not robot.connected:
+394:             return Reason.ROBOT_DISCONNECTED, '/robot/status 가 없거나 connected=false'
+395:         try:
+396:             store = ResultStore(os.path.expanduser(p.result_dir))
+397:             scan_input = load_scan(store, request.scan_id, p.result_frame_id, p.motion_frame_id)
+398:         except NoScanResult as error:
+399:             return Reason.NO_SCAN_RESULT, str(error)
+400:         problem = line_range_problem(request.start_line, request.end_line)
+401:         if problem:
+402:             return Reason.LINE_OUT_OF_RANGE, problem
+403:         override = conversions.override_from_msg(request.config_override) if request.use_override else {}
+404:         problems = weld_params.check_override(override)
+405:         checked = weld_params.check(self._parameter_values(), override)
+406:         if problems or not checked.ok:
+407:             return Reason.INVALID_VALUE, 'config_override: ' + '; '.join(problems or checked.invalid)
+408:         p = checked.params
+409:         sample, why = self._fresh_sample(p.sample_timeout_s)
+410:         if sample is None:
+411:             return Reason.NO_SAMPLE, why
+412:         if sample.frame_id != p.motion_frame_id:
+413:             return Reason.NO_SAMPLE, f'/robot/sample 의 frame_id {sample.frame_id!r} 가 {p.motion_frame_id!r} 가 아니다'
+414:         f = sample.wrench.force
+415:         force = math.sqrt(f.x * f.x + f.y * f.y + f.z * f.z)
+416:         if force > p.tool_check_max_force_n:
+417:             return (Reason.TOOL_REG_SUSPECT,
+418:                     f'무접촉 |F| {force:.2f} N > tool_check_max_force_n {p.tool_check_max_force_n} N '
+419:                     '(툴 · TCP 등록이 빠졌는지 본다)')
+420:         try:
+421:             plan = plan_weld(scan_input, request.start_line, request.end_line, p)
+422:         except PathRejected as error:
+423:             return Reason.PATH_REJECTED, str(error)
+424:         # 팁이 z_safe 아래여도 거절하지 않는다. 러너가 먼저 수직 상승한다(D30). 홈이라고 가정하지 않는다
+425:         start_pose = Pose(conversions.position_of(sample.pose), conversions.orientation_of(sample.pose))
+426:         return p, plan, weld_record.new_weld_id(datetime.now()), start_pose
+427: 
+428:     def _execute_run(self, goal_handle):
+429:         request = goal_handle.request
+430:         result = RunWeld.Result()
+431:         checked = self._start_problem(request)
+432:         if not isinstance(checked[0], weld_params.WeldParams):
+433:             return self._reject(goal_handle, result, *checked)
+
+## 04_flow:linefail ws_cobot1/src/weld_manager/weld_manager/sequence.py L340-358
+340:     def run(self) -> RunOutcome:
+341:         p = self._params
+342:         self._started_at = self._ports.now()
+343:         try:
+344:             for index in range(self._plan.start_line, self._plan.end_line + 1):
+345:                 line = self._plan.lines[index]
+346:                 # 알림이 받아들여진 뒤에 "진행 중"으로 표시한다. 그 사이에 중지가 접수되면 이 선은 시작하지 않은 것이다
+347:                 self._notify(Signal.APPROACH, line=index)
+348:                 self._current = index
+349:                 self._lines[index] = replace(self._lines[index], started_at=self._ports.now())
+350:                 if index == self._plan.start_line:
+351:                     self._lift_to_z_safe()          # 선의 goal 이 아니다 — 실패하면 ERROR(D33 밖)
+352:                 try:
+353:                     self._run_line(index, line)
+354:                 except _Fail as failure:
+355:                     if not (p.continue_on_line_failure and failure.line_recoverable):
+356:                         raise
+357:                     self._fail_line_and_recover(line, failure)
+358:                     continue
+
+## 04_flow:tip ws_cobot1/src/weld_manager/weld_manager/sequence.py L404-436
+404:     def _fail_line_and_recover(self, line, failure: _Fail) -> None:
+405:         """D33(9/26 좁힘): 그 선을 FAILED 로 적고, 팁 위치에 따라 다음 선으로 가거나 복구 뒤 ERROR 로 끝낸다(weld-motion.md 5절).
+406: 
+407:         - 팁 자리는 /robot/sample(ports.current_pose)로 본다. 모르면 복구를 시도하지 않고 ERROR.
+408:         - z_safe 위(도달 불가라 출발조차 안 한 경우 — 앞 선의 후퇴점에 서 있다)면 이동 없이 다음 선.
+409:           "위" 의 여유는 path_tolerance_m — 후퇴점 도착도 그 허용치로 판정되므로 샘플이 z_safe 를 조금 밑돌 수 있다.
+410:         - z_safe 아래(원인 모름 · 접촉 가능성)면 7.2 안전복귀와 같은 순서로 복구만 한다: 툴 축 뒤(−d)로 approach_m
+411:           물러남 → 같은 x · y 로 z_safe 까지 수직 상승 → 그리고 ERROR. 뒤 선은 NOT_ATTEMPTED.
+412:         - 복구 이동 자체가 실패(어떤 사유든)하면 ERROR. 같은 선을 다시 시도하지 않는다.
+413:         """
+414:         p = self._params
+415:         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+416:         self._ports.log('warn', f'{line.name} 실패 → FAILED 로 기록한다(D33). 팁 위치를 본다: {failure.detail}',
+417:                         None if self.last_pose is None else self.last_pose.position)
+418:         self._notify(Signal.LINE_FAILED)
+419:         pose = self._ports.current_pose()
+420:         if pose is None:
+421:             raise _Fail(failure.reason_code,
+422:                         f'{line.name} 실패 뒤 복구 불가: 팁 위치(/robot/sample)를 모른다. 원인: {failure.detail}')
+423:         z_safe = self._plan.z_safe_base
+424:         if pose.position[2] >= z_safe - p.path_tolerance_m:
+425:             self._ports.log('info', f'{line.name}: 팁이 z_safe 위라 이동 없이 다음 선으로 계속한다', pose.position)
+426:             self._safe_pose = pose
+427:             return
+428:         self._ports.log('warn', f'{line.name}: 팁 z {pose.position[2] * 1000:.1f} mm 가 z_safe '
+429:                                 f'{z_safe * 1000:.1f} mm 아래다. 툴 축 뒤로 물러난 뒤 올리고 ERROR 로 끝낸다', pose.position)
+430:         try:
+431:             back = self._back_off(pose, f'{line.name} 복구 물러남')
+432:             self._lift(back, pose.orientation, z_safe, f'{line.name} 복구 올림')
+433:         except _Fail as recovery:
+434:             raise _Fail(recovery.reason_code, f'{line.name} 복구 이동 실패: {recovery.detail}')
+435:         raise _Fail(failure.reason_code,
+436:                     f'{line.name}: z_safe 아래에서 난 204 — 복구 이동 뒤 ERROR(D33 9/26). 원인: {failure.detail}')
+
+## 04_flow:recover ws_cobot1/src/weld_manager/weld_manager/sequence.py L404-436
+404:     def _fail_line_and_recover(self, line, failure: _Fail) -> None:
+405:         """D33(9/26 좁힘): 그 선을 FAILED 로 적고, 팁 위치에 따라 다음 선으로 가거나 복구 뒤 ERROR 로 끝낸다(weld-motion.md 5절).
+406: 
+407:         - 팁 자리는 /robot/sample(ports.current_pose)로 본다. 모르면 복구를 시도하지 않고 ERROR.
+408:         - z_safe 위(도달 불가라 출발조차 안 한 경우 — 앞 선의 후퇴점에 서 있다)면 이동 없이 다음 선.
+409:           "위" 의 여유는 path_tolerance_m — 후퇴점 도착도 그 허용치로 판정되므로 샘플이 z_safe 를 조금 밑돌 수 있다.
+410:         - z_safe 아래(원인 모름 · 접촉 가능성)면 7.2 안전복귀와 같은 순서로 복구만 한다: 툴 축 뒤(−d)로 approach_m
+411:           물러남 → 같은 x · y 로 z_safe 까지 수직 상승 → 그리고 ERROR. 뒤 선은 NOT_ATTEMPTED.
+412:         - 복구 이동 자체가 실패(어떤 사유든)하면 ERROR. 같은 선을 다시 시도하지 않는다.
+413:         """
+414:         p = self._params
+415:         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+416:         self._ports.log('warn', f'{line.name} 실패 → FAILED 로 기록한다(D33). 팁 위치를 본다: {failure.detail}',
+417:                         None if self.last_pose is None else self.last_pose.position)
+418:         self._notify(Signal.LINE_FAILED)
+419:         pose = self._ports.current_pose()
+420:         if pose is None:
+421:             raise _Fail(failure.reason_code,
+422:                         f'{line.name} 실패 뒤 복구 불가: 팁 위치(/robot/sample)를 모른다. 원인: {failure.detail}')
+423:         z_safe = self._plan.z_safe_base
+424:         if pose.position[2] >= z_safe - p.path_tolerance_m:
+425:             self._ports.log('info', f'{line.name}: 팁이 z_safe 위라 이동 없이 다음 선으로 계속한다', pose.position)
+426:             self._safe_pose = pose
+427:             return
+428:         self._ports.log('warn', f'{line.name}: 팁 z {pose.position[2] * 1000:.1f} mm 가 z_safe '
+429:                                 f'{z_safe * 1000:.1f} mm 아래다. 툴 축 뒤로 물러난 뒤 올리고 ERROR 로 끝낸다', pose.position)
+430:         try:
+431:             back = self._back_off(pose, f'{line.name} 복구 물러남')
+432:             self._lift(back, pose.orientation, z_safe, f'{line.name} 복구 올림')
+433:         except _Fail as recovery:
+434:             raise _Fail(recovery.reason_code, f'{line.name} 복구 이동 실패: {recovery.detail}')
+435:         raise _Fail(failure.reason_code,
+436:                     f'{line.name}: z_safe 아래에서 난 204 — 복구 이동 뒤 ERROR(D33 9/26). 원인: {failure.detail}')
+
+## 04_flow:next ws_cobot1/src/weld_manager/weld_manager/sequence.py L344-371
+344:             for index in range(self._plan.start_line, self._plan.end_line + 1):
+345:                 line = self._plan.lines[index]
+346:                 # 알림이 받아들여진 뒤에 "진행 중"으로 표시한다. 그 사이에 중지가 접수되면 이 선은 시작하지 않은 것이다
+347:                 self._notify(Signal.APPROACH, line=index)
+348:                 self._current = index
+349:                 self._lines[index] = replace(self._lines[index], started_at=self._ports.now())
+350:                 if index == self._plan.start_line:
+351:                     self._lift_to_z_safe()          # 선의 goal 이 아니다 — 실패하면 ERROR(D33 밖)
+352:                 try:
+353:                     self._run_line(index, line)
+354:                 except _Fail as failure:
+355:                     if not (p.continue_on_line_failure and failure.line_recoverable):
+356:                         raise
+357:                     self._fail_line_and_recover(line, failure)
+358:                     continue
+359:                 self._lines[index] = replace(
+360:                     self._lines[index], status=LineStatus.DONE, finished_at=self._ports.now())
+361:                 self._current = None
+362:                 self._safe_pose = Pose(tuple(line.retreat), tuple(line.orientation))
+363:                 self._notify(Signal.LINE_DONE)
+364:             failed = [i for i in range(self._plan.start_line, self._plan.end_line + 1)
+365:                       if self._lines[i].status is LineStatus.FAILED]
+366:             if failed:
+367:                 # D33: 작업은 끝까지 갔다. 결과는 success=false, 코드는 첫 FAILED 선의 것, detail 에 실패 선 목록
+368:                 code, detail = self._lines[failed[0]].reason_code, ','.join(f'L{i}' for i in failed) + ' FAILED'
+369:             else:
+370:                 code, detail = 0, ''
+371:             self._publish(success=not failed, reason_code=code, detail=detail)
+
+## 04_flow:wstop ws_cobot1/src/weld_manager/weld_manager/state_machine.py L143-149
+143:             if command is Command.STOP:
+144:                 if phase in ACTIVE_PHASES:
+145:                     self._set(replace(self._state, phase=WeldPhase.STOPPING, line_progress=0.0))
+146:                     return Outcome(True, Reason.OK, self._state, changed=True)
+147:                 if phase is WeldPhase.STOPPING:
+148:                     return Outcome(True, Reason.OK, self._state)             # 이미 멈추는 중(멱등)
+149:                 return Outcome(False, Reason.OK, self._state)                # 4.1절: 멈출 것이 없다
+
+## 04_flow:wstop ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L321-335
+321:     def wait_still(self, timeout_s) -> bool:
+322:         """요청 뒤에 찍힌 /robot/status 로 connected && !moving 을 확인한다(요청 전의 옛 moving=false 로 통과시키지 않는다)."""
+323:         asked_at = self.get_clock().now().nanoseconds
+324:         if asked_at <= 0:
+325:             self.get_logger().error('ROS 시계가 0 이다(use_sim_time 인데 /clock 없음?). 정지를 확인할 수 없다')
+326:             return False
+327: 
+328:         def still():
+329:             status = self._robot_status
+330:             if status is None or not status.connected or status.moving:
+331:                 return False
+332:             return status.stamp.sec * 1_000_000_000 + status.stamp.nanosec > asked_at
+333: 
+334:         with self._status_cond:
+335:             return self._wait(still, timeout_s, self._status_cond.wait)
+
+## 04_flow:wstop ws_cobot1/src/weld_manager/weld_manager/sequence.py L494-510
+494:     def _finish_stop(self) -> RunOutcome:
+495:         if not self._ports.wait_still():
+496:             return self._finish_fail(_Fail(
+497:                 Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
+498:         self._end_current_line(LineStatus.STOPPED, Reason.STOP_REQUESTED, '작업 중지')
+499:         self._publish(False, Reason.STOP_REQUESTED, '작업 중지')
+500:         self._ports.notify(Signal.STOP_CONFIRMED)
+501:         return RunOutcome(OutcomeKind.STOPPED, int(Reason.STOP_REQUESTED), 'stopped',
+502:                           self._published, self.last_motion_id)
+503: 
+504:     def _finish_fail(self, failure: _Fail) -> RunOutcome:
+505:         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+506:         self._publish(False, failure.reason_code, failure.detail)
+507:         self._ports.notify(Signal.FAILED, reason_code=failure.reason_code, detail=failure.detail)
+508:         kind = OutcomeKind.HOMING_FAILED if self._homing else OutcomeKind.FAILED
+509:         return RunOutcome(kind, failure.reason_code, failure.detail, self._published, self.last_motion_id)
+510: 
+
+## 04_flow:wstopped ws_cobot1/src/weld_manager/weld_manager/sequence.py L494-510
+494:     def _finish_stop(self) -> RunOutcome:
+495:         if not self._ports.wait_still():
+496:             return self._finish_fail(_Fail(
+497:                 Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
+498:         self._end_current_line(LineStatus.STOPPED, Reason.STOP_REQUESTED, '작업 중지')
+499:         self._publish(False, Reason.STOP_REQUESTED, '작업 중지')
+500:         self._ports.notify(Signal.STOP_CONFIRMED)
+501:         return RunOutcome(OutcomeKind.STOPPED, int(Reason.STOP_REQUESTED), 'stopped',
+502:                           self._published, self.last_motion_id)
+503: 
+504:     def _finish_fail(self, failure: _Fail) -> RunOutcome:
+505:         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+506:         self._publish(False, failure.reason_code, failure.detail)
+507:         self._ports.notify(Signal.FAILED, reason_code=failure.reason_code, detail=failure.detail)
+508:         kind = OutcomeKind.HOMING_FAILED if self._homing else OutcomeKind.FAILED
+509:         return RunOutcome(kind, failure.reason_code, failure.detail, self._published, self.last_motion_id)
+510: 
+
+## 04_flow:werror ws_cobot1/src/weld_manager/weld_manager/sequence.py L494-510
+494:     def _finish_stop(self) -> RunOutcome:
+495:         if not self._ports.wait_still():
+496:             return self._finish_fail(_Fail(
+497:                 Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
+498:         self._end_current_line(LineStatus.STOPPED, Reason.STOP_REQUESTED, '작업 중지')
+499:         self._publish(False, Reason.STOP_REQUESTED, '작업 중지')
+500:         self._ports.notify(Signal.STOP_CONFIRMED)
+501:         return RunOutcome(OutcomeKind.STOPPED, int(Reason.STOP_REQUESTED), 'stopped',
+502:                           self._published, self.last_motion_id)
+503: 
+504:     def _finish_fail(self, failure: _Fail) -> RunOutcome:
+505:         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+506:         self._publish(False, failure.reason_code, failure.detail)
+507:         self._ports.notify(Signal.FAILED, reason_code=failure.reason_code, detail=failure.detail)
+508:         kind = OutcomeKind.HOMING_FAILED if self._homing else OutcomeKind.FAILED
+509:         return RunOutcome(kind, failure.reason_code, failure.detail, self._published, self.last_motion_id)
+510: 
+
+## 04_flow:mhome ws_cobot1/src/weld_manager/weld_manager/state_machine.py L150-170
+150:             if command is Command.HOME:
+151:                 if phase not in REST_PHASES:
+152:                     return Outcome(False, Reason.BUSY, self._state)
+153:                 self._home_origin = phase
+154:                 self._set(replace(self._state, phase=WeldPhase.HOMING, line_index=LINE_NONE,
+155:                                   line_progress=0.0, motion_id=0))
+156:                 return Outcome(True, Reason.OK, self._state, changed=True)
+157:             raise ValueError(f'모르는 명령: {command!r}')
+158: 
+159:     # ---- 진행 보고 ----
+160: 
+161:     def notify(self, signal: Signal, *, line: Optional[int] = None,
+162:                reason_code: int = 0, detail: str = '') -> Snapshot:
+163:         with self._lock:
+164:             phase = self._state.phase
+165:             if signal is Signal.HOMING_DONE and phase is WeldPhase.HOMING and self._home_origin is not None:
+166:                 target = self._home_origin
+167:             else:
+168:                 table = SIGNAL_TRANSITIONS[signal]
+169:                 if phase not in table:
+170:                     raise InvalidTransition(phase, signal)
+
+## 04_flow:rest ws_cobot1/src/weld_manager/weld_manager/state_machine.py L150-170
+150:             if command is Command.HOME:
+151:                 if phase not in REST_PHASES:
+152:                     return Outcome(False, Reason.BUSY, self._state)
+153:                 self._home_origin = phase
+154:                 self._set(replace(self._state, phase=WeldPhase.HOMING, line_index=LINE_NONE,
+155:                                   line_progress=0.0, motion_id=0))
+156:                 return Outcome(True, Reason.OK, self._state, changed=True)
+157:             raise ValueError(f'모르는 명령: {command!r}')
+158: 
+159:     # ---- 진행 보고 ----
+160: 
+161:     def notify(self, signal: Signal, *, line: Optional[int] = None,
+162:                reason_code: int = 0, detail: str = '') -> Snapshot:
+163:         with self._lock:
+164:             phase = self._state.phase
+165:             if signal is Signal.HOMING_DONE and phase is WeldPhase.HOMING and self._home_origin is not None:
+166:                 target = self._home_origin
+167:             else:
+168:                 table = SIGNAL_TRANSITIONS[signal]
+169:                 if phase not in table:
+170:                     raise InvalidTransition(phase, signal)
+
+## 04_flow:scanmhome ws_cobot1/src/scan_manager/scan_manager/state_machine.py L475-478
+475:         elif command is Command.HOME:
+476:             self._homing_origin = phase
+477:             self._moved_since_stop = True
+478:             self._enter(Phase.HOMING)
+
+## 04_flow:scanmhome ws_cobot1/src/scan_manager/scan_manager/state_machine.py L516-518
+516:             elif signal is Signal.HOMING_DONE:
+517:                 origin = self._homing_origin
+518:                 target = Phase.DONE if origin is None else origin
+
+## 04_flow:scanrest ws_cobot1/src/scan_manager/scan_manager/state_machine.py L475-478
+475:         elif command is Command.HOME:
+476:             self._homing_origin = phase
+477:             self._moved_since_stop = True
+478:             self._enter(Phase.HOMING)
+
+## 04_flow:scanrest ws_cobot1/src/scan_manager/scan_manager/state_machine.py L516-518
+516:             elif signal is Signal.HOMING_DONE:
+517:                 origin = self._homing_origin
+518:                 target = Phase.DONE if origin is None else origin
+
+## 04_flow:wstoperror ws_cobot1/src/weld_manager/weld_manager/weld_manager.py L321-335
+321:     def wait_still(self, timeout_s) -> bool:
+322:         """요청 뒤에 찍힌 /robot/status 로 connected && !moving 을 확인한다(요청 전의 옛 moving=false 로 통과시키지 않는다)."""
+323:         asked_at = self.get_clock().now().nanoseconds
+324:         if asked_at <= 0:
+325:             self.get_logger().error('ROS 시계가 0 이다(use_sim_time 인데 /clock 없음?). 정지를 확인할 수 없다')
+326:             return False
+327: 
+328:         def still():
+329:             status = self._robot_status
+330:             if status is None or not status.connected or status.moving:
+331:                 return False
+332:             return status.stamp.sec * 1_000_000_000 + status.stamp.nanosec > asked_at
+333: 
+334:         with self._status_cond:
+335:             return self._wait(still, timeout_s, self._status_cond.wait)
+
+## 04_flow:wstoperror ws_cobot1/src/weld_manager/weld_manager/sequence.py L494-510
+494:     def _finish_stop(self) -> RunOutcome:
+495:         if not self._ports.wait_still():
+496:             return self._finish_fail(_Fail(
+497:                 Reason.STOP_UNCONFIRMED, '정지 완료(connected && !moving)를 확인하지 못했다'))
+498:         self._end_current_line(LineStatus.STOPPED, Reason.STOP_REQUESTED, '작업 중지')
+499:         self._publish(False, Reason.STOP_REQUESTED, '작업 중지')
+500:         self._ports.notify(Signal.STOP_CONFIRMED)
+501:         return RunOutcome(OutcomeKind.STOPPED, int(Reason.STOP_REQUESTED), 'stopped',
+502:                           self._published, self.last_motion_id)
+503: 
+504:     def _finish_fail(self, failure: _Fail) -> RunOutcome:
+505:         self._end_current_line(LineStatus.FAILED, failure.reason_code, failure.detail)
+506:         self._publish(False, failure.reason_code, failure.detail)
+507:         self._ports.notify(Signal.FAILED, reason_code=failure.reason_code, detail=failure.detail)
+508:         kind = OutcomeKind.HOMING_FAILED if self._homing else OutcomeKind.FAILED
+509:         return RunOutcome(kind, failure.reason_code, failure.detail, self._published, self.last_motion_id)
+510: 
+
+## 04_flow:end ws_cobot1/src/weld_manager/weld_manager/sequence.py L364-385
+364:             failed = [i for i in range(self._plan.start_line, self._plan.end_line + 1)
+365:                       if self._lines[i].status is LineStatus.FAILED]
+366:             if failed:
+367:                 # D33: 작업은 끝까지 갔다. 결과는 success=false, 코드는 첫 FAILED 선의 것, detail 에 실패 선 목록
+368:                 code, detail = self._lines[failed[0]].reason_code, ','.join(f'L{i}' for i in failed) + ' FAILED'
+369:             else:
+370:                 code, detail = 0, ''
+371:             self._publish(success=not failed, reason_code=code, detail=detail)
+372:             self._homing = True
+373:             self._notify(Signal.HOMING)
+374:             # 7.3절: HOMING = OP_MOVE_TO z_safe → OP_HOME. 마지막 후퇴(또는 복구 뒤 자리)가 이미 z_safe 라 거의 제자리 이동이다.
+375:             # 마지막 선이 도달 불가로 실패했으면 그 선의 후퇴점도 못 가므로, 실제로 서 있는 z_safe 자리를 쓴다
+376:             safe = self._safe_pose
+377:             self._move_to('마무리 올림', safe.position, safe.orientation, p.travel_speed_mps)
+378:             self._home()
+379:             self._notify(Signal.HOMING_DONE)
+380:             kind = OutcomeKind.PARTIAL if failed else OutcomeKind.DONE
+381:             return RunOutcome(kind, code, detail, self._published, self.last_motion_id)
+382:         except _Stop:
+383:             return self._finish_stop()
+384:         except _Fail as failure:
+385:             return self._finish_fail(failure)
+
+## 04_flow:end ws_cobot1/src/scan_manager/scan_manager/state_machine.py L516-518
+516:             elif signal is Signal.HOMING_DONE:
+517:                 origin = self._homing_origin
+518:                 target = Phase.DONE if origin is None else origin

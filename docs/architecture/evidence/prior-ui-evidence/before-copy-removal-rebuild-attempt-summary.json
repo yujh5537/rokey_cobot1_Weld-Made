@@ -1,0 +1,16 @@
+{
+  "initialFreshAttempts": [
+    {
+      "directory": "reference-final-rebuild",
+      "result": "failed: own stale delivery lock from preceding completed child"
+    },
+    {
+      "directory": "reference-final-rebuild2",
+      "result": "failed: own pending journal caused provenance-failed"
+    }
+  ],
+  "fix": "Serial regeneration helper recovers only states from children it waited for, after matching current candidate/artifact SHA and receipt paths. At most 2 retries. Foreign state is still refused.",
+  "finalFreshDirectory": "reference-final-rebuild3",
+  "finalResult": "success; actual commands plus byte identity in relocated-regeneration.json",
+  "browser": "unconfirmed; chrome unavailable / UI policy blocked"
+}

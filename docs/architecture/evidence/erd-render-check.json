@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "check",
+  "provenance": "invalid",
+  "artifact": {
+    "path": "/workspace/scratch/29663fd5a592/png-repair/03_erd.html"
+  },
+  "error": "Delivery provenance could not be verified.",
+  "file": "/workspace/scratch/29663fd5a592/png-repair/03_erd.html",
+  "diagnostic": "Delivery provenance could not be verified.",
+  "diagnostics": [
+    {
+      "code": "delivery/provenance-invalid",
+      "severity": "error",
+      "message": "Delivery provenance could not be verified.",
+      "subject": {
+        "artifact": "/workspace/scratch/29663fd5a592/png-repair/03_erd.html",
+        "provenance": "/workspace/scratch/29663fd5a592/png-repair/03_erd.delivery.json"
+      },
+      "evidence": {
+        "reason": "The recorded delivery output does not identify this artifact.",
+        "recordedOutput": "/workspace/scratch/29663fd5a592/png-regeneration/03_erd.html",
+        "pathIdentity": {
+          "code": "file-identity-different",
+          "operation": "same-entry",
+          "method": "bigint-stat"
+        }
+      },
+      "supportedFixes": [
+        "restore access to the delivery records, then rerun deliver successfully"
+      ]
+    }
+  ]
+}

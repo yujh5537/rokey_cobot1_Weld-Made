@@ -1,0 +1,950 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ERD",
+    "locale": "en",
+    "output": "audit-fixed/03_erd.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/yujh5537/rokey_cobot1_Weld-Made.git",
+      "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+      "provider": "github",
+      "link_mode": "web"
+    },
+    "animation": "trace",
+    "relationship_font_size": 12
+  },
+  "components": [
+    {
+      "id": "workpieces",
+      "type": "database",
+      "label": "workpieces",
+      "pos": [
+        40,
+        80
+      ],
+      "size": [
+        512,
+        364
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/002_business_schema.sql",
+          "line": 6,
+          "end_line": 16
+        }
+      ],
+      "fields": [
+        {
+          "name": "workpiece_id",
+          "type": "TEXT",
+          "key": "PK",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "active",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "TRUE",
+          "reference": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "id": "work_orders",
+      "type": "database",
+      "label": "work_orders",
+      "pos": [
+        680,
+        80
+      ],
+      "size": [
+        512,
+        440
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/002_business_schema.sql",
+          "line": 20,
+          "end_line": 30
+        }
+      ],
+      "fields": [
+        {
+          "name": "work_order_id",
+          "type": "TEXT",
+          "key": "PK",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "workpiece_id",
+          "type": "TEXT",
+          "key": "FK",
+          "nullable": false,
+          "default": "",
+          "reference": "REFERENCES workpieces(workpiece_id) ON DELETE RESTRICT"
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "key": "",
+          "nullable": false,
+          "default": "'READY'",
+          "reference": ""
+        },
+        {
+          "name": "note",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": [
+        "workpiece_id → workpieces(workpiece_id) ON DELETE RESTRICT"
+      ]
+    },
+    {
+      "id": "work_order_scans",
+      "type": "database",
+      "label": "work_order_scans",
+      "pos": [
+        680,
+        640
+      ],
+      "size": [
+        512,
+        304
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/002_business_schema.sql",
+          "line": 37,
+          "end_line": 47
+        }
+      ],
+      "fields": [
+        {
+          "name": "work_order_id",
+          "type": "TEXT",
+          "key": "PK/FK",
+          "nullable": false,
+          "default": "",
+          "reference": "REFERENCES work_orders(work_order_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "scan_id",
+          "type": "TEXT",
+          "key": "PK/FK/UQ",
+          "nullable": false,
+          "default": "",
+          "reference": "REFERENCES scan_jobs(scan_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "linked_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": [
+        "work_order_id → work_orders(work_order_id) ON DELETE CASCADE",
+        "scan_id → scan_jobs(scan_id) ON DELETE CASCADE",
+        "PRIMARY KEY (work_order_id, scan_id)"
+      ]
+    },
+    {
+      "id": "scan_jobs",
+      "type": "database",
+      "label": "scan_jobs",
+      "pos": [
+        680,
+        1050
+      ],
+      "size": [
+        512,
+        572
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/001_schema.sql",
+          "line": 6,
+          "end_line": 16
+        }
+      ],
+      "fields": [
+        {
+          "name": "scan_id",
+          "type": "TEXT",
+          "key": "PK",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "success",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "reason_code",
+          "type": "INTEGER",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "detail",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "frame_id",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "started_at_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "finished_at_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "published_at_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "id": "measurements",
+      "type": "database",
+      "label": "measurements",
+      "pos": [
+        40,
+        2250
+      ],
+      "size": [
+        512,
+        1272
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/001_schema.sql",
+          "line": 24,
+          "end_line": 34
+        }
+      ],
+      "fields": [
+        {
+          "name": "scan_id",
+          "type": "TEXT",
+          "key": "PK/FK",
+          "nullable": false,
+          "default": "",
+          "reference": "REFERENCES scan_jobs(scan_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "stamp_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "z_top_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "z_top_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "x_pos_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "x_pos_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "x_neg_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "x_neg_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "y_pos_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "y_pos_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "y_neg_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "y_neg_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "width_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "length_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "height_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "dims_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "support_z_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "support_z_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "vertices",
+          "type": "JSONB",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "edges",
+          "type": "JSONB",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "path_candidates",
+          "type": "JSONB",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "box_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": [
+        "scan_id → scan_jobs(scan_id) ON DELETE CASCADE"
+      ]
+    },
+    {
+      "id": "scan_configs",
+      "type": "database",
+      "label": "scan_configs",
+      "pos": [
+        680,
+        2250
+      ],
+      "size": [
+        512,
+        232
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/001_schema.sql",
+          "line": 98,
+          "end_line": 106
+        }
+      ],
+      "fields": [
+        {
+          "name": "scan_id",
+          "type": "TEXT",
+          "key": "PK/FK",
+          "nullable": false,
+          "default": "",
+          "reference": "REFERENCES scan_jobs(scan_id) ON DELETE CASCADE"
+        },
+        {
+          "name": "config",
+          "type": "JSONB",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": [
+        "scan_id → scan_jobs(scan_id) ON DELETE CASCADE"
+      ]
+    },
+    {
+      "id": "contact_events",
+      "type": "database",
+      "label": "contact_events",
+      "pos": [
+        40,
+        1050
+      ],
+      "size": [
+        512,
+        1064
+      ],
+      "sources": [
+        {
+          "path": "docker/postgres/init/001_schema.sql",
+          "line": 64,
+          "end_line": 74
+        }
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "key": "PK",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "scan_id",
+          "type": "TEXT",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "event_id",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "motion_id",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "sample_id",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "key": "",
+          "nullable": false,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "frame_id",
+          "type": "TEXT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "pose",
+          "type": "JSONB",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "wrench",
+          "type": "JSONB",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "pose_stamp_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "force_stamp_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "detect_stamp_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "force_delta_n",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "z_drop_mm",
+          "type": "DOUBLE PRECISION",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "z_drop_valid",
+          "type": "BOOLEAN",
+          "key": "",
+          "nullable": false,
+          "default": "FALSE",
+          "reference": ""
+        },
+        {
+          "name": "debounce_count",
+          "type": "INTEGER",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "published_at_ms",
+          "type": "BIGINT",
+          "key": "",
+          "nullable": true,
+          "default": "",
+          "reference": ""
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMPTZ",
+          "key": "",
+          "nullable": false,
+          "default": "NOW()",
+          "reference": ""
+        }
+      ],
+      "constraints": [
+        "UNIQUE (scan_id, event_id)"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "e1",
+      "to": "workpieces",
+      "label": "공작물별 작업",
+      "variant": "default",
+      "from": "work_orders",
+      "start_cap": "ERD_ZERO_OR_MORE",
+      "end_cap": "ERD_EXACTLY_ONE"
+    },
+    {
+      "id": "e2",
+      "to": "work_orders",
+      "label": "작업별 스캔 연결",
+      "variant": "default",
+      "from": "work_order_scans",
+      "start_cap": "ERD_ZERO_OR_MORE",
+      "end_cap": "ERD_EXACTLY_ONE"
+    },
+    {
+      "id": "e3",
+      "to": "scan_jobs",
+      "label": "스캔의 작업 연결",
+      "variant": "default",
+      "from": "work_order_scans",
+      "start_cap": "ERD_ZERO_OR_ONE",
+      "end_cap": "ERD_EXACTLY_ONE"
+    },
+    {
+      "id": "e4",
+      "to": "scan_jobs",
+      "label": "스캔 측정 결과",
+      "variant": "default",
+      "from": "measurements",
+      "start_cap": "ERD_ZERO_OR_ONE",
+      "end_cap": "ERD_EXACTLY_ONE"
+    },
+    {
+      "id": "e5",
+      "to": "scan_jobs",
+      "label": "스캔 적용 설정",
+      "variant": "default",
+      "from": "scan_configs",
+      "start_cap": "ERD_ZERO_OR_ONE",
+      "end_cap": "ERD_EXACTLY_ONE"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "관계 기호 · Cobot3 표기",
+      "items": [
+        "|| = 정확히 하나 (1) · ○| = 없거나 하나 (0..1) · ○< = 없거나 여러 개 (0..N)",
+        "공작물 1 : 작업 0..N · 작업 1 : 스캔 연결 0..N",
+        "스캔 1 : 작업 연결/측정 결과/적용 설정 각각 0..1",
+        "scan_id UNIQUE이므로 작업↔스캔은 N:M이 아니다. contact_events.scan_id는 FK가 없어 관계선을 추가하지 않았다."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "실제 스키마",
+      "items": [
+        "선은 자식 FK → 부모 PK 방향이다. 카디널리티는 DB 제약으로 보장되는 범위.",
+        "contact_events.scan_id에는 FOREIGN KEY가 없다. scan_jobs와 연결선을 만들지 않았다.",
+        "Spring JPA ddl-auto=none. 초기화 SQL이 테이블 생성 기준이다.",
+        "용접 전용 테이블 없음. weld/result를 DB에 저장하는 분기 없음."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "scan_jobs",
+      "items": [
+        "scan_id TEXT PRIMARY KEY",
+        "success BOOLEAN",
+        "reason_code INTEGER",
+        "reason TEXT",
+        "detail TEXT",
+        "frame_id TEXT",
+        "started_at_ms BIGINT",
+        "finished_at_ms BIGINT",
+        "published_at_ms BIGINT",
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "measurements",
+      "items": [
+        "scan_id TEXT PRIMARY KEY",
+        "stamp_ms BIGINT NOT NULL",
+        "z_top_mm DOUBLE PRECISION",
+        "z_top_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "x_pos_mm DOUBLE PRECISION",
+        "x_pos_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "x_neg_mm DOUBLE PRECISION",
+        "x_neg_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "y_pos_mm DOUBLE PRECISION",
+        "y_pos_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "y_neg_mm DOUBLE PRECISION",
+        "y_neg_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "width_mm DOUBLE PRECISION",
+        "length_mm DOUBLE PRECISION",
+        "height_mm DOUBLE PRECISION",
+        "dims_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "support_z_mm DOUBLE PRECISION",
+        "support_z_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "vertices JSONB",
+        "edges JSONB",
+        "path_candidates JSONB",
+        "box_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "FK scan_id → scan_jobs.scan_id · ON DELETE CASCADE"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "contact_events",
+      "items": [
+        "id BIGSERIAL PRIMARY KEY",
+        "scan_id TEXT NOT NULL",
+        "event_id BIGINT NOT NULL",
+        "motion_id BIGINT",
+        "sample_id BIGINT",
+        "event_type TEXT NOT NULL",
+        "source TEXT",
+        "frame_id TEXT",
+        "pose JSONB",
+        "wrench JSONB",
+        "pose_stamp_ms BIGINT",
+        "force_stamp_ms BIGINT",
+        "detect_stamp_ms BIGINT",
+        "force_delta_n DOUBLE PRECISION",
+        "z_drop_mm DOUBLE PRECISION",
+        "z_drop_valid BOOLEAN NOT NULL DEFAULT FALSE",
+        "debounce_count INTEGER",
+        "published_at_ms BIGINT",
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "UNIQUE(scan_id,event_id) · scan_id FK 없음"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "scan_configs",
+      "items": [
+        "scan_id TEXT PRIMARY KEY",
+        "config JSONB NOT NULL",
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "FK scan_id → scan_jobs.scan_id · ON DELETE CASCADE"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "workpieces",
+      "items": [
+        "workpiece_id TEXT PRIMARY KEY",
+        "name TEXT NOT NULL",
+        "description TEXT",
+        "active BOOLEAN NOT NULL DEFAULT TRUE",
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "work_orders",
+      "items": [
+        "work_order_id TEXT PRIMARY KEY",
+        "workpiece_id TEXT NOT NULL",
+        "name TEXT NOT NULL",
+        "status TEXT NOT NULL DEFAULT 'READY'",
+        "note TEXT",
+        "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "work_order_scans",
+      "items": [
+        "work_order_id TEXT NOT NULL",
+        "scan_id TEXT NOT NULL UNIQUE",
+        "linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "PK(work_order_id,scan_id)",
+        "scan_id UNIQUE · FK scan_id → scan_jobs",
+        "FK work_order_id → work_orders"
+      ]
+    }
+  ],
+  "boundaries": []
+}

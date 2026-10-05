@@ -1,0 +1,25 @@
+{
+  "syntax": "node --check pass",
+  "embeddedViewersByteExact": 4,
+  "externalIframeSrcCount": 0,
+  "unchangedCandidateNativeHtmlSvgPng": [
+    "data/01_system.json",
+    "01_system.html",
+    "01_system.svg",
+    "01_system.png",
+    "data/02_ros2.json",
+    "02_ros2.html",
+    "02_ros2.svg",
+    "02_ros2.png",
+    "data/03_erd.json",
+    "03_erd.html",
+    "03_erd.svg",
+    "03_erd.png",
+    "data/04_flow.json",
+    "04_flow.html",
+    "04_flow.svg",
+    "04_flow.png"
+  ],
+  "indexMatchesStandalonePreview": true,
+  "actualMobileBrowser": "unconfirmed: direct browser URL policy blocked previous local viewer; no bypass attempted"
+}

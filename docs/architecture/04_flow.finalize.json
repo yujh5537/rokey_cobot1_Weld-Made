@@ -1,0 +1,1274 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-05T10:05:24.120Z",
+  "specification": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/data/04_flow.json",
+    "sha256": "369f8557a37249141efc6d39049d48782194883c9e9d73c6f9f65eb94055410d",
+    "bytes": 33069
+  },
+  "artifact": {
+    "path": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+    "sha256": "5b978c245a5b60da870b410973509d782f50f9181a3abab242575ddbd40c1181",
+    "bytes": 864948
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/29663fd5a592/no-copy/data/04_flow.json",
+        "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/workspace/scratch/29663fd5a592/weld-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "369f8557a37249141efc6d39049d48782194883c9e9d73c6f9f65eb94055410d",
+          "bytes": 33069
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 1771,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/workspace/scratch/29663fd5a592/no-copy/data/04_flow.json",
+        "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/workspace/scratch/29663fd5a592/weld-source",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "01a7228c-6bcb-419e-8cdc-cbe2ff98102d",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/workspace/scratch/29663fd5a592/no-copy/data/04_flow.json",
+        "output": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+        "specification": {
+          "sha256": "369f8557a37249141efc6d39049d48782194883c9e9d73c6f9f65eb94055410d",
+          "bytes": 33069
+        },
+        "artifact": {
+          "sha256": "5b978c245a5b60da870b410973509d782f50f9181a3abab242575ddbd40c1181",
+          "bytes": 864948
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/yujh5537/rokey_cobot1_Weld-Made",
+          "revision": "8933b739ee43294605e57dca07625bad2f9e8ca4",
+          "references": 54
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 241,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify/archify/bin/archify.mjs",
+        "check",
+        "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+        "artifact": {
+          "sha256": "5b978c245a5b60da870b410973509d782f50f9181a3abab242575ddbd40c1181",
+          "bytes": 864948
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 33,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 4.6,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 7.063291139240506,
+            "maxBends": 4,
+            "routesOverSuggestedBends": 10,
+            "maxStretch": 2.196,
+            "routesOverSuggestedStretch": 7,
+            "minSegmentPx": 16,
+            "minInteriorSegmentPx": 16,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "id": "main3",
+                  "from": "prepare",
+                  "to": "top",
+                  "label": "",
+                  "collectionIndex": 3,
+                  "artifactIndex": 4
+                },
+                "right": {
+                  "id": "safe",
+                  "from": "top",
+                  "to": "retry",
+                  "label": "감시 이상 / latch",
+                  "collectionIndex": 35,
+                  "artifactIndex": 36
+                },
+                "point": [
+                  442.00000000000006,
+                  796.0000000000001
+                ],
+                "sharedNode": "top"
+              },
+              {
+                "left": {
+                  "id": "main4",
+                  "from": "top",
+                  "to": "edge",
+                  "label": "TOP_FOUND",
+                  "collectionIndex": 4,
+                  "artifactIndex": 5
+                },
+                "right": {
+                  "id": "contactwait",
+                  "from": "top",
+                  "to": "top",
+                  "label": "event_id 대기 / 제한 시간",
+                  "collectionIndex": 20,
+                  "artifactIndex": 21
+                },
+                "point": [
+                  448.9999999999999,
+                  944
+                ],
+                "sharedNode": "top"
+              },
+              {
+                "left": {
+                  "id": "main5",
+                  "from": "edge",
+                  "to": "geometry",
+                  "label": "4/4",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "right": {
+                  "id": "edgewait",
+                  "from": "edge",
+                  "to": "edge",
+                  "label": "미완료: 다음 방향",
+                  "collectionIndex": 19,
+                  "artifactIndex": 20
+                },
+                "point": [
+                  448.9999999999999,
+                  1134
+                ],
+                "sharedNode": "edge"
+              },
+              {
+                "left": {
+                  "id": "main8",
+                  "from": "done",
+                  "to": "weldgate",
+                  "label": "",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "id": "resumeaccept",
+                  "from": "rg",
+                  "to": "resume",
+                  "label": "모든 검사 통과",
+                  "collectionIndex": 29,
+                  "artifactIndex": 30
+                },
+                "point": [
+                  442,
+                  1704
+                ]
+              },
+              {
+                "left": {
+                  "id": "main14",
+                  "from": "wresult",
+                  "to": "weldhome",
+                  "label": "",
+                  "collectionIndex": 14,
+                  "artifactIndex": 15
+                },
+                "right": {
+                  "id": "safeheight",
+                  "from": "tip",
+                  "to": "next",
+                  "label": "안전 높이 이상 / 이동 없음",
+                  "collectionIndex": 44,
+                  "artifactIndex": 45
+                },
+                "point": [
+                  442,
+                  2864
+                ]
+              },
+              {
+                "left": {
+                  "id": "end-done",
+                  "from": "wdone",
+                  "to": "end",
+                  "label": "",
+                  "collectionIndex": 16,
+                  "artifactIndex": 17
+                },
+                "right": {
+                  "id": "manualhomeerror",
+                  "from": "werror",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 57,
+                  "artifactIndex": 58
+                },
+                "point": [
+                  433.95,
+                  3473
+                ]
+              },
+              {
+                "left": {
+                  "id": "end-done",
+                  "from": "wdone",
+                  "to": "end",
+                  "label": "",
+                  "collectionIndex": 16,
+                  "artifactIndex": 17
+                },
+                "right": {
+                  "id": "mhomefailure",
+                  "from": "mhome",
+                  "to": "werror",
+                  "label": "HOME 실패 → ERROR",
+                  "collectionIndex": 60,
+                  "artifactIndex": 61
+                },
+                "point": [
+                  433.95,
+                  3487
+                ]
+              },
+              {
+                "left": {
+                  "id": "edgewait",
+                  "from": "edge",
+                  "to": "edge",
+                  "label": "미완료: 다음 방향",
+                  "collectionIndex": 19,
+                  "artifactIndex": 20
+                },
+                "right": {
+                  "id": "fail",
+                  "from": "edge",
+                  "to": "error",
+                  "label": "모션·접촉·안전 실패",
+                  "collectionIndex": 24,
+                  "artifactIndex": 25
+                },
+                "point": [
+                  556,
+                  1067
+                ],
+                "sharedNode": "edge"
+              },
+              {
+                "left": {
+                  "id": "contactwait",
+                  "from": "top",
+                  "to": "top",
+                  "label": "event_id 대기 / 제한 시간",
+                  "collectionIndex": 20,
+                  "artifactIndex": 21
+                },
+                "right": {
+                  "id": "stop",
+                  "from": "top",
+                  "to": "stop",
+                  "label": "STOP 접수",
+                  "collectionIndex": 21,
+                  "artifactIndex": 22
+                },
+                "point": [
+                  556,
+                  884
+                ],
+                "sharedNode": "top"
+              },
+              {
+                "left": {
+                  "id": "stopfail",
+                  "from": "stop",
+                  "to": "error",
+                  "label": "확인 실패 407 / 재개 단계 삭제",
+                  "collectionIndex": 23,
+                  "artifactIndex": 24
+                },
+                "right": {
+                  "id": "stoppedresume",
+                  "from": "stopped",
+                  "to": "rg",
+                  "label": "수동 RESUME",
+                  "collectionIndex": 27,
+                  "artifactIndex": 28
+                },
+                "point": [
+                  755,
+                  1196.9333333333334
+                ]
+              },
+              {
+                "left": {
+                  "id": "fail",
+                  "from": "edge",
+                  "to": "error",
+                  "label": "모션·접촉·안전 실패",
+                  "collectionIndex": 24,
+                  "artifactIndex": 25
+                },
+                "right": {
+                  "id": "stoppedresume",
+                  "from": "stopped",
+                  "to": "rg",
+                  "label": "수동 RESUME",
+                  "collectionIndex": 27,
+                  "artifactIndex": 28
+                },
+                "point": [
+                  648,
+                  1197.0000000000002
+                ]
+              },
+              {
+                "left": {
+                  "id": "shape-fail",
+                  "from": "geometry",
+                  "to": "error",
+                  "label": "형상 실패",
+                  "collectionIndex": 25,
+                  "artifactIndex": 26
+                },
+                "right": {
+                  "id": "stoppedresume",
+                  "from": "stopped",
+                  "to": "rg",
+                  "label": "수동 RESUME",
+                  "collectionIndex": 27,
+                  "artifactIndex": 28
+                },
+                "point": [
+                  637.6499999999996,
+                  1250
+                ]
+              },
+              {
+                "left": {
+                  "id": "homefail",
+                  "from": "home",
+                  "to": "error",
+                  "label": "홈 실패 / 측정 결과 유지",
+                  "collectionIndex": 26,
+                  "artifactIndex": 27
+                },
+                "right": {
+                  "id": "stoppedresume",
+                  "from": "stopped",
+                  "to": "rg",
+                  "label": "수동 RESUME",
+                  "collectionIndex": 27,
+                  "artifactIndex": 28
+                },
+                "point": [
+                  648,
+                  1345.9999999999995
+                ]
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "linefailure",
+                  "from": "welding",
+                  "to": "linefail",
+                  "label": "개별 선 실패",
+                  "collectionIndex": 40,
+                  "artifactIndex": 41
+                },
+                "point": [
+                  556,
+                  2383
+                ]
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "safeheight",
+                  "from": "tip",
+                  "to": "next",
+                  "label": "안전 높이 이상 / 이동 없음",
+                  "collectionIndex": 44,
+                  "artifactIndex": 45
+                },
+                "point": [
+                  556,
+                  2864
+                ]
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "wfail",
+                  "from": "welding",
+                  "to": "werror",
+                  "label": "전체 실패",
+                  "collectionIndex": 53,
+                  "artifactIndex": 54
+                },
+                "point": [
+                  556,
+                  2397
+                ]
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "whomefail",
+                  "from": "weldhome",
+                  "to": "werror",
+                  "label": "홈 실패 · 발행 유지",
+                  "collectionIndex": 54,
+                  "artifactIndex": 55
+                },
+                "point": [
+                  556,
+                  2960
+                ]
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "werrend",
+                  "from": "werror",
+                  "to": "end",
+                  "label": "명령 실패 종료",
+                  "collectionIndex": 55,
+                  "artifactIndex": 56
+                },
+                "point": [
+                  556,
+                  3570
+                ],
+                "sharedNode": "end"
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "manualhomeerror",
+                  "from": "werror",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 57,
+                  "artifactIndex": 58
+                },
+                "point": [
+                  556,
+                  3340
+                ]
+              },
+              {
+                "left": {
+                  "id": "scanonly",
+                  "from": "weldgate",
+                  "to": "end",
+                  "label": "NO / 스캔만 종료",
+                  "collectionIndex": 38,
+                  "artifactIndex": 39
+                },
+                "right": {
+                  "id": "mhomefailure",
+                  "from": "mhome",
+                  "to": "werror",
+                  "label": "HOME 실패 → ERROR",
+                  "collectionIndex": 60,
+                  "artifactIndex": 61
+                },
+                "point": [
+                  556,
+                  3487
+                ]
+              },
+              {
+                "left": {
+                  "id": "linefailure",
+                  "from": "welding",
+                  "to": "linefail",
+                  "label": "개별 선 실패",
+                  "collectionIndex": 40,
+                  "artifactIndex": 41
+                },
+                "right": {
+                  "id": "normal-next",
+                  "from": "retreat",
+                  "to": "approach",
+                  "label": "다음 선",
+                  "collectionIndex": 49,
+                  "artifactIndex": 50
+                },
+                "point": [
+                  535,
+                  2383
+                ]
+              },
+              {
+                "left": {
+                  "id": "unknown",
+                  "from": "tip",
+                  "to": "werror",
+                  "label": "팁 위치 모름",
+                  "collectionIndex": 43,
+                  "artifactIndex": 44
+                },
+                "right": {
+                  "id": "whomefail",
+                  "from": "weldhome",
+                  "to": "werror",
+                  "label": "홈 실패 · 발행 유지",
+                  "collectionIndex": 54,
+                  "artifactIndex": 55
+                },
+                "point": [
+                  856,
+                  2960
+                ],
+                "sharedNode": "werror"
+              },
+              {
+                "left": {
+                  "id": "safeheight",
+                  "from": "tip",
+                  "to": "next",
+                  "label": "안전 높이 이상 / 이동 없음",
+                  "collectionIndex": 44,
+                  "artifactIndex": 45
+                },
+                "right": {
+                  "id": "recovery-end",
+                  "from": "recover",
+                  "to": "werror",
+                  "label": "성공·실패 모두 ERROR",
+                  "collectionIndex": 46,
+                  "artifactIndex": 47
+                },
+                "point": [
+                  762,
+                  2864
+                ]
+              },
+              {
+                "left": {
+                  "id": "safeheight",
+                  "from": "tip",
+                  "to": "next",
+                  "label": "안전 높이 이상 / 이동 없음",
+                  "collectionIndex": 44,
+                  "artifactIndex": 45
+                },
+                "right": {
+                  "id": "wfail",
+                  "from": "welding",
+                  "to": "werror",
+                  "label": "전체 실패",
+                  "collectionIndex": 53,
+                  "artifactIndex": 54
+                },
+                "point": [
+                  602,
+                  2864
+                ]
+              },
+              {
+                "left": {
+                  "id": "safeheight",
+                  "from": "tip",
+                  "to": "next",
+                  "label": "안전 높이 이상 / 이동 없음",
+                  "collectionIndex": 44,
+                  "artifactIndex": 45
+                },
+                "right": {
+                  "id": "manualhome",
+                  "from": "wstopped",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 56,
+                  "artifactIndex": 57
+                },
+                "point": [
+                  236,
+                  2864
+                ]
+              },
+              {
+                "left": {
+                  "id": "nextline",
+                  "from": "next",
+                  "to": "approach",
+                  "label": "남은 선 있음",
+                  "collectionIndex": 47,
+                  "artifactIndex": 48
+                },
+                "right": {
+                  "id": "wstop",
+                  "from": "welding",
+                  "to": "wstop",
+                  "label": "STOP 접수",
+                  "collectionIndex": 50,
+                  "artifactIndex": 51
+                },
+                "point": [
+                  272,
+                  2390
+                ]
+              },
+              {
+                "left": {
+                  "id": "nextline",
+                  "from": "next",
+                  "to": "approach",
+                  "label": "남은 선 있음",
+                  "collectionIndex": 47,
+                  "artifactIndex": 48
+                },
+                "right": {
+                  "id": "manualhome",
+                  "from": "wstopped",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 56,
+                  "artifactIndex": 57
+                },
+                "point": [
+                  236,
+                  2770
+                ]
+              },
+              {
+                "left": {
+                  "id": "lastfailed",
+                  "from": "next",
+                  "to": "wresult",
+                  "label": "선 처리 끝",
+                  "collectionIndex": 48,
+                  "artifactIndex": 49
+                },
+                "right": {
+                  "id": "manualhome",
+                  "from": "wstopped",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 56,
+                  "artifactIndex": 57
+                },
+                "point": [
+                  236,
+                  2770
+                ]
+              },
+              {
+                "left": {
+                  "id": "normal-next",
+                  "from": "retreat",
+                  "to": "approach",
+                  "label": "다음 선",
+                  "collectionIndex": 49,
+                  "artifactIndex": 50
+                },
+                "right": {
+                  "id": "wfail",
+                  "from": "welding",
+                  "to": "werror",
+                  "label": "전체 실패",
+                  "collectionIndex": 53,
+                  "artifactIndex": 54
+                },
+                "point": [
+                  535,
+                  2397
+                ]
+              },
+              {
+                "left": {
+                  "id": "wfail",
+                  "from": "welding",
+                  "to": "werror",
+                  "label": "전체 실패",
+                  "collectionIndex": 53,
+                  "artifactIndex": 54
+                },
+                "right": {
+                  "id": "whomefail",
+                  "from": "weldhome",
+                  "to": "werror",
+                  "label": "홈 실패 · 발행 유지",
+                  "collectionIndex": 54,
+                  "artifactIndex": 55
+                },
+                "point": [
+                  602,
+                  2960
+                ],
+                "sharedNode": "werror"
+              },
+              {
+                "left": {
+                  "id": "manualhome",
+                  "from": "wstopped",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 56,
+                  "artifactIndex": 57
+                },
+                "right": {
+                  "id": "wstoperror-end",
+                  "from": "wstoperror",
+                  "to": "end",
+                  "label": "명령 실패 종료",
+                  "collectionIndex": 64,
+                  "artifactIndex": 65
+                },
+                "point": [
+                  236,
+                  3050
+                ]
+              },
+              {
+                "left": {
+                  "id": "manualhomeerror",
+                  "from": "werror",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 57,
+                  "artifactIndex": 58
+                },
+                "right": {
+                  "id": "wstoperror-end",
+                  "from": "wstoperror",
+                  "to": "end",
+                  "label": "명령 실패 종료",
+                  "collectionIndex": 64,
+                  "artifactIndex": 65
+                },
+                "point": [
+                  282,
+                  3473
+                ]
+              },
+              {
+                "left": {
+                  "id": "mhomefailure",
+                  "from": "mhome",
+                  "to": "werror",
+                  "label": "HOME 실패 → ERROR",
+                  "collectionIndex": 60,
+                  "artifactIndex": 61
+                },
+                "right": {
+                  "id": "wstoperror-end",
+                  "from": "wstoperror",
+                  "to": "end",
+                  "label": "명령 실패 종료",
+                  "collectionIndex": 64,
+                  "artifactIndex": 65
+                },
+                "point": [
+                  282,
+                  3487
+                ]
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "edgewait",
+                  "from": "edge",
+                  "to": "edge",
+                  "label": "미완료: 다음 방향",
+                  "collectionIndex": 19,
+                  "artifactIndex": 20
+                },
+                "bends": 3,
+                "stretch": 1.619
+              },
+              {
+                "relationship": {
+                  "id": "contactwait",
+                  "from": "top",
+                  "to": "top",
+                  "label": "event_id 대기 / 제한 시간",
+                  "collectionIndex": 20,
+                  "artifactIndex": 21
+                },
+                "bends": 3,
+                "stretch": 1.592
+              },
+              {
+                "relationship": {
+                  "id": "stopfail",
+                  "from": "stop",
+                  "to": "error",
+                  "label": "확인 실패 407 / 재개 단계 삭제",
+                  "collectionIndex": 23,
+                  "artifactIndex": 24
+                },
+                "bends": 4,
+                "stretch": 1.614,
+                "directCorridorBlockers": [
+                  {
+                    "id": "stopped",
+                    "label": "스캔 STOPPED",
+                    "box": [
+                      672,
+                      1010,
+                      180,
+                      100
+                    ]
+                  }
+                ]
+              },
+              {
+                "relationship": {
+                  "id": "stoppedresume",
+                  "from": "stopped",
+                  "to": "rg",
+                  "label": "수동 RESUME",
+                  "collectionIndex": 27,
+                  "artifactIndex": 28
+                },
+                "bends": 4,
+                "stretch": 1.957
+              },
+              {
+                "relationship": {
+                  "id": "safe-retry",
+                  "from": "retry",
+                  "to": "retry",
+                  "label": "미확인 + timeout + 주기",
+                  "collectionIndex": 36,
+                  "artifactIndex": 37
+                },
+                "bends": 4,
+                "stretch": 2.196
+              },
+              {
+                "relationship": {
+                  "id": "unknown",
+                  "from": "tip",
+                  "to": "werror",
+                  "label": "팁 위치 모름",
+                  "collectionIndex": 43,
+                  "artifactIndex": 44
+                },
+                "bends": 3,
+                "stretch": 1.061
+              },
+              {
+                "relationship": {
+                  "id": "safeheight",
+                  "from": "tip",
+                  "to": "next",
+                  "label": "안전 높이 이상 / 이동 없음",
+                  "collectionIndex": 44,
+                  "artifactIndex": 45
+                },
+                "bends": 3,
+                "stretch": 1.099
+              },
+              {
+                "relationship": {
+                  "id": "normal-next",
+                  "from": "retreat",
+                  "to": "approach",
+                  "label": "다음 선",
+                  "collectionIndex": 49,
+                  "artifactIndex": 50
+                },
+                "bends": 4,
+                "stretch": 1.614,
+                "directCorridorBlockers": [
+                  {
+                    "id": "welding",
+                    "label": "WELDING",
+                    "box": [
+                      352,
+                      2340,
+                      180,
+                      100
+                    ]
+                  }
+                ]
+              },
+              {
+                "relationship": {
+                  "id": "manualhome",
+                  "from": "wstopped",
+                  "to": "mhome",
+                  "label": "수동 HOME",
+                  "collectionIndex": 56,
+                  "artifactIndex": 57
+                },
+                "bends": 3,
+                "stretch": 1.051,
+                "directCorridorBlockers": [
+                  {
+                    "id": "wstoperror",
+                    "label": "용접 ERROR",
+                    "box": [
+                      32,
+                      3000,
+                      180,
+                      100
+                    ]
+                  }
+                ]
+              },
+              {
+                "relationship": {
+                  "id": "scan-home-success",
+                  "from": "scanmhome",
+                  "to": "scanrest",
+                  "label": "성공 → HOME 전 상태",
+                  "collectionIndex": 62,
+                  "artifactIndex": 63
+                },
+                "bends": 4,
+                "stretch": 1.786,
+                "directCorridorBlockers": [
+                  {
+                    "id": "rreject",
+                    "label": "재개 요청 거절",
+                    "box": [
+                      940,
+                      1390,
+                      180,
+                      100
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": false,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "legacy-930",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 930,
+            "actualBudgetPx": 930,
+            "limit": "legacy",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": false,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "boundary",
+              "id": null
+            },
+            "minimumSourceTextPx": 9,
+            "minimumProjectedTextPx": 7.063291139240506,
+            "semanticTextCount": 100
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "01a7228c-6bcb-419e-8cdc-cbe2ff98102d"
+      }
+    },
+    "browser-check": {
+      "status": "skipped",
+      "exitCode": 2,
+      "durationMs": 16,
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/workspace/scratch/29663fd5a592/archify/archify/bin/archify.mjs",
+        "browser-check",
+        "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "skipped",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "01a7228c-6bcb-419e-8cdc-cbe2ff98102d",
+        "artifact": {
+          "path": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html",
+          "sha256": "5b978c245a5b60da870b410973509d782f50f9181a3abab242575ddbd40c1181",
+          "bytes": 864948
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "unavailable",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/chrome-unavailable",
+            "severity": "warning",
+            "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+            "subject": {
+              "artifact": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html"
+            },
+            "evidence": {
+              "executable": null
+            },
+            "supportedFixes": [
+              "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "skipped",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "readability": {
+          "status": "skipped",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "04_flow.browser-check.json",
+          "files": []
+        },
+        "error": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path."
+      }
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/workspace/scratch/29663fd5a592/no-copy/04_flow.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/workspace/scratch/29663fd5a592/no-copy/04_flow.finalize.json",
+    "summaryReceipt": "/workspace/scratch/29663fd5a592/no-copy/04_flow.finalize-summary.json",
+    "browserCheckReceipt": "/workspace/scratch/29663fd5a592/no-copy/04_flow.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-05T10:05:26.203Z",
+  "durationMs": 2082,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  }
+}
