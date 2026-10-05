@@ -64,7 +64,7 @@
 
 ### 구현 아키텍처 · Archify
 
-실행 코드와 DB 스키마를 기준으로 정리한 네 가지 도면입니다. **각 이미지를 클릭하면 해당 Archify 인터랙티브 뷰어가 열립니다.**
+실행 코드와 DB 스키마를 기준으로 정리한 네 가지 도면입니다. 이미지를 누르면 해당 도면이 열립니다.
 
 **[전체 아키텍처 사이트](https://rokey-cobot1-weld-made.netlify.app/)** · [시스템](#1-시스템-아키텍쳐) · [ROS 2 통신](#2-ros-2-통신-아키텍쳐) · [공정 흐름](#3-전체-공정-플로우차트) · [ERD](#4-erd)
 
@@ -76,15 +76,11 @@
 
 Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를 보여줍니다. MQTT와 ROS 2를 통한 제어·상태 전달 경로를 정리했습니다.
 
-[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/01_system.html) · [원본 SVG](./docs/architecture/01_system.svg)
-
 #### 2. ROS 2 통신 아키텍쳐
 
 [![Archify ROS 2 통신 아키텍쳐 — 노드 간 토픽·서비스·액션](./docs/architecture/02_ros2.png)](https://rokey-cobot1-weld-made.netlify.app/02_ros2.html)
 
 노드 간 토픽·서비스·액션의 이름과 타입, 송수신 방향을 보여줍니다. 모션 실행·접촉 판정·안전 감시·MQTT 중계 관계를 확인할 수 있습니다.
-
-[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/02_ros2.html) · [원본 SVG](./docs/architecture/02_ros2.svg)
 
 #### 3. 전체 공정 플로우차트
 
@@ -94,8 +90,6 @@ Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를
 
 접촉 스캔과 용접 경로 실행의 상태 전이를 보여줍니다. 요청 거절·실패·정지·재개·수동 HOME 분기를 포함하며, 실제 용접 전원 제어와는 구분합니다.
 
-[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/04_flow.html) · [원본 SVG](./docs/architecture/04_flow.svg)
-
 추가 문서: [03 동작 순서도](./docs/deliverables/03-flowchart.md) · [08 예외 · 오류 리스트](./docs/deliverables/08-exceptions.md)
 
 #### 4. ERD
@@ -103,8 +97,6 @@ Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를
 [![Archify ERD — 7개 테이블·71개 컬럼과 데이터 관계](./docs/architecture/03_erd.png)](https://rokey-cobot1-weld-made.netlify.app/03_erd.html)
 
 실제 초기화 SQL의 7개 테이블·71개 컬럼과 관계를 보여줍니다. PK·FK·UNIQUE·NULL·기본값·ON DELETE 정책과 카디널리티를 표시했습니다.
-
-[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/03_erd.html) · [원본 SVG](./docs/architecture/03_erd.svg)
 
 ## 개발 환경
 
