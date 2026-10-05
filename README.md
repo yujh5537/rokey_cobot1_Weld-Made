@@ -6,6 +6,34 @@
 
 > 두산로보틱스 지능형 로보틱스 엔지니어 · 협동-1 프로젝트 "ROS2를 활용한 로봇 자동화 공정 시스템 구현" · TEAM C-3조 **weld-made** (박병후 · 김학민 · 남현지 · 정의석, 멘토 이일주) · 2026-09-14 ~ 09-30
 
+## 시연 영상
+
+실제 M0609 동작과 웹 3D 관제 화면을 함께 확인할 수 있습니다. 아래 제목을 클릭하면 저장소의 원본 영상으로 이동합니다.
+
+### 실물·웹 통합 시연
+
+**[통합 시연 영상 보기](./docs/demonstration-video/통합.webm)** · 3분 39초  
+실물 로봇과 웹 관제 화면을 나란히 배치해 접촉 탐색과 용접 경로 추종을 함께 보여줍니다.
+
+<!-- GIF 교체 위치: 통합 시연. GIF를 추가할 때 이미지의 링크 대상은 위 원본 영상 경로를 유지합니다. -->
+
+| 실제 로봇 공정 | 웹 3D 관제 |
+|---|---|
+| [실물 시연 영상 보기](./docs/demonstration-video/전체시연통합.webm) · 3분 18초 | [관제 시연 영상 보기](./docs/demonstration-video/관제통합.webm) · 3분 15초 |
+| 로봇·시편·관제 모니터를 함께 촬영한 접촉 탐색과 경로 추종 과정입니다. | 탐색 진행 상태, 탐침 위치, 측정 결과와 선별 경로 실행 화면입니다. |
+
+<!-- GIF 교체 위치: 위 표의 각 영상 링크 앞에 해당 원본 영상을 링크 대상으로 하는 GIF 미리보기를 넣습니다. -->
+
+<details>
+<summary><b>시스템 실행 준비 영상</b></summary>
+
+**[실행 준비 영상 보기](./docs/demonstration-video/터미널x4.mp4)** · 28초 · 4배속  
+빌드부터 Docker 서비스, 로봇 드라이버, ROS 2 노드와 프런트엔드 기동까지 보여줍니다.
+
+<!-- GIF 교체 위치: 실행 준비. 원본이 이미 4배속이므로 추가 배속 없이 미리보기를 넣습니다. -->
+
+</details>
+
 ## 주요 기능
 
 - **티칭 없는 접촉 탐색**: 부재를 놓고 웹의 시작 버튼만 누른다. 수직 하강으로 윗면 높이 1점, 네 방향 스텝 밀기로 모서리 4점을 얻는다. 큐브 위치 · 크기를 입력하지 않는다.
@@ -33,6 +61,46 @@
 | 로봇 셀 | 두산 M0609 + OnRobot RG2 + 탐침, 컨트롤러 DRCF | 제공 드라이버(`dsr_controller2` · `onrobot_driver`)는 수정하지 않는다 |
 
 노드별 연결은 [06 ROS2 노드 구조도](docs/deliverables/06-node-graph.md), 타입 전문은 [05 인터페이스 정의서](docs/deliverables/05-interfaces.md)와 [`docs/contracts/`](docs/contracts/)에 있다.
+
+### 구현 아키텍처 · Archify
+
+실행 코드와 DB 스키마를 기준으로 정리한 네 가지 도면입니다. **각 이미지를 클릭하면 해당 Archify 인터랙티브 뷰어가 열립니다.**
+
+**[전체 아키텍처 사이트](https://rokey-cobot1-weld-made.netlify.app/)** · [시스템](#1-시스템-아키텍쳐) · [ROS 2 통신](#2-ros-2-통신-아키텍쳐) · [공정 흐름](#3-전체-공정-플로우차트) · [ERD](#4-erd)
+
+분석 기준: 프로젝트 커밋 `8933b739ee43294605e57dca07625bad2f9e8ca4`. 확인되지 않은 외부 연결은 구현된 경로로 표시하지 않았습니다.
+
+#### 1. 시스템 아키텍쳐
+
+[![Archify 시스템 아키텍쳐 — Web PC·Main PC·외부 로봇 컨트롤러](./docs/architecture/01_system.png)](https://rokey-cobot1-weld-made.netlify.app/01_system.html)
+
+Web PC·Main PC·외부 로봇 컨트롤러의 실행 영역과 구성 요소를 보여줍니다. MQTT와 ROS 2를 통한 제어·상태 전달 경로를 정리했습니다.
+
+[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/01_system.html) · [원본 SVG](./docs/architecture/01_system.svg)
+
+#### 2. ROS 2 통신 아키텍쳐
+
+[![Archify ROS 2 통신 아키텍쳐 — 노드 간 토픽·서비스·액션](./docs/architecture/02_ros2.png)](https://rokey-cobot1-weld-made.netlify.app/02_ros2.html)
+
+노드 간 토픽·서비스·액션의 이름과 타입, 송수신 방향을 보여줍니다. 모션 실행·접촉 판정·안전 감시·MQTT 중계 관계를 확인할 수 있습니다.
+
+[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/02_ros2.html) · [원본 SVG](./docs/architecture/02_ros2.svg)
+
+#### 3. 전체 공정 플로우차트
+
+[![Archify 전체 공정 플로우차트 — 스캔·용접 경로 실행과 예외 분기](./docs/architecture/04_flow.png)](https://rokey-cobot1-weld-made.netlify.app/04_flow.html)
+
+접촉 스캔과 용접 경로 실행의 상태 전이를 보여줍니다. 요청 거절·실패·정지·재개·수동 HOME 분기를 포함하며, 실제 용접 전원 제어와는 구분합니다.
+
+[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/04_flow.html) · [원본 SVG](./docs/architecture/04_flow.svg)
+
+#### 4. ERD
+
+[![Archify ERD — 7개 테이블·71개 컬럼과 데이터 관계](./docs/architecture/03_erd.png)](https://rokey-cobot1-weld-made.netlify.app/03_erd.html)
+
+실제 초기화 SQL의 7개 테이블·71개 컬럼과 관계를 보여줍니다. PK·FK·UNIQUE·NULL·기본값·ON DELETE 정책과 카디널리티를 표시했습니다.
+
+[인터랙티브 보기](https://rokey-cobot1-weld-made.netlify.app/03_erd.html) · [원본 SVG](./docs/architecture/03_erd.svg)
 
 ### 동작 흐름
 
