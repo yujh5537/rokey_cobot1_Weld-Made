@@ -27,54 +27,41 @@
   <tr>
     <td align="center" width="50%">
       <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
-        <img
-          src="./docs/demonstration-video/전체시연통합.gif"
-          alt="실제 로봇 공정 GIF"
-          width="100%"
-        >
+        <img src="./docs/demonstration-video/전체시연통합.gif"
+             alt="실제 로봇 공정 GIF"
+             width="100%">
       </a>
     </td>
     <td align="center" width="50%">
       <a href="./docs/demonstration-video/관제통합-5x.webm">
-        <img
-          src="./docs/demonstration-video/관제통합.gif"
-          alt="웹 3D 관제 GIF"
-          width="100%"
-        >
+        <img src="./docs/demonstration-video/관제통합.gif"
+             alt="웹 3D 관제 GIF"
+             width="100%">
       </a>
     </td>
   </tr>
 
   <tr>
-    <td align="center">
+    <td align="center" width="50%">
       <b>실제 로봇 공정</b><br>
       M0609 접촉 탐색 · 용접 경로 추종
     </td>
-    <td align="center">
+    <td align="center" width="50%">
       <b>웹 3D 관제</b><br>
       탐색 상태 · 측정 결과 · 경로 실행 모니터링
     </td>
   </tr>
 
   <tr>
-    <td align="center">
-      <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
-        5배속 영상 보기
-      </a>
+    <td align="center" width="50%">
+      <a href="./docs/demonstration-video/전체시연통합-5x.mp4">5배속 영상 보기</a>
       ·
-      <a href="./docs/demonstration-video/전체시연통합.webm">
-        원본
-      </a>
+      <a href="./docs/demonstration-video/전체시연통합.webm">원본</a>
     </td>
-
-    <td align="center">
-      <a href="./docs/demonstration-video/관제통합-5x.webm">
-        5배속 영상 보기
-      </a>
+    <td align="center" width="50%">
+      <a href="./docs/demonstration-video/관제통합-5x.webm">5배속 영상 보기</a>
       ·
-      <a href="./docs/demonstration-video/관제통합.webm">
-        원본
-      </a>
+      <a href="./docs/demonstration-video/관제통합.webm">원본</a>
     </td>
   </tr>
 </table>
