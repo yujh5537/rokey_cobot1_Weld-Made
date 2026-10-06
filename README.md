@@ -68,14 +68,34 @@
 
 ### 시스템 실행 준비 영상
 
-<div align="center">
-  <a href="./docs/demonstration-video/터미널x4.mp4">
-    <img src="./docs/demonstration-video/터미널x4.gif" alt="터미널 실행 준비 GIF — 클릭하면 원본 영상 재생" width="720">
-  </a>
-</div>
+<details>
+  <summary><b>시스템 실행 준비 영상</b></summary>
 
-<p align="center"><b><a href="./docs/demonstration-video/터미널x4.mp4">실행 준비 영상 보기</a></b> · 28초 · 4배속</p>
-<p align="center">빌드부터 Docker 서비스, 로봇 드라이버, ROS 2 노드와 프런트엔드 기동까지 보여준다.</p>
+  <br>
+
+  <div align="center">
+    <a href="./docs/demonstration-video/터미널x4.mp4">
+      <img
+        src="./docs/demonstration-video/터미널x4.gif"
+        alt="터미널 실행 준비 GIF"
+        width="720"
+      >
+    </a>
+  </div>
+
+  <p align="center">
+    <b>
+      <a href="./docs/demonstration-video/터미널x4.mp4">
+        실행 준비 영상 보기
+      </a>
+    </b>
+    · 28초 · 4배속
+  </p>
+
+  <p align="center">
+    빌드부터 Docker 서비스, 로봇 드라이버, ROS 2 노드와 프런트엔드 기동까지 보여준다.
+  </p>
+</details>
 
 ## 주요 기능
 
