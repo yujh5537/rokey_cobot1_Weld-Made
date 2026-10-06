@@ -21,27 +21,63 @@
 <p align="center"><b><a href="./docs/demonstration-video/통합-5x.mp4">통합 5배속 영상 보기</a></b> · <a href="./docs/demonstration-video/통합.webm">전체 길이 원본</a></p>
 <p align="center">실제 M0609와 웹 관제 화면을 함께 보여주는 통합 시연이다.</p>
 
-### 실제 로봇 공정
+### 실제 로봇 공정 · 웹 3D 관제
 
-<div align="center">
-  <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
-    <img src="./docs/demonstration-video/전체시연통합.gif" alt="실제 로봇 공정 GIF — 클릭하면 5배속 영상 재생" width="720">
-  </a>
-</div>
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
+        <img
+          src="./docs/demonstration-video/전체시연통합.gif"
+          alt="실제 로봇 공정 GIF"
+          width="100%"
+        >
+      </a>
+    </td>
+    <td align="center" width="50%">
+      <a href="./docs/demonstration-video/관제통합-5x.webm">
+        <img
+          src="./docs/demonstration-video/관제통합.gif"
+          alt="웹 3D 관제 GIF"
+          width="100%"
+        >
+      </a>
+    </td>
+  </tr>
 
-<p align="center"><b><a href="./docs/demonstration-video/전체시연통합-5x.mp4">실제 로봇 공정 5배속 영상 보기</a></b> · <a href="./docs/demonstration-video/전체시연통합.webm">전체 길이 원본</a></p>
-<p align="center">실제 M0609의 접촉 탐색과 용접 경로 추종 과정을 보여준다.</p>
+  <tr>
+    <td align="center">
+      <b>실제 로봇 공정</b><br>
+      M0609 접촉 탐색 · 용접 경로 추종
+    </td>
+    <td align="center">
+      <b>웹 3D 관제</b><br>
+      탐색 상태 · 측정 결과 · 경로 실행 모니터링
+    </td>
+  </tr>
 
-### 웹 3D 관제
+  <tr>
+    <td align="center">
+      <a href="./docs/demonstration-video/전체시연통합-5x.mp4">
+        5배속 영상 보기
+      </a>
+      ·
+      <a href="./docs/demonstration-video/전체시연통합.webm">
+        원본
+      </a>
+    </td>
 
-<div align="center">
-  <a href="./docs/demonstration-video/관제통합-5x.webm">
-    <img src="./docs/demonstration-video/관제통합.gif" alt="웹 3D 관제 GIF — 클릭하면 5배속 영상 재생" width="720">
-  </a>
-</div>
-
-<p align="center"><b><a href="./docs/demonstration-video/관제통합-5x.webm">웹 3D 관제 5배속 영상 보기</a></b> · <a href="./docs/demonstration-video/관제통합.webm">전체 길이 원본</a></p>
-<p align="center">탐색 진행 상태, 탐침 위치, 측정 결과와 선별 경로 실행 화면이다.</p>
+    <td align="center">
+      <a href="./docs/demonstration-video/관제통합-5x.webm">
+        5배속 영상 보기
+      </a>
+      ·
+      <a href="./docs/demonstration-video/관제통합.webm">
+        원본
+      </a>
+    </td>
+  </tr>
+</table>
 
 ### 시스템 실행 준비 영상
 
